@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, Zap, Target, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, CheckCircle2, Bot, CalendarCheck } from "lucide-react";
+import { Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot, CalendarCheck } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -400,5 +400,3 @@ function MobileStickyBar() {
   );
 }
 
-// unused but kept for potential reuse
-export const _unused = CheckCircle2 && Target;
