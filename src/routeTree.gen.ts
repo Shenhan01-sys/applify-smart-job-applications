@@ -9,10 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SkillRadarRouteImport } from './routes/skill-radar'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BlindModeRouteImport } from './routes/blind-mode'
+import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SkillRadarRoute = SkillRadarRouteImport.update({
+  id: '/skill-radar',
+  path: '/skill-radar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -23,6 +43,16 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlindModeRoute = BlindModeRouteImport.update({
+  id: '/blind-mode',
+  path: '/blind-mode',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApplicationsRoute = ApplicationsRouteImport.update({
+  id: '/applications',
+  path: '/applications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,36 +61,102 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
+  '/skill-radar': typeof SkillRadarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
+  '/skill-radar': typeof SkillRadarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRoute
+  '/skill-radar': typeof SkillRadarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/jobs'
+  fullPaths:
+    | '/'
+    | '/applications'
+    | '/blind-mode'
+    | '/dashboard'
+    | '/jobs'
+    | '/profile'
+    | '/settings'
+    | '/skill-radar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/jobs'
-  id: '__root__' | '/' | '/dashboard' | '/jobs'
+  to:
+    | '/'
+    | '/applications'
+    | '/blind-mode'
+    | '/dashboard'
+    | '/jobs'
+    | '/profile'
+    | '/settings'
+    | '/skill-radar'
+  id:
+    | '__root__'
+    | '/'
+    | '/applications'
+    | '/blind-mode'
+    | '/dashboard'
+    | '/jobs'
+    | '/profile'
+    | '/settings'
+    | '/skill-radar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApplicationsRoute: typeof ApplicationsRoute
+  BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
   JobsRoute: typeof JobsRoute
+  ProfileRoute: typeof ProfileRoute
+  SettingsRoute: typeof SettingsRoute
+  SkillRadarRoute: typeof SkillRadarRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/skill-radar': {
+      id: '/skill-radar'
+      path: '/skill-radar'
+      fullPath: '/skill-radar'
+      preLoaderRoute: typeof SkillRadarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs': {
       id: '/jobs'
       path: '/jobs'
@@ -75,6 +171,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blind-mode': {
+      id: '/blind-mode'
+      path: '/blind-mode'
+      fullPath: '/blind-mode'
+      preLoaderRoute: typeof BlindModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/applications': {
+      id: '/applications'
+      path: '/applications'
+      fullPath: '/applications'
+      preLoaderRoute: typeof ApplicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,8 +197,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApplicationsRoute: ApplicationsRoute,
+  BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
   JobsRoute: JobsRoute,
+  ProfileRoute: ProfileRoute,
+  SettingsRoute: SettingsRoute,
+  SkillRadarRoute: SkillRadarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
