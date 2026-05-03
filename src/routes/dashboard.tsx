@@ -25,21 +25,21 @@ const activity = [
 ];
 
 const platformColor: Record<string, string> = {
-  LinkedIn: "bg-[#0A66C2]/15 text-[#5BA0FF] border-[#0A66C2]/30",
-  Jobstreet: "bg-[#E8192C]/15 text-[#FF6B7A] border-[#E8192C]/30",
-  Glints: "bg-[#0BD461]/15 text-[#3DEA8A] border-[#0BD461]/30",
-  KitaLulus: "bg-[#FF6B00]/15 text-[#FFA866] border-[#FF6B00]/30",
-  Kalibrr: "bg-[#2563EB]/15 text-[#7AA8FF] border-[#2563EB]/30",
-  Dealls: "bg-[#6366F1]/15 text-[#9DA0FF] border-[#6366F1]/30",
-  Facebook: "bg-[#1877F2]/15 text-[#6BA8FF] border-[#1877F2]/30",
+  LinkedIn: "bg-[#0A66C2] text-white border-[#0A66C2]",
+  Jobstreet: "bg-[#E8192C] text-white border-[#E8192C]",
+  Glints: "bg-[#0BD461] text-[#161616] border-[#0BD461]",
+  KitaLulus: "bg-[#FF6B00] text-white border-[#FF6B00]",
+  Kalibrr: "bg-[#2563EB] text-white border-[#2563EB]",
+  Dealls: "bg-[#6366F1] text-white border-[#6366F1]",
+  Facebook: "bg-[#1877F2] text-white border-[#1877F2]",
 };
 
 const statusBadge: Record<string, string> = {
-  Terkirim: "bg-primary/15 text-primary border-primary/30",
-  "ATS Lolos": "bg-teal/15 text-teal border-teal/30",
-  Callback: "bg-gold/15 text-gold border-gold/30",
-  Manual: "bg-warm/15 text-warm border-warm/30",
-  Ditolak: "bg-danger/15 text-danger border-danger/30",
+  Terkirim: "bg-[#0367FC] text-white border-[#0367FC]",
+  "ATS Lolos": "bg-[#D2F801] text-[#161616] border-[#D2F801]",
+  Callback: "bg-[#161616] text-white border-[#161616]",
+  Manual: "bg-[#F0F0F0] text-[#161616] border-[#E0E0E0]",
+  Ditolak: "bg-[#DC2626] text-white border-[#DC2626]",
 };
 
 function DashboardPage() {
@@ -64,18 +64,18 @@ function DashboardPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {["Semua", "Terkirim", "Callback", "Ditolak", "Manual"].map((f, i) => (
-              <button key={f} className={`text-xs px-3 py-1.5 rounded-full border ${i===0?'gradient-primary text-white border-transparent':'border-white/10 bg-white/5 text-muted-foreground hover:text-foreground'}`}>{f}</button>
+              <button key={f} className={`text-xs px-3 py-1.5 rounded-full border ${i===0?'gradient-primary text-white border-transparent':'border-black/[8%] bg-black/[4%] text-muted-foreground hover:text-foreground'}`}>{f}</button>
             ))}
           </div>
         </div>
-        <ul className="mt-5 divide-y divide-white/5">
+        <ul className="mt-5 divide-y divide-black/[5%]">
           {activity.map((a, i) => (
-            <li key={i} className="py-3 flex items-center gap-3 hover:bg-white/[0.02] -mx-2 px-2 rounded-lg transition">
+            <li key={i} className="py-3 flex items-center gap-3 hover:bg-black/[2%] -mx-2 px-2 rounded-lg transition">
               <div className="h-10 w-10 rounded-lg gradient-primary grid place-items-center text-white text-sm font-bold shrink-0">{a.c[0]}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-sm truncate">{a.c}</p>
-                  {a.golden && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-warm/15 text-warm border border-warm/40 animate-pulse-glow">⚡ Golden</span>}
+                  {a.golden && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#D2F801] text-[#161616] border-[#D2F801]">⚡ Golden</span>}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{a.r}</p>
               </div>
@@ -96,7 +96,7 @@ function DashboardPage() {
             <h2 className="text-lg font-semibold">ATS Intelligence</h2>
             <p className="text-xs text-muted-foreground">Berdasarkan 12.400+ data lamaran komunitas</p>
           </div>
-          <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-teal/15 text-teal border border-teal/30">Live</span>
+          <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-[#D2F801] text-[#161616] border-[#D2F801]">Live</span>
         </div>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-sm min-w-[520px]">
@@ -116,12 +116,12 @@ function DashboardPage() {
                 ["BCA Digital","SAP SuccessFactors",68,"+ regulatori OJK"],
                 ["Traveloka","Workday",81,"+ system design"],
               ].map(([c,a,m,t]) => (
-                <tr key={c as string} className="border-t border-white/5">
+                <tr key={c as string} className="border-t border-black/[5%]">
                   <td className="py-3 pr-4 font-medium">{c}</td>
                   <td className="py-3 pr-4 text-muted-foreground font-mono text-xs">{a}</td>
                   <td className="py-3 pr-4 w-[40%]">
                     <div className="flex items-center gap-3">
-                      <div className="h-1.5 flex-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-1.5 flex-1 bg-black/[5%] rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${(m as number)>=80?'gradient-success':(m as number)>=60?'gradient-primary':'gradient-warm'}`} style={{width:`${m}%`}}/>
                       </div>
                       <span className="font-mono text-xs font-bold w-10 text-right">{m as number}%</span>
@@ -145,13 +145,13 @@ function StatCard({ label, value, suffix, target, icon: Icon, tone, delta, delay
   return (
     <div className="glass rounded-2xl p-4 md:p-5 hover:scale-[1.02] transition group" style={{animation:`fade-up .5s both ${delay}ms`}}>
       <div className="flex items-start justify-between">
-        <div className={`h-9 w-9 rounded-lg grid place-items-center bg-white/5 border border-white/10 ${color}`}><Icon className="h-4 w-4" /></div>
+        <div className={`h-9 w-9 rounded-lg grid place-items-center bg-black/[4%] border border-black/[8%] ${color}`}><Icon className="h-4 w-4" /></div>
         <span className="text-[10px] uppercase tracking-wider text-teal font-mono flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{delta}</span>
       </div>
       <p className="mt-4 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
       <p className={`font-mono text-2xl md:text-3xl font-bold mt-1 ${color} transition-all`}>{Math.round(n)}{suffix}</p>
       {target && (
-        <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+        <div className="mt-3 h-1 bg-black/[5%] rounded-full overflow-hidden">
           <div className="h-full gradient-primary rounded-full transition-all duration-1000" style={{width:`${(value/target)*100}%`}}/>
         </div>
       )}
@@ -186,7 +186,7 @@ function RightPanel() {
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-2">
-          <div className="h-8 w-8 rounded-lg gradient-warm grid place-items-center"><Award className="h-4 w-4 text-white" /></div>
+          <div className="h-8 w-8 rounded-lg gradient-warm grid place-items-center"><Award className="h-4 w-4 text-[#161616]" /></div>
           <p className="text-xs uppercase tracking-wider text-warm font-semibold">Skill Gap Alert</p>
         </div>
         <p className="text-sm font-semibold leading-snug"><span className="font-mono text-warm">FastAPI</span> trending <span className="text-teal">+171%</span> minggu ini di posisi Backend.</p>
@@ -198,7 +198,7 @@ function RightPanel() {
           <span>Kuota Bulan Ini</span>
           <span className="font-mono"><span className="text-foreground font-bold">67</span> / 100</span>
         </div>
-        <div className="mt-2 h-2 bg-white/5 rounded-full overflow-hidden">
+        <div className="mt-2 h-2 bg-black/[5%] rounded-full overflow-hidden">
           <div className="h-full gradient-primary rounded-full" style={{width:'67%'}}/>
         </div>
         <button className="mt-3 w-full h-9 rounded-lg gradient-primary text-white text-xs font-semibold glow-primary">Upgrade ke Annual</button>

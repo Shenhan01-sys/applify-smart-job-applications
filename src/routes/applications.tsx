@@ -31,11 +31,11 @@ const cols = [
 ];
 
 const colorMap: Record<string, string> = {
-  primary: "border-primary/30 bg-primary/10 text-primary",
-  teal: "border-teal/30 bg-teal/10 text-teal",
-  violet: "border-violet/30 bg-violet/10 text-violet",
-  gold: "border-gold/30 bg-gold/10 text-gold",
-  warm: "border-warm/30 bg-warm/10 text-warm",
+  primary: "border-[#0367FC] bg-[#0367FC] text-white",
+  teal: "border-[#D2F801] bg-[#D2F801] text-[#161616]",
+  violet: "border-[#161616] bg-[#161616] text-white",
+  gold: "border-[#D2F801] bg-[#D2F801] text-[#161616]",
+  warm: "border-[#D2F801] bg-[#D2F801] text-[#161616]",
 };
 
 function AppsPage() {
@@ -48,8 +48,8 @@ function AppsPage() {
           <p className="text-muted-foreground text-sm mt-1">Lacak setiap lamaran dari kirim sampai offer.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={()=>setView('kanban')} className={`hidden md:inline-flex h-10 px-3 rounded-lg items-center gap-2 text-sm border ${view==='kanban'?'gradient-primary text-white border-transparent':'border-white/10 bg-white/5'}`}><LayoutGrid className="h-4 w-4"/> Kanban</button>
-          <button onClick={()=>setView('list')} className={`h-10 px-3 rounded-lg inline-flex items-center gap-2 text-sm border ${view==='list'?'gradient-primary text-white border-transparent':'border-white/10 bg-white/5'}`}><List className="h-4 w-4"/> List</button>
+          <button onClick={()=>setView('kanban')} className={`hidden md:inline-flex h-10 px-3 rounded-lg items-center gap-2 text-sm border ${view==='kanban'?'gradient-primary text-white border-transparent':'border-black/[8%] bg-black/[4%]'}`}><LayoutGrid className="h-4 w-4"/> Kanban</button>
+          <button onClick={()=>setView('list')} className={`h-10 px-3 rounded-lg inline-flex items-center gap-2 text-sm border ${view==='list'?'gradient-primary text-white border-transparent':'border-black/[8%] bg-black/[4%]'}`}><List className="h-4 w-4"/> List</button>
         </div>
       </header>
 
@@ -77,7 +77,7 @@ function AppsPage() {
               </div>
               <div className="mt-3 space-y-2">
                 {c.items.map((it, i) => (
-                  <div key={i} className="rounded-xl bg-white/[0.03] border border-white/5 p-3 cursor-grab hover:bg-white/[0.06] transition">
+                  <div key={i} className="rounded-xl bg-black/[3%] border border-black/[6%] p-3 cursor-grab hover:bg-black/[5%] transition">
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 rounded-md gradient-primary grid place-items-center text-white text-xs font-bold">{it.c[0]}</div>
                       <p className="text-sm font-semibold truncate">{it.c}</p>
@@ -96,7 +96,7 @@ function AppsPage() {
       <div className={view==='list' ? 'block' : 'md:hidden'}>
         <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 mb-3">
           {cols.map((c, i) => (
-            <button key={c.k} className={`shrink-0 text-xs px-3 py-1.5 rounded-full border whitespace-nowrap ${i===0?'gradient-primary text-white border-transparent':'border-white/10 bg-white/5 text-muted-foreground'}`}>{c.label} · {c.items.length}</button>
+            <button key={c.k} className={`shrink-0 text-xs px-3 py-1.5 rounded-full border whitespace-nowrap ${i===0?'gradient-primary text-white border-transparent':'border-black/[8%] bg-black/[4%] text-muted-foreground'}`}>{c.label} · {c.items.length}</button>
           ))}
         </div>
         <div className="space-y-2">

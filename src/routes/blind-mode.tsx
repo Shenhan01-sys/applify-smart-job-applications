@@ -7,7 +7,7 @@ export const Route = createFileRoute("/blind-mode")({
   component: () => (
     <AppShell>
       <div className="max-w-3xl">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-violet/15 text-violet border border-violet/40 px-3 py-1 text-xs font-bold"><EyeOff className="h-3.5 w-3.5"/> Blind Merit Mode</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#161616] text-white px-3 py-1 text-xs font-bold"><EyeOff className="h-3.5 w-3.5"/> Blind Merit Mode</span>
         <h1 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight">Biarkan skill berbicara <span className="text-gradient-primary">lebih dulu.</span></h1>
         <p className="mt-3 text-muted-foreground">Sembunyikan nama, kampus, dan latar belakang sosial dari resume kamu. Recruiter melihat skill dan pencapaian terlebih dahulu — identitas dibuka setelah shortlist.</p>
         <div className="mt-8 grid gap-4 md:grid-cols-3">

@@ -35,7 +35,7 @@ function SkillPage() {
           </div>
           <div className="mt-4 flex items-center justify-center gap-5 text-xs">
             <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-primary"/>Kamu</span>
-            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-white/30"/>Market Average</span>
+            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-[#161616]"/>Market Average</span>
           </div>
         </div>
 
@@ -48,7 +48,7 @@ function SkillPage() {
               const Icon = s.dir==='up'?TrendingUp:s.dir==='down'?TrendingDown:Minus;
               const color = s.dir==='up'?'text-teal':s.dir==='down'?'text-danger':'text-muted-foreground';
               return (
-                <li key={s.n} className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex items-center gap-3">
+                <li key={s.n} className="rounded-xl bg-black/[3%] border border-black/[6%] p-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm">{s.n}</p>
@@ -66,17 +66,16 @@ function SkillPage() {
 
       <section className="mt-6 grid gap-4 md:grid-cols-3">
         {[
-          { t: "FastAPI", impact: "+43% callback", g: "from-teal/20 to-primary/10", border: "border-teal/30" },
-          { t: "Kubernetes", impact: "+28% match rate", g: "from-primary/20 to-violet/10", border: "border-primary/30" },
-          { t: "System Design", impact: "+19% interview", g: "from-violet/20 to-warm/10", border: "border-violet/30" },
+          { t: "FastAPI", impact: "+43% callback", bg: "bg-[#D2F801]", txt: "text-[#161616]", sub: "text-[#444444]" },
+          { t: "Kubernetes", impact: "+28% match rate", bg: "bg-[#0367FC]", txt: "text-white", sub: "text-white/80" },
+          { t: "System Design", impact: "+19% interview", bg: "bg-[#161616]", txt: "text-white", sub: "text-white/70" },
         ].map((c) => (
-          <div key={c.t} className={`relative overflow-hidden rounded-2xl border ${c.border} p-5`}>
-            <div className={`absolute inset-0 bg-gradient-to-br ${c.g}`}/>
+          <div key={c.t} className={`relative overflow-hidden rounded-2xl ${c.bg} p-5`}>
             <div className="relative">
-              <Sparkles className="h-5 w-5 text-gold" />
-              <p className="mt-3 text-sm font-semibold">Tambahkan <span className="text-gradient-primary font-bold">{c.t}</span></p>
-              <p className="text-xs text-muted-foreground mt-1">Estimasi {c.impact}</p>
-              <button className="mt-4 text-xs font-semibold text-primary inline-flex items-center gap-1">Mulai belajar <ArrowUpRight className="h-3 w-3"/></button>
+              <Sparkles className={`h-5 w-5 ${c.txt}`} />
+              <p className={`mt-3 text-sm font-semibold ${c.txt}`}>Tambahkan <span className="font-bold">{c.t}</span></p>
+              <p className={`text-xs mt-1 ${c.sub}`}>Estimasi {c.impact}</p>
+              <button className={`mt-4 text-xs font-semibold inline-flex items-center gap-1 ${c.txt}`}>Mulai belajar <ArrowUpRight className="h-3 w-3"/></button>
             </div>
           </div>
         ))}
@@ -99,21 +98,15 @@ function RadarChart() {
 
   return (
     <svg viewBox="0 0 320 320" className="w-full max-w-[340px]">
-      <defs>
-        <linearGradient id="you" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#4F8EF7" stopOpacity="0.6"/>
-          <stop offset="100%" stopColor="#7C5CFC" stopOpacity="0.3"/>
-        </linearGradient>
-      </defs>
       {[1,0.75,0.5,0.25].map(s => (
-        <polygon key={s} points={path(axes.map(()=>s*100))} fill="none" stroke="rgba(255,255,255,0.06)"/>
+        <polygon key={s} points={path(axes.map(()=>s*100))} fill="none" stroke="rgba(0,0,0,0.05)"/>
       ))}
       {axes.map((_, i) => {
         const [x,y] = pt(100, i);
-        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.06)"/>;
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(0,0,0,0.05)"/>;
       })}
-      <polygon points={path(market)} fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.3)" strokeDasharray="4 4" strokeWidth="1.5"/>
-      <polygon points={path(you)} fill="url(#you)" stroke="#4F8EF7" strokeWidth="2"/>
+      <polygon points={path(market)} fill="rgba(0,0,0,0.04)" stroke="rgba(0,0,0,0.15)" strokeDasharray="4 4" strokeWidth="1.5"/>
+      <polygon points={path(you)} fill="#0367FC" fillOpacity="0.18" stroke="#0367FC" strokeWidth="2"/>
       {axes.map((label, i) => {
         const [x,y] = pt(118, i);
         return <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground" style={{fontSize:'11px'}}>{label}</text>;

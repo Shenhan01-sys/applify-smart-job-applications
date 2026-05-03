@@ -18,7 +18,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
   return (
     <div className="min-h-screen flex">
       {/* Sidebar — desktop */}
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-white/5 bg-card/40 px-4 py-5 sticky top-0 h-screen">
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-black/[6%] bg-card/80 px-4 py-5 sticky top-0 h-screen">
         <Link to="/" className="flex items-center gap-2 px-2">
           <div className="grid h-9 w-9 place-items-center rounded-lg gradient-primary text-white font-bold">A</div>
           <span className="text-lg font-bold">Applify</span>
@@ -34,7 +34,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
           {nav.map((it) => {
             const active = path === it.to;
             return (
-              <Link key={it.to} to={it.to as any} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'gradient-primary text-white shadow-md glow-primary' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'}`}>
+              <Link key={it.to} to={it.to as any} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'gradient-primary text-white shadow-md glow-primary' : 'text-muted-foreground hover:bg-black/[4%] hover:text-foreground'}`}>
                 <it.icon className="h-4 w-4" />
                 {it.label}
               </Link>
@@ -62,7 +62,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
           {children ?? <Outlet />}
         </div>
         {rightPanel && (
-          <aside className="hidden xl:block w-[320px] shrink-0 border-l border-white/5 bg-card/40 px-5 py-6">
+          <aside className="hidden xl:block w-[320px] shrink-0 border-l border-black/[6%] bg-card/80 px-5 py-6">
             {rightPanel}
           </aside>
         )}
@@ -75,10 +75,10 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
 
 function AgentToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
   return (
-    <button onClick={() => setOn(!on)} className={`mt-4 group rounded-xl border p-3 text-left transition ${on ? 'border-teal/30 bg-teal/5' : 'border-white/10 bg-white/5'}`}>
+    <button onClick={() => setOn(!on)} className={`mt-4 group rounded-xl border p-3 text-left transition ${on ? 'border-teal/30 bg-teal/5' : 'border-black/[8%] bg-black/[4%]'}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Status Agen</span>
-        <div className={`h-6 w-11 rounded-full transition relative ${on ? 'gradient-success' : 'bg-white/10'}`}>
+        <div className={`h-6 w-11 rounded-full transition relative ${on ? 'gradient-success' : 'bg-black/[8%]'}`}>
           <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
         </div>
       </div>
@@ -109,12 +109,12 @@ function MobileNav({ agentOn, setAgentOn }: { agentOn: boolean; setAgentOn: (v: 
     { to: "/profile", icon: User, label: "Profile" },
   ] as const;
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 glass-strong border-t border-white/10 px-2 pt-2 pb-3">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 glass-strong border-t border-black/[8%] px-2 pt-2 pb-3">
       <div className="relative grid grid-cols-5 gap-1">
         {items.slice(0,2).map((it) => <NavBtn key={it.to} {...it} active={path===it.to} />)}
         <button onClick={()=>setAgentOn(!agentOn)} className="flex flex-col items-center justify-center -mt-6">
-          <div className={`h-14 w-14 rounded-full grid place-items-center ${agentOn?'gradient-success glow-success':'bg-white/10 border border-white/20'}`}>
-            <Sparkles className="h-6 w-6 text-white" />
+          <div className={`h-14 w-14 rounded-full grid place-items-center ${agentOn?'gradient-success glow-success':'bg-black/[8%] border border-black/[12%]'}`}>
+            <Sparkles className={`h-6 w-6 ${agentOn ? 'text-[#161616]' : 'text-foreground'}`} />
           </div>
           <span className="text-[10px] mt-1 text-muted-foreground">{agentOn?'Agen ON':'Agen OFF'}</span>
         </button>
