@@ -1,0 +1,123 @@
+import { createFileRoute } from "@tanstack/react-router";
+import AppShell from "@/components/app/AppShell";
+import { TrendingUp, TrendingDown, Minus, ArrowUpRight, Sparkles } from "lucide-react";
+
+export const Route = createFileRoute("/skill-radar")({
+  head: () => ({ meta: [{ title: "Skill Radar — Applify" }] }),
+  component: SkillPage,
+});
+
+const trending = [
+  { n: "FastAPI", g: 171, c: 432, dir: "up" },
+  { n: "TypeScript", g: 84, c: 1208, dir: "up" },
+  { n: "Kubernetes", g: 56, c: 612, dir: "up" },
+  { n: "PHP", g: -34, c: 287, dir: "down" },
+  { n: "Tableau", g: 12, c: 198, dir: "stable" },
+  { n: "Rust", g: 192, c: 142, dir: "up" },
+];
+
+function SkillPage() {
+  return (
+    <AppShell>
+      <header className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Skill Radar</h1>
+        <p className="text-muted-foreground text-sm mt-1">Real-time tren skill di pasar Indonesia, dipersonalisasi untuk profil kamu.</p>
+      </header>
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Profil Skill Kamu</h2>
+            <span className="text-[10px] uppercase tracking-wider text-teal font-mono">vs Market Avg</span>
+          </div>
+          <div className="mt-4 grid place-items-center">
+            <RadarChart />
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-5 text-xs">
+            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-primary"/>Kamu</span>
+            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-white/30"/>Market Average</span>
+          </div>
+        </div>
+
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Trending Skills · Minggu Ini</h2>
+          </div>
+          <ul className="space-y-2">
+            {trending.map((s) => {
+              const Icon = s.dir==='up'?TrendingUp:s.dir==='down'?TrendingDown:Minus;
+              const color = s.dir==='up'?'text-teal':s.dir==='down'?'text-danger':'text-muted-foreground';
+              return (
+                <li key={s.n} className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{s.n}</p>
+                      <span className={`inline-flex items-center gap-0.5 text-xs font-mono font-bold ${color}`}><Icon className="h-3 w-3"/>{s.g>0?'+':''}{s.g}%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{s.c.toLocaleString('id-ID')} lowongan menyebutkan minggu ini</p>
+                  </div>
+                  <button className="text-xs text-primary font-semibold inline-flex items-center gap-1 shrink-0">Pelajari <ArrowUpRight className="h-3 w-3"/></button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
+        {[
+          { t: "FastAPI", impact: "+43% callback", g: "from-teal/20 to-primary/10", border: "border-teal/30" },
+          { t: "Kubernetes", impact: "+28% match rate", g: "from-primary/20 to-violet/10", border: "border-primary/30" },
+          { t: "System Design", impact: "+19% interview", g: "from-violet/20 to-warm/10", border: "border-violet/30" },
+        ].map((c) => (
+          <div key={c.t} className={`relative overflow-hidden rounded-2xl border ${c.border} p-5`}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${c.g}`}/>
+            <div className="relative">
+              <Sparkles className="h-5 w-5 text-gold" />
+              <p className="mt-3 text-sm font-semibold">Tambahkan <span className="text-gradient-primary font-bold">{c.t}</span></p>
+              <p className="text-xs text-muted-foreground mt-1">Estimasi {c.impact}</p>
+              <button className="mt-4 text-xs font-semibold text-primary inline-flex items-center gap-1">Mulai belajar <ArrowUpRight className="h-3 w-3"/></button>
+            </div>
+          </div>
+        ))}
+      </section>
+    </AppShell>
+  );
+}
+
+function RadarChart() {
+  const axes = ["Technical", "Soft Skills", "Domain", "Tools", "Languages"];
+  const you = [78, 64, 82, 70, 55];
+  const market = [70, 72, 68, 65, 60];
+  const cx = 160, cy = 160, R = 120;
+  const pt = (v: number, i: number) => {
+    const a = -Math.PI/2 + i * 2*Math.PI/axes.length;
+    const r = (v/100)*R;
+    return [cx + r*Math.cos(a), cy + r*Math.sin(a)];
+  };
+  const path = (vals: number[]) => vals.map((v,i)=>pt(v,i).join(',')).join(' ');
+
+  return (
+    <svg viewBox="0 0 320 320" className="w-full max-w-[340px]">
+      <defs>
+        <linearGradient id="you" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#4F8EF7" stopOpacity="0.6"/>
+          <stop offset="100%" stopColor="#7C5CFC" stopOpacity="0.3"/>
+        </linearGradient>
+      </defs>
+      {[1,0.75,0.5,0.25].map(s => (
+        <polygon key={s} points={path(axes.map(()=>s*100))} fill="none" stroke="rgba(255,255,255,0.06)"/>
+      ))}
+      {axes.map((_, i) => {
+        const [x,y] = pt(100, i);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.06)"/>;
+      })}
+      <polygon points={path(market)} fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.3)" strokeDasharray="4 4" strokeWidth="1.5"/>
+      <polygon points={path(you)} fill="url(#you)" stroke="#4F8EF7" strokeWidth="2"/>
+      {axes.map((label, i) => {
+        const [x,y] = pt(118, i);
+        return <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground" style={{fontSize:'11px'}}>{label}</text>;
+      })}
+    </svg>
+  );
+}
