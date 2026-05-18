@@ -1,9 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { LayoutGrid, List } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/applications")({
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   head: () => ({ meta: [{ title: "Applications — Applify" }] }),
   component: AppsPage,
 });

@@ -1,8 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { Search, MapPin, Bookmark, EyeOff, Zap, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/jobs")({
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   head: () => ({ meta: [{ title: "Job Feed — Applify" }] }),
   component: JobsPage,
 });

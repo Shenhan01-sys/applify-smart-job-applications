@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
@@ -31,6 +32,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JobsRoute = JobsRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/login'
     | '/profile'
     | '/settings'
     | '/skill-radar'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/login'
     | '/profile'
     | '/settings'
     | '/skill-radar'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/login'
     | '/profile'
     | '/settings'
     | '/skill-radar'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
   JobsRoute: typeof JobsRoute
+  LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
   SkillRadarRoute: typeof SkillRadarRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/jobs': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
   JobsRoute: JobsRoute,
+  LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,
   SkillRadarRoute: SkillRadarRoute,
@@ -208,12 +229,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

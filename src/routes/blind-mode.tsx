@@ -1,8 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { EyeOff, Sparkles, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/blind-mode")({
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   head: () => ({ meta: [{ title: "Blind Merit Mode — Applify" }] }),
   component: () => (
     <AppShell>

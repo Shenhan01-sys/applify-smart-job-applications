@@ -1,30 +1,63 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot, CalendarCheck, Star } from "lucide-react";
+import { Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot, CalendarCheck, Star, LogIn, UserPlus } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const platforms = ["LinkedIn", "Jobstreet", "Glints", "KitaLulus", "Kalibrr", "Dealls", "Facebook Groups"];
+function ScrollReveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.transitionDelay = `${delay}ms`;
+          el.classList.add("scroll-reveal-visible");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [delay]);
 
-function Landing() {
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      <Navbar />
-      <Hero />
-      <HowItWorks />
-      <Testimonials />
-      <Features />
-      <PlatformMarquee />
-      <Pricing />
-      <FinalCTA />
-      <Footer />
-      <MobileStickyBar />
+    <div ref={ref} className="scroll-reveal">
+      {children}
     </div>
   );
 }
 
-function Navbar() {
+const platforms = ["LinkedIn", "Jobstreet", "Glints", "KitaLulus", "Kalibrr", "Dealls", "Facebook Groups"];
+
+function Landing() {
+  const { user } = useAuth();
+  const authLink = user ? "/dashboard" : "/login";
+
+  return (
+    <div className="min-h-screen overflow-x-hidden">
+      <Navbar authLink={authLink} />
+      <Hero authLink={authLink} />
+      <HowItWorks />
+      <Testimonials />
+      <Features />
+      <PlatformMarquee />
+      <Pricing authLink={authLink} />
+      <FinalCTA authLink={authLink} />
+      <Footer />
+      <MobileStickyBar authLink={authLink} />
+    </div>
+  );
+}
+
+function Navbar({ authLink }: { authLink: string }) {
+  const { user, signOut } = useAuth();
+
   return (
     <header className="sticky top-0 z-40 glass-strong border-b border-black/[6%]">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
@@ -38,18 +71,35 @@ function Navbar() {
           <a href="#pricing" className="hover:text-foreground transition">Harga</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/dashboard" className="hidden md:inline-flex h-9 items-center px-3 text-sm text-muted-foreground hover:text-foreground">Login</Link>
-          <Link to="/dashboard" className="inline-flex h-9 items-center rounded-lg gradient-primary px-4 text-sm font-medium text-white glow-primary hover:opacity-90 transition">
-            Mulai Gratis
-          </Link>
+          {user ? (
+            <>
+              <Link to="/dashboard" className="hidden md:inline-flex h-9 items-center px-3 text-sm text-muted-foreground hover:text-foreground">Dashboard</Link>
+              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border border-black/[8%] bg-black/[4%] px-4 text-sm font-medium hover:bg-black/[7%] transition">
+                Logout
+              </button>
+              <Link to="/dashboard" className="inline-flex h-9 items-center rounded-lg gradient-primary px-4 text-sm font-medium text-white hover:opacity-90 transition">
+                Mulai
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to={authLink} className="hidden md:inline-flex h-9 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground">
+                <LogIn className="h-3.5 w-3.5" /> Masuk
+              </Link>
+              <Link to={authLink} className="inline-flex h-9 items-center gap-1.5 rounded-lg gradient-primary px-4 text-sm font-medium text-white hover:opacity-90 transition">
+                <UserPlus className="h-3.5 w-3.5" /> Daftar Gratis
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
   );
 }
 
-function Hero() {
+function Hero({ authLink }: { authLink: string }) {
   return (
+    <ScrollReveal>
     <section className="relative grid-bg">
       <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 md:px-8">
         <div className="flex flex-col justify-center animate-fade-up">
@@ -63,7 +113,7 @@ function Hero() {
             Applify mengindeks Jobstreet, LinkedIn, Glints, dan 4 platform lain secara bersamaan — lalu mengirim lamaran yang sudah dioptimasi ATS atas nama kamu. Otomatis. 24/7.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to="/dashboard" className="inline-flex h-12 items-center rounded-xl gradient-primary px-6 text-sm font-semibold text-white glow-primary hover:opacity-95">
+            <Link to={authLink} className="inline-flex h-12 items-center rounded-xl gradient-primary px-6 text-sm font-semibold text-white hover:opacity-95 transition">
               Mulai Gratis <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <a href="#how" className="inline-flex h-12 items-center rounded-xl border border-black/[8%] bg-black/[4%] px-6 text-sm font-semibold hover:bg-black/[7%] transition">
@@ -143,6 +193,7 @@ function Hero() {
         </div>
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
@@ -245,6 +296,7 @@ function HowItWorks() {
     { icon: CalendarCheck, title: "Terima Undangan Interview", desc: "Fokus pada persiapan interview, biarkan agen mengurus sisanya." },
   ];
   return (
+    <ScrollReveal>
     <section id="how" className="bg-[#F5F5F5] border-y border-black/[6%]">
       <div className="mx-auto max-w-7xl px-4 py-20 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
@@ -256,7 +308,7 @@ function HowItWorks() {
           {steps.map((s, i) => (
             <div key={i} className="relative glass rounded-2xl p-6 text-center">
               <StepIllo step={(i + 1) as 1 | 2 | 3} />
-              <div className="mx-auto h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white shadow-lg glow-primary">
+              <div className="mx-auto h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white shadow-lg">
                 <s.icon className="h-6 w-6" />
               </div>
               <p className="mt-4 font-mono text-xs text-muted-foreground">LANGKAH 0{i + 1}</p>
@@ -267,6 +319,7 @@ function HowItWorks() {
         </div>
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
@@ -342,6 +395,7 @@ function Testimonials() {
     },
   ];
   return (
+    <ScrollReveal delay={100}>
     <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
       <div className="text-center max-w-2xl mx-auto">
         <p className="text-xs uppercase tracking-[0.2em] text-violet font-semibold">Testimoni</p>
@@ -371,11 +425,13 @@ function Testimonials() {
         ))}
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
 function Features() {
   return (
+    <ScrollReveal delay={50}>
     <section id="features" className="mx-auto max-w-7xl px-4 py-20 md:px-8">
       <div className="text-center max-w-2xl mx-auto">
         <p className="text-xs uppercase tracking-[0.2em] text-teal font-semibold">Fitur Unggulan</p>
@@ -408,6 +464,7 @@ function Features() {
         </div>
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
@@ -516,13 +573,14 @@ function PlatformMarquee() {
   );
 }
 
-function Pricing() {
+function Pricing({ authLink }: { authLink: string }) {
   const tiers = [
     { name: "Free", price: "Gratis", per: "selamanya", features: ["10 lamaran/bulan", "3 platform", "Resume rewrite dasar", "Skill radar (read-only)"] },
     { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: ["100 lamaran/bulan", "Semua 7 platform", "Collective ATS Intelligence", "Golden Window Sniper", "Blind Merit Mode", "Prioritas dukungan"] },
     { name: "Annual", price: "Rp 299.000", per: "/tahun", features: ["Semua fitur Pro", "Hemat 64%", "Skill Radar premium", "Karier coach 1-on-1 bulanan"] },
   ];
   return (
+    <ScrollReveal delay={100}>
     <section id="pricing" className="mx-auto max-w-7xl px-4 py-20 md:px-8">
       <div className="text-center max-w-2xl mx-auto">
         <p className="text-xs uppercase tracking-[0.2em] text-gold font-semibold">Pricing</p>
@@ -530,7 +588,7 @@ function Pricing() {
       </div>
       <div className="mt-12 grid gap-6 md:grid-cols-3 md:items-stretch">
         {tiers.map((t) => (
-          <div key={t.name} className={`relative glass rounded-3xl p-7 flex flex-col ${t.popular?'md:scale-[1.04] border-primary/40 shadow-2xl glow-primary':''}`}>
+          <div key={t.name} className={`relative glass rounded-3xl p-7 flex flex-col ${t.popular?'md:scale-[1.04] border-primary/40 shadow-2xl':''}`}>
             {t.popular && <span className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs font-bold px-3 py-1 rounded-full">PALING POPULER</span>}
             <h3 className="text-lg font-semibold text-muted-foreground">{t.name}</h3>
             <div className="mt-3 flex items-baseline gap-1">
@@ -545,18 +603,20 @@ function Pricing() {
                 </li>
               ))}
             </ul>
-            <Link to="/dashboard" className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular?'gradient-primary text-white glow-primary':'border border-black/[8%] bg-black/[4%] hover:bg-black/[7%]'}`}>
+            <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular?'gradient-primary text-white':'border border-black/[8%] bg-black/[4%] hover:bg-black/[7%]'}`}>
               {t.name === 'Free' ? 'Mulai Gratis' : 'Pilih Paket'}
             </Link>
           </div>
         ))}
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
-function FinalCTA() {
+function FinalCTA({ authLink }: { authLink: string }) {
   return (
+    <ScrollReveal delay={50}>
     <section className="relative mx-auto max-w-7xl px-4 py-20 md:px-8">
       <div className="relative overflow-hidden rounded-3xl bg-[#0367FC] p-10 md:p-16 text-center">
         <div className="relative">
@@ -565,12 +625,13 @@ function FinalCTA() {
             Sudah saatnya AI bekerja untuk <span className="text-[#D2F801]">kariermu.</span>
           </h2>
           <p className="mt-4 text-white/80 max-w-xl mx-auto">Gabung 12.400+ pencari kerja Indonesia yang sudah membiarkan agen melakukan kerja berat.</p>
-          <Link to="/dashboard" className="mt-8 inline-flex h-14 items-center rounded-2xl bg-[#D2F801] px-8 text-base font-semibold text-[#161616]">
+          <Link to={authLink} className="mt-8 inline-flex h-14 items-center rounded-2xl bg-[#D2F801] px-8 text-base font-semibold text-[#161616] hover:opacity-90 transition">
             Aktifkan Agen Sekarang <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
         </div>
       </div>
     </section>
+    </ScrollReveal>
   );
 }
 
@@ -603,11 +664,11 @@ function Footer() {
   );
 }
 
-function MobileStickyBar() {
+function MobileStickyBar({ authLink }: { authLink: string }) {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-black/[8%] px-4 py-3 flex gap-2">
-      <a href="#" className="flex-1 h-11 rounded-xl border border-black/[8%] bg-black/[4%] grid place-items-center text-sm font-semibold">Login</a>
-      <Link to="/dashboard" className="flex-[2] h-11 rounded-xl gradient-primary grid place-items-center text-sm font-semibold text-white glow-primary">Mulai Gratis</Link>
+      <Link to={authLink} className="flex-1 h-11 rounded-xl border border-black/[8%] bg-black/[4%] grid place-items-center text-sm font-semibold hover:bg-black/[7%] transition">Masuk</Link>
+      <Link to={authLink} className="flex-[2] h-11 rounded-xl gradient-primary grid place-items-center text-sm font-semibold text-white hover:opacity-90 transition">Mulai Gratis</Link>
     </div>
   );
 }

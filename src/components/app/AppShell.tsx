@@ -1,6 +1,7 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User } from "lucide-react";
+import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,6 +15,15 @@ const nav = [
 export default function AppShell({ children, rightPanel }: { children: React.ReactNode; rightPanel?: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [agentOn, setAgentOn] = useState(true);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const email = user?.email ?? "";
+  const initials = email.slice(0, 2).toUpperCase();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -24,17 +34,17 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
           <span className="text-lg font-bold">Applify</span>
         </Link>
         <div className="mt-6 glass rounded-xl p-3 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full gradient-primary grid place-items-center text-white text-sm font-bold">RA</div>
+          <div className="h-9 w-9 rounded-full gradient-primary grid place-items-center text-white text-sm font-bold">{initials}</div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold truncate">Rizky A.</p>
-            <p className="text-[10px] uppercase tracking-wider text-gold font-mono">Pro Member</p>
+            <p className="text-sm font-semibold truncate">{email.split("@")[0]}</p>
+            <p className="text-[10px] uppercase tracking-wider text-primary font-mono">Free Member</p>
           </div>
         </div>
         <nav className="mt-6 flex-1 flex flex-col gap-1">
           {nav.map((it) => {
             const active = path === it.to;
             return (
-              <Link key={it.to} to={it.to as any} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'gradient-primary text-white shadow-md glow-primary' : 'text-muted-foreground hover:bg-black/[4%] hover:text-foreground'}`}>
+              <Link key={it.to} to={it.to as any} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'gradient-primary text-white shadow-md' : 'text-muted-foreground hover:bg-black/[4%] hover:text-foreground'}`}>
                 <it.icon className="h-4 w-4" />
                 {it.label}
               </Link>
@@ -42,6 +52,10 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
           })}
         </nav>
         <AgentToggle on={agentOn} setOn={setAgentOn} />
+        <button onClick={handleSignOut} className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition">
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
         <p className="mt-3 text-[10px] text-text-muted text-center font-mono">v1.0.0 · feedback</p>
       </aside>
 
