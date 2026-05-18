@@ -59,7 +59,7 @@ function Navbar({ authLink }: { authLink: string }) {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 glass-strong border-b border-black/[6%]">
+    <header className="sticky top-0 z-40 glass-strong border-b border-[#AAAAAA]">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
         <Link to="/" className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg gradient-primary text-white font-bold">A</div>
@@ -74,7 +74,7 @@ function Navbar({ authLink }: { authLink: string }) {
           {user ? (
             <>
               <Link to="/dashboard" className="hidden md:inline-flex h-9 items-center px-3 text-sm text-muted-foreground hover:text-foreground">Dashboard</Link>
-              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border border-black/[8%] bg-black/[4%] px-4 text-sm font-medium hover:bg-black/[7%] transition">
+              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border border-[#999999] bg-black/[4%] px-4 text-sm font-medium hover:bg-black/[7%] transition">
                 Logout
               </button>
               <Link to="/dashboard" className="inline-flex h-9 items-center rounded-lg gradient-primary px-4 text-sm font-medium text-white hover:opacity-90 transition">
@@ -116,7 +116,7 @@ function Hero({ authLink }: { authLink: string }) {
             <Link to={authLink} className="inline-flex h-12 items-center rounded-xl gradient-primary px-6 text-sm font-semibold text-white hover:opacity-95 transition">
               Mulai Gratis <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <a href="#how" className="inline-flex h-12 items-center rounded-xl border border-black/[8%] bg-black/[4%] px-6 text-sm font-semibold hover:bg-black/[7%] transition">
+            <a href="#how" className="inline-flex h-12 items-center rounded-xl border border-[#999999] bg-black/[4%] px-6 text-sm font-semibold hover:bg-black/[7%] transition">
               Lihat Demo →
             </a>
           </div>
@@ -171,7 +171,7 @@ function Hero({ authLink }: { authLink: string }) {
                 { c: "Tokopedia", r: "Product Manager", s: "Callback", tone: "gold" },
                 { c: "BCA Digital", r: "Data Analyst", s: "Terkirim", tone: "primary" },
               ].map((it, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg bg-black/[3%] border border-black/[5%] p-3">
+                <div key={i} className="flex items-center gap-3 rounded-lg bg-black/[3%] border border-[#BBBBBB] p-3">
                   <div className="h-8 w-8 rounded-md gradient-primary grid place-items-center text-xs font-bold text-white">{it.c[0]}</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{it.c}</p>
@@ -200,7 +200,7 @@ function Hero({ authLink }: { authLink: string }) {
 function MiniStat({ label, value, tone }: { label: string; value: string; tone: string }) {
   const color = tone==='teal'?'text-teal':tone==='gold'?'text-gold':tone==='warm'?'text-warm':'text-primary';
   return (
-    <div className="rounded-xl bg-black/[3%] border border-black/[5%] p-3">
+    <div className="rounded-xl bg-black/[3%] border border-[#BBBBBB] p-3">
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className={`font-mono text-2xl font-bold mt-1 ${color}`}>{value}</p>
     </div>
@@ -297,7 +297,7 @@ function HowItWorks() {
   ];
   return (
     <ScrollReveal>
-    <section id="how" className="bg-[#F5F5F5] border-y border-black/[6%]">
+    <section id="how" className="bg-[#F5F5F5] border-y border-[#AAAAAA]">
       <div className="mx-auto max-w-7xl px-4 py-20 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Cara Kerja</p>
@@ -414,7 +414,7 @@ function Testimonials() {
             <div className={`glass rounded-xl p-2.5 text-xs font-semibold font-mono ${r.statColor}`}>
               📈 {r.stat}
             </div>
-            <div className="flex items-center gap-3 mt-1 border-t border-black/[6%] pt-4">
+            <div className="flex items-center gap-3 mt-1 border-t border-[#AAAAAA] pt-4">
               <AvatarIllo variant={r.avatar} />
               <div>
                 <p className="text-sm font-semibold">{r.name}</p>
@@ -490,7 +490,7 @@ function FeatureBig() {
             { c: "Shopee", ats: "Greenhouse", m: 92 },
             { c: "BCA", ats: "SAP SuccessFactors", m: 68 },
           ].map((row, i) => (
-            <div key={i} className="rounded-lg bg-black/[3%] border border-black/[5%] p-3">
+            <div key={i} className="rounded-lg bg-black/[3%] border border-[#BBBBBB] p-3">
               <div className="flex items-center justify-between text-sm">
                 <div>
                   <p className="font-medium">{row.c}</p>
@@ -555,7 +555,7 @@ const platformMeta: Record<string, { color: string; bg: string; emoji: string }>
 function PlatformMarquee() {
   const items = [...platforms, ...platforms];
   return (
-    <section className="border-y border-black/[6%] py-14 overflow-hidden">
+    <section className="border-y border-[#AAAAAA] py-14 overflow-hidden">
       <p className="text-center text-xs uppercase tracking-[0.2em] text-muted-foreground font-semibold">Satu agent. Semua platform kerja Indonesia.</p>
       <div className="mt-8 flex animate-marquee gap-5 whitespace-nowrap">
         {items.map((p, i) => {
@@ -603,7 +603,7 @@ function Pricing({ authLink }: { authLink: string }) {
                 </li>
               ))}
             </ul>
-            <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular?'gradient-primary text-white':'border border-black/[8%] bg-black/[4%] hover:bg-black/[7%]'}`}>
+            <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular?'gradient-primary text-white':'border border-[#999999] bg-black/[4%] hover:bg-black/[7%]'}`}>
               {t.name === 'Free' ? 'Mulai Gratis' : 'Pilih Paket'}
             </Link>
           </div>
@@ -637,7 +637,7 @@ function FinalCTA({ authLink }: { authLink: string }) {
 
 function Footer() {
   return (
-    <footer className="border-t border-black/[6%] mt-10 pb-24 md:pb-10">
+    <footer className="border-t border-[#AAAAAA] mt-10 pb-24 md:pb-10">
       <div className="mx-auto max-w-7xl px-4 py-12 md:px-8 grid gap-8 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2">
@@ -666,8 +666,8 @@ function Footer() {
 
 function MobileStickyBar({ authLink }: { authLink: string }) {
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-black/[8%] px-4 py-3 flex gap-2">
-      <Link to={authLink} className="flex-1 h-11 rounded-xl border border-black/[8%] bg-black/[4%] grid place-items-center text-sm font-semibold hover:bg-black/[7%] transition">Masuk</Link>
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-[#999999] px-4 py-3 flex gap-2">
+      <Link to={authLink} className="flex-1 h-11 rounded-xl border border-[#999999] bg-black/[4%] grid place-items-center text-sm font-semibold hover:bg-black/[7%] transition">Masuk</Link>
       <Link to={authLink} className="flex-[2] h-11 rounded-xl gradient-primary grid place-items-center text-sm font-semibold text-white hover:opacity-90 transition">Mulai Gratis</Link>
     </div>
   );

@@ -119,12 +119,12 @@
   /* ── Cards — flat, no blur, no transparency ── */
   .glass {
     background: #FFFFFF;
-    border: 1px solid #E0E0E0;
+    border: 2px solid #999999;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   }
   .glass-strong {
     background: #FFFFFF;
-    border: 1px solid #D0D0D0;
+    border: 2px solid #888888;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
   }
 
