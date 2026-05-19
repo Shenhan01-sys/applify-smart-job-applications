@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,7 +34,7 @@ function GoogleIcon() {
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,10 +44,13 @@ function LoginPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  if (user) {
-    navigate({ to: "/dashboard" });
-    return null;
-  }
+  // Redirect to dashboard if already logged in (using useEffect to avoid blank page)
+  useEffect(() => {
+    if (user && !authLoading) {
+      console.log('[Login] User already authenticated, redirecting to dashboard...');
+      navigate({ to: "/dashboard" });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +64,7 @@ function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            emailRedirectTo: `${window.location.origin}/login`,
           },
         });
         if (error) throw error;
@@ -88,7 +91,7 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/login`, // Redirect back to login, let login page handle the redirect
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -102,6 +105,16 @@ function LoginPage() {
       setGoogleLoading(false);
     }
   };
+
+  // Show loading while auth state is being determined (prevents blank page)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen grid-bg flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+        <span className="ml-3 text-muted-foreground">Memuat...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen grid-bg flex items-center justify-center px-4 py-20">

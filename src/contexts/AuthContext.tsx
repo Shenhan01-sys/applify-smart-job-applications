@@ -17,16 +17,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Handle OAuth callback - Supabase automatically processes hash fragment
+    const handleOAuthCallback = async () => {
+      // Check if there's an auth hash in the URL (from OAuth redirect)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        console.log('[Auth] OAuth callback detected, processing tokens...');
+        // Wait for Supabase to process the hash (it does this automatically)
+        // Give it a moment to exchange tokens
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session?.user) {
+        console.log('[Auth] Session recovered for user:', session.user.email);
+      }
+    };
+
+    handleOAuthCallback();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Auth state changed:', event, 'User:', session?.user?.email);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // Clear hash from URL after successful OAuth login to prevent issues on refresh
+      if (event === 'SIGNED_IN' && window.location.hash.includes('access_token=')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     });
 
     return () => subscription.unsubscribe();
