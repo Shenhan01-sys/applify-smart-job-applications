@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { AIJobScanner } from "@/components/AIJobScanner";
+import { AIApplyModal } from "@/components/AIApplyModal";
 import { JobCard, type JobData } from "@/components/JobCard";
 import { Search, SlidersHorizontal, Zap, Loader2, Brain } from "lucide-react";
 
@@ -22,6 +23,8 @@ function JobsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [showScanner, setShowScanner] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
 
   // Fetch jobs from Supabase
   useEffect(() => {
@@ -92,32 +95,9 @@ function JobsPage() {
     }
   };
 
-  const handleApply = async (job: JobData) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Create application record
-      const { error } = await supabase.from("applications").insert({
-        user_id: user.id,
-        job_id: job.id,
-        company: job.company,
-        position: job.title,
-        platform: job.platform_source,
-        status: "applied",
-        applied_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-
-      // Update job status
-      await supabase.from("jobs").update({ status: "applied" }).eq("id", job.id);
-
-      // Refresh jobs
-      fetchJobs();
-    } catch (err) {
-      console.error("Error applying:", err);
-    }
+  const handleApply = (job: JobData) => {
+    setSelectedJob(job);
+    setShowApplyModal(true);
   };
 
   // Generate mock jobs if none exist
@@ -441,6 +421,17 @@ function JobsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* AI Apply Modal */}
+      {showApplyModal && selectedJob && (
+        <AIApplyModal
+          jobId={selectedJob.id}
+          jobTitle={selectedJob.title}
+          company={selectedJob.company}
+          onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
+          onSuccess={() => { fetchJobs(); }}
+        />
       )}
     </AppShell>
   );
