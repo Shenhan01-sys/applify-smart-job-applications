@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot, CalendarCheck, Star, LogIn, UserPlus } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,8 +36,27 @@ function ScrollReveal({ children, delay = 0 }: { children: ReactNode; delay?: nu
 const platforms = ["LinkedIn", "Jobstreet", "Glints", "KitaLulus", "Kalibrr", "Dealls", "Facebook Groups"];
 
 function Landing() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const authLink = user ? "/dashboard" : "/login";
+
+  // Redirect to dashboard if already logged in (for OAuth callback)
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('[Landing] User authenticated, redirecting to dashboard...');
+      navigate({ to: "/dashboard" });
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-[#0367FC] border-t-transparent rounded-full" />
+        <span className="ml-3 text-muted-foreground">Memuat...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden">

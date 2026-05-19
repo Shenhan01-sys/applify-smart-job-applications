@@ -21,8 +21,10 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>
 );
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
-}
+// Service Worker disabled to prevent caching issues and 404 errors on OAuth redirect
+// Re-enable only if sw.js exists and is properly configured
+// if ("serviceWorker" in navigator) {
+//   window.addEventListener("load", () => {
+//     navigator.serviceWorker.register("/sw.js").catch(() => {});
+//   });
+// }

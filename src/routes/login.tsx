@@ -64,7 +64,7 @@ function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/login`,
+            emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
@@ -91,7 +91,7 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/login`, // Redirect back to login, let login page handle the redirect
+          redirectTo: window.location.origin, // Redirect to root, let AuthContext handle session + redirect
           queryParams: {
             access_type: "offline",
             prompt: "consent",
