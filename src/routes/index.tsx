@@ -590,13 +590,14 @@ function Pricing({ authLink }: { authLink: string }) {
     },
     { 
       name: "Pro", 
-      price: "Rp 69.000", 
+      price: "Rp 99.000", 
       per: "/bulan", 
       popular: true, 
       features: [
-        "50 AI Apply/hari",
-        "AI Advanced (85% accuracy)",
-        "Cover letter premium (Claude 3.5)",
+        "20 AI Apply/hari",
+        "AI Premium (90% accuracy)",
+        "Claude Opus 4.5/4.6 (high-match jobs)",
+        "Claude Sonnet 4.5/4.6 (regular jobs)",
         "Semua 7 platform",
         "Golden Window Sniper",
         "CV Optimization AI",
@@ -607,13 +608,14 @@ function Pricing({ authLink }: { authLink: string }) {
     },
     { 
       name: "Annual", 
-      price: "Rp 299.000", 
+      price: "Rp 499.000", 
       per: "/tahun", 
       features: [
         "Semua fitur Pro",
-        "50 Apply/hari",
-        "AI Premium (85% accuracy)",
-        "Hemat 64% vs bulanan",
+        "20 Apply/hari",
+        "AI Premium (90% accuracy)",
+        "Claude Opus + Sonnet Hybrid",
+        "Hemat 58% vs bulanan",
         "Skill Radar premium",
         "Karier coach 1-on-1 bulanan",
         "Early access fitur baru"

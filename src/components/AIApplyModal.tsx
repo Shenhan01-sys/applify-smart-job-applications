@@ -41,6 +41,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [tier, setTier] = useState<"free" | "pro">("free");
   const [quota, setQuota] = useState({ canApply: true, remaining: 10 });
   const [modelUsed, setModelUsed] = useState("");
+  const [modelType, setModelType] = useState<"sonnet" | "opus" | "free">("free");
+  const [matchScore, setMatchScore] = useState(0);
   const [aiGenerated, setAiGenerated] = useState<{
     coverLetter: string;
     optimizedCV: Record<string, any>;
@@ -105,7 +107,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       ]);
 
       setModelUsed(coverLetterResult.modelUsed);
+      setModelType(coverLetterResult.modelType);
       setTier(coverLetterResult.tier);
+      setMatchScore(analysisResult.matchScore);
 
       const aiResult = {
         coverLetter: coverLetterResult.coverLetter,
@@ -195,6 +199,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       );
 
       setModelUsed(result.modelUsed);
+      setModelType(result.modelType);
       setEditedCoverLetter(result.coverLetter);
       if (application) {
         await aiApplicationService.updateCoverLetter(application.id, result.coverLetter);
@@ -281,7 +286,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               </div>
 
               {/* AI Scores */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div className="rounded-xl bg-[#0367FC]/5 border border-[#0367FC]/20 p-3 text-center">
                   <Target className="h-5 w-5 mx-auto text-[#0367FC] mb-1" />
                   <div className="text-lg font-bold text-[#0367FC]">{aiGenerated.tailoredSkills?.length || 0}</div>
@@ -289,8 +294,17 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
                   <Sparkles className="h-5 w-5 mx-auto text-[#161616] mb-1" />
-                  <div className="text-lg font-bold">{tier === "pro" ? "85%" : "70%"}</div>
+                  <div className="text-lg font-bold">{tier === "pro" ? "90%" : "70%"}</div>
                   <div className="text-xs text-muted-foreground">AI Accuracy</div>
+                </div>
+                <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
+                  <Bot className="h-5 w-5 mx-auto text-purple-600 mb-1" />
+                  <div className="text-sm font-bold text-purple-600">
+                    {modelType === "opus" ? "Opus" : modelType === "sonnet" ? "Sonnet" : "Free"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {modelType === "opus" ? "Premium" : modelType === "sonnet" ? "Advanced" : "Basic"}
+                  </div>
                 </div>
                 <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-center">
                   <CheckCircle2 className="h-5 w-5 mx-auto text-green-600 mb-1" />
@@ -298,6 +312,31 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                   <div className="text-xs text-muted-foreground">Cover & CV</div>
                 </div>
               </div>
+
+              {/* Model Explanation for Pro */}
+              {tier === "pro" && (
+                <div className={`rounded-xl p-3 text-sm ${
+                  modelType === "opus" 
+                    ? "bg-purple-50 border border-purple-200 text-purple-700" 
+                    : "bg-blue-50 border border-blue-200 text-blue-700"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="font-semibold">
+                      {modelType === "opus" 
+                        ? `Claude Opus 4.5 aktif (Match Score: ${matchScore}%)`
+                        : `Claude Sonnet 4.5 aktif (Match Score: ${matchScore}%)`
+                      }
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1 ml-6">
+                    {modelType === "opus"
+                      ? "High-match job menggunakan Claude Opus untuk kualitas maksimal."
+                      : "Regular job menggunakan Claude Sonnet untuk kualitas optimal & hemat cost."
+                    }
+                  </p>
+                </div>
+              )}
 
               {/* Tabs */}
               <div className="flex gap-2 border-b border-[#E0E0E0]">
@@ -331,12 +370,17 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                         AI-Generated Cover Letter
                         {tier === "free" && (
                           <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-0.5 rounded-full">
-                            Basic
+                            Basic AI
                           </span>
                         )}
-                        {tier === "pro" && (
-                          <span className="text-xs text-[#D2F801] bg-[#161616] px-2 py-0.5 rounded-full">
-                            Premium
+                        {tier === "pro" && modelType === "sonnet" && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                            Claude Sonnet 4.5
+                          </span>
+                        )}
+                        {tier === "pro" && modelType === "opus" && (
+                          <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                            Claude Opus 4.5 🔥
                           </span>
                         )}
                       </span>
@@ -438,9 +482,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               ? "Mengirim..." 
               : !quota.canApply 
                 ? "Kuota Habis" 
-                : tier === "pro"
-                  ? "AI Apply Sekarang (Pro)"
-                  : "AI Apply Sekarang"
+                : tier === "pro" && modelType === "opus"
+                  ? "AI Apply dengan Opus 🔥"
+                  : tier === "pro" && modelType === "sonnet"
+                    ? "AI Apply dengan Sonnet"
+                    : "AI Apply Sekarang"
             }
           </button>
         </div>

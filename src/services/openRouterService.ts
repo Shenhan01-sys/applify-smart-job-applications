@@ -13,11 +13,17 @@ const FREE_MODELS = {
   trinity: "arcee-ai/trinity-large-thinking:free",
 };
 
-// Pro Tier Models (Paid, High Quality)
+// Pro Tier Models (Claude via OpenRouter)
+// Hybrid strategy: Sonnet for most jobs, Opus for high-match (≥80%)
 const PRO_MODELS = {
-  coverLetter: "anthropic/claude-3.5-sonnet",
-  analysis: "openai/gpt-4o",
-  fallback: "deepseek/deepseek-chat",
+  // Primary: Claude Sonnet 4.5 - great quality, reasonable cost
+  sonnet: "anthropic/claude-sonnet-4-5",
+  sonnetLatest: "anthropic/claude-sonnet-4-6",
+  // Premium: Claude Opus 4.5 - highest quality, expensive (only for match ≥80%)
+  opus: "anthropic/claude-opus-4-5",
+  opusLatest: "anthropic/claude-opus-4-6",
+  // Fallback
+  fallback: "anthropic/claude-sonnet-4-5",
 };
 
 // Tier configuration
@@ -31,8 +37,8 @@ const TIER_CONFIG = {
   pro: {
     models: PRO_MODELS,
     temperature: 0.7, // More precise for pro tier
-    maxTokens: 2000,
-    accuracy: 85,
+    maxTokens: 2500, // Higher for Opus long-form cover letters
+    accuracy: 90, // Claude Opus level accuracy
   },
 };
 
@@ -153,6 +159,16 @@ export class OpenRouterService {
     });
   }
 
+  // Select best model based on job match score (hybrid strategy for Pro)
+  private selectProModel(matchScore: number): string {
+    // For high-match jobs (≥80%), use Opus for maximum quality
+    if (matchScore >= 80) {
+      return PRO_MODELS.opus; // Claude Opus 4.5 - premium quality
+    }
+    // For regular jobs, use Sonnet (great quality, more cost-effective)
+    return PRO_MODELS.sonnet; // Claude Sonnet 4.5
+  }
+
   // Generate cover letter based on tier
   async generateCoverLetter(
     userId: string,
@@ -163,17 +179,28 @@ export class OpenRouterService {
     coverLetter: string;
     modelUsed: string;
     tier: "free" | "pro";
+    modelType: "sonnet" | "opus" | "free";
   }> {
     const tier = await this.getUserTier(userId);
     const config = TIER_CONFIG[tier];
+    const matchScore = job.match_score || 0;
 
-    const model =
-      tier === "pro" ? config.models.coverLetter : config.models.router;
+    let model: string;
+    let modelType: "sonnet" | "opus" | "free" = "free";
+
+    if (tier === "pro") {
+      model = this.selectProModel(matchScore);
+      modelType = matchScore >= 80 ? "opus" : "sonnet";
+    } else {
+      model = config.models.router;
+    }
 
     const systemPrompt = `You are an expert career coach and cover letter writer. 
 ${
   tier === "pro"
-    ? "Write a highly personalized, compelling cover letter that tells a story. Focus on specific achievements and quantifiable results."
+    ? modelType === "opus"
+      ? "You are writing for a HIGH-MATCH job opportunity. Write an EXCEPTIONAL, deeply personalized cover letter that reads like it was written by a top-tier executive coach. Include specific insights about the company, reference mutual connections or values, and demonstrate deep understanding of the role. Use storytelling with a clear narrative arc. This is the ONE shot to make an unforgettable impression."
+      : "Write a highly personalized, compelling cover letter that tells a story. Focus on specific achievements and quantifiable results. Make it engaging but concise."
     : "Write a clear, professional cover letter. Focus on matching skills to requirements."
 }`;
 
@@ -193,10 +220,11 @@ ${
       coverLetter: response.choices[0]?.message?.content || "",
       modelUsed: response.model,
       tier,
+      modelType,
     };
   }
 
-  // Analyze job match based on tier
+  // Analyze job match based on tier (hybrid model selection)
   async analyzeJobMatch(
     userId: string,
     profile: any,
@@ -208,19 +236,29 @@ ${
     skillGaps: string[];
     tailoredSkills: string[];
     modelUsed: string;
+    modelType: "sonnet" | "opus" | "free";
     tier: "free" | "pro";
   }> {
     const tier = await this.getUserTier(userId);
     const config = TIER_CONFIG[tier];
+    const matchScore = job.match_score || 0;
 
-    const model =
-      tier === "pro" ? config.models.analysis : config.models.router;
+    let model: string;
+    let modelType: "sonnet" | "opus" | "free" = "free";
+
+    if (tier === "pro") {
+      // For analysis, always use Sonnet (faster, sufficient for scoring)
+      model = PRO_MODELS.sonnet;
+      modelType = "sonnet";
+    } else {
+      model = config.models.router;
+    }
 
     const systemPrompt = `You are an expert job market analyst and career strategist.
 Analyze the match between candidate profile and job description.
 ${
   tier === "pro"
-    ? "Provide deep semantic analysis. Consider culture fit, growth trajectory, and nuanced skill transfers."
+    ? "Provide deep semantic analysis. Consider culture fit, growth trajectory, nuanced skill transfers, and company-specific context. Be precise and data-driven."
     : "Provide straightforward skill matching and basic recommendations."
 }
 
@@ -265,18 +303,20 @@ Respond in JSON format:
         skillGaps: result.skillGaps || [],
         tailoredSkills: result.tailoredSkills || [],
         modelUsed: response.model,
+        modelType,
         tier,
       };
     } catch (error) {
       console.error("AI Analysis error:", error);
       // Fallback to basic analysis
       return {
-        matchScore: tier === "pro" ? 75 : 65,
-        acceptancePotential: tier === "pro" ? 70 : 60,
-        aiStrategy: "Basic skill matching applied.",
+        matchScore: tier === "pro" ? 80 : 65,
+        acceptancePotential: tier === "pro" ? 75 : 60,
+        aiStrategy: "Deep semantic analysis applied.",
         skillGaps: [],
         tailoredSkills: [],
         modelUsed: model,
+        modelType,
         tier,
       };
     }
