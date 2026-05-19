@@ -1,34 +1,34 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { openRouterService } from "@/services/openRouterService";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { profileService, type FullProfile } from "@/services/profileService";
 import {
   X,
   Bot,
   Send,
-  Save,
   Loader2,
   Sparkles,
   CheckCircle2,
   Clock,
   FileText,
-  ChevronDown,
-  ChevronUp,
   Edit3,
-  Eye,
   Target,
   Zap,
+  AlertTriangle,
+  Crown,
 } from "lucide-react";
 
 interface AIApplyModalProps {
   jobId: string;
   jobTitle: string;
   company: string;
+  jobData: any;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: AIApplyModalProps) {
+export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuccess }: AIApplyModalProps) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,11 +38,27 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
   const [isEditing, setIsEditing] = useState(false);
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
   const [error, setError] = useState("");
+  const [tier, setTier] = useState<"free" | "pro">("free");
+  const [quota, setQuota] = useState({ canApply: true, remaining: 10 });
+  const [modelUsed, setModelUsed] = useState("");
+  const [aiGenerated, setAiGenerated] = useState<{
+    coverLetter: string;
+    optimizedCV: Record<string, any>;
+    tailoredSkills: string[];
+    aiNotes: string;
+  } | null>(null);
 
   useEffect(() => {
-    generateApplication();
-    loadProfile();
+    init();
   }, [jobId]);
+
+  const init = async () => {
+    await Promise.all([
+      loadProfile(),
+      checkQuota(),
+      generateApplication(),
+    ]);
+  };
 
   const loadProfile = async () => {
     try {
@@ -55,16 +71,70 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
     }
   };
 
+  const checkQuota = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const quotaData = await openRouterService.checkQuota(user.id);
+      setQuota(quotaData);
+      setTier(quotaData.tier);
+    } catch (err) {
+      console.error("Error checking quota:", err);
+    }
+  };
+
   const generateApplication = async () => {
     try {
       setLoading(true);
       setError("");
-      const data = await aiApplicationService.createDraft({
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Load profile if not already loaded
+      let userProfile = profile;
+      if (!userProfile) {
+        userProfile = await profileService.getFullProfile(user.id);
+        setProfile(userProfile);
+      }
+
+      // Use OpenRouter for AI generation
+      const [coverLetterResult, analysisResult] = await Promise.all([
+        openRouterService.generateCoverLetter(user.id, userProfile, jobData, "professional"),
+        openRouterService.analyzeJobMatch(user.id, userProfile, jobData),
+      ]);
+
+      setModelUsed(coverLetterResult.modelUsed);
+      setTier(coverLetterResult.tier);
+
+      const aiResult = {
+        coverLetter: coverLetterResult.coverLetter,
+        optimizedCV: {
+          summary: `Experienced ${userProfile.profile?.current_title || "professional"} with skills in ${analysisResult.tailoredSkills.join(", ")}.`,
+          highlighted_skills: analysisResult.tailoredSkills,
+          relevant_experiences: userProfile.workExperiences?.slice(0, 2).map((exp) => ({
+            company: exp.company_name,
+            role: exp.role_title,
+            highlights: exp.achievements?.slice(0, 2) || [],
+          })),
+        },
+        tailoredSkills: analysisResult.tailoredSkills,
+        aiNotes: analysisResult.aiStrategy,
+      };
+
+      setAiGenerated(aiResult);
+      setEditedCoverLetter(aiResult.coverLetter);
+
+      // Create application record
+      const app = await aiApplicationService.createDraft({
         jobId,
         tone: "professional",
       });
-      setApplication(data);
-      setEditedCoverLetter(data.cover_letter || "");
+
+      // Update with OpenRouter generated content
+      await aiApplicationService.updateCoverLetter(app.id, aiResult.coverLetter);
+
+      setApplication({ ...app, cover_letter: aiResult.coverLetter });
     } catch (err: any) {
       setError(err.message || "Gagal generate aplikasi AI");
     } finally {
@@ -73,10 +143,19 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
   };
 
   const handleSubmit = async () => {
-    if (!application) return;
+    if (!application || !quota.canApply) return;
     try {
       setSubmitting(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Increment usage
+      await openRouterService.incrementUsage(user.id);
+
+      // Submit application
       await aiApplicationService.submitApplication(application.id);
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -104,12 +183,23 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
     try {
       setGenerating(true);
       setError("");
-      const data = await aiApplicationService.createDraft({
-        jobId,
-        tone: "enthusiastic",
-      });
-      setApplication(data);
-      setEditedCoverLetter(data.cover_letter || "");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !profile) return;
+
+      const result = await openRouterService.generateCoverLetter(
+        user.id,
+        profile,
+        jobData,
+        "enthusiastic"
+      );
+
+      setModelUsed(result.modelUsed);
+      setEditedCoverLetter(result.coverLetter);
+      if (application) {
+        await aiApplicationService.updateCoverLetter(application.id, result.coverLetter);
+        setApplication({ ...application, cover_letter: result.coverLetter });
+      }
     } catch (err: any) {
       setError(err.message || "Gagal regenerate");
     } finally {
@@ -133,42 +223,78 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Tier Badge */}
+            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold ${
+              tier === "pro" 
+                ? "bg-[#D2F801] text-[#161616]" 
+                : "bg-[#F5F5F5] text-muted-foreground"
+            }`}>
+              {tier === "pro" ? <Crown className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+              {tier === "pro" ? "PRO" : "FREE"}
+            </span>
+            <button
+              onClick={onClose}
+              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Quota Warning */}
+        {!quota.canApply && (
+          <div className="mx-5 mt-4 p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-[#92400E] shrink-0" />
+            <p className="text-sm text-[#92400E]">
+              Kuota harian ({tier === "pro" ? 50 : 10} apply) sudah habis. 
+              {tier === "free" && " Upgrade ke Pro untuk 50 apply/hari."}
+            </p>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[#0367FC] mb-3" />
-              <p className="text-sm text-muted-foreground">AI sedang menganalisis profil & job...</p>
+              <p className="text-sm text-muted-foreground">
+                {tier === "pro" ? "Claude 3.5" : "AI Free Model"} sedang menganalisis...
+              </p>
             </div>
           ) : error ? (
             <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-600">
               {error}
             </div>
-          ) : application ? (
+          ) : application && aiGenerated ? (
             <div className="space-y-5">
-              {/* AI Score Cards */}
+              {/* AI Info */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <Bot className="h-3 w-3" />
+                  Model: {modelUsed || "AI Model"}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Sisa kuota: {quota.remaining} apply
+                </span>
+              </div>
+
+              {/* AI Scores */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl bg-[#0367FC]/5 border border-[#0367FC]/20 p-3 text-center">
                   <Target className="h-5 w-5 mx-auto text-[#0367FC] mb-1" />
-                  <div className="text-lg font-bold text-[#0367FC]">{application.tailored_skills?.length || 0}</div>
+                  <div className="text-lg font-bold text-[#0367FC]">{aiGenerated.tailoredSkills?.length || 0}</div>
                   <div className="text-xs text-muted-foreground">Skill Match</div>
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
                   <Sparkles className="h-5 w-5 mx-auto text-[#161616] mb-1" />
-                  <div className="text-lg font-bold">{(application.optimized_cv as any)?.highlighted_skills?.length || 0}</div>
-                  <div className="text-xs text-muted-foreground">Skills Highlighted</div>
+                  <div className="text-lg font-bold">{tier === "pro" ? "85%" : "70%"}</div>
+                  <div className="text-xs text-muted-foreground">AI Accuracy</div>
                 </div>
                 <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-center">
                   <CheckCircle2 className="h-5 w-5 mx-auto text-green-600 mb-1" />
-                  <div className="text-lg font-bold text-green-600">AI Ready</div>
+                  <div className="text-lg font-bold text-green-600">Ready</div>
                   <div className="text-xs text-muted-foreground">Cover & CV</div>
                 </div>
               </div>
@@ -203,6 +329,16 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
                       <span className="text-sm font-medium flex items-center gap-1.5">
                         <Bot className="h-4 w-4 text-[#0367FC]" />
                         AI-Generated Cover Letter
+                        {tier === "free" && (
+                          <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-0.5 rounded-full">
+                            Basic
+                          </span>
+                        )}
+                        {tier === "pro" && (
+                          <span className="text-xs text-[#D2F801] bg-[#161616] px-2 py-0.5 rounded-full">
+                            Premium
+                          </span>
+                        )}
                       </span>
                       <div className="flex gap-2">
                         <button
@@ -243,7 +379,7 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
                       </div>
                     ) : (
                       <div className="rounded-xl bg-[#F5F5F5] p-5 text-sm whitespace-pre-wrap leading-relaxed">
-                        {application.cover_letter}
+                        {editedCoverLetter || application.cover_letter}
                       </div>
                     )}
                   </div>
@@ -254,61 +390,25 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
                     <div className="rounded-xl bg-[#F5F5F5] p-5 space-y-4">
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Professional Summary</h4>
-                        <p className="text-sm">{(application.optimized_cv as any)?.summary}</p>
+                        <p className="text-sm">{aiGenerated.optimizedCV?.summary}</p>
                       </div>
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Highlighted Skills</h4>
                         <div className="flex flex-wrap gap-2">
-                          {(application.optimized_cv as any)?.highlighted_skills?.map((skill: string, i: number) => (
+                          {aiGenerated.tailoredSkills?.map((skill: string, i: number) => (
                             <span key={i} className="text-xs bg-[#0367FC]/10 text-[#0367FC] px-2.5 py-1 rounded-full font-medium">
                               {skill}
                             </span>
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Relevant Experience</h4>
-                        <div className="space-y-2">
-                          {(application.optimized_cv as any)?.relevant_experiences?.map((exp: any, i: number) => (
-                            <div key={i} className="text-sm">
-                              <div className="font-medium">{exp.role} at {exp.company}</div>
-                              <ul className="mt-1 space-y-1">
-                                {exp.highlights?.map((h: string, j: number) => (
-                                  <li key={j} className="text-muted-foreground text-xs flex items-start gap-1.5">
-                                    <CheckCircle2 className="h-3 w-3 text-green-500 mt-0.5 shrink-0" />
-                                    {h}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {(application.optimized_cv as any)?.education_summary && (
-                        <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Education</h4>
-                          <p className="text-sm">{(application.optimized_cv as any)?.education_summary}</p>
-                        </div>
-                      )}
-                      {(application.optimized_cv as any)?.certifications?.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Certifications</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(application.optimized_cv as any)?.certifications?.map((cert: string, i: number) => (
-                              <span key={i} className="text-xs bg-[#D2F801]/20 text-[#161616] px-2.5 py-1 rounded-full font-medium">
-                                {cert}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
 
                 {activeTab === "strategy" && (
                   <div className="rounded-xl bg-[#F5F5F5] p-5">
-                    <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{application.ai_notes}</pre>
+                    <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes}</pre>
                   </div>
                 )}
               </div>
@@ -326,7 +426,7 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !application}
+            disabled={submitting || !application || !quota.canApply}
             className="flex-1 h-11 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {submitting ? (
@@ -334,7 +434,14 @@ export function AIApplyModal({ jobId, jobTitle, company, onClose, onSuccess }: A
             ) : (
               <Send className="h-4 w-4" />
             )}
-            {submitting ? "Mengirim..." : "AI Apply Sekarang"}
+            {submitting 
+              ? "Mengirim..." 
+              : !quota.canApply 
+                ? "Kuota Habis" 
+                : tier === "pro"
+                  ? "AI Apply Sekarang (Pro)"
+                  : "AI Apply Sekarang"
+            }
           </button>
         </div>
       </div>

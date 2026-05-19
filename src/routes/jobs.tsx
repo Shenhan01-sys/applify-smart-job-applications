@@ -5,7 +5,7 @@ import AppShell from "@/components/app/AppShell";
 import { AIJobScanner } from "@/components/AIJobScanner";
 import { AIApplyModal } from "@/components/AIApplyModal";
 import { JobCard, type JobData } from "@/components/JobCard";
-import { Search, SlidersHorizontal, Zap, Loader2, Brain } from "lucide-react";
+import { Search, SlidersHorizontal, Zap, Loader2, Brain, Crown, Sparkles, Target } from "lucide-react";
 
 export const Route = createFileRoute("/jobs")({
   beforeLoad: async () => {
@@ -25,12 +25,33 @@ function JobsPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
+  const [userTier, setUserTier] = useState<"free" | "pro">("free");
+  const [remainingQuota, setRemainingQuota] = useState(10);
 
   // Fetch jobs from Supabase
   useEffect(() => {
     fetchJobs();
     fetchSavedJobs();
+    loadUserTier();
   }, []);
+
+  const loadUserTier = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("ai_model_tier, daily_apply_quota")
+        .eq("user_id", user.id)
+        .single();
+      if (data) {
+        setUserTier(data.ai_model_tier as "free" | "pro");
+        setRemainingQuota(data.daily_apply_quota);
+      }
+    } catch (err) {
+      console.error("Error loading tier:", err);
+    }
+  };
 
   const fetchJobs = async () => {
     try {
@@ -314,11 +335,27 @@ function JobsPage() {
                 : "AI akan mencari & menganalisis lowongan untuk kamu"}
             </p>
           </div>
-          {goldenWindows > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#161616] px-3 py-1.5 text-xs font-bold">
-              <Zap className="h-3.5 w-3.5" /> {goldenWindows} Golden Window aktif
+          <div className="flex items-center gap-2">
+            {/* Tier Badge */}
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
+              userTier === "pro" 
+                ? "bg-[#D2F801] text-[#161616]" 
+                : "bg-[#F5F5F5] text-muted-foreground border border-[#999999]"
+            }`}>
+              {userTier === "pro" ? <Crown className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {userTier === "pro" ? "PRO" : "FREE"}
             </span>
-          )}
+            {/* Quota */}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0367FC]/10 text-[#0367FC] px-3 py-1.5 text-xs font-bold">
+              <Target className="h-3.5 w-3.5" />
+              {remainingQuota} apply tersisa
+            </span>
+            {goldenWindows > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#161616] px-3 py-1.5 text-xs font-bold">
+                <Zap className="h-3.5 w-3.5" /> {goldenWindows} Golden Window
+              </span>
+            )}
+          </div>
         </div>
 
         {/* AI Scanner Toggle */}
@@ -429,8 +466,9 @@ function JobsPage() {
           jobId={selectedJob.id}
           jobTitle={selectedJob.title}
           company={selectedJob.company}
+          jobData={selectedJob}
           onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
-          onSuccess={() => { fetchJobs(); }}
+          onSuccess={() => { fetchJobs(); loadUserTier(); }}
         />
       )}
     </AppShell>

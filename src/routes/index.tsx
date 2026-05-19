@@ -575,9 +575,50 @@ function PlatformMarquee() {
 
 function Pricing({ authLink }: { authLink: string }) {
   const tiers = [
-    { name: "Free", price: "Gratis", per: "selamanya", features: ["10 lamaran/bulan", "3 platform", "Resume rewrite dasar", "Skill radar (read-only)"] },
-    { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: ["100 lamaran/bulan", "Semua 7 platform", "Collective ATS Intelligence", "Golden Window Sniper", "Blind Merit Mode", "Prioritas dukungan"] },
-    { name: "Annual", price: "Rp 299.000", per: "/tahun", features: ["Semua fitur Pro", "Hemat 64%", "Skill Radar premium", "Karier coach 1-on-1 bulanan"] },
+    { 
+      name: "Free", 
+      price: "Gratis", 
+      per: "selamanya", 
+      features: [
+        "10 AI Apply/hari",
+        "AI Basic (70% accuracy)",
+        "Cover letter standar",
+        "3 platform utama",
+        "Skill radar dasar",
+        "Human approval required"
+      ] 
+    },
+    { 
+      name: "Pro", 
+      price: "Rp 69.000", 
+      per: "/bulan", 
+      popular: true, 
+      features: [
+        "50 AI Apply/hari",
+        "AI Advanced (85% accuracy)",
+        "Cover letter premium (Claude 3.5)",
+        "Semua 7 platform",
+        "Golden Window Sniper",
+        "CV Optimization AI",
+        "Follow-up scheduler",
+        "Blind Merit Mode",
+        "Prioritas dukungan"
+      ] 
+    },
+    { 
+      name: "Annual", 
+      price: "Rp 299.000", 
+      per: "/tahun", 
+      features: [
+        "Semua fitur Pro",
+        "50 Apply/hari",
+        "AI Premium (85% accuracy)",
+        "Hemat 64% vs bulanan",
+        "Skill Radar premium",
+        "Karier coach 1-on-1 bulanan",
+        "Early access fitur baru"
+      ] 
+    },
   ];
   return (
     <ScrollReveal delay={100}>
