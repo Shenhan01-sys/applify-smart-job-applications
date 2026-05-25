@@ -448,14 +448,15 @@ function JobsPage() {
         </div>
       ) : filteredJobs.length > 0 ? (
         <div className="space-y-4">
-          {filteredJobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              isSaved={savedJobs.has(job.id)}
-              onToggleSave={() => toggleSaveJob(job.id)}
-              onApply={() => handleApply(job)}
-            />
+          {filteredJobs.map((job, i) => (
+            <div key={job.id} style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both` }}>
+              <JobCard
+                job={job}
+                isSaved={savedJobs.has(job.id)}
+                onToggleSave={() => toggleSaveJob(job.id)}
+                onApply={() => handleApply(job)}
+              />
+            </div>
           ))}
         </div>
       ) : (

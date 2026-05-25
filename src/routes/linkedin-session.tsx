@@ -30,9 +30,14 @@ function LinkedInSessionPage() {
   const [verifying, setVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'guide'>('manual');
   const [tabKey, setTabKey] = useState(0);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [status, setStatus] = useState(sessionStatus);
 
+  const tabOrder: ('manual' | 'guide')[] = ['manual', 'guide'];
   const handleTabChange = (tab: 'manual' | 'guide') => {
+    const currentIndex = tabOrder.indexOf(activeTab);
+    const newIndex = tabOrder.indexOf(tab);
+    setDirection(newIndex > currentIndex ? 'next' : 'prev');
     setActiveTab(tab);
     setTabKey(k => k + 1);
   };
@@ -203,7 +208,7 @@ function LinkedInSessionPage() {
               })}
             </div>
 
-            <div key={tabKey} className="animate-tab-enter">
+            <div key={tabKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
             {activeTab === 'manual' && (
               <div className="space-y-4">
                 <div>

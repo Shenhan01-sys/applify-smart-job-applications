@@ -110,11 +110,16 @@ function AppsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [viewKey, setViewKey] = useState(0);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
 
+  const viewOrder: ("kanban" | "list")[] = ["kanban", "list"];
   const handleViewChange = (newView: "kanban" | "list") => {
+    const currentIndex = viewOrder.indexOf(view);
+    const newIndex = viewOrder.indexOf(newView);
+    setDirection(newIndex > currentIndex ? 'next' : 'prev');
     setView(newView);
     setViewKey(k => k + 1);
   };
@@ -259,7 +264,7 @@ function AppsPage() {
         ))}
       </div>
 
-      <div key={viewKey} className="animate-view-enter">
+      <div key={viewKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
       {applications.length === 0 ? (
         <div className="text-center py-16">
           <Bot className="h-12 w-12 mx-auto text-[#999999] mb-4" />

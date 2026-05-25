@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { automationApi, AutomationSettings } from "@/services/automationApi";
-import { mockAutomationSettings } from "@/mocks/mockData";
+import { mockAutomationSettings, mockSubscription } from "@/mocks/mockData";
 import { 
   Loader2, Save, User, FileText, Search, Settings, Brain,
   Briefcase, MapPin, DollarSign, Clock, CheckCircle2, ToggleLeft,
-  AlertCircle, Sparkles, ChevronRight
+  AlertCircle, Sparkles, ChevronRight, Crown, Zap, Lock, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,8 +38,12 @@ function AutomationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [tabKey, setTabKey] = useState(0);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
   const handleTabChange = (tabId: string) => {
+    const currentIndex = tabs.findIndex(t => t.id === activeTab);
+    const newIndex = tabs.findIndex(t => t.id === tabId);
+    setDirection(newIndex > currentIndex ? 'next' : 'prev');
     setActiveTab(tabId);
     setTabKey(k => k + 1);
   };
@@ -137,7 +141,7 @@ function AutomationSettingsPage() {
       <div className="glass rounded-2xl p-5 md:p-6 overflow-hidden">
         <div
           key={tabKey}
-          className="animate-tab-enter"
+          className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}
         >
           {activeTab === 'personal' && (
             <div className="space-y-4">
@@ -259,37 +263,7 @@ function AutomationSettingsPage() {
           )}
 
           {activeTab === 'ai' && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
-              </h2>
-              <SelectField 
-                label="AI Provider" 
-                value={settings.ai_provider || 'openai'} 
-                options={[
-                  {value: 'openai', label: 'OpenAI'},
-                  {value: 'openrouter', label: 'OpenRouter'},
-                  {value: 'deepseek', label: 'DeepSeek'},
-                  {value: 'gemini', label: 'Google Gemini'},
-                ]}
-                onChange={(v: string) => updateField('ai_provider', v)} 
-              />
-              <InputField 
-                label="AI Model" 
-                value={settings.ai_model || 'gpt-4'} 
-                onChange={(v: string) => updateField('ai_model', v)} 
-                placeholder="Contoh: gpt-4, claude-3.5-sonnet"
-              />
-              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800">Catatan</p>
-                  <p className="text-xs text-amber-700 mt-1">
-                    Pemilihan model AI mempengaruhi kualitas dan biaya. Free tier menggunakan model gratis. Pro tier menggunakan Claude Opus/Sonnet.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <AITierDisplay />
           )}
 
           {/* Save Button */}
@@ -360,6 +334,137 @@ function ToggleField({ label, description, checked, onChange }: any) {
           className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'left-[22px]' : 'left-0.5'}`}
         />
       </button>
+    </div>
+  );
+}
+
+function AITierDisplay() {
+  const tier = isMockMode() ? mockSubscription.ai_model_tier : 'pro';
+  
+  const tierConfig: Record<string, { label: string; color: string; bg: string; border: string; badge: string; icon: any }> = {
+    free: { 
+      label: 'Free', 
+      color: 'text-muted-foreground', 
+      bg: 'bg-black/[3%]', 
+      border: 'border-black/[8%]',
+      badge: 'bg-black/[6%] text-muted-foreground border-black/[8%]',
+      icon: Lock 
+    },
+    pro: { 
+      label: 'Pro', 
+      color: 'text-[#0367FC]', 
+      bg: 'bg-[#0367FC]/5', 
+      border: 'border-[#0367FC]/20',
+      badge: 'bg-[#0367FC]/10 text-[#0367FC] border-[#0367FC]/20',
+      icon: Zap 
+    },
+    ultimate: { 
+      label: 'Ultimate', 
+      color: 'text-[#D2F801]', 
+      bg: 'bg-[#D2F801]/10', 
+      border: 'border-[#D2F801]/30',
+      badge: 'bg-[#D2F801]/20 text-[#161616] border-[#D2F801]/30',
+      icon: Crown 
+    },
+  };
+  
+  const config = tierConfig[tier] || tierConfig.pro;
+  const TierIcon = config.icon;
+  
+  const modelConfig: Record<string, { models: { name: string; pct: string; desc: string }[]; note: string }> = {
+    free: {
+      models: [
+        { name: 'DeepSeek v4 Flash', pct: '100%', desc: 'Model cepat untuk generasi cover letter dan analisis dasar' },
+      ],
+      note: 'Upgrade ke Pro untuk akses model AI yang lebih powerful dengan hasil optimal.',
+    },
+    pro: {
+      models: [
+        { name: 'DeepSeek v4 Pro', pct: '60%', desc: 'Model utama untuk cover letter & analisis mendalam' },
+        { name: 'DeepSeek v4 Flash', pct: '40%', desc: 'Model pendukung untuk tugas cepat & ringan' },
+      ],
+      note: 'AI akan otomatis memilih model terbaik untuk setiap lamaran berdasarkan kompleksitas.',
+    },
+    ultimate: {
+      models: [
+        { name: 'Claude Sonnet 4.6', pct: '60%', desc: 'Model premium untuk cover letter & strategi lanjutan' },
+        { name: 'DeepSeek v4 Pro', pct: '40%', desc: 'Model andalan untuk analisis & matching akurat' },
+      ],
+      note: 'Akses ke model AI paling canggih untuk hasil lamaran yang optimal dan personalisasi tingkat tinggi.',
+    },
+  };
+  
+  const currentModels = modelConfig[tier] || modelConfig.pro;
+  
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold flex items-center gap-2">
+        <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
+      </h2>
+      
+      {/* Tier Badge */}
+      <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-4 flex items-center gap-3`}>
+        <div className={`h-10 w-10 rounded-xl grid place-items-center ${tier === 'ultimate' ? 'bg-[#D2F801]' : 'bg-[#0367FC]'}`}>
+          <TierIcon className={`h-5 w-5 ${tier === 'ultimate' ? 'text-[#161616]' : 'text-white'}`} />
+        </div>
+        <div>
+          <p className="text-sm font-bold">Plan {config.label}</p>
+          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.badge}`}>
+            Aktif
+          </span>
+        </div>
+      </div>
+      
+      {/* Model Distribution */}
+      <div>
+        <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+          <BarChart3 className="h-4 w-4 text-[#0367FC]" /> Model Distribution
+        </h3>
+        <div className="space-y-3">
+          {currentModels.models.map((m, i) => (
+            <div 
+              key={m.name}
+              className="rounded-xl border border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all"
+              style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-[#0367FC]/10 text-[#0367FC] grid place-items-center text-xs font-bold">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{m.name}</p>
+                    <p className="text-xs text-muted-foreground">{m.desc}</p>
+                  </div>
+                </div>
+                <span className="text-sm font-mono font-bold text-[#0367FC]">{m.pct}</span>
+              </div>
+              <div className="mt-3 h-1.5 bg-black/[5%] rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-[#0367FC] transition-all duration-700"
+                  style={{ width: m.pct, animation: `fadeInUp 0.6s ease-out ${0.2 + i * 0.1}s both` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Note */}
+      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-amber-800">Catatan</p>
+          <p className="text-xs text-amber-700 mt-1">{currentModels.note}</p>
+        </div>
+      </div>
+      
+      {/* Upgrade CTA for Free */}
+      {tier === 'free' && (
+        <button className="w-full h-11 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center justify-center gap-2 shadow-lg shadow-[#0367FC]/20 hover:-translate-y-0.5">
+          <Zap className="h-4 w-4" /> Upgrade ke Pro
+        </button>
+      )}
     </div>
   );
 }

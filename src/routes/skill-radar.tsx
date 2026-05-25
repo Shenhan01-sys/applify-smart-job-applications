@@ -33,7 +33,7 @@ function SkillPage() {
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
-        <div className="glass rounded-2xl p-5">
+        <div className="glass rounded-2xl p-5 animate-fade-in-up">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Profil Skill Kamu</h2>
             <span className="text-[10px] uppercase tracking-wider text-teal font-mono">vs Market Avg</span>
@@ -47,16 +47,16 @@ function SkillPage() {
           </div>
         </div>
 
-        <div className="glass rounded-2xl p-5">
+        <div className="glass rounded-2xl p-5 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Trending Skills · Minggu Ini</h2>
           </div>
           <ul className="space-y-2">
-            {trending.map((s) => {
+            {trending.map((s, i) => {
               const Icon = s.dir==='up'?TrendingUp:s.dir==='down'?TrendingDown:Minus;
               const color = s.dir==='up'?'text-teal':s.dir==='down'?'text-danger':'text-muted-foreground';
               return (
-                <li key={s.n} className="rounded-xl bg-black/[3%] border border-black/[6%] p-3 flex items-center gap-3">
+                <li key={s.n} className="rounded-xl bg-black/[3%] border border-black/[6%] p-3 flex items-center gap-3 hover:border-black/[10%] transition-all" style={{ animation: `fadeInUp 0.35s ease-out ${0.15 + i * 0.05}s both` }}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm">{s.n}</p>
@@ -77,8 +77,8 @@ function SkillPage() {
           { t: "FastAPI", impact: "+43% callback", bg: "bg-[#D2F801]", txt: "text-[#161616]", sub: "text-[#444444]" },
           { t: "Kubernetes", impact: "+28% match rate", bg: "bg-[#0367FC]", txt: "text-white", sub: "text-white/80" },
           { t: "System Design", impact: "+19% interview", bg: "bg-[#161616]", txt: "text-white", sub: "text-white/70" },
-        ].map((c) => (
-          <div key={c.t} className={`relative overflow-hidden rounded-2xl ${c.bg} p-5`}>
+        ].map((c, i) => (
+          <div key={c.t} className={`relative overflow-hidden rounded-2xl ${c.bg} p-5 hover:scale-[1.02] transition-transform duration-300`} style={{ animation: `fadeInUp 0.4s ease-out ${0.2 + i * 0.08}s both` }}>
             <div className="relative">
               <Sparkles className={`h-5 w-5 ${c.txt}`} />
               <p className={`mt-3 text-sm font-semibold ${c.txt}`}>Tambahkan <span className="font-bold">{c.t}</span></p>

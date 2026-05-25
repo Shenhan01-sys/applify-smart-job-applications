@@ -40,11 +40,16 @@ function ApprovalsPage() {
   const [history, setHistory] = useState<ApprovalRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [tabKey, setTabKey] = useState(0);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  const tabOrder: ('pending' | 'history')[] = ['pending', 'history'];
   const handleTabChange = (tab: 'pending' | 'history') => {
+    const currentIndex = tabOrder.indexOf(activeTab);
+    const newIndex = tabOrder.indexOf(tab);
+    setDirection(newIndex > currentIndex ? 'next' : 'prev');
     setActiveTab(tab);
     setTabKey(k => k + 1);
   };
@@ -153,7 +158,7 @@ function ApprovalsPage() {
       </div>
 
       {/* Content */}
-      <div key={tabKey} className="animate-tab-enter">
+      <div key={tabKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
       {displayApprovals.length === 0 ? (
         <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[8%]">
           {activeTab === 'pending' ? (
