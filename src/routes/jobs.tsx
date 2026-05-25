@@ -255,7 +255,7 @@ function JobsPage() {
           ai_strategy: "AI akan membuat CV yang menonjolkan proyek data analysis dan visualisasi kamu. Sertifikat dan course completion akan di-highlight. AI akan juga menyarankan portfolio project yang bisa ditambahkan.",
           ai_actions: [
             { step: 1, title: "Skills Highlight", description: "Soroti SQL, Python, dan visualization skills", status: "pending", estimated_time: "2 menit" },
-            { step: 2, title: "Portfolio Enhancement", description: "Tambahkan link ke project dashboard dan GitHub", status: "pending", estimated_time: "3 menit" },
+            { step: 2, title: "Portfolio Enhancement", description: "Tambahkan link ke project dan portfolio", status: "pending", estimated_time: "3 menit" },
             { step: 3, title: "CV Submission", description: "Submit dengan format yang ATS-friendly", status: "pending", estimated_time: "1 menit" },
           ],
           skill_gaps: [

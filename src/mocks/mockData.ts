@@ -31,7 +31,7 @@ export const mockProfile = {
   avatar_url: null,
   phone: "+6281234567890",
   linkedin_url: "https://linkedin.com/in/demo-user",
-  portfolio_url: "https://github.com/demo-user",
+  portfolio_url: "https://demo-user.com/portfolio",
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-05-25T00:00:00Z",
 };
@@ -157,7 +157,7 @@ export const mockJobs = [
     ai_strategy: "AI akan membuat CV yang menonjolkan proyek data analysis dan visualisasi kamu.",
     ai_actions: [
       { step: 1, title: "Skills Highlight", description: "Soroti SQL, Python, dan visualization skills", status: "pending", estimated_time: "2 menit" },
-      { step: 2, title: "Portfolio Enhancement", description: "Tambahkan link ke dashboard dan GitHub", status: "pending", estimated_time: "3 menit" },
+            { step: 2, title: "Portfolio Enhancement", description: "Tambahkan link ke portfolio", status: "pending", estimated_time: "3 menit" },
       { step: 3, title: "Submit", description: "Submit dengan format ATS-friendly", status: "pending", estimated_time: "1 menit" },
     ],
     skill_gaps: [
@@ -640,7 +640,7 @@ export const mockAutomationSettings = {
   veteran_status: "",
   years_of_experience: "5",
   require_visa: "no",
-  website: "https://github.com/demo-user",
+  website: "https://demo-user.com",
   linkedin_url: "https://linkedin.com/in/demo-user",
   us_citizenship: "no",
   desired_salary: 40000000,
@@ -742,13 +742,13 @@ export const mockProjects = [
   {
     id: "proj-001", user_id: MOCK_USER_ID, title: "E-commerce Platform", description: "Full-stack e-commerce platform serving 100k+ daily users.",
     role: "Lead Developer", tech_stack: ["React", "Node.js", "PostgreSQL", "Redis"], project_url: "https://example.com",
-    repo_url: "https://github.com/demo/ecommerce", image_url: null, start_date: "2023-01-01", end_date: "2023-06-30",
+    repo_url: "https://demo-user.com/project/ecommerce", image_url: null, start_date: "2023-01-01", end_date: "2023-06-30",
     is_featured: true, impact_metrics: { users: "100k+", revenue: "$500k+" }, created_at: daysAgo(500), updated_at: daysAgo(200),
   },
   {
     id: "proj-002", user_id: MOCK_USER_ID, title: "Real-time Dashboard", description: "Analytics dashboard with real-time data processing.",
     role: "Backend Engineer", tech_stack: ["Go", "WebSocket", "Redis", "React"], project_url: null,
-    repo_url: "https://github.com/demo/dashboard", image_url: null, start_date: "2024-01-01", end_date: "2024-03-31",
+    repo_url: "https://demo-user.com/project/dashboard", image_url: null, start_date: "2024-01-01", end_date: "2024-03-31",
     is_featured: false, impact_metrics: { data_points: "1M+/day" }, created_at: daysAgo(100), updated_at: daysAgo(50),
   },
 ];
@@ -761,7 +761,7 @@ export const mockAchievements = [
   },
   {
     id: "ach-002", user_id: MOCK_USER_ID, title: "Open Source Contributor", description: "Contributed to 5 open source projects.",
-    category: "community", issuer: null, achievement_date: null, url: "https://github.com/demo", is_featured: false,
+    category: "community", issuer: null, achievement_date: null, url: "https://demo-user.com", is_featured: false,
     created_at: daysAgo(200), updated_at: daysAgo(200),
   },
 ];

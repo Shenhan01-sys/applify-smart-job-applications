@@ -438,7 +438,7 @@ function Step1Basic({ formData, setFormData }: {
     { key: 'phone', label: 'Nomor Telepon', placeholder: '+62 812-3456-7890', icon: Phone, type: 'text' },
     { key: 'email', label: 'Email', placeholder: 'nama@email.com', icon: Mail, type: 'email' },
     { key: 'linkedin_url', label: 'LinkedIn URL', placeholder: 'https://linkedin.com/in/username', icon: Link2, type: 'url' },
-    { key: 'portfolio_url', label: 'Portfolio / GitHub', placeholder: 'https://github.com/username', icon: Layers, type: 'url' },
+    { key: 'portfolio_url', label: 'Portfolio / Website', placeholder: 'https://www.portfolio.com/username', icon: Layers, type: 'url' },
   ];
 
   return (
