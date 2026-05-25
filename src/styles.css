@@ -172,6 +172,23 @@
 }
 .animate-float { animation: float 4s ease-in-out infinite; }
 
+/* ── Smooth tab / view switch animation ── */
+@keyframes tab-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-tab-enter {
+  animation: tab-enter 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-view-enter {
+  animation: view-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
 /* ── Scroll-triggered reveal animation ── */
 .scroll-reveal {
   opacity: 0;

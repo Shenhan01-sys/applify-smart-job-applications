@@ -6,8 +6,8 @@ import { automationApi } from "@/services/automationApi";
 import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
 import {
-  Clock, CheckCircle, XCircle, AlertCircle, Loader2,
-  ShieldCheck, History, ChevronRight
+  ShieldCheck, History, ChevronRight, Clock, CheckCircle2,
+  XCircle, AlertCircle, Loader2, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,9 +39,15 @@ function ApprovalsPage() {
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
   const [history, setHistory] = useState<ApprovalRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+  const [tabKey, setTabKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const handleTabChange = (tab: 'pending' | 'history') => {
+    setActiveTab(tab);
+    setTabKey(k => k + 1);
+  };
 
   useEffect(() => {
     loadData();
@@ -88,11 +94,11 @@ function ApprovalsPage() {
   };
 
   const getStatusConfig = (status: string) => {
-    const configs: Record<string, { icon: any; color: string; bg: string; border: string }> = {
-      pending: { icon: Clock, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-      approved: { icon: CheckCircle, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
-      rejected: { icon: XCircle, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
-      expired: { icon: AlertCircle, color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200' },
+    const configs: Record<string, { icon: any; color: string; bg: string; border: string; text: string }> = {
+      pending:   { icon: Clock,       color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200', text: 'bg-amber-100 text-amber-800 border-amber-200' },
+      approved:  { icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200', text: 'bg-green-100 text-green-800 border-green-200' },
+      rejected:  { icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',   text: 'bg-red-100 text-red-800 border-red-200' },
+      expired:   { icon: AlertCircle,  color: 'text-gray-600',   bg: 'bg-gray-50',   border: 'border-gray-200',  text: 'bg-gray-100 text-gray-800 border-gray-200' },
     };
     return configs[status] || configs.pending;
   };
@@ -129,7 +135,7 @@ function ApprovalsPage() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
@@ -147,11 +153,14 @@ function ApprovalsPage() {
       </div>
 
       {/* Content */}
+      <div key={tabKey} className="animate-tab-enter">
       {displayApprovals.length === 0 ? (
         <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[8%]">
           {activeTab === 'pending' ? (
             <>
-              <CheckCircle className="h-12 w-12 mx-auto text-green-400 mb-4" />
+              <div className="h-12 w-12 rounded-full bg-green-100 grid place-items-center mx-auto mb-4">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+              </div>
               <h3 className="text-lg font-semibold mb-2">Semua sudah di-review!</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
                 Tidak ada pending approvals. AI akan memberitahu kamu saat ada aplikasi baru yang perlu di-review.
@@ -159,7 +168,9 @@ function ApprovalsPage() {
             </>
           ) : (
             <>
-              <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <div className="h-12 w-12 rounded-full bg-black/[5%] grid place-items-center mx-auto mb-4">
+                <History className="h-6 w-6 text-muted-foreground" />
+              </div>
               <h3 className="text-lg font-semibold mb-2">Belum ada history</h3>
               <p className="text-sm text-muted-foreground">
                 Aplikasi yang di-approve atau di-reject akan muncul di sini.
@@ -175,18 +186,19 @@ function ApprovalsPage() {
             return (
               <div
                 key={request.id}
-                className="rounded-xl border-2 border-[#E0E0E0] bg-white p-4 hover:border-[#0367FC]/40 hover:shadow-md transition-all duration-200 group"
+                className="rounded-2xl border-2 border-[#999999] bg-white p-4 hover:border-[#0367FC]/40 hover:shadow-md transition-all duration-200 group"
                 style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both` }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-bold truncate">{request.job_title}</h3>
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.bg} ${config.color} ${config.border}`}>
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.text}`}>
                         <StatusIcon className="h-3 w-3" />
                         {request.status}
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border border-black/[6%]">
+                        <Sparkles className="h-3 w-3" />
                         {request.platform}
                       </span>
                     </div>
@@ -210,7 +222,7 @@ function ApprovalsPage() {
                   {activeTab === 'pending' && (
                     <button
                       onClick={() => handleReview(request)}
-                      className="h-9 px-4 rounded-lg bg-[#0367FC] text-white text-xs font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md"
+                      className="h-9 px-4 rounded-lg bg-[#0367FC] text-white text-xs font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"
                     >
                       Review <ChevronRight className="h-3 w-3" />
                     </button>
@@ -221,6 +233,7 @@ function ApprovalsPage() {
           })}
         </div>
       )}
+      </div>
 
       {selectedRequest && (
         <ApprovalReviewModal

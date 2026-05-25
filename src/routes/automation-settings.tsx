@@ -7,7 +7,7 @@ import { mockAutomationSettings } from "@/mocks/mockData";
 import { 
   Loader2, Save, User, FileText, Search, Settings, Brain,
   Briefcase, MapPin, DollarSign, Clock, CheckCircle2, ToggleLeft,
-  AlertCircle, Sparkles
+  AlertCircle, Sparkles, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +37,12 @@ function AutomationSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [tabKey, setTabKey] = useState(0);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setTabKey(k => k + 1);
+  };
 
   useEffect(() => {
     loadSettings();
@@ -113,7 +119,7 @@ function AutomationSettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 isActive
                   ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
@@ -128,170 +134,175 @@ function AutomationSettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="glass rounded-2xl p-5 md:p-6">
-        {activeTab === 'personal' && (
-          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <User className="h-5 w-5 text-[#0367FC]" /> Personal Information
-            </h2>
-            <p className="text-sm text-muted-foreground">Data ini digunakan untuk mengisi form lamaran otomatis</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="First Name" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
-              <InputField label="Last Name" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
-              <InputField label="Phone Number" value={settings.phone_number || ''} onChange={(v: string) => updateField('phone_number', v)} icon={Sparkles} />
-              <InputField label="Current City" value={settings.current_city || ''} onChange={(v: string) => updateField('current_city', v)} icon={MapPin} />
-              <InputField label="Street" value={settings.street || ''} onChange={(v: string) => updateField('street', v)} />
-              <InputField label="State" value={settings.state || ''} onChange={(v: string) => updateField('state', v)} />
-              <InputField label="Zip Code" value={settings.zipcode || ''} onChange={(v: string) => updateField('zipcode', v)} />
-              <InputField label="Country" value={settings.country || ''} onChange={(v: string) => updateField('country', v)} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'answers' && (
-          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#0367FC]" /> Application Answers
-            </h2>
-            <p className="text-sm text-muted-foreground">Jawaban yang sudah dikonfigurasi untuk pertanyaan umum lamaran</p>
+      <div className="glass rounded-2xl p-5 md:p-6 overflow-hidden">
+        <div
+          key={tabKey}
+          className="animate-tab-enter"
+        >
+          {activeTab === 'personal' && (
             <div className="space-y-4">
-              <InputField label="Years of Experience" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
-              <SelectField 
-                label="Require Visa Sponsorship" 
-                value={settings.require_visa || 'no'} 
-                options={[{value: 'no', label: 'No'}, {value: 'yes', label: 'Yes'}]}
-                onChange={(v: string) => updateField('require_visa', v)} 
-              />
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <User className="h-5 w-5 text-[#0367FC]" /> Personal Information
+              </h2>
+              <p className="text-sm text-muted-foreground">Data ini digunakan untuk mengisi form lamaran otomatis</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Desired Salary (Annual)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
-                <InputField label="Current CTC (Annual)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
+                <InputField label="First Name" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
+                <InputField label="Last Name" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
+                <InputField label="Phone Number" value={settings.phone_number || ''} onChange={(v: string) => updateField('phone_number', v)} icon={Sparkles} />
+                <InputField label="Current City" value={settings.current_city || ''} onChange={(v: string) => updateField('current_city', v)} icon={MapPin} />
+                <InputField label="Street" value={settings.street || ''} onChange={(v: string) => updateField('street', v)} />
+                <InputField label="State" value={settings.state || ''} onChange={(v: string) => updateField('state', v)} />
+                <InputField label="Zip Code" value={settings.zipcode || ''} onChange={(v: string) => updateField('zipcode', v)} />
+                <InputField label="Country" value={settings.country || ''} onChange={(v: string) => updateField('country', v)} />
               </div>
-              <InputField label="Notice Period (days)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
-              <InputField label="LinkedIn URL" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
-              <InputField label="Website / Portfolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
-              <div>
-                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Default Cover Letter</label>
-                <textarea
-                  rows={6}
-                  value={settings.cover_letter || ''}
-                  onChange={(e) => updateField('cover_letter', e.target.value)}
-                  placeholder="Template cover letter default kamu..."
-                  className="mt-1.5 w-full rounded-lg bg-black/[4%] border border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+            </div>
+          )}
+
+          {activeTab === 'answers' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <FileText className="h-5 w-5 text-[#0367FC]" /> Application Answers
+              </h2>
+              <p className="text-sm text-muted-foreground">Jawaban yang sudah dikonfigurasi untuk pertanyaan umum lamaran</p>
+              <div className="space-y-4">
+                <InputField label="Years of Experience" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
+                <SelectField 
+                  label="Require Visa Sponsorship" 
+                  value={settings.require_visa || 'no'} 
+                  options={[{value: 'no', label: 'No'}, {value: 'yes', label: 'Yes'}]}
+                  onChange={(v: string) => updateField('require_visa', v)} 
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField label="Desired Salary (Annual)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
+                  <InputField label="Current CTC (Annual)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
+                </div>
+                <InputField label="Notice Period (days)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
+                <InputField label="LinkedIn URL" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
+                <InputField label="Website / Portfolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Default Cover Letter</label>
+                  <textarea
+                    rows={6}
+                    value={settings.cover_letter || ''}
+                    onChange={(e) => updateField('cover_letter', e.target.value)}
+                    placeholder="Template cover letter default kamu..."
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'search' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Search className="h-5 w-5 text-[#0367FC]" /> Search Preferences
+              </h2>
+              <div className="space-y-4">
+                <InputField 
+                  label="Search Keywords (pisahkan koma)" 
+                  value={settings.search_keywords?.join(', ') || ''} 
+                  onChange={(v: string) => updateField('search_keywords', v.split(',').map(k => k.trim()).filter(Boolean))} 
+                  placeholder="Software Engineer, React Developer, Full Stack"
+                />
+                <InputField 
+                  label="Search Location" 
+                  value={settings.search_location || ''} 
+                  onChange={(v: string) => updateField('search_location', v)} 
+                  placeholder="Jakarta, Indonesia atau Remote"
+                  icon={MapPin}
+                />
+                <ToggleField 
+                  label="Easy Apply Only" 
+                  description="Hanya cari lowongan dengan easy apply"
+                  checked={settings.easy_apply_only ?? false}
+                  onChange={(v: boolean) => updateField('easy_apply_only', v)}
+                />
+                <InputField 
+                  label="Blacklist Companies (pisahkan koma)" 
+                  value={settings.blacklist_companies?.join(', ') || ''} 
+                  onChange={(v: string) => updateField('blacklist_companies', v.split(',').map(k => k.trim()).filter(Boolean))} 
+                />
+                <InputField 
+                  label="Blacklist Words (pisahkan koma)" 
+                  value={settings.blacklist_words?.join(', ') || ''} 
+                  onChange={(v: string) => updateField('blacklist_words', v.split(',').map(k => k.trim()).filter(Boolean))} 
                 />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'search' && (
-          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Search className="h-5 w-5 text-[#0367FC]" /> Search Preferences
-            </h2>
-            <div className="space-y-4">
-              <InputField 
-                label="Search Keywords (pisahkan koma)" 
-                value={settings.search_keywords?.join(', ') || ''} 
-                onChange={(v: string) => updateField('search_keywords', v.split(',').map(k => k.trim()).filter(Boolean))} 
-                placeholder="Software Engineer, React Developer, Full Stack"
-              />
-              <InputField 
-                label="Search Location" 
-                value={settings.search_location || ''} 
-                onChange={(v: string) => updateField('search_location', v)} 
-                placeholder="Jakarta, Indonesia atau Remote"
-                icon={MapPin}
+          {activeTab === 'behavior' && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Settings className="h-5 w-5 text-[#0367FC]" /> Automation Behavior
+              </h2>
+              <ToggleField 
+                label="Pause Before Submit" 
+                description="Berhenti sebelum submit setiap lamaran untuk review kamu"
+                checked={settings.pause_before_submit ?? true}
+                onChange={(v: boolean) => updateField('pause_before_submit', v)}
               />
               <ToggleField 
-                label="Easy Apply Only" 
-                description="Hanya cari lowongan dengan easy apply"
-                checked={settings.easy_apply_only ?? false}
-                onChange={(v: boolean) => updateField('easy_apply_only', v)}
+                label="Pause at Unknown Questions" 
+                description="Berhenti saat AI menemukan pertanyaan yang tidak bisa dijawab"
+                checked={settings.pause_at_failed_question ?? true}
+                onChange={(v: boolean) => updateField('pause_at_failed_question', v)}
               />
-              <InputField 
-                label="Blacklist Companies (pisahkan koma)" 
-                value={settings.blacklist_companies?.join(', ') || ''} 
-                onChange={(v: string) => updateField('blacklist_companies', v.split(',').map(k => k.trim()).filter(Boolean))} 
-              />
-              <InputField 
-                label="Blacklist Words (pisahkan koma)" 
-                value={settings.blacklist_words?.join(', ') || ''} 
-                onChange={(v: string) => updateField('blacklist_words', v.split(',').map(k => k.trim()).filter(Boolean))} 
+              <ToggleField 
+                label="Overwrite Previous Answers" 
+                description="Selalu gunakan settings terbaru daripada jawaban yang sudah tersimpan"
+                checked={settings.overwrite_previous_answers ?? false}
+                onChange={(v: boolean) => updateField('overwrite_previous_answers', v)}
               />
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'behavior' && (
-          <div className="space-y-6" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Settings className="h-5 w-5 text-[#0367FC]" /> Automation Behavior
-            </h2>
-            <ToggleField 
-              label="Pause Before Submit" 
-              description="Berhenti sebelum submit setiap lamaran untuk review kamu"
-              checked={settings.pause_before_submit ?? true}
-              onChange={(v: boolean) => updateField('pause_before_submit', v)}
-            />
-            <ToggleField 
-              label="Pause at Unknown Questions" 
-              description="Berhenti saat AI menemukan pertanyaan yang tidak bisa dijawab"
-              checked={settings.pause_at_failed_question ?? true}
-              onChange={(v: boolean) => updateField('pause_at_failed_question', v)}
-            />
-            <ToggleField 
-              label="Overwrite Previous Answers" 
-              description="Selalu gunakan settings terbaru daripada jawaban yang sudah tersimpan"
-              checked={settings.overwrite_previous_answers ?? false}
-              onChange={(v: boolean) => updateField('overwrite_previous_answers', v)}
-            />
-          </div>
-        )}
-
-        {activeTab === 'ai' && (
-          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
-            </h2>
-            <SelectField 
-              label="AI Provider" 
-              value={settings.ai_provider || 'openai'} 
-              options={[
-                {value: 'openai', label: 'OpenAI'},
-                {value: 'openrouter', label: 'OpenRouter'},
-                {value: 'deepseek', label: 'DeepSeek'},
-                {value: 'gemini', label: 'Google Gemini'},
-              ]}
-              onChange={(v: string) => updateField('ai_provider', v)} 
-            />
-            <InputField 
-              label="AI Model" 
-              value={settings.ai_model || 'gpt-4'} 
-              onChange={(v: string) => updateField('ai_model', v)} 
-              placeholder="Contoh: gpt-4, claude-3.5-sonnet"
-            />
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-800">Catatan</p>
-                <p className="text-xs text-amber-700 mt-1">
-                  Pemilihan model AI mempengaruhi kualitas dan biaya. Free tier menggunakan model gratis. Pro tier menggunakan Claude Opus/Sonnet.
-                </p>
+          {activeTab === 'ai' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
+              </h2>
+              <SelectField 
+                label="AI Provider" 
+                value={settings.ai_provider || 'openai'} 
+                options={[
+                  {value: 'openai', label: 'OpenAI'},
+                  {value: 'openrouter', label: 'OpenRouter'},
+                  {value: 'deepseek', label: 'DeepSeek'},
+                  {value: 'gemini', label: 'Google Gemini'},
+                ]}
+                onChange={(v: string) => updateField('ai_provider', v)} 
+              />
+              <InputField 
+                label="AI Model" 
+                value={settings.ai_model || 'gpt-4'} 
+                onChange={(v: string) => updateField('ai_model', v)} 
+                placeholder="Contoh: gpt-4, claude-3.5-sonnet"
+              />
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Catatan</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Pemilihan model AI mempengaruhi kualitas dan biaya. Free tier menggunakan model gratis. Pro tier menggunakan Claude Opus/Sonnet.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Save Button */}
-        <div className="mt-6 pt-6 border-t border-black/[6%] flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="h-11 px-8 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Menyimpan...' : 'Simpan Settings'}
-          </button>
+          {/* Save Button */}
+          <div className="mt-6 pt-6 border-t border-black/[6%] flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="h-11 px-8 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Menyimpan...' : 'Simpan Settings'}
+            </button>
+          </div>
         </div>
       </div>
     </AppShell>
@@ -311,7 +322,7 @@ function InputField({ label, value, onChange, type = 'text', placeholder = '', i
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
       />
     </div>
   );
@@ -324,7 +335,7 @@ function SelectField({ label, value, options, onChange }: any) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
       >
         {options.map((opt: any) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -336,7 +347,7 @@ function SelectField({ label, value, options, onChange }: any) {
 
 function ToggleField({ label, description, checked, onChange }: any) {
   return (
-    <div className="flex items-center justify-between py-2">
+    <div className="flex items-center justify-between py-2 border-b border-black/[4%] last:border-0">
       <div>
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>

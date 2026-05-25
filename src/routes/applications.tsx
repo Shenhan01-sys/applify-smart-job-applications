@@ -109,9 +109,15 @@ function AppsPage() {
   const [applications, setApplications] = useState<AIApplicationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [viewKey, setViewKey] = useState(0);
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
+
+  const handleViewChange = (newView: "kanban" | "list") => {
+    setView(newView);
+    setViewKey(k => k + 1);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -216,7 +222,7 @@ function AppsPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setView("kanban")}
+            onClick={() => handleViewChange("kanban")}
             className={`hidden md:inline-flex h-10 px-3 rounded-lg items-center gap-2 text-sm border-2 transition ${
               view === "kanban"
                 ? "bg-[#0367FC] text-white border-[#0367FC]"
@@ -226,7 +232,7 @@ function AppsPage() {
             <LayoutGrid className="h-4 w-4" /> Kanban
           </button>
           <button
-            onClick={() => setView("list")}
+            onClick={() => handleViewChange("list")}
             className={`h-10 px-3 rounded-lg inline-flex items-center gap-2 text-sm border-2 transition ${
               view === "list"
                 ? "bg-[#0367FC] text-white border-[#0367FC]"
@@ -253,6 +259,7 @@ function AppsPage() {
         ))}
       </div>
 
+      <div key={viewKey} className="animate-view-enter">
       {applications.length === 0 ? (
         <div className="text-center py-16">
           <Bot className="h-12 w-12 mx-auto text-[#999999] mb-4" />
@@ -338,6 +345,7 @@ function AppsPage() {
           })}
         </div>
       )}
+      </div>
 
       {/* Detail Modal */}
       {showDetail && selectedApp && (

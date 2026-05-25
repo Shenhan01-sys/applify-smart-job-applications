@@ -7,7 +7,7 @@ import { mockLinkedInStatus } from "@/mocks/mockData";
 import { 
   Shield, ShieldCheck, ShieldAlert, RefreshCw, Clock, 
   CheckCircle2, AlertCircle, Loader2, Linkedin, BookOpen,
-  Lock, KeyRound, Trash2
+  Lock, KeyRound, Trash2, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,7 +29,13 @@ function LinkedInSessionPage() {
   const [importing, setImporting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'guide'>('manual');
+  const [tabKey, setTabKey] = useState(0);
   const [status, setStatus] = useState(sessionStatus);
+
+  const handleTabChange = (tab: 'manual' | 'guide') => {
+    setActiveTab(tab);
+    setTabKey(k => k + 1);
+  };
 
   useEffect(() => {
     if (isMockMode()) {
@@ -129,7 +135,7 @@ function LinkedInSessionPage() {
           <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-5 transition-all duration-300`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`h-12 w-12 rounded-xl ${config.bg} grid place-items-center`}>
+                <div className={`h-12 w-12 rounded-xl ${config.bg} grid place-items-center border-2 ${config.border}`}>
                   <StatusIcon className={`h-6 w-6 ${config.color}`} />
                 </div>
                 <div>
@@ -150,8 +156,9 @@ function LinkedInSessionPage() {
                     {verifying ? 'Verifying...' : 'Verify'}
                   </button>
                 </div>
-              )}
+            )}
             </div>
+          </div>
 
             {status?.hasSession ? (
               <div className="mt-4 pt-4 border-t border-black/[6%] space-y-2 text-sm">
@@ -183,11 +190,11 @@ function LinkedInSessionPage() {
                 return (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    onClick={() => handleTabChange(tab.key)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                       activeTab === tab.key
-                        ? 'bg-[#0367FC] text-white'
-                        : 'bg-black/[4%] text-muted-foreground hover:bg-black/[7%]'
+                        ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
+                        : 'bg-black/[4%] text-muted-foreground border border-black/[8%] hover:bg-black/[7%]'
                     }`}
                   >
                     <Icon className="h-4 w-4" /> {tab.label}
@@ -196,13 +203,14 @@ function LinkedInSessionPage() {
               })}
             </div>
 
+            <div key={tabKey} className="animate-tab-enter">
             {activeTab === 'manual' && (
-              <div className="space-y-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+              <div className="space-y-4">
                 <div>
                   <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cookies JSON</label>
                   <textarea
                     rows={6}
-                    className="mt-1.5 w-full rounded-lg bg-black/[4%] border border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
                     placeholder={`Paste cookies di sini dalam format JSON:\n[\n  {"name": "li_at", "value": "...", "domain": ".linkedin.com"}\n]`}
                     value={cookiesJson}
                     onChange={(e) => setCookiesJson(e.target.value)}
@@ -211,7 +219,7 @@ function LinkedInSessionPage() {
                 <button
                   onClick={handleImport}
                   disabled={importing || !cookiesJson.trim()}
-                  className="h-10 px-5 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60"
+                  className="h-10 px-5 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
                 >
                   {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                   {importing ? 'Importing...' : 'Import Session'}
@@ -220,7 +228,7 @@ function LinkedInSessionPage() {
             )}
 
             {activeTab === 'guide' && (
-              <div className="space-y-3 text-sm" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+              <div className="space-y-3 text-sm">
                 <h4 className="font-semibold">Cara export cookies LinkedIn:</h4>
                 <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
                   <li>Buka LinkedIn di browser dan login ke akun kamu</li>
