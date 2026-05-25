@@ -4,9 +4,13 @@ import AppShell from "@/components/app/AppShell";
 import { EyeOff, Download, FileCheck2, ChevronRight, Loader2, Save } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { mockProfile as mockProfileData } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/profile")({
   beforeLoad: async () => {
+    if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
@@ -34,12 +38,8 @@ function ProfilePage() {
 
   useEffect(() => {
     async function loadProfile() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user?.id)
-        .single();
-      if (data) {
+      if (isMockMode()) {
+        const data = mockProfileData;
         setProfile(data);
         setFormData({
           full_name: data.full_name || "",
@@ -49,7 +49,25 @@ function ProfilePage() {
           skills: data.skills || [],
           phone: data.phone || "",
         });
+        setLoading(false);
+        return;
       }
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user?.id)
+        .single();
+      const fallbackData = data || mockProfileData;
+      setProfile(fallbackData);
+      setFormData({
+        full_name: fallbackData.full_name || "",
+        current_title: fallbackData.current_title || "",
+        location: fallbackData.location || "",
+        experience_years: fallbackData.experience_years || 0,
+        skills: fallbackData.skills || [],
+        phone: fallbackData.phone || "",
+      });
       setLoading(false);
     }
     if (user) loadProfile();

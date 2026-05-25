@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import { profileService, type FullProfile } from "./profileService";
+import { mockAIApplications, mockFullProfile, MOCK_USER_ID } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
+
+// In-memory mock store for mock mode
+let mockAppStore = [...mockAIApplications];
 
 export interface AIApplicationData {
   id: string;
@@ -116,10 +122,33 @@ ESTIMATED SUCCESS RATE: ${job.acceptance_potential}%`;
 export const aiApplicationService = {
   // Create AI application draft
   async createDraft(input: AIApplicationInput): Promise<AIApplicationData> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 1500));
+      const newApp = {
+        id: `app-${Date.now()}`,
+        user_id: MOCK_USER_ID,
+        job_id: input.jobId,
+        optimized_cv: mockAiAnalysis.optimizedCV,
+        cover_letter: mockAiAnalysis.coverLetter,
+        tailored_skills: mockAiAnalysis.tailoredSkills,
+        ai_notes: mockAiAnalysis.aiNotes,
+        status: "draft" as const,
+        submitted_at: undefined,
+        follow_up_scheduled: undefined,
+        follow_up_sent: false,
+        company_response: undefined,
+        response_received_at: undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        jobs: { title: "New Job", company: "Company" },
+      };
+      mockAppStore = [newApp as any, ...mockAppStore];
+      return newApp as AIApplicationData;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    // Fetch profile and job data
     const [profile, { data: job }] = await Promise.all([
       profileService.getFullProfile(user.id),
       supabase.from("jobs").select("*").eq("id", input.jobId).single(),
@@ -127,10 +156,8 @@ export const aiApplicationService = {
 
     if (!job) throw new Error("Job not found");
 
-    // Simulate AI generation
     const aiResult = simulateAIGeneration(profile, job, input.tone || "professional");
 
-    // Save to database
     const { data, error } = await supabase
       .from("ai_applications")
       .insert({
@@ -151,6 +178,10 @@ export const aiApplicationService = {
 
   // Get all AI applications for user
   async getApplications(): Promise<AIApplicationData[]> {
+    if (isMockMode()) {
+      return mockAppStore as unknown as AIApplicationData[];
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
@@ -166,6 +197,11 @@ export const aiApplicationService = {
 
   // Get single application
   async getApplication(id: string): Promise<AIApplicationData & { job: any }> {
+    if (isMockMode()) {
+      const app = mockAppStore.find(a => a.id === id) || mockAppStore[0];
+      return { ...app, job: app.jobs } as any;
+    }
+
     const { data, error } = await supabase
       .from("ai_applications")
       .select("*, jobs(*)")
@@ -178,6 +214,13 @@ export const aiApplicationService = {
 
   // Update cover letter
   async updateCoverLetter(id: string, coverLetter: string) {
+    if (isMockMode()) {
+      mockAppStore = mockAppStore.map(a =>
+        a.id === id ? { ...a, cover_letter: coverLetter, updated_at: new Date().toISOString() } : a
+      );
+      return mockAppStore.find(a => a.id === id);
+    }
+
     const { data, error } = await supabase
       .from("ai_applications")
       .update({ cover_letter: coverLetter, updated_at: new Date().toISOString() })
@@ -191,12 +234,26 @@ export const aiApplicationService = {
 
   // Submit application (mark as ready/submitted)
   async submitApplication(id: string) {
+    if (isMockMode()) {
+      mockAppStore = mockAppStore.map(a =>
+        a.id === id
+          ? {
+              ...a,
+              status: "submitted",
+              submitted_at: new Date().toISOString(),
+              follow_up_scheduled: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+            }
+          : a
+      );
+      return mockAppStore.find(a => a.id === id);
+    }
+
     const { data, error } = await supabase
       .from("ai_applications")
       .update({
         status: "submitted",
         submitted_at: new Date().toISOString(),
-        follow_up_scheduled: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(), // 4 days later
+        follow_up_scheduled: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .eq("id", id)
       .select()
@@ -204,7 +261,6 @@ export const aiApplicationService = {
 
     if (error) throw error;
 
-    // Also update job status
     const app = await this.getApplication(id);
     if (app.job_id) {
       await supabase.from("jobs").update({ status: "applied" }).eq("id", app.job_id);

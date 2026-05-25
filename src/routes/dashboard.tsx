@@ -4,9 +4,13 @@ import AppShell from "@/components/app/AppShell";
 import { Rocket, Target, CalendarCheck, Zap, TrendingUp, ArrowUpRight, Bell, Award, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { mockProfile as mockProfileData, mockSubscription, mockApplications as mockAppData, MOCK_USER_ID } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async () => {
+    if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
@@ -24,14 +28,22 @@ function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       if (!user?.id) return;
-      
+
+      if (isMockMode()) {
+        setProfile(mockProfileData);
+        setApplications(mockAppData as any[]);
+        setSubscription(mockSubscription);
+        setLoading(false);
+        return;
+      }
+
       // Load profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
-      setProfile(profileData);
+      setProfile(profileData || mockProfileData);
 
       // Load applications
       const { data: appData } = await supabase
@@ -40,7 +52,7 @@ function DashboardPage() {
         .eq("user_id", user.id)
         .order("applied_at", { ascending: false })
         .limit(10);
-      setApplications(appData || []);
+      setApplications((appData?.length ? appData : mockAppData) as any[]);
 
       // Load subscription
       const { data: subData } = await supabase
@@ -48,7 +60,7 @@ function DashboardPage() {
         .select("*")
         .eq("user_id", user.id)
         .single();
-      setSubscription(subData);
+      setSubscription(subData || mockSubscription);
 
       setLoading(false);
     }

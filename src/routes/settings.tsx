@@ -3,8 +3,11 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { Chrome, Bell, CreditCard, Lock } from "lucide-react";
 
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
+
 export const Route = createFileRoute("/settings")({
   beforeLoad: async () => {
+    if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },

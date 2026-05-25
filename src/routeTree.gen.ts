@@ -13,9 +13,12 @@ import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LinkedinSessionRouteImport } from './routes/linkedin-session'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
+import { Route as AutomationSettingsRouteImport } from './routes/automation-settings'
+import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -39,6 +42,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LinkedinSessionRoute = LinkedinSessionRouteImport.update({
+  id: '/linkedin-session',
+  path: '/linkedin-session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -52,6 +60,16 @@ const DashboardRoute = DashboardRouteImport.update({
 const BlindModeRoute = BlindModeRouteImport.update({
   id: '/blind-mode',
   path: '/blind-mode',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutomationSettingsRoute = AutomationSettingsRouteImport.update({
+  id: '/automation-settings',
+  path: '/automation-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApprovalsRoute = ApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApplicationsRoute = ApplicationsRouteImport.update({
@@ -68,9 +86,12 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
+  '/approvals': typeof ApprovalsRoute
+  '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -79,9 +100,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
+  '/approvals': typeof ApprovalsRoute
+  '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -91,9 +115,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
+  '/approvals': typeof ApprovalsRoute
+  '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/jobs': typeof JobsRoute
+  '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
@@ -104,9 +131,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/applications'
+    | '/approvals'
+    | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/linkedin-session'
     | '/login'
     | '/profile'
     | '/settings'
@@ -115,9 +145,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/applications'
+    | '/approvals'
+    | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/linkedin-session'
     | '/login'
     | '/profile'
     | '/settings'
@@ -126,9 +159,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/applications'
+    | '/approvals'
+    | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
     | '/jobs'
+    | '/linkedin-session'
     | '/login'
     | '/profile'
     | '/settings'
@@ -138,9 +174,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApplicationsRoute: typeof ApplicationsRoute
+  ApprovalsRoute: typeof ApprovalsRoute
+  AutomationSettingsRoute: typeof AutomationSettingsRoute
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
   JobsRoute: typeof JobsRoute
+  LinkedinSessionRoute: typeof LinkedinSessionRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
@@ -177,6 +216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/linkedin-session': {
+      id: '/linkedin-session'
+      path: '/linkedin-session'
+      fullPath: '/linkedin-session'
+      preLoaderRoute: typeof LinkedinSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs': {
       id: '/jobs'
       path: '/jobs'
@@ -196,6 +242,20 @@ declare module '@tanstack/react-router' {
       path: '/blind-mode'
       fullPath: '/blind-mode'
       preLoaderRoute: typeof BlindModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/automation-settings': {
+      id: '/automation-settings'
+      path: '/automation-settings'
+      fullPath: '/automation-settings'
+      preLoaderRoute: typeof AutomationSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approvals': {
+      id: '/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof ApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/applications': {
@@ -218,9 +278,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApplicationsRoute: ApplicationsRoute,
+  ApprovalsRoute: ApprovalsRoute,
+  AutomationSettingsRoute: AutomationSettingsRoute,
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
   JobsRoute: JobsRoute,
+  LinkedinSessionRoute: LinkedinSessionRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,

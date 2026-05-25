@@ -1,4 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { mockFullProfile, mockAiAnalysis, mockSubscription } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 // OpenRouter API Configuration
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
@@ -119,6 +122,14 @@ export class OpenRouterService {
     remaining: number;
     tier: "free" | "pro";
   }> {
+    if (isMockMode()) {
+      return {
+        canApply: true,
+        remaining: mockSubscription.daily_apply_quota - 3,
+        tier: mockSubscription.ai_model_tier as "free" | "pro",
+      };
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     // Get user's subscription
@@ -151,6 +162,8 @@ export class OpenRouterService {
 
   // Increment usage
   async incrementUsage(userId: string): Promise<void> {
+    if (isMockMode()) return;
+
     const today = new Date().toISOString().split("T")[0];
 
     await supabase.rpc("increment_daily_applies", {
@@ -181,6 +194,16 @@ export class OpenRouterService {
     tier: "free" | "pro";
     modelType: "sonnet" | "opus" | "free";
   }> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 2000));
+      return {
+        coverLetter: mockAiAnalysis.coverLetter,
+        modelUsed: "anthropic/claude-sonnet-4-5",
+        tier: "pro",
+        modelType: "sonnet",
+      };
+    }
+
     const tier = await this.getUserTier(userId);
     const config = TIER_CONFIG[tier];
     const matchScore = job.match_score || 0;
@@ -239,6 +262,20 @@ ${
     modelType: "sonnet" | "opus" | "free";
     tier: "free" | "pro";
   }> {
+    if (isMockMode()) {
+      await new Promise(r => setTimeout(r, 1500));
+      return {
+        matchScore: job.match_score || 85,
+        acceptancePotential: job.acceptance_potential || 78,
+        aiStrategy: mockAiAnalysis.aiNotes,
+        skillGaps: ["Go Language", "Kubernetes Advanced"],
+        tailoredSkills: ["TypeScript", "React", "Node.js", "PostgreSQL"],
+        modelUsed: "anthropic/claude-sonnet-4-5",
+        modelType: "sonnet",
+        tier: "pro",
+      };
+    }
+
     const tier = await this.getUserTier(userId);
     const config = TIER_CONFIG[tier];
     const matchScore = job.match_score || 0;

@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
+import { mockUser, mockSession } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 interface AuthContextType {
   user: User | null;
@@ -12,19 +15,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => isMockMode() ? (mockUser as unknown as User) : null);
+  const [session, setSession] = useState<Session | null>(() => isMockMode() ? (mockSession as unknown as Session) : null);
+  const [loading, setLoading] = useState(!isMockMode());
 
   useEffect(() => {
-    // Handle OAuth callback - Supabase automatically processes hash fragment
+    if (isMockMode()) {
+      setLoading(false);
+      console.log('[Auth] Mock mode active — auto-logged in as demo user');
+      return;
+    }
+
     const handleOAuthCallback = async () => {
-      // Check if there's an auth hash in the URL (from OAuth redirect)
       const hash = window.location.hash;
       if (hash && hash.includes('access_token=')) {
-        console.log('[Auth] OAuth callback detected, processing tokens...');
-        // Wait for Supabase to process the hash (it does this automatically)
-        // Give it a moment to exchange tokens
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -32,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      
+
       if (session?.user) {
         console.log('[Auth] Session recovered for user:', session.user.email);
       }
@@ -41,12 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     handleOAuthCallback();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth] Auth state changed:', event, 'User:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      
-      // Clear hash from URL after successful OAuth login to prevent issues on refresh
+
       if (event === 'SIGNED_IN' && window.location.hash.includes('access_token=')) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
@@ -56,6 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    if (isMockMode()) {
+      setUser(null);
+      setSession(null);
+      return;
+    }
     await supabase.auth.signOut();
   };
 

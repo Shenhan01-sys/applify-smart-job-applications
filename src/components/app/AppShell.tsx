@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut, Bot, ShieldCheck, Linkedin } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -7,6 +7,9 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/jobs", label: "Job Feed", icon: Briefcase },
   { to: "/applications", label: "Applications", icon: FileCheck2 },
+  { to: "/approvals", label: "Approvals", icon: ShieldCheck },
+  { to: "/automation-settings", label: "Automation", icon: Bot },
+  { to: "/linkedin-session", label: "LinkedIn", icon: Linkedin },
   { to: "/skill-radar", label: "Skill Radar", icon: Radar },
   { to: "/blind-mode", label: "Blind Merit Mode", icon: EyeOff },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -118,8 +121,8 @@ function MobileNav({ agentOn, setAgentOn }: { agentOn: boolean; setAgentOn: (v: 
   const items = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { to: "/jobs", icon: Briefcase, label: "Jobs" },
+    { to: "/approvals", icon: ShieldCheck, label: "Review" },
     { to: "/applications", icon: FileCheck2, label: "Apps" },
-    { to: "/skill-radar", icon: Radar, label: "Skill" },
     { to: "/profile", icon: User, label: "Profile" },
   ] as const;
   return (

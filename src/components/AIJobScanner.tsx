@@ -1,110 +1,110 @@
-import { useState, useEffect } from "react";
-import { Brain, Search, Globe, Check, Loader2, Sparkles, Radar } from "lucide-react";
+import { useState, useCallback } from 'react'
+import { Brain, Search, Check, Loader2, Sparkles, Radar, Globe } from 'lucide-react'
+import { useJobSearch } from '@/hooks/useAutomation'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 
 interface Platform {
-  name: string;
-  icon: string;
-  status: "idle" | "scanning" | "found" | "done";
-  jobsFound: number;
+  name: string
+  icon: string
+  id: string
 }
 
 const PLATFORMS: Platform[] = [
-  { name: "LinkedIn", icon: "💼", status: "idle", jobsFound: 0 },
-  { name: "Jobstreet", icon: "📋", status: "idle", jobsFound: 0 },
-  { name: "Glints", icon: "✨", status: "idle", jobsFound: 0 },
-  { name: "Kalibrr", icon: "🎯", status: "idle", jobsFound: 0 },
-  { name: "KitaLulus", icon: "🎓", status: "idle", jobsFound: 0 },
-  { name: "Dealls", icon: "🚀", status: "idle", jobsFound: 0 },
-];
+  { name: 'LinkedIn', icon: '💼', id: 'linkedin' },
+  { name: 'Greenhouse', icon: '🌱', id: 'greenhouse' },
+  { name: 'Lever', icon: '🔄', id: 'lever' },
+  { name: 'Ashby', icon: '⚡', id: 'ashby' },
+  { name: 'Workable', icon: '🔧', id: 'workable' },
+  { name: 'JobStreet', icon: '📋', id: 'jobstreet' },
+]
 
 interface ScanStage {
-  message: string;
-  type: "info" | "success" | "analysis";
+  message: string
+  type: 'info' | 'success' | 'analysis' | 'error'
 }
 
 export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
-  const [isScanning, setIsScanning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [platforms, setPlatforms] = useState<Platform[]>(PLATFORMS);
-  const [stages, setStages] = useState<ScanStage[]>([]);
-  const [totalJobs, setTotalJobs] = useState(0);
+  const [isScanning, setIsScanning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['greenhouse', 'lever', 'ashby', 'workable'])
+  const [stages, setStages] = useState<ScanStage[]>([])
+  const { results, loading, totalJobs, searchJobs } = useJobSearch()
 
-  const addStage = (message: string, type: ScanStage["type"] = "info") => {
-    setStages((prev) => [...prev.slice(-4), { message, type }]);
-  };
+  const addStage = useCallback((message: string, type: ScanStage['type'] = 'info') => {
+    setStages((prev) => [...prev.slice(-4), { message, type }])
+  }, [])
+
+  const togglePlatform = (platformId: string) => {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platformId) ? prev.filter((p) => p !== platformId) : [...prev, platformId]
+    )
+  }
 
   const startScan = async () => {
-    setIsScanning(true);
-    setProgress(0);
-    setStages([]);
-    setTotalJobs(0);
-    setPlatforms(PLATFORMS.map((p) => ({ ...p, status: "idle", jobsFound: 0 })));
-
-    // Stage 1: Initialize AI
-    addStage("🤖 Memulai AI Job Agent v2.1...", "info");
-    await sleep(800);
-    addStage("📡 Menghubungkan ke 6 platform job...", "info");
-    await sleep(600);
-
-    // Stage 2: Scan each platform
-    let currentProgress = 0;
-    let jobsCount = 0;
-
-    for (let i = 0; i < PLATFORMS.length; i++) {
-      const platform = PLATFORMS[i];
-      
-      setPlatforms((prev) =>
-        prev.map((p, idx) =>
-          idx === i ? { ...p, status: "scanning" } : p
-        )
-      );
-      addStage(`🔍 Menelusuri ${platform.name}...`, "info");
-      await sleep(1200);
-
-      const found = Math.floor(Math.random() * 8) + 3; // 3-10 jobs per platform
-      jobsCount += found;
-
-      setPlatforms((prev) =>
-        prev.map((p, idx) =>
-          idx === i ? { ...p, status: "found", jobsFound: found } : p
-        )
-      );
-      addStage(`✅ Menemukan ${found} lowongan di ${platform.name}`, "success");
-      await sleep(400);
-
-      currentProgress = ((i + 1) / PLATFORMS.length) * 60;
-      setProgress(currentProgress);
+    if (selectedPlatforms.length === 0) {
+      toast.error('Please select at least one platform')
+      return
     }
 
-    setTotalJobs(jobsCount);
+    setIsScanning(true)
+    setProgress(0)
+    setStages([])
 
-    // Stage 3: AI Analysis
-    addStage("🧠 AI mulai menganalisis setiap lowongan...", "analysis");
-    await sleep(1000);
-    setProgress(70);
-    
-    addStage("📊 Menghitung kecocokan dengan profil kamu...", "analysis");
-    await sleep(800);
-    setProgress(80);
-    
-    addStage("🎯 Memprediksi potensi diterima untuk tiap posisi...", "analysis");
-    await sleep(800);
-    setProgress(90);
-    
-    addStage("📈 Menganalisis tren pasar & benchmark gaji...", "analysis");
-    await sleep(800);
-    setProgress(95);
-    
-    addStage("✨ Membuat strategi aplikasi optimal...", "analysis");
-    await sleep(600);
-    setProgress(100);
+    try {
+      // Stage 1: Initialize
+      addStage('🤖 Memulai AI Job Agent v2.1...', 'info')
+      setProgress(10)
+      await sleep(500)
 
-    addStage(`🎉 Selesai! ${jobsCount} lowongan ditemukan & dianalisis`, "success");
-    await sleep(1000);
+      addStage(`📡 Menghubungkan ke ${selectedPlatforms.length} platform...`, 'info')
+      setProgress(20)
+      await sleep(500)
 
-    setIsScanning(false);
-    onComplete();
-  };
+      // Stage 2: Search
+      addStage('🔍 Mencari lowongan...', 'info')
+      const searchResults = await searchJobs({
+        platforms: selectedPlatforms,
+      })
+
+      setProgress(60)
+      
+      if (searchResults.length === 0) {
+        addStage('⚠️ Tidak ada lowongan ditemukan', 'error')
+        setIsScanning(false)
+        return
+      }
+
+      // Stage 3: AI Analysis
+      addStage('🧠 AI mulai menganalisis setiap lowongan...', 'analysis')
+      setProgress(70)
+      await sleep(800)
+
+      addStage('📊 Menghitung kecocokan dengan profil kamu...', 'analysis')
+      setProgress(80)
+      await sleep(800)
+
+      addStage('🎯 Memprediksi potensi diterima untuk tiap posisi...', 'analysis')
+      setProgress(90)
+      await sleep(800)
+
+      addStage('📈 Menganalisis tren pasar & benchmark gaji...', 'analysis')
+      setProgress(95)
+      await sleep(800)
+
+      setProgress(100)
+      addStage(`🎉 Selesai! ${totalJobs} lowongan ditemukan & dianalisis`, 'success')
+      await sleep(1000)
+
+      onComplete()
+    } catch (error) {
+      addStage('❌ Terjadi kesalahan saat scanning', 'error')
+      toast.error('Scanning failed. Please try again.')
+    } finally {
+      setIsScanning(false)
+    }
+  }
 
   return (
     <div className="rounded-2xl border-2 border-[#999999] bg-white p-6 md:p-8">
@@ -115,24 +115,46 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             <h2 className="text-lg font-bold">AI Job Scanner</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            AI akan mencari & menganalisis lowongan dari 6 platform sekaligus
+            AI akan mencari & menganalisis lowongan dari multiple platform sekaligus
           </p>
         </div>
-        <button
+        <Button
           onClick={startScan}
-          disabled={isScanning}
+          disabled={isScanning || selectedPlatforms.length === 0}
           className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#0367FC] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isScanning ? (
+          {isScanning || loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Radar className="h-4 w-4" />
           )}
-          {isScanning ? "Mencari Lowongan..." : "Scan Job Sekarang"}
-        </button>
+          {isScanning || loading ? 'Mencari Lowongan...' : 'Scan Job Sekarang'}
+        </Button>
       </div>
 
-      {isScanning && (
+      {/* Platform Selection */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-3">Pilih Platform:</p>
+        <div className="flex flex-wrap gap-2">
+          {PLATFORMS.map((platform) => (
+            <button
+              key={platform.id}
+              onClick={() => togglePlatform(platform.id)}
+              disabled={isScanning}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                selectedPlatforms.includes(platform.id)
+                  ? 'bg-[#0367FC] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              } disabled:opacity-50`}
+            >
+              <span>{platform.icon}</span>
+              <span>{platform.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {(isScanning || loading) && (
         <div className="space-y-4">
           {/* Progress bar */}
           <div className="h-2 bg-[#EFEFEF] rounded-full overflow-hidden">
@@ -144,29 +166,36 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
           {/* Platform scanning status */}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-            {platforms.map((platform) => (
-              <div
-                key={platform.name}
-                className={`rounded-xl border p-3 text-center transition-all ${
-                  platform.status === "scanning"
-                    ? "border-[#0367FC] bg-[#0367FC]/5"
-                    : platform.status === "found"
-                    ? "border-[#D2F801] bg-[#D2F801]/10"
-                    : "border-[#E0E0E0]"
-                }`}
-              >
-                <div className="text-2xl mb-1">{platform.icon}</div>
-                <div className="text-xs font-medium truncate">{platform.name}</div>
-                {platform.status === "found" && (
-                  <div className="text-xs text-[#0367FC] font-bold mt-1">
-                    +{platform.jobsFound}
-                  </div>
-                )}
-                {platform.status === "scanning" && (
-                  <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0367FC]" />
-                )}
-              </div>
-            ))}
+            {PLATFORMS.map((platform) => {
+              const isSelected = selectedPlatforms.includes(platform.id)
+              const platformResult = results.find((r) => r.platform === platform.id)
+              
+              return (
+                <div
+                  key={platform.name}
+                  className={`rounded-xl border p-3 text-center transition-all ${
+                    !isSelected
+                      ? 'border-gray-200 opacity-50'
+                      : isScanning && !platformResult
+                      ? 'border-[#0367FC] bg-[#0367FC]/5'
+                      : platformResult
+                      ? 'border-[#D2F801] bg-[#D2F801]/10'
+                      : 'border-[#E0E0E0]'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{platform.icon}</div>
+                  <div className="text-xs font-medium truncate">{platform.name}</div>
+                  {platformResult && (
+                    <div className="text-xs text-[#0367FC] font-bold mt-1">
+                      +{platformResult.jobs.length}
+                    </div>
+                  )}
+                  {isScanning && !platformResult && isSelected && (
+                    <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0367FC]" />
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Scan stages log */}
@@ -176,11 +205,13 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                 <div
                   key={i}
                   className={`text-sm animate-fade-in ${
-                    stage.type === "success"
-                      ? "text-green-600"
-                      : stage.type === "analysis"
-                      ? "text-[#0367FC]"
-                      : "text-[#666666]"
+                    stage.type === 'success'
+                      ? 'text-green-600'
+                      : stage.type === 'analysis'
+                      ? 'text-[#0367FC]'
+                      : stage.type === 'error'
+                      ? 'text-red-600'
+                      : 'text-[#666666]'
                   }`}
                 >
                   {stage.message}
@@ -191,16 +222,16 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {!isScanning && totalJobs > 0 && (
+      {totalJobs > 0 && !isScanning && !loading && (
         <div className="flex items-center justify-center gap-2 py-4 text-[#0367FC] font-semibold">
           <Sparkles className="h-5 w-5" />
-          <span>{totalJobs} lowongan berhasil dianalisis!</span>
+          <span>{totalJobs} lowongan berhasil ditemukan!</span>
         </div>
       )}
     </div>
-  );
+  )
 }
 
 function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

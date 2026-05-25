@@ -6,9 +6,13 @@ import { AIJobScanner } from "@/components/AIJobScanner";
 import { AIApplyModal } from "@/components/AIApplyModal";
 import { JobCard, type JobData } from "@/components/JobCard";
 import { Search, SlidersHorizontal, Zap, Loader2, Brain, Crown, Sparkles, Target } from "lucide-react";
+import { mockJobs as mockJobsData, mockSavedJobIds, mockSubscription, MOCK_USER_ID } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/jobs")({
   beforeLoad: async () => {
+    if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
@@ -28,8 +32,15 @@ function JobsPage() {
   const [userTier, setUserTier] = useState<"free" | "pro">("free");
   const [remainingQuota, setRemainingQuota] = useState(10);
 
-  // Fetch jobs from Supabase
   useEffect(() => {
+    if (isMockMode()) {
+      setJobs(mockJobsData as JobData[]);
+      setSavedJobs(new Set(mockSavedJobIds));
+      setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
+      setRemainingQuota(mockSubscription.daily_apply_quota);
+      setLoading(false);
+      return;
+    }
     fetchJobs();
     fetchSavedJobs();
     loadUserTier();
@@ -47,9 +58,14 @@ function JobsPage() {
       if (data) {
         setUserTier(data.ai_model_tier as "free" | "pro");
         setRemainingQuota(data.daily_apply_quota);
+      } else {
+        setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
+        setRemainingQuota(mockSubscription.daily_apply_quota);
       }
     } catch (err) {
       console.error("Error loading tier:", err);
+      setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
+      setRemainingQuota(mockSubscription.daily_apply_quota);
     }
   };
 
@@ -63,9 +79,10 @@ function JobsPage() {
         .limit(50);
 
       if (error) throw error;
-      setJobs(data || []);
+      setJobs((data?.length ? data : mockJobsData) as JobData[]);
     } catch (err) {
       console.error("Error fetching jobs:", err);
+      setJobs(mockJobsData as JobData[]);
     } finally {
       setLoading(false);
     }
@@ -85,10 +102,19 @@ function JobsPage() {
       setSavedJobs(new Set(data?.map((j) => j.job_id) || []));
     } catch (err) {
       console.error("Error fetching saved jobs:", err);
+      setSavedJobs(new Set(mockSavedJobIds));
     }
   };
 
   const toggleSaveJob = async (jobId: string) => {
+    if (isMockMode()) {
+      setSavedJobs((prev) => {
+        const next = new Set(prev);
+        next.has(jobId) ? next.delete(jobId) : next.add(jobId);
+        return next;
+      });
+      return;
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -121,7 +147,7 @@ function JobsPage() {
     setShowApplyModal(true);
   };
 
-  // Generate mock jobs if none exist
+  // Generate mock jobs if none exist (for non-mock mode)
   const generateMockJobs = async () => {
     setLoading(true);
     try {

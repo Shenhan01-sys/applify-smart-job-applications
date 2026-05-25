@@ -1,4 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { mockFullProfile } from "@/mocks/mockData";
+
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 // ==================== TYPES ====================
 
@@ -129,6 +132,10 @@ export interface FullProfile {
 export const profileService = {
   // Fetch full profile
   async getFullProfile(userId: string): Promise<FullProfile> {
+    if (isMockMode()) {
+      return mockFullProfile as FullProfile;
+    }
+
     const [
       { data: profile },
       { data: workExperiences },
