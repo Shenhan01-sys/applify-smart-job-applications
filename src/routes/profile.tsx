@@ -8,7 +8,7 @@ import {
   Building2, Calendar, Star, TrendingUp, DollarSign, Clock,
   Layers, Sparkles
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   mockProfile as mockProfileData,
@@ -16,8 +16,6 @@ import {
   mockEducation,
   mockCertifications,
   mockUserSkills,
-  mockAutomationSettings,
-  MOCK_USER_ID,
 } from "@/mocks/mockData";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";

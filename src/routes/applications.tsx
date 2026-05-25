@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { mockAIApplications } from "@/mocks/mockData";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   LayoutGrid,
   List,

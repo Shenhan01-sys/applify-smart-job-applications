@@ -1,262 +1,292 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { useLinkedInSession } from '@/hooks/useAutomation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'sonner'
-import { Shield, ShieldCheck, ShieldAlert, RefreshCw, Copy, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/app/AppShell";
+import { useLinkedInSession } from "@/hooks/useAutomation";
+import { mockLinkedInStatus } from "@/mocks/mockData";
+import { 
+  Shield, ShieldCheck, ShieldAlert, RefreshCw, Clock, 
+  CheckCircle2, AlertCircle, Loader2, Linkedin, BookOpen,
+  Lock, KeyRound, Trash2
+} from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/linkedin-session')({
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
+
+export const Route = createFileRoute("/linkedin-session")({
+  beforeLoad: async () => {
+    if (isMockMode()) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
+  head: () => ({ meta: [{ title: "LinkedIn Session — Applify" }] }),
   component: LinkedInSessionPage,
-})
+});
 
 function LinkedInSessionPage() {
-  const { sessionStatus, loading, checkSession, importSession, verifySession } = useLinkedInSession()
-  const [cookiesJson, setCookiesJson] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [verifying, setVerifying] = useState(false)
+  const { sessionStatus, loading: hookLoading, checkSession, importSession, verifySession } = useLinkedInSession();
+  const [cookiesJson, setCookiesJson] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [activeTab, setActiveTab] = useState<'manual' | 'guide'>('manual');
+  const [status, setStatus] = useState(sessionStatus);
 
   useEffect(() => {
-    checkSession()
-  }, [])
+    if (isMockMode()) {
+      setStatus(mockLinkedInStatus);
+      return;
+    }
+    setStatus(sessionStatus);
+  }, [sessionStatus]);
 
   const handleImport = async () => {
     if (!cookiesJson.trim()) {
-      toast.error('Please paste your cookies JSON')
-      return
+      toast.error('Harap paste cookies JSON kamu');
+      return;
     }
-
     try {
-      setImporting(true)
-      const cookies = JSON.parse(cookiesJson)
-      await importSession(cookies)
-      setCookiesJson('')
+      setImporting(true);
+      const cookies = JSON.parse(cookiesJson);
+      if (isMockMode()) {
+        setStatus({ hasSession: true, isValid: true, lastUsed: new Date().toISOString(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
+        toast.success('Session berhasil di-import!');
+      } else {
+        await importSession(cookies);
+      }
+      setCookiesJson('');
     } catch (error) {
-      toast.error('Invalid JSON format. Please check your cookies.')
+      toast.error('Format JSON tidak valid. Periksa cookies kamu.');
     } finally {
-      setImporting(false)
+      setImporting(false);
     }
-  }
+  };
 
   const handleVerify = async () => {
-    setVerifying(true)
-    await verifySession()
-    setVerifying(false)
-  }
+    setVerifying(true);
+    try {
+      if (isMockMode()) {
+        await new Promise(r => setTimeout(r, 1500));
+        toast.success('Session valid!');
+      } else {
+        await verifySession();
+      }
+    } catch (error) {
+      toast.error('Gagal verifikasi session');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
-  const getSessionIcon = () => {
-    if (!sessionStatus?.hasSession) {
-      return <ShieldAlert className="h-12 w-12 text-red-400" />
+  const getSessionConfig = () => {
+    if (!status?.hasSession) {
+      return { 
+        icon: ShieldAlert, 
+        color: 'text-red-500', 
+        bg: 'bg-red-50', 
+        border: 'border-red-200',
+        badge: 'bg-red-100 text-red-800 border-red-200',
+        text: 'Tidak Ada Session' 
+      };
     }
-    if (sessionStatus?.isValid) {
-      return <ShieldCheck className="h-12 w-12 text-green-500" />
+    if (status?.isValid) {
+      return { 
+        icon: ShieldCheck, 
+        color: 'text-green-500', 
+        bg: 'bg-green-50', 
+        border: 'border-green-200',
+        badge: 'bg-green-100 text-green-800 border-green-200',
+        text: 'Aktif' 
+      };
     }
-    return <Shield className="h-12 w-12 text-yellow-500" />
-  }
+    return { 
+      icon: Shield, 
+      color: 'text-amber-500', 
+      bg: 'bg-amber-50', 
+      border: 'border-amber-200',
+      badge: 'bg-amber-100 text-amber-800 border-amber-200',
+      text: 'Expired' 
+    };
+  };
 
-  const getSessionStatus = () => {
-    if (!sessionStatus?.hasSession) {
-      return { text: 'No Session', color: 'bg-red-100 text-red-800 border-red-200' }
-    }
-    if (sessionStatus?.isValid) {
-      return { text: 'Active', color: 'bg-green-100 text-green-800 border-green-200' }
-    }
-    return { text: 'Expired', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
-  }
+  const config = getSessionConfig();
+  const StatusIcon = config.icon;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#161616]">LinkedIn Session Management</h1>
-        <p className="text-gray-600 mt-2">
-          Manage your LinkedIn browser session for automated job applications
+    <AppShell>
+      <header className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+          <Linkedin className="h-7 w-7 text-[#0A66C2]" /> LinkedIn Session
+        </h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Kelola browser session LinkedIn untuk otomatisasi lamaran kerja
         </p>
-      </div>
+      </header>
 
-      <div className="grid gap-6">
-        {/* Session Status Card */}
-        <Card>
-          <CardHeader>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        {/* LEFT: Session Management */}
+        <div className="space-y-5">
+          {/* Status Card */}
+          <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-5 transition-all duration-300`}>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Session Status</CardTitle>
-                <CardDescription>Current LinkedIn authentication status</CardDescription>
-              </div>
               <div className="flex items-center gap-3">
-                {getSessionIcon()}
-                <Badge variant="outline" className={getSessionStatus().color}>
-                  {getSessionStatus().text}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {sessionStatus?.hasSession ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Last Used:</span>
-                    <p className="font-medium">
-                      {sessionStatus?.lastUsed
-                        ? new Date(sessionStatus.lastUsed).toLocaleString()
-                        : 'Never'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Expires At:</span>
-                    <p className="font-medium">
-                      {sessionStatus?.expiresAt
-                        ? new Date(sessionStatus.expiresAt).toLocaleString()
-                        : 'Unknown'}
-                    </p>
-                  </div>
+                <div className={`h-12 w-12 rounded-xl ${config.bg} grid place-items-center`}>
+                  <StatusIcon className={`h-6 w-6 ${config.color}`} />
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Button
+                <div>
+                  <p className="text-sm font-bold">Session Status</p>
+                  <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.badge}`}>
+                    {config.text}
+                  </span>
+                </div>
+              </div>
+              {status?.hasSession && (
+                <div className="flex gap-2">
+                  <button
                     onClick={handleVerify}
                     disabled={verifying}
-                    variant="outline"
-                    className="flex items-center gap-2"
+                    className="h-9 px-3 rounded-lg border border-black/[8%] bg-white text-xs font-medium hover:bg-black/[4%] transition inline-flex items-center gap-1.5"
                   >
-                    <RefreshCw className={`h-4 w-4 ${verifying ? 'animate-spin' : ''}`} />
-                    {verifying ? 'Verifying...' : 'Verify Session'}
-                  </Button>
-                  <Button
-                    onClick={() => checkSession()}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <Clock className="h-4 w-4" />
-                    Refresh Status
-                  </Button>
+                    <RefreshCw className={`h-3.5 w-3.5 ${verifying ? 'animate-spin' : ''}`} />
+                    {verifying ? 'Verifying...' : 'Verify'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {status?.hasSession ? (
+              <div className="mt-4 pt-4 border-t border-black/[6%] space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Used</span>
+                  <span className="font-medium">{status.lastUsed ? new Date(status.lastUsed).toLocaleDateString('id-ID') : 'Never'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Expires At</span>
+                  <span className="font-medium">{status.expiresAt ? new Date(status.expiresAt).toLocaleDateString('id-ID') : 'Unknown'}</span>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3 text-yellow-700 bg-yellow-50 p-4 rounded-lg">
-                <AlertCircle className="h-5 w-5" />
-                <p className="text-sm">
-                  No active LinkedIn session found. Import your session cookies below to enable
-                  automated applications.
-                </p>
+              <div className="mt-4 flex items-center gap-2 text-amber-700 bg-amber-100 p-3 rounded-xl text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <p className="text-xs">Tidak ada session LinkedIn aktif. Import cookies di bawah untuk mengaktifkan otomatisasi.</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Import Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Import Session</CardTitle>
-            <CardDescription>
-              Export cookies from your browser and paste them here
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Tabs defaultValue="manual">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="manual">Manual Import</TabsTrigger>
-                <TabsTrigger value="guide">How to Export</TabsTrigger>
-              </TabsList>
+          {/* Import Tabs */}
+          <div className="glass rounded-2xl p-5">
+            <div className="flex gap-2 mb-4">
+              {[
+                { key: 'manual' as const, label: 'Manual Import', icon: KeyRound },
+                { key: 'guide' as const, label: 'Panduan', icon: BookOpen },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === tab.key
+                        ? 'bg-[#0367FC] text-white'
+                        : 'bg-black/[4%] text-muted-foreground hover:bg-black/[7%]'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" /> {tab.label}
+                  </button>
+                );
+              })}
+            </div>
 
-              <TabsContent value="manual" className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cookies">Cookies JSON</Label>
+            {activeTab === 'manual' && (
+              <div className="space-y-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cookies JSON</label>
                   <textarea
-                    id="cookies"
                     rows={6}
-                    className="w-full p-3 border rounded-md font-mono text-xs"
-                    placeholder={`Paste your cookies here in JSON format:
-[
-  {"name": "li_at", "value": "your_cookie_value", "domain": ".linkedin.com"},
-  {"name": "JSESSIONID", "value": "your_session_id", "domain": "www.linkedin.com"}
-]`}
+                    className="mt-1.5 w-full rounded-lg bg-black/[4%] border border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    placeholder={`Paste cookies di sini dalam format JSON:\n[\n  {"name": "li_at", "value": "...", "domain": ".linkedin.com"}\n]`}
                     value={cookiesJson}
                     onChange={(e) => setCookiesJson(e.target.value)}
                   />
                 </div>
-                <Button
+                <button
                   onClick={handleImport}
                   disabled={importing || !cookiesJson.trim()}
-                  className="bg-[#0367FC] hover:bg-[#0256d3]"
+                  className="h-10 px-5 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60"
                 >
+                  {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                   {importing ? 'Importing...' : 'Import Session'}
-                </Button>
-              </TabsContent>
+                </button>
+              </div>
+            )}
 
-              <TabsContent value="guide" className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg space-y-3 text-sm">
-                  <h4 className="font-semibold">How to export LinkedIn cookies:</h4>
-                  <ol className="list-decimal list-inside space-y-2">
-                    <li>
-                      Open LinkedIn in your browser and login to your account
-                    </li>
-                    <li>
-                      Open Developer Tools (F12 or Ctrl+Shift+I / Cmd+Option+I)
-                    </li>
-                    <li>
-                      Go to the Application tab → Cookies → https://www.linkedin.com
-                    </li>
-                    <li>
-                      Find and copy these cookies: <code>li_at</code>,{' '}
-                      <code>JSESSIONID</code>, <code>bcookie</code>
-                    </li>
-                    <li>
-                      Paste them in JSON format in the Manual Import tab
-                    </li>
-                  </ol>
-                  <div className="bg-blue-50 p-3 rounded border border-blue-200 text-blue-800">
-                    <p className="font-medium">Security Note:</p>
-                    <p className="text-xs mt-1">
-                      Your cookies are encrypted before storage and never shared. You can revoke
-                      access anytime by logging out of LinkedIn on your browser.
-                    </p>
-                  </div>
+            {activeTab === 'guide' && (
+              <div className="space-y-3 text-sm" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                <h4 className="font-semibold">Cara export cookies LinkedIn:</h4>
+                <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                  <li>Buka LinkedIn di browser dan login ke akun kamu</li>
+                  <li>Buka Developer Tools (F12 atau Ctrl+Shift+I)</li>
+                  <li>Pergi ke tab Application → Cookies → https://www.linkedin.com</li>
+                  <li>Cari dan copy cookies: <code>li_at</code>, <code>JSESSIONID</code>, <code>bcookie</code></li>
+                  <li>Paste dalam format JSON di tab Manual Import</li>
+                </ol>
+                <div className="mt-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800">
+                  <p className="font-medium text-xs">Catatan Keamanan</p>
+                  <p className="text-[11px] mt-1 opacity-80">
+                    Cookies dienkripsi sebelum disimpan dan tidak pernah dibagikan. Kamu bisa mencabut akses kapan saja dengan logout dari LinkedIn di browser.
+                  </p>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+              </div>
+            )}
+          </div>
+        </div>
 
-        {/* Security Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="font-medium">Encrypted Storage</p>
-                <p className="text-gray-500">
-                  Session cookies are encrypted with AES-256 before storage
-                </p>
-              </div>
+        {/* RIGHT: Security Info */}
+        <div className="space-y-5">
+          <div className="glass rounded-2xl p-5">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Lock className="h-5 w-5 text-[#0367FC]" /> Informasi Keamanan
+            </h2>
+            <div className="space-y-4">
+              {[
+                { icon: CheckCircle2, color: 'text-green-500', title: 'Encrypted Storage', desc: 'Session cookies dienkripsi dengan AES-256 sebelum disimpan' },
+                { icon: Shield, color: 'text-[#0367FC]', title: 'User Control', desc: 'Kamu bisa mencabut akses kapan saja dengan logout dari LinkedIn' },
+                { icon: Clock, color: 'text-amber-500', title: 'Session Expiry', desc: 'Session expired setelah 30 hari dan harus di-import ulang' },
+                { icon: Trash2, color: 'text-red-500', title: 'One-Click Revoke', desc: 'Hapus session kapan saja dari halaman ini' },
+              ].map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <div 
+                    key={i} 
+                    className="flex items-start gap-3 p-3 rounded-xl bg-black/[2%] border border-black/[6%] hover:border-black/[10%] transition-all"
+                    style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.08}s both` }}
+                  >
+                    <Icon className={`h-5 w-5 ${item.color} shrink-0 mt-0.5`} />
+                    <div>
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="font-medium">User Control</p>
-                <p className="text-gray-500">
-                  You can revoke access anytime by logging out of LinkedIn
-                </p>
-              </div>
+          </div>
+
+          {/* Platform Tips */}
+          <div className="glass rounded-2xl p-5">
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" /> Tips
+            </h2>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>• Jangan share cookies kamu dengan siapa pun</p>
+              <p>• Import ulang jika mendapat error saat apply</p>
+              <p>• Pastikan kamu login dengan akun LinkedIn yang benar</p>
+              <p>• Verifikasi session secara berkala untuk memastikan valid</p>
             </div>
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
-              <div>
-                <p className="font-medium">Session Expiry</p>
-                <p className="text-gray-500">
-                  Sessions expire after 30 days and must be re-imported
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    </AppShell>
+  );
 }
+
+export default LinkedInSessionPage;

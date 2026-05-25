@@ -1,443 +1,356 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { automationApi, AutomationSettings } from '@/services/automationApi'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'sonner'
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/app/AppShell";
+import { automationApi, AutomationSettings } from "@/services/automationApi";
+import { mockAutomationSettings } from "@/mocks/mockData";
+import { 
+  Loader2, Save, User, FileText, Search, Settings, Brain,
+  Briefcase, MapPin, DollarSign, Clock, CheckCircle2, ToggleLeft,
+  AlertCircle, Sparkles
+} from "lucide-react";
+import { toast } from "sonner";
 
-export const Route = createFileRoute('/automation-settings')({
+const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
+
+export const Route = createFileRoute("/automation-settings")({
+  beforeLoad: async () => {
+    if (isMockMode()) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
+  head: () => ({ meta: [{ title: "Automation Settings — Applify" }] }),
   component: AutomationSettingsPage,
-})
+});
+
+const tabs = [
+  { id: 'personal', label: 'Personal Info', icon: User },
+  { id: 'answers', label: 'Application Answers', icon: FileText },
+  { id: 'search', label: 'Search Preferences', icon: Search },
+  { id: 'behavior', label: 'Behavior', icon: Settings },
+  { id: 'ai', label: 'AI Settings', icon: Brain },
+];
 
 function AutomationSettingsPage() {
-  const [settings, setSettings] = useState<AutomationSettings>({})
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [settings, setSettings] = useState<AutomationSettings>({});
+  const [activeTab, setActiveTab] = useState('personal');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
   useEffect(() => {
-    loadSettings()
-  }, [])
+    loadSettings();
+  }, []);
 
   const loadSettings = async () => {
     try {
-      const data = await automationApi.getSettings()
-      setSettings(data)
+      if (isMockMode()) {
+        setSettings(mockAutomationSettings);
+        setLoading(false);
+        return;
+      }
+      const data = await automationApi.getSettings();
+      setSettings(data);
     } catch (error) {
-      toast.error('Failed to load automation settings')
+      toast.error('Gagal memuat settings');
+      setSettings(mockAutomationSettings);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleSave = async () => {
-    setSaving(true)
+    setSaving(true);
     try {
-      await automationApi.updateSettings(settings)
-      toast.success('Automation settings saved successfully')
+      if (!isMockMode()) {
+        await automationApi.updateSettings(settings);
+      }
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
     } catch (error) {
-      toast.error('Failed to save automation settings')
+      toast.error('Gagal menyimpan settings');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const updateField = (field: keyof AutomationSettings, value: any) => {
-    setSettings((prev) => ({ ...prev, [field]: value }))
-  }
+    setSettings((prev) => ({ ...prev, [field]: value }));
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0367FC]" />
-      </div>
-    )
+      <AppShell>
+        <div className="flex items-center justify-center h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+        </div>
+      </AppShell>
+    );
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#161616]">Automation Settings</h1>
-        <p className="text-gray-600 mt-2">
-          Configure your AI job application automation preferences
+    <AppShell>
+      {/* Save Toast */}
+      {showSaved && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-[fadeInUp_0.3s_ease-out]">
+          <CheckCircle2 className="h-4 w-4" />
+          <span className="text-sm font-semibold">Settings disimpan!</span>
+        </div>
+      )}
+
+      <header className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Automation Settings</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Konfigurasi preferensi otomatisasi lamaran kerja AI kamu
         </p>
+      </header>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                isActive
+                  ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
+                  : 'bg-black/[4%] text-muted-foreground border border-black/[8%] hover:bg-black/[7%]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-8">
-          <TabsTrigger value="personal">Personal Info</TabsTrigger>
-          <TabsTrigger value="answers">Application Answers</TabsTrigger>
-          <TabsTrigger value="search">Search Preferences</TabsTrigger>
-          <TabsTrigger value="behavior">Behavior</TabsTrigger>
-          <TabsTrigger value="ai">AI Settings</TabsTrigger>
-        </TabsList>
+      {/* Content */}
+      <div className="glass rounded-2xl p-5 md:p-6">
+        {activeTab === 'personal' && (
+          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <User className="h-5 w-5 text-[#0367FC]" /> Personal Information
+            </h2>
+            <p className="text-sm text-muted-foreground">Data ini digunakan untuk mengisi form lamaran otomatis</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField label="First Name" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
+              <InputField label="Last Name" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
+              <InputField label="Phone Number" value={settings.phone_number || ''} onChange={(v: string) => updateField('phone_number', v)} icon={Sparkles} />
+              <InputField label="Current City" value={settings.current_city || ''} onChange={(v: string) => updateField('current_city', v)} icon={MapPin} />
+              <InputField label="Street" value={settings.street || ''} onChange={(v: string) => updateField('street', v)} />
+              <InputField label="State" value={settings.state || ''} onChange={(v: string) => updateField('state', v)} />
+              <InputField label="Zip Code" value={settings.zipcode || ''} onChange={(v: string) => updateField('zipcode', v)} />
+              <InputField label="Country" value={settings.country || ''} onChange={(v: string) => updateField('country', v)} />
+            </div>
+          </div>
+        )}
 
-        <TabsContent value="personal">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>
-                This information will be used to auto-fill job application forms
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name">First Name</Label>
-                  <Input
-                    id="first_name"
-                    value={settings.first_name || ''}
-                    onChange={(e) => updateField('first_name', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name">Last Name</Label>
-                  <Input
-                    id="last_name"
-                    value={settings.last_name || ''}
-                    onChange={(e) => updateField('last_name', e.target.value)}
-                  />
-                </div>
+        {activeTab === 'answers' && (
+          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <FileText className="h-5 w-5 text-[#0367FC]" /> Application Answers
+            </h2>
+            <p className="text-sm text-muted-foreground">Jawaban yang sudah dikonfigurasi untuk pertanyaan umum lamaran</p>
+            <div className="space-y-4">
+              <InputField label="Years of Experience" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
+              <SelectField 
+                label="Require Visa Sponsorship" 
+                value={settings.require_visa || 'no'} 
+                options={[{value: 'no', label: 'No'}, {value: 'yes', label: 'Yes'}]}
+                onChange={(v: string) => updateField('require_visa', v)} 
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField label="Desired Salary (Annual)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
+                <InputField label="Current CTC (Annual)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone_number">Phone Number</Label>
-                <Input
-                  id="phone_number"
-                  value={settings.phone_number || ''}
-                  onChange={(e) => updateField('phone_number', e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="current_city">Current City</Label>
-                <Input
-                  id="current_city"
-                  value={settings.current_city || ''}
-                  onChange={(e) => updateField('current_city', e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="street">Street</Label>
-                  <Input
-                    id="street"
-                    value={settings.street || ''}
-                    onChange={(e) => updateField('street', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={settings.state || ''}
-                    onChange={(e) => updateField('state', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zipcode">Zip Code</Label>
-                  <Input
-                    id="zipcode"
-                    value={settings.zipcode || ''}
-                    onChange={(e) => updateField('zipcode', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  value={settings.country || ''}
-                  onChange={(e) => updateField('country', e.target.value)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="answers">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Answers</CardTitle>
-              <CardDescription>
-                Pre-configured answers for common job application questions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="years_of_experience">Years of Experience</Label>
-                  <Input
-                    id="years_of_experience"
-                    value={settings.years_of_experience || ''}
-                    onChange={(e) => updateField('years_of_experience', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="require_visa">Require Visa Sponsorship</Label>
-                  <select
-                    id="require_visa"
-                    className="w-full p-2 border rounded-md"
-                    value={settings.require_visa || 'No'}
-                    onChange={(e) => updateField('require_visa', e.target.value)}
-                  >
-                    <option value="No">No</option>
-                    <option value="Yes">Yes</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="desired_salary">Desired Salary (Annual)</Label>
-                  <Input
-                    id="desired_salary"
-                    type="number"
-                    value={settings.desired_salary || ''}
-                    onChange={(e) => updateField('desired_salary', Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="current_ctc">Current CTC (Annual)</Label>
-                  <Input
-                    id="current_ctc"
-                    type="number"
-                    value={settings.current_ctc || ''}
-                    onChange={(e) => updateField('current_ctc', Number(e.target.value))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notice_period">Notice Period (days)</Label>
-                <Input
-                  id="notice_period"
-                  type="number"
-                  value={settings.notice_period || 30}
-                  onChange={(e) => updateField('notice_period', Number(e.target.value))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                <Input
-                  id="linkedin_url"
-                  value={settings.linkedin_url || ''}
-                  onChange={(e) => updateField('linkedin_url', e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="website">Website/Portfolio</Label>
-                <Input
-                  id="website"
-                  value={settings.website || ''}
-                  onChange={(e) => updateField('website', e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cover_letter">Default Cover Letter</Label>
-                <Textarea
-                  id="cover_letter"
+              <InputField label="Notice Period (days)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
+              <InputField label="LinkedIn URL" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
+              <InputField label="Website / Portfolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Default Cover Letter</label>
+                <textarea
                   rows={6}
                   value={settings.cover_letter || ''}
                   onChange={(e) => updateField('cover_letter', e.target.value)}
-                  placeholder="Your default cover letter template..."
+                  placeholder="Template cover letter default kamu..."
+                  className="mt-1.5 w-full rounded-lg bg-black/[4%] border border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
                 />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </div>
+        )}
 
-        <TabsContent value="search">
-          <Card>
-            <CardHeader>
-              <CardTitle>Search Preferences</CardTitle>
-              <CardDescription>
-                Configure job search keywords and filters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="search_keywords">Search Keywords (comma-separated)</Label>
-                <Input
-                  id="search_keywords"
-                  value={settings.search_keywords?.join(', ') || ''}
-                  onChange={(e) =>
-                    updateField(
-                      'search_keywords',
-                      e.target.value.split(',').map((k) => k.trim()).filter(Boolean)
-                    )
-                  }
-                  placeholder="Software Engineer, React Developer, Full Stack"
-                />
-              </div>
+        {activeTab === 'search' && (
+          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Search className="h-5 w-5 text-[#0367FC]" /> Search Preferences
+            </h2>
+            <div className="space-y-4">
+              <InputField 
+                label="Search Keywords (pisahkan koma)" 
+                value={settings.search_keywords?.join(', ') || ''} 
+                onChange={(v: string) => updateField('search_keywords', v.split(',').map(k => k.trim()).filter(Boolean))} 
+                placeholder="Software Engineer, React Developer, Full Stack"
+              />
+              <InputField 
+                label="Search Location" 
+                value={settings.search_location || ''} 
+                onChange={(v: string) => updateField('search_location', v)} 
+                placeholder="Jakarta, Indonesia atau Remote"
+                icon={MapPin}
+              />
+              <ToggleField 
+                label="Easy Apply Only" 
+                description="Hanya cari lowongan dengan easy apply"
+                checked={settings.easy_apply_only ?? false}
+                onChange={(v: boolean) => updateField('easy_apply_only', v)}
+              />
+              <InputField 
+                label="Blacklist Companies (pisahkan koma)" 
+                value={settings.blacklist_companies?.join(', ') || ''} 
+                onChange={(v: string) => updateField('blacklist_companies', v.split(',').map(k => k.trim()).filter(Boolean))} 
+              />
+              <InputField 
+                label="Blacklist Words (pisahkan koma)" 
+                value={settings.blacklist_words?.join(', ') || ''} 
+                onChange={(v: string) => updateField('blacklist_words', v.split(',').map(k => k.trim()).filter(Boolean))} 
+              />
+            </div>
+          </div>
+        )}
 
-              <div className="space-y-2">
-                <Label htmlFor="search_location">Search Location</Label>
-                <Input
-                  id="search_location"
-                  value={settings.search_location || ''}
-                  onChange={(e) => updateField('search_location', e.target.value)}
-                  placeholder="Jakarta, Indonesia or Remote"
-                />
-              </div>
+        {activeTab === 'behavior' && (
+          <div className="space-y-6" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Settings className="h-5 w-5 text-[#0367FC]" /> Automation Behavior
+            </h2>
+            <ToggleField 
+              label="Pause Before Submit" 
+              description="Berhenti sebelum submit setiap lamaran untuk review kamu"
+              checked={settings.pause_before_submit ?? true}
+              onChange={(v: boolean) => updateField('pause_before_submit', v)}
+            />
+            <ToggleField 
+              label="Pause at Unknown Questions" 
+              description="Berhenti saat AI menemukan pertanyaan yang tidak bisa dijawab"
+              checked={settings.pause_at_failed_question ?? true}
+              onChange={(v: boolean) => updateField('pause_at_failed_question', v)}
+            />
+            <ToggleField 
+              label="Overwrite Previous Answers" 
+              description="Selalu gunakan settings terbaru daripada jawaban yang sudah tersimpan"
+              checked={settings.overwrite_previous_answers ?? false}
+              onChange={(v: boolean) => updateField('overwrite_previous_answers', v)}
+            />
+          </div>
+        )}
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="easy_apply_only"
-                  checked={settings.easy_apply_only ?? true}
-                  onCheckedChange={(checked) => updateField('easy_apply_only', checked)}
-                />
-                <Label htmlFor="easy_apply_only">Easy Apply Only</Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Blacklist Companies (comma-separated)</Label>
-                <Input
-                  value={settings.blacklist_companies?.join(', ') || ''}
-                  onChange={(e) =>
-                    updateField(
-                      'blacklist_companies',
-                      e.target.value.split(',').map((k) => k.trim()).filter(Boolean)
-                    )
-                  }
-                  placeholder="Company A, Company B"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Blacklist Words (comma-separated)</Label>
-                <Input
-                  value={settings.blacklist_words?.join(', ') || ''}
-                  onChange={(e) =>
-                    updateField(
-                      'blacklist_words',
-                      e.target.value.split(',').map((k) => k.trim()).filter(Boolean)
-                    )
-                  }
-                  placeholder="PHP, .NET, WordPress"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="behavior">
-          <Card>
-            <CardHeader>
-              <CardTitle>Automation Behavior</CardTitle>
-              <CardDescription>
-                Control how the AI behaves during job applications
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="pause_before_submit">Pause Before Submit</Label>
-                  <p className="text-sm text-gray-500">
-                    Stop before submitting each application for your review
-                  </p>
-                </div>
-                <Switch
-                  id="pause_before_submit"
-                  checked={settings.pause_before_submit ?? true}
-                  onCheckedChange={(checked) => updateField('pause_before_submit', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="pause_at_failed_question">Pause at Unknown Questions</Label>
-                  <p className="text-sm text-gray-500">
-                    Stop when AI encounters a question it can't answer
-                  </p>
-                </div>
-                <Switch
-                  id="pause_at_failed_question"
-                  checked={settings.pause_at_failed_question ?? true}
-                  onCheckedChange={(checked) => updateField('pause_at_failed_question', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="overwrite_previous_answers">Overwrite Previous Answers</Label>
-                  <p className="text-sm text-gray-500">
-                    Always use latest settings instead of saved answers
-                  </p>
-                </div>
-                <Switch
-                  id="overwrite_previous_answers"
-                  checked={settings.overwrite_previous_answers ?? false}
-                  onCheckedChange={(checked) => updateField('overwrite_previous_answers', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ai">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Settings</CardTitle>
-              <CardDescription>
-                Configure AI model and provider for automation
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="ai_provider">AI Provider</Label>
-                <select
-                  id="ai_provider"
-                  className="w-full p-2 border rounded-md"
-                  value={settings.ai_provider || 'openrouter'}
-                  onChange={(e) => updateField('ai_provider', e.target.value)}
-                >
-                  <option value="openrouter">OpenRouter</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="gemini">Google Gemini</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ai_model">AI Model</Label>
-                <Input
-                  id="ai_model"
-                  value={settings.ai_model || 'openrouter/free'}
-                  onChange={(e) => updateField('ai_model', e.target.value)}
-                  placeholder="e.g., openrouter/free, claude-3.5-sonnet"
-                />
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mt-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> AI model selection affects both quality and cost.
-                  Free tier uses openrouter/free models. Pro tier uses Claude Opus/Sonnet.
+        {activeTab === 'ai' && (
+          <div className="space-y-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
+            </h2>
+            <SelectField 
+              label="AI Provider" 
+              value={settings.ai_provider || 'openai'} 
+              options={[
+                {value: 'openai', label: 'OpenAI'},
+                {value: 'openrouter', label: 'OpenRouter'},
+                {value: 'deepseek', label: 'DeepSeek'},
+                {value: 'gemini', label: 'Google Gemini'},
+              ]}
+              onChange={(v: string) => updateField('ai_provider', v)} 
+            />
+            <InputField 
+              label="AI Model" 
+              value={settings.ai_model || 'gpt-4'} 
+              onChange={(v: string) => updateField('ai_model', v)} 
+              placeholder="Contoh: gpt-4, claude-3.5-sonnet"
+            />
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Catatan</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  Pemilihan model AI mempengaruhi kualitas dan biaya. Free tier menggunakan model gratis. Pro tier menggunakan Claude Opus/Sonnet.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </div>
+        )}
 
-      <div className="mt-8 flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-[#0367FC] hover:bg-[#0256d3] text-white px-8"
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </Button>
+        {/* Save Button */}
+        <div className="mt-6 pt-6 border-t border-black/[6%] flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-11 px-8 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Menyimpan...' : 'Simpan Settings'}
+          </button>
+        </div>
       </div>
-    </div>
-  )
+    </AppShell>
+  );
 }
+
+// Helper components
+function InputField({ label, value, onChange, type = 'text', placeholder = '', icon: Icon }: any) {
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+        {Icon && <Icon className="h-3.5 w-3.5 text-[#0367FC]" />}
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
+      />
+    </div>
+  );
+}
+
+function SelectField({ label, value, options, onChange }: any) {
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
+      >
+        {options.map((opt: any) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ToggleField({ label, description, checked, onChange }: any) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0367FC]' : 'bg-black/[12%]'}`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'left-[22px]' : 'left-0.5'}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+export default AutomationSettingsPage;
