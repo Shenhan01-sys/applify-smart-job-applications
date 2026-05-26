@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "@tanstack/react-router";
@@ -6,11 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
-  beforeLoad: async () => {
-    if (isMockMode()) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) throw redirect({ to: "/dashboard" });
-  },
   component: LoginPage,
 });
 
