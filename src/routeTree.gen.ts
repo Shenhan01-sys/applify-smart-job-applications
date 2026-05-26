@@ -18,6 +18,7 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
 import { Route as AutomationSettingsRouteImport } from './routes/automation-settings'
+import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
@@ -67,6 +68,11 @@ const AutomationSettingsRoute = AutomationSettingsRouteImport.update({
   path: '/automation-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth-callback',
+  path: '/auth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApprovalsRoute = ApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/applications'
     | '/approvals'
+    | '/auth-callback'
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/applications'
     | '/approvals'
+    | '/auth-callback'
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/applications'
     | '/approvals'
+    | '/auth-callback'
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApplicationsRoute: typeof ApplicationsRoute
   ApprovalsRoute: typeof ApprovalsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   AutomationSettingsRoute: typeof AutomationSettingsRoute
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
@@ -251,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutomationSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth-callback': {
+      id: '/auth-callback'
+      path: '/auth-callback'
+      fullPath: '/auth-callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/approvals': {
       id: '/approvals'
       path: '/approvals'
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApplicationsRoute: ApplicationsRoute,
   ApprovalsRoute: ApprovalsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   AutomationSettingsRoute: AutomationSettingsRoute,
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,

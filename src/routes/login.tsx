@@ -91,7 +91,7 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin + '/login', // Return to /login so beforeLoad can redirect to /dashboard
+          redirectTo: window.location.origin + '/auth/callback', // Return to dedicated callback handler
           queryParams: {
             access_type: "offline",
             prompt: "consent",
