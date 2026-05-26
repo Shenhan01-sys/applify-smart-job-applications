@@ -26,13 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const handleOAuthCallback = async () => {
-      const hash = window.location.hash;
-      const isOAuthReturn = hash && hash.includes('access_token=');
-      if (isOAuthReturn) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
+    const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
@@ -40,14 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user) {
         console.log('[Auth] Session recovered for user:', session.user.email);
-        // If we just came back from OAuth and landed on root, redirect to dashboard
-        if (isOAuthReturn && window.location.pathname === '/') {
-          window.location.replace('/dashboard');
-        }
       }
     };
 
-    handleOAuthCallback();
+    initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
