@@ -28,7 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const handleOAuthCallback = async () => {
       const hash = window.location.hash;
-      if (hash && hash.includes('access_token=')) {
+      const isOAuthReturn = hash && hash.includes('access_token=');
+      if (isOAuthReturn) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -39,6 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user) {
         console.log('[Auth] Session recovered for user:', session.user.email);
+        // If we just came back from OAuth and landed on root, redirect to dashboard
+        if (isOAuthReturn && window.location.pathname === '/') {
+          window.location.replace('/dashboard');
+        }
       }
     };
 
