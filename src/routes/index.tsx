@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot,
-  CalendarCheck, Star, LogIn, UserPlus, Search, Send, Leaf, Target,
+  CalendarCheck, Star, LogIn, UserPlus, Search, Send, Leaf,
   TrendingUp, Scale, Globe, Clock, BadgeCheck, Quote, Briefcase, GraduationCap,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
@@ -290,6 +290,9 @@ const HIcons = {
   ),
   Sparkles: (p: HSvg) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
+  ),
+  FileUp: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M12 12v6" /><path d="m15 15-3-3-3 3" /></svg>
   ),
 };
 
@@ -588,67 +591,139 @@ function StatBand() {
 /* ─────────────────────────  Manifesto / Tentang  ───────────────────────── */
 
 function Manifesto() {
+  const nodes = [
+    { pos: "top-[80px] left-[20px] -translate-x-[100%] -translate-y-1/2 pr-2", d: "mf-d1", e: "♻️", t: "Net-Zero", dark: true },
+    { pos: "top-[45px] left-[45px] -translate-x-[100%] -translate-y-[100%] pr-1 pb-1", d: "mf-d2", e: "🤝", t: "Fair Pay", dark: true },
+    { pos: "top-[25px] left-[75px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "🌿", t: "ESG+", dark: true },
+    { pos: "top-[15px] left-[125px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d4", e: "🔋", t: "Clean Tech", dark: false },
+    { pos: "top-[30px] left-[175px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "📉", t: "Low Carbon", dark: true },
+    { pos: "top-[50px] left-[200px] -translate-y-[100%] pl-1 pb-1", d: "mf-d2", e: "⚖️", t: "Equity", dark: true },
+    { pos: "top-[90px] left-[220px] -translate-y-[50%] pl-2", d: "mf-d1", e: "👁️", t: "Transparent", dark: true },
+  ];
+  const ecoPaths = [
+    "M 120,170 C 105,150 115,120 90,105 C 65,90 40,110 20,80",
+    "M 120,170 C 110,145 130,115 100,95 C 70,75 60,65 45,45",
+    "M 120,170 C 115,140 105,110 105,90 C 105,70 90,45 75,25",
+    "M 120,170 C 130,135 105,100 125,70 C 140,40 115,30 125,15",
+    "M 120,170 C 125,145 135,115 135,90 C 135,65 155,50 175,30",
+    "M 120,170 C 115,140 150,115 145,95 C 140,75 175,70 200,50",
+    "M 120,170 C 125,150 145,120 155,105 C 165,90 195,110 220,90",
+  ];
+  const drawDelays = ["mf-d0", "mf-d1", "mf-d2", "mf-d3", "mf-d2", "mf-d1", "mf-d0"];
+
   return (
     <ScrollReveal>
-      <section id="tentang" className="mx-auto max-w-7xl px-4 py-20 md:py-28 md:px-8">
-        <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16 items-center">
-          <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-[#0A5BE0] font-bold">Tentang Applify</p>
-            <h2 className="mt-4 font-display text-3xl md:text-5xl font-extrabold tracking-tight leading-[1.05]">
-              Melamar kerja seharusnya soal <span className="text-[#0A5BE0]">kemampuan</span> — bukan soal waktu, koneksi, atau keberuntungan.
-            </h2>
-            <p className="mt-6 text-muted-foreground leading-relaxed md:text-lg max-w-xl">
-              Applify lahir dari satu keresahan: proses melamar kerja di Indonesia melelahkan, tidak setara, dan sering menutup pintu sebelum kemampuan sempat terlihat. Kami membangun <b className="text-foreground">agen AI otonom</b> yang mengambil alih kerja berat — agar setiap orang punya peluang yang adil.
-            </p>
-            <div className="mt-8 grid sm:grid-cols-2 gap-4 max-w-xl">
-              <MissionCard icon={Target} tone="#0A5BE0" title="Misi" body="Mendemokratisasi akses ke kerja layak lewat otomasi AI yang terjangkau bagi semua." />
-              <MissionCard icon={Globe} tone="#1C9656" title="Visi" body="Pasar kerja Indonesia di mana skill berbicara lebih dulu, tanpa hambatan struktural." />
+      <section id="tentang" className="mx-auto max-w-7xl px-4 py-20 md:py-24 md:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[600px]">
+
+          {/* Box 1: Typography */}
+          <div className="lg:col-span-5 flex flex-col justify-center p-8 lg:p-10 bg-white rounded-[2rem] border border-neutral-200 shadow-sm h-full relative overflow-hidden">
+            <div className="inline-flex mb-8 self-start">
+              <span className="bg-brand-dark text-white px-3 py-1 rounded-full font-sans text-[10px] font-bold uppercase tracking-widest border border-neutral-700">
+                Manifesto
+              </span>
             </div>
+            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-neutral-900 leading-[1.1] tracking-tight">
+              Karier Anda ditentukan oleh <span className="text-brand-lime bg-brand-dark px-2 pt-1 pb-0.5 rounded-md inline-block leading-none align-bottom">skill.</span>
+            </h2>
+            <div className="font-display text-xl sm:text-2xl font-bold text-neutral-400 mt-6 leading-snug space-y-2">
+              <p className="line-through decoration-neutral-300 decoration-4">Bukan nama belakang.</p>
+              <p className="line-through decoration-neutral-300 decoration-4">Bukan waktu luang.</p>
+              <p className="line-through decoration-neutral-300 decoration-4">Bukan almamater.</p>
+            </div>
+            <p className="mt-8 font-sans text-base text-neutral-600 leading-relaxed font-medium">
+              Kami mendemokratisasi akses ke pasar kerja melalui agen AI otonom, memastikan peluang kerja dinilai berdasarkan merit, bukan bias.
+            </p>
           </div>
-          <div className="relative">
-            <div className="glass rounded-3xl p-7">
-              <div className="flex items-center gap-3 border-b border-[color:var(--border)] pb-4">
-                <AgentMascot className="h-12 w-12" />
+
+          {/* Box 2: Visuals Area */}
+          <div className="lg:col-span-7 grid grid-rows-2 grid-cols-2 gap-6 h-full">
+
+            {/* Visual A: Otonom */}
+            <div className="col-span-2 row-span-1 bg-brand-paper border border-neutral-200 rounded-[2rem] p-6 shadow-inner flex overflow-hidden relative min-h-[250px]">
+              <div className="absolute inset-0 bg-cyber-grid opacity-50 z-0" />
+              <div className="z-10 w-1/2 flex flex-col justify-between">
                 <div>
-                  <p className="font-display font-bold text-lg">Prinsip kami</p>
-                  <p className="text-xs text-muted-foreground">Apa yang membuat Applify berbeda</p>
+                  <h3 className="font-display text-xl font-bold text-neutral-900">Otonom &amp; End-to-End</h3>
+                  <p className="font-sans text-sm text-neutral-500 mt-1 pr-4">Mesin pintar yang bergerak dalam loop tak henti.</p>
+                </div>
+                <div className="mt-4 bg-white/80 backdrop-blur-sm border border-neutral-200 rounded-lg p-3 w-48 shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-2 border-b border-neutral-100 pb-1">
+                    <div className="w-2 h-2 bg-brand-lime rounded-full animate-pulse" />
+                    <span className="text-[9px] font-display font-bold text-neutral-800 uppercase tracking-widest">Live Agent Log</span>
+                  </div>
+                  <div className="flex flex-col gap-1 text-[9px] font-mono text-neutral-500">
+                    <div className="animate-logFade mf-d1">&gt; Fetching 430 jobs...</div>
+                    <div className="animate-logFade mf-d2">&gt; Matching skills...</div>
+                    <div className="animate-logFade mf-d3">&gt; Optimizing ATS...</div>
+                    <div className="animate-logFade mf-d4 font-bold text-brand-lime">&gt; Sent apps successfully.</div>
+                  </div>
                 </div>
               </div>
-              <ul className="mt-5 space-y-4">
-                {[
-                  { icon: Bot, t: "Otonom, bukan sekadar asisten", d: "Agen bertindak sendiri — mencari, melamar, menyiapkan interview." },
-                  { icon: Scale, t: "Adil sejak desain", d: "Blind Merit Mode menyembunyikan bias kampus & latar belakang." },
-                  { icon: Leaf, t: "Berdampak", d: "Green Career Track memprioritaskan perusahaan berdampak positif." },
-                ].map((p) => (
-                  <li key={p.t} className="flex gap-3.5">
-                    <div className="h-9 w-9 rounded-xl bg-[#16150F] grid place-items-center text-[#D2F801] shrink-0">
-                      <p.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{p.t}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{p.d}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="absolute right-12 top-1/2 -translate-y-1/2 w-48 h-48 flex items-center justify-center z-10">
+                <div className="w-14 h-14 bg-brand-dark rounded-xl border-2 border-brand-lime flex items-center justify-center text-brand-lime z-20 shadow-[0_0_20px_rgba(163,230,53,0.3)]">
+                  <HIcons.Bot />
+                </div>
+                <div className="absolute inset-0 rounded-full border-2 border-dashed border-neutral-300 animate-spin-slow" />
+                <div className="absolute w-10 h-10 bg-white border border-neutral-200 rounded-full flex items-center justify-center text-neutral-600 shadow-sm z-30 animate-orbit1"><HIcons.Search /></div>
+                <div className="absolute w-10 h-10 bg-white border border-neutral-200 rounded-full flex items-center justify-center text-neutral-600 shadow-sm z-30 animate-orbit2"><HIcons.PenTool /></div>
+                <div className="absolute w-10 h-10 bg-white border border-neutral-200 rounded-full flex items-center justify-center text-neutral-600 shadow-sm z-30 animate-orbit3"><HIcons.FileUp /></div>
+              </div>
             </div>
-            <div className="absolute -z-10 -inset-3 rounded-[2rem] bg-[#D2F801]/30 blur-2xl" aria-hidden="true" />
+
+            {/* Visual B: Adil */}
+            <div className="col-span-1 row-span-1 bg-white border border-neutral-200 rounded-[2rem] p-6 flex flex-col relative overflow-hidden min-h-[250px]">
+              <div className="z-10 mb-2">
+                <h3 className="font-display text-lg font-bold text-neutral-900">Blind Merit Mode</h3>
+                <p className="font-sans text-xs text-neutral-500 mt-1">Meratakan hierarki bias.</p>
+              </div>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 h-[100px] flex items-end justify-center gap-5 border-b-2 border-neutral-100 pb-1">
+                <div className="absolute left-0 right-0 h-0.5 bg-brand-lime shadow-[0_0_8px_#A3E635] z-30 animate-scanner" />
+                <div className="w-8 relative flex flex-col justify-end items-center">
+                  <div className="w-full bg-neutral-800 rounded-t absolute bottom-0 z-10 animate-biasBar1" />
+                  <div className="w-full bg-brand-lime rounded-t absolute bottom-0 z-20 shadow-[0_0_10px_rgba(163,230,53,0.5)] animate-skillBar1" />
+                </div>
+                <div className="w-8 relative flex flex-col justify-end items-center">
+                  <div className="w-full bg-neutral-800 rounded-t absolute bottom-0 z-10 animate-biasBar2" />
+                  <div className="w-full bg-brand-lime rounded-t absolute bottom-0 z-20 shadow-[0_0_10px_rgba(163,230,53,0.5)] animate-skillBar2" />
+                </div>
+                <div className="w-8 relative flex flex-col justify-end items-center">
+                  <div className="w-full bg-neutral-800 rounded-t absolute bottom-0 z-10 animate-biasBar3" />
+                  <div className="w-full bg-brand-lime rounded-t absolute bottom-0 z-20 shadow-[0_0_10px_rgba(163,230,53,0.5)] animate-skillBar3" />
+                </div>
+              </div>
+            </div>
+
+            {/* Visual C: Berdampak — organic neural eco-network */}
+            <div className="col-span-1 row-span-1 bg-brand-dark border-4 border-neutral-800 rounded-[2rem] p-6 flex flex-col relative overflow-hidden min-h-[250px]">
+              <div className="z-10 relative pointer-events-none">
+                <h3 className="font-display text-lg font-bold text-brand-lime">Green Ecosystem</h3>
+                <p className="font-sans text-xs text-neutral-400 mt-1">Ekspansi AI ke sektor berdampak.</p>
+              </div>
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[240px] h-[170px]">
+                <svg viewBox="0 0 240 170" className="w-full h-full overflow-visible drop-shadow-[0_0_10px_rgba(163,230,53,0.8)]">
+                  <g stroke="#A3E635" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.2" filter="blur(2px)">
+                    {ecoPaths.map((d, i) => <path key={i} d={d} />)}
+                  </g>
+                  <g stroke="#A3E635" strokeWidth="4" fill="none" strokeLinecap="round">
+                    {ecoPaths.map((d, i) => <path key={i} d={d} className={`animate-draw-main ${drawDelays[i]}`} />)}
+                  </g>
+                </svg>
+                {nodes.map((n) => (
+                  <div key={n.t} className={`absolute ${n.pos} animate-popUI ${n.d}`}>
+                    <div className={`rounded shadow-sm flex items-center gap-1.5 px-2 py-0.5 whitespace-nowrap border border-brand-lime ${n.dark ? "bg-neutral-900" : "bg-brand-lime shadow-[0_0_8px_rgba(163,230,53,0.5)]"}`}>
+                      <span className="text-[9px]">{n.e}</span>
+                      <span className={`font-display font-bold text-[8px] tracking-wide uppercase ${n.dark ? "text-white" : "text-brand-dark"}`}>{n.t}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
     </ScrollReveal>
-  );
-}
-
-function MissionCard({ icon: Icon, tone, title, body }: { icon: any; tone: string; title: string; body: string }) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-white p-5">
-      <div className="h-10 w-10 rounded-xl grid place-items-center text-white" style={{ background: tone }}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <p className="mt-3 font-display font-bold">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{body}</p>
-    </div>
   );
 }
 

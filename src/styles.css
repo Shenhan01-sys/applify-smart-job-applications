@@ -54,6 +54,8 @@
   --color-soc: var(--soc);
   --color-grn: var(--grn);
   --color-brand-lime: #A3E635;   /* hero v4 "Agent Workspace" accent lime */
+  --color-brand-dark: #0A0A0A;   /* manifesto bento near-black */
+  --color-brand-paper: #FDFBF7;  /* manifesto bento off-white */
 
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -296,6 +298,74 @@
 /* Scene 2 (Writing) — named classes (Tailwind v4 doesn't generate arbitrary animate-[...]) */
 .animate-popIn { animation: popInFwd 0.4s ease-out forwards; }
 .animate-typeLine { animation: typeLine 0.4s ease-out forwards; }
+
+/* ────────── Manifesto "Bento" section — animations & utilities ────────── */
+.bg-cyber-grid {
+  background-size: 20px 20px;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+}
+.mf-d0 { animation-delay: 0s; }
+.mf-d1 { animation-delay: 0.2s; }
+.mf-d2 { animation-delay: 0.4s; }
+.mf-d3 { animation-delay: 0.6s; }
+.mf-d4 { animation-delay: 0.8s; }
+
+.animate-orbit1 { animation: orbit 6s linear infinite; }
+.animate-orbit2 { animation: orbit 6s linear infinite -2s; }
+.animate-orbit3 { animation: orbit 6s linear infinite -4s; }
+.animate-biasBar1 { animation: biasBar1 5s ease-in-out infinite; }
+.animate-biasBar2 { animation: biasBar2 5s ease-in-out infinite; }
+.animate-biasBar3 { animation: biasBar3 5s ease-in-out infinite; }
+.animate-skillBar1 { animation: skillBar1 5s ease-in-out infinite; }
+.animate-skillBar2 { animation: skillBar2 5s ease-in-out infinite; }
+.animate-skillBar3 { animation: skillBar3 5s ease-in-out infinite; }
+.animate-scanner { animation: scanner 5s ease-in-out infinite; }
+.animate-logFade { animation: logFade 6s ease-in-out infinite; }
+.animate-spin-slow { animation: spin 12s linear infinite; }
+.animate-draw-main {
+  stroke-dasharray: 250;
+  stroke-dashoffset: 250;
+  animation: drawAbstract 6s cubic-bezier(0.4, 0, 0.2, 1) infinite forwards;
+}
+.animate-popUI {
+  opacity: 0;
+  animation: popUI 6s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite;
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg) translateX(70px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(70px) rotate(-360deg); }
+}
+@keyframes scanner {
+  0%, 10% { top: -10px; opacity: 0; }
+  15% { top: -10px; opacity: 1; }
+  30% { top: 60px; opacity: 1; }
+  35%, 100% { top: 60px; opacity: 0; }
+}
+@keyframes biasBar1 { 0%, 15% { height: 90px; } 30%, 85% { height: 15px; } 100% { height: 90px; } }
+@keyframes biasBar2 { 0%, 20% { height: 60px; } 30%, 85% { height: 15px; } 100% { height: 60px; } }
+@keyframes biasBar3 { 0%, 25% { height: 30px; } 30%, 85% { height: 15px; } 100% { height: 30px; } }
+@keyframes skillBar1 { 0%, 15% { height: 15px; } 30%, 85% { height: 90px; } 100% { height: 15px; } }
+@keyframes skillBar2 { 0%, 20% { height: 15px; } 30%, 85% { height: 60px; } 100% { height: 15px; } }
+@keyframes skillBar3 { 0%, 25% { height: 15px; } 30%, 85% { height: 30px; } 100% { height: 15px; } }
+@keyframes logFade {
+  0%, 100% { opacity: 0; transform: translateX(-10px); }
+  10%, 80% { opacity: 1; transform: translateX(0); }
+  90% { opacity: 0; transform: translateX(10px); }
+}
+@keyframes drawAbstract {
+  0%, 10% { stroke-dashoffset: 250; opacity: 0; }
+  15% { opacity: 1; stroke-dashoffset: 250; }
+  45%, 85% { stroke-dashoffset: 0; opacity: 1; }
+  95%, 100% { stroke-dashoffset: -250; opacity: 0; }
+}
+@keyframes popUI {
+  0%, 30% { transform: scale(0.3) translateY(10px); opacity: 0; }
+  40%, 85% { transform: scale(1) translateY(0); opacity: 1; }
+  90%, 100% { transform: scale(0.3) translateY(10px); opacity: 0; }
+}
 
 @keyframes blob {
   0%, 100% { transform: translate(0px, 0px) scale(1); }
