@@ -845,7 +845,7 @@ function CapabilitiesBento() {
           <p className="mt-4 text-muted-foreground">Lima kemampuan eksklusif yang tidak akan kamu temukan di platform lain.</p>
         </div>
 
-        <div className="mt-12 grid gap-4 md:grid-cols-4 md:auto-rows-[200px]">
+        <div className="mt-12 grid gap-4 md:grid-cols-4 md:auto-rows-[230px]">
           {/* Hero cell 2x2 — Collective ATS Intelligence */}
           <div className="md:col-span-2 md:row-span-2 glass rounded-3xl p-7 relative overflow-hidden flex flex-col">
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#0A5BE0] px-3 py-1 text-xs font-bold text-white">
@@ -854,9 +854,9 @@ function CapabilitiesBento() {
             <div className="mt-5 h-12 w-12 rounded-xl bg-[#16150F] grid place-items-center text-[#D2F801]">
               <Brain className="h-6 w-6" />
             </div>
-            <h3 className="mt-4 font-display text-2xl font-extrabold">Collective ATS Intelligence</h3>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Agregasi data ATS dari 12.000+ pelamar. Kami tahu keyword apa yang lolos di Workday Gojek, Lever Tokopedia, Greenhouse Shopee.
+            <h3 className="mt-4 font-display text-2xl font-extrabold leading-tight">Collective ATS Intelligence</h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-snug">
+              Agregasi data ATS dari 12.000+ pelamar — kami tahu keyword yang lolos di Workday, Lever &amp; Greenhouse.
             </p>
             <div className="mt-auto pt-5 space-y-2.5">
               {[
@@ -880,15 +880,15 @@ function CapabilitiesBento() {
             </div>
           </div>
 
-          <BentoCard icon={EyeOff} badge="Social Impact" badgeTone="#16150F" title="Blind Merit Mode" desc="Sembunyikan nama, kampus & latar belakang. Skill bicara dulu." accent="#1C9656" />
-          <BentoCard icon={Zap} badge="Real-time" badgeTone="#0A5BE0" title="Golden Window Sniper" desc="Lamar 2 jam pertama — callback 4x lebih tinggi." accent="#D9741A" />
+          <BentoCard icon={EyeOff} badge="Social Impact" badgeTone="#16150F" title="Blind Merit Mode" desc="Sembunyikan identitas; biarkan skill dinilai lebih dulu." accent="#1C9656" />
+          <BentoCard icon={Zap} badge="Real-time" badgeTone="#0A5BE0" title="Golden Window Sniper" desc="Lamar di 2 jam pertama — callback 4× lebih tinggi." accent="#D9741A" />
 
           {/* Wide cell 2x1 — Skill Radar with mini radar */}
           <div className="md:col-span-2 glass rounded-3xl p-6 flex items-center gap-5">
             <div className="flex-1">
               <span className="inline-flex items-center rounded-full bg-[#16150F] px-3 py-1 text-xs font-bold text-[#D2F801]">Smart Learning</span>
               <h3 className="mt-3 font-display text-xl font-bold">Skill Radar</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">Visualisasi gap skill-mu vs tren pasar real-time, terhubung ke platform learning.</p>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-snug">Visualisasi gap skill-mu vs tren pasar, real-time.</p>
             </div>
             <RadarMini />
           </div>
@@ -900,13 +900,13 @@ function CapabilitiesBento() {
 
 function BentoCard({ icon: Icon, badge, badgeTone, title, desc, accent }: { icon: any; badge: string; badgeTone: string; title: string; desc: string; accent: string }) {
   return (
-    <div className="glass rounded-3xl p-6 hover:-translate-y-1 transition-transform duration-300">
+    <div className="glass rounded-3xl p-6 overflow-hidden hover:-translate-y-1 transition-transform duration-300">
       <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold text-white" style={{ background: badgeTone }}>{badge}</span>
-      <div className="mt-4 h-11 w-11 rounded-xl grid place-items-center text-white" style={{ background: accent }}>
+      <div className="mt-3.5 h-11 w-11 rounded-xl grid place-items-center text-white" style={{ background: accent }}>
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="mt-4 font-display text-xl font-bold">{title}</h3>
-      <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{desc}</p>
+      <h3 className="mt-3.5 font-display text-lg font-bold leading-tight">{title}</h3>
+      <p className="mt-1.5 text-sm text-muted-foreground leading-snug">{desc}</p>
     </div>
   );
 }
