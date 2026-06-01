@@ -4,7 +4,7 @@ import {
   CalendarCheck, Star, LogIn, UserPlus, Search, Send, Leaf, Target,
   TrendingUp, Scale, Globe, Clock, BadgeCheck, Quote, Briefcase, GraduationCap,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/")({
@@ -262,75 +262,280 @@ function Hero({ authLink }: { authLink: string }) {
   );
 }
 
-/* The "transparency layer" — show what the autonomous agent is doing right now */
-function AgentLivePanel() {
-  const log = [
-    { icon: Search, t: "Memindai 7 platform…", s: "342 lowongan baru", tone: "eco" },
-    { icon: Brain, t: "Mencocokkan & menulis CV", s: "12 lamaran disiapkan", tone: "soc" },
-    { icon: Send, t: "Mengirim lamaran (ATS-ready)", s: "47 terkirim hari ini", tone: "eco" },
-    { icon: CalendarCheck, t: "Menyiapkan interview", s: "8 callback diterima", tone: "grn" },
-  ];
+/* ── Hero "Agent Workspace" live panel (ported from hero v4 design) ──
+   The transparency layer: 4 auto-cycling scenes showing the autonomous
+   agent scraping → writing → submitting → preparing interviews. */
+type HSvg = SVGProps<SVGSVGElement>;
+const HIcons = {
+  Bot: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg>
+  ),
+  Search: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+  ),
+  PenTool: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m12 19 7-7 3 3-7 7-3-3z" /><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="m2 2 7.586 7.586" /><circle cx="11" cy="11" r="2" /></svg>
+  ),
+  UploadCloud: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /><path d="M12 12v9" /><path d="m16 16-4-4-4 4" /></svg>
+  ),
+  CheckCircle: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></svg>
+  ),
+  MessageSquare: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+  ),
+  Briefcase: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+  ),
+  Sparkles: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
+  ),
+};
+
+function SceneScraping() {
   return (
-    <div className="relative">
-      <div className="relative glass rounded-3xl p-6 animate-fade-up">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <AgentMascot className="h-10 w-10" />
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Agen Applify</p>
-              <p className="text-sm font-semibold">Bekerja untukmu</p>
+    <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
+      <div className="flex justify-between items-center w-full mb-4 opacity-80">
+        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Mengekstrak Syarat Loker</span>
+        <span className="font-display text-xs font-bold text-brand-lime flex items-center gap-1 animate-pulseGlow">
+          <HIcons.Search /> Reading...
+        </span>
+      </div>
+      <div className="relative w-full max-w-[200px] bg-white border border-neutral-200 rounded-lg shadow-sm p-4 text-left overflow-hidden">
+        <div className="w-3/4 h-2.5 bg-neutral-200 rounded mb-4" />
+        <div className="space-y-3.5">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 flex-shrink-0" />
+            <div className="h-2 bg-neutral-100 rounded w-full flex items-center relative">
+              <div className="absolute left-[20%] w-[35%] h-2.5 bg-neutral-200 rounded animate-popWord1 shadow-sm origin-left" />
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#1C9656] animate-pulse-glow" />
-            <span className="text-xs text-[#1C9656] font-mono font-semibold">LIVE</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 flex-shrink-0" />
+            <div className="h-2 bg-neutral-100 rounded w-[90%] flex items-center relative">
+              <div className="absolute left-[30%] w-[45%] h-2.5 bg-neutral-200 rounded animate-popWord2 shadow-sm origin-left" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 flex-shrink-0" />
+            <div className="h-2 bg-neutral-100 rounded w-[75%] flex items-center relative">
+              <div className="absolute left-[10%] w-[50%] h-2.5 bg-neutral-200 rounded animate-popWord3 shadow-sm origin-left" />
+            </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <MiniStat label="Terkirim" value="47" tone="eco" />
-          <MiniStat label="ATS Lolos" value="91%" tone="grn" />
-          <MiniStat label="Callback" value="8" tone="soc" />
-          <MiniStat label="⚡ Golden" value="3" tone="eco" />
+        <div className="absolute top-9 left-3 w-10 h-10 border-2 border-brand-lime bg-lime-50/20 backdrop-blur-[2px] rounded-full shadow-[0_0_15px_rgba(163,230,53,0.5)] animate-magnifyMove flex items-center justify-center pointer-events-none z-10">
+          <div className="w-1 h-1 bg-brand-lime rounded-full shadow-sm" />
+          <div className="absolute top-2 bottom-2 w-[1px] bg-brand-lime/40" />
+          <div className="absolute left-2 right-2 h-[1px] bg-brand-lime/40" />
+          <div className="absolute -bottom-2 -right-2 w-3.5 h-1.5 bg-neutral-700 rotate-45 rounded-sm" />
         </div>
-
-        <div className="mt-5 space-y-2">
-          {log.map((it, i) => {
-            const ic = it.tone === "eco" ? "#0A5BE0" : it.tone === "soc" ? "#D9741A" : "#1C9656";
-            return (
-              <div key={i} className="flex items-center gap-3 rounded-xl border border-[color:var(--border)] bg-[#FBF9F2] p-3">
-                <div className="h-8 w-8 rounded-lg grid place-items-center text-white shrink-0" style={{ background: ic }}>
-                  <it.icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{it.t}</p>
-                  <p className="text-xs text-muted-foreground truncate">{it.s}</p>
-                </div>
-                <Check className="h-4 w-4 text-[#1C9656]" />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="absolute -top-4 -right-3 glass rounded-xl px-4 py-3 animate-float hidden sm:block">
-        <p className="text-xs text-muted-foreground">Hari ini</p>
-        <p className="text-sm font-bold">🎯 47 lamaran terkirim</p>
-      </div>
-      <div className="absolute -bottom-4 -left-3 glass rounded-xl px-4 py-3 animate-float hidden sm:block" style={{ animationDelay: "1s" }}>
-        <p className="text-xs text-muted-foreground">Lolos ATS</p>
-        <p className="text-sm font-bold text-[#1C9656]">91% akurasi</p>
       </div>
     </div>
   );
 }
 
-function MiniStat({ label, value, tone }: { label: string; value: string; tone: "eco" | "soc" | "grn" }) {
-  const color = tone === "eco" ? "text-[#0A5BE0]" : tone === "soc" ? "text-[#D9741A]" : "text-[#1C9656]";
+function SceneWriting() {
   return (
-    <div className="rounded-xl border border-[color:var(--border)] bg-[#FBF9F2] p-3">
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`font-mono text-2xl font-bold mt-1 ${color}`}>{value}</p>
+    <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
+      <div className="flex justify-between items-center w-full mb-4 opacity-80">
+        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Menyesuaikan CV</span>
+        <span className="font-display text-xs font-bold text-neutral-800 flex items-center gap-1">
+          <HIcons.PenTool /> Tailoring...
+        </span>
+      </div>
+      <div className="w-full max-w-[200px] h-[225px] bg-white border border-neutral-200 rounded-lg shadow-sm p-4 flex flex-col relative overflow-hidden">
+        <div className="absolute top-3 right-3">
+          <HIcons.Sparkles className="w-3.5 h-3.5 text-brand-lime animate-pulseGlow" />
+        </div>
+        <div className="flex gap-2 mb-3 items-center">
+          <div className="w-7 h-7 rounded-full bg-neutral-200 opacity-0 animate-[popInFwd_0.4s_ease-out_forwards]" style={{ animationDelay: "0s" }} />
+          <div className="space-y-1.5 flex-grow">
+            <div className="w-[80%]"><div className="h-2 bg-neutral-800 rounded w-0 animate-[typeLine_0.4s_ease-out_forwards]" style={{ animationDelay: "0.1s" }} /></div>
+            <div className="w-[50%]"><div className="h-1.5 bg-neutral-300 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.2s" }} /></div>
+          </div>
+        </div>
+        <div className="w-full h-px bg-neutral-100 mb-3 opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "0.3s" }} />
+        <div className="flex flex-col gap-2.5">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1 w-full">
+              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.4s" }} /></div>
+              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(163,230,53,0.5)]" style={{ animationDelay: "0.6s" }} />
+              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.7s" }} /></div>
+            </div>
+            <div className="w-[85%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.4s_ease-out_forwards]" style={{ animationDelay: "0.9s" }} /></div>
+          </div>
+          <div className="space-y-2 pl-2 border-l-2 border-neutral-100 mt-1">
+            <div className="flex items-center gap-1 w-full">
+              <div className="w-[20%] h-1.5 bg-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.1s" }} />
+              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "1.2s" }} /></div>
+              <div className="w-[15%] h-1.5 bg-indigo-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(129,140,248,0.5)]" style={{ animationDelay: "1.4s" }} />
+            </div>
+            <div className="flex items-center gap-1 w-full">
+              <div className="w-[25%] h-1.5 bg-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.6s" }} />
+              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "1.7s" }} /></div>
+              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "1.9s" }} />
+            </div>
+          </div>
+          <div className="flex gap-1.5 mt-1.5">
+            <div className="h-4 w-10 bg-lime-100 border border-lime-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.1s" }} />
+            <div className="h-4 w-12 bg-teal-100 border border-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.2s" }} />
+            <div className="h-4 w-14 bg-indigo-100 border border-indigo-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.3s" }} />
+          </div>
+        </div>
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-neutral-900 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg opacity-0 animate-[popInFwd_0.4s_ease-out_forwards] z-20" style={{ animationDelay: "2.6s" }}>
+          <HIcons.CheckCircle className="w-3.5 h-3.5 text-brand-lime" />
+          <span className="font-sans text-[10px] font-bold text-white tracking-wide uppercase">ATS Optimized</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SceneUploading() {
+  return (
+    <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
+      <div className="w-full bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="h-6 bg-neutral-100 border-b border-neutral-200 flex items-center px-2 gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <div className="w-2 h-2 rounded-full bg-yellow-400" />
+          <div className="w-2 h-2 rounded-full bg-green-400" />
+          <div className="ml-2 h-3 bg-white w-1/2 rounded border border-neutral-200" />
+        </div>
+        <div className="p-4 flex flex-col items-center justify-center relative h-32">
+          <div className="w-12 h-12 bg-neutral-50 rounded-xl border border-neutral-100 flex items-center justify-center mb-3">
+            <HIcons.UploadCloud className="w-6 h-6 text-neutral-400" />
+          </div>
+          <div className="absolute top-6 w-8 h-10 bg-white border border-brand-lime rounded shadow-sm animate-flyUp flex flex-col p-1 gap-0.5">
+            <div className="h-1 bg-neutral-200 w-full rounded" />
+            <div className="h-1 bg-brand-lime w-3/4 rounded" />
+          </div>
+          <div className="w-full max-w-[150px] space-y-1">
+            <div className="flex justify-between text-[9px] font-sans text-neutral-500 font-semibold">
+              <span>Submitting...</span>
+              <span>Success</span>
+            </div>
+            <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-lime rounded-full animate-progressFill" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SceneInterview() {
+  return (
+    <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
+      <div className="flex justify-between items-center w-full mb-5 opacity-80">
+        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Menyiapkan Interview</span>
+        <span className="font-display text-xs font-bold text-neutral-800 flex items-center gap-1">
+          <HIcons.Briefcase className="w-3.5 h-3.5" /> Pipeline Sync...
+        </span>
+      </div>
+      <div className="relative w-[280px] flex gap-2">
+        {["Applied", "AI Prep", "Ready"].map((col, i) => (
+          <div key={col} className="w-[88px] h-[160px] bg-neutral-100 rounded-xl p-1.5 flex flex-col gap-1.5 border border-neutral-200/60 shadow-inner">
+            <div className="text-[9px] font-sans font-bold text-neutral-400 uppercase tracking-widest text-center mt-0.5 mb-1">{col}</div>
+            {i === 0 && <div className="w-full h-10 bg-white rounded border border-neutral-200 opacity-60" />}
+            {i === 2 && (
+              <>
+                <div className="w-full h-10 bg-brand-lime/10 rounded border border-brand-lime/30 opacity-70" />
+                <div className="w-full h-10 bg-white rounded border border-neutral-200 opacity-40" />
+              </>
+            )}
+          </div>
+        ))}
+        <div className="absolute top-[34px] left-[6px] w-[76px] h-12 bg-white rounded-md border border-neutral-200 shadow-sm flex flex-col justify-center px-2 gap-1.5 animate-kanbanDrag z-10 origin-center cursor-grab">
+          <div className="h-1.5 bg-neutral-300 w-3/4 rounded-full" />
+          <div className="h-1.5 bg-neutral-200 w-1/2 rounded-full" />
+          <div className="absolute inset-0 flex items-center justify-center bg-white/90 backdrop-blur-[1px] rounded-md opacity-0 animate-kanbanSparkle">
+            <HIcons.Sparkles className="w-5 h-5 text-brand-lime drop-shadow-md" />
+          </div>
+          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-brand-lime rounded-full flex items-center justify-center opacity-0 animate-kanbanCheck shadow-md">
+            <HIcons.CheckCircle className="w-3 h-3 text-lime-900" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentLivePanel() {
+  const [activeScene, setActiveScene] = useState(0);
+  const steps = [
+    { id: 0, label: "Memindai Portal", icon: HIcons.Search },
+    { id: 1, label: "Menulis CV ATS", icon: HIcons.PenTool },
+    { id: 2, label: "Auto Submit", icon: HIcons.UploadCloud },
+    { id: 3, label: "Interview Prep", icon: HIcons.MessageSquare },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveScene((prev) => (prev + 1) % steps.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [steps.length]);
+
+  return (
+    <div className="relative w-full max-w-md mx-auto perspective-1000">
+      <div className="absolute top-1/4 -left-10 w-64 h-64 bg-lime-300 rounded-full mix-blend-multiply blur-[64px] opacity-60 animate-blob" />
+      <div className="absolute bottom-1/4 -right-10 w-64 h-64 bg-blue-200 rounded-full mix-blend-multiply blur-[64px] opacity-60 animate-blob animation-delay-2000" />
+
+      <div className="relative glass-panel rounded-3xl shadow-2xl overflow-hidden flex flex-col z-10">
+        <div className="flex justify-between items-center px-6 py-5 bg-white/50 border-b border-white/60">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-neutral-900 text-brand-lime rounded-xl shadow-inner animate-botIdle">
+              <HIcons.Bot />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-sm text-neutral-900 leading-tight">Agent Workspace</h3>
+              <p className="font-sans text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">Autonomous Mode</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-lime-100 border border-lime-200 rounded-full">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-600" />
+            </span>
+            <span className="font-sans text-[10px] font-extrabold text-lime-800 tracking-wider">LIVE</span>
+          </div>
+        </div>
+
+        <div className="relative h-[270px] bg-neutral-50/50 w-full overflow-hidden">
+          {[SceneScraping, SceneWriting, SceneUploading, SceneInterview].map((Scene, idx) => (
+            <div key={idx} className={`transition-all duration-700 ease-in-out absolute inset-0 flex items-center justify-center ${activeScene === idx ? "opacity-100 z-10 scale-100" : "opacity-0 z-0 scale-95"}`}>
+              {activeScene === idx && <Scene />}
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white px-6 py-5 flex justify-between items-center relative">
+          <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-neutral-100 -translate-y-1/2 z-0" />
+          {steps.map((step, index) => {
+            const isActive = index === activeScene;
+            const isPast = index < activeScene;
+            const StepIcon = step.icon;
+            return (
+              <div key={step.id} className="relative z-10 flex flex-col items-center gap-1.5 group">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 border-2 ${
+                  isActive ? "bg-brand-lime border-brand-lime text-neutral-900 scale-110 shadow-lg shadow-lime-500/30" :
+                  isPast ? "bg-neutral-900 border-neutral-900 text-white" : "bg-white border-neutral-200 text-neutral-300"
+                }`}>
+                  {isPast ? <HIcons.CheckCircle className="w-4 h-4" /> : <StepIcon className="w-4 h-4" />}
+                </div>
+                <span className={`text-[9px] font-sans font-bold text-center absolute -bottom-5 w-20 transition-colors ${
+                  isActive ? "text-neutral-900" : isPast ? "text-neutral-600" : "text-neutral-300"
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="h-6 bg-white" />
+      </div>
     </div>
   );
 }
