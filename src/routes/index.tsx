@@ -349,41 +349,41 @@ function SceneWriting() {
           <HIcons.Sparkles className="w-3.5 h-3.5 text-brand-lime animate-pulseGlow" />
         </div>
         <div className="flex gap-2 mb-3 items-center">
-          <div className="w-7 h-7 rounded-full bg-neutral-200 opacity-0 animate-[popInFwd_0.4s_ease-out_forwards]" style={{ animationDelay: "0s" }} />
+          <div className="w-7 h-7 rounded-full bg-neutral-200 opacity-0 animate-popIn" style={{ animationDelay: "0s" }} />
           <div className="space-y-1.5 flex-grow">
-            <div className="w-[80%]"><div className="h-2 bg-neutral-800 rounded w-0 animate-[typeLine_0.4s_ease-out_forwards]" style={{ animationDelay: "0.1s" }} /></div>
-            <div className="w-[50%]"><div className="h-1.5 bg-neutral-300 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.2s" }} /></div>
+            <div className="w-[80%]"><div className="h-2 bg-neutral-800 rounded w-0 animate-typeLine" style={{ animationDelay: "0.1s" }} /></div>
+            <div className="w-[50%]"><div className="h-1.5 bg-neutral-300 rounded w-0 animate-typeLine" style={{ animationDelay: "0.2s" }} /></div>
           </div>
         </div>
-        <div className="w-full h-px bg-neutral-100 mb-3 opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "0.3s" }} />
+        <div className="w-full h-px bg-neutral-100 mb-3 opacity-0 animate-popIn" style={{ animationDelay: "0.3s" }} />
         <div className="flex flex-col gap-2.5">
           <div className="space-y-1.5">
             <div className="flex items-center gap-1 w-full">
-              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.4s" }} /></div>
-              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(163,230,53,0.5)]" style={{ animationDelay: "0.6s" }} />
-              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "0.7s" }} /></div>
+              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-typeLine" style={{ animationDelay: "0.4s" }} /></div>
+              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-popIn shadow-[0_0_5px_rgba(163,230,53,0.5)]" style={{ animationDelay: "0.6s" }} />
+              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-typeLine" style={{ animationDelay: "0.7s" }} /></div>
             </div>
-            <div className="w-[85%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.4s_ease-out_forwards]" style={{ animationDelay: "0.9s" }} /></div>
+            <div className="w-[85%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-typeLine" style={{ animationDelay: "0.9s" }} /></div>
           </div>
           <div className="space-y-2 pl-2 border-l-2 border-neutral-100 mt-1">
             <div className="flex items-center gap-1 w-full">
-              <div className="w-[20%] h-1.5 bg-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.1s" }} />
-              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "1.2s" }} /></div>
-              <div className="w-[15%] h-1.5 bg-indigo-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(129,140,248,0.5)]" style={{ animationDelay: "1.4s" }} />
+              <div className="w-[20%] h-1.5 bg-teal-400 rounded opacity-0 animate-popIn shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.1s" }} />
+              <div className="w-[40%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-typeLine" style={{ animationDelay: "1.2s" }} /></div>
+              <div className="w-[15%] h-1.5 bg-indigo-400 rounded opacity-0 animate-popIn shadow-[0_0_5px_rgba(129,140,248,0.5)]" style={{ animationDelay: "1.4s" }} />
             </div>
             <div className="flex items-center gap-1 w-full">
-              <div className="w-[25%] h-1.5 bg-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards] shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.6s" }} />
-              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-[typeLine_0.3s_ease-out_forwards]" style={{ animationDelay: "1.7s" }} /></div>
-              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "1.9s" }} />
+              <div className="w-[25%] h-1.5 bg-teal-400 rounded opacity-0 animate-popIn shadow-[0_0_5px_rgba(45,212,191,0.5)]" style={{ animationDelay: "1.6s" }} />
+              <div className="w-[30%]"><div className="h-1.5 bg-neutral-700 rounded w-0 animate-typeLine" style={{ animationDelay: "1.7s" }} /></div>
+              <div className="w-[25%] h-1.5 bg-brand-lime rounded opacity-0 animate-popIn" style={{ animationDelay: "1.9s" }} />
             </div>
           </div>
           <div className="flex gap-1.5 mt-1.5">
-            <div className="h-4 w-10 bg-lime-100 border border-lime-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.1s" }} />
-            <div className="h-4 w-12 bg-teal-100 border border-teal-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.2s" }} />
-            <div className="h-4 w-14 bg-indigo-100 border border-indigo-400 rounded opacity-0 animate-[popInFwd_0.3s_ease-out_forwards]" style={{ animationDelay: "2.3s" }} />
+            <div className="h-4 w-10 bg-lime-100 border border-lime-400 rounded opacity-0 animate-popIn" style={{ animationDelay: "2.1s" }} />
+            <div className="h-4 w-12 bg-teal-100 border border-teal-400 rounded opacity-0 animate-popIn" style={{ animationDelay: "2.2s" }} />
+            <div className="h-4 w-14 bg-indigo-100 border border-indigo-400 rounded opacity-0 animate-popIn" style={{ animationDelay: "2.3s" }} />
           </div>
         </div>
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-neutral-900 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg opacity-0 animate-[popInFwd_0.4s_ease-out_forwards] z-20" style={{ animationDelay: "2.6s" }}>
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-neutral-900 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg opacity-0 animate-popIn z-20" style={{ animationDelay: "2.6s" }}>
           <HIcons.CheckCircle className="w-3.5 h-3.5 text-brand-lime" />
           <span className="font-sans text-[10px] font-bold text-white tracking-wide uppercase">ATS Optimized</span>
         </div>

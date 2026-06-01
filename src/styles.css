@@ -293,6 +293,9 @@
 .animate-kanbanDrag { animation: kanbanDrag 4s ease-in-out infinite; }
 .animate-kanbanSparkle { animation: kanbanSparkle 4s ease-in-out infinite; }
 .animate-kanbanCheck { animation: kanbanCheck 4s ease-in-out infinite; }
+/* Scene 2 (Writing) — named classes (Tailwind v4 doesn't generate arbitrary animate-[...]) */
+.animate-popIn { animation: popInFwd 0.4s ease-out forwards; }
+.animate-typeLine { animation: typeLine 0.4s ease-out forwards; }
 
 @keyframes blob {
   0%, 100% { transform: translate(0px, 0px) scale(1); }
@@ -368,6 +371,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-float, .animate-marquee, [class*="animate-"] { animation: none !important; }
+  .animate-float, .animate-marquee { animation: none !important; }
   .scroll-reveal { opacity: 1; transform: none; transition: none; }
 }
