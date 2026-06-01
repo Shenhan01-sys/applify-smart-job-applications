@@ -5,14 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 26px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -43,48 +44,71 @@
   --color-danger: var(--danger);
   --color-text-muted: var(--text-muted);
 
-  --animate-pulse-glow: none;
-  --animate-fade-up: fade-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  /* ── Brand / pilar tokens exposed as utilities (bg-eco, text-grn, bg-lime …) ── */
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-lime: var(--lime);
+  --color-lime-deep: var(--lime-deep);
+  --color-eco: var(--eco);
+  --color-soc: var(--soc);
+  --color-grn: var(--grn);
+
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-shimmer: shimmer 2s linear infinite;
-  --animate-marquee: marquee 30s linear infinite;
+  --animate-marquee: marquee 32s linear infinite;
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
-  /* ── Strict 4-colour flat palette ── */
-  --background: #FFFFFF;        /* Click White  */
-  --foreground: #161616;        /* Black Charcoal */
-  --card: #F5F5F5;
-  --card-foreground: #161616;
+  /* ── Warm "paper" editorial palette (from Applify BMC) ── */
+  --paper: #F4F1E8;            /* warm paper background */
+  --background: #F4F1E8;
+  --foreground: #16150F;       /* warm ink */
+  --card: #FFFFFF;             /* white cards pop on paper */
+  --card-foreground: #16150F;
   --popover: #FFFFFF;
-  --popover-foreground: #161616;
+  --popover-foreground: #16150F;
 
-  --primary: #0367FC;           /* Vibrant Blue */
+  --primary: #0A5BE0;          /* Pilar Ekonomi — blue */
   --primary-foreground: #FFFFFF;
-  --secondary: #F0F0F0;
-  --secondary-foreground: #161616;
-  --muted: #EFEFEF;
-  --muted-foreground: #666666;
-  --accent: #F0F0F0;
-  --accent-foreground: #161616;
+  --secondary: #EDE8D8;        /* warm tint */
+  --secondary-foreground: #16150F;
+  --muted: #ECE7D6;
+  --muted-foreground: #6B6658;
+  --accent: #EDE8D8;
+  --accent-foreground: #16150F;
 
-  --destructive: #DC2626;
+  --destructive: #C0341A;
   --destructive-foreground: #FFFFFF;
 
-  --border: #E0E0E0;
-  --input: #E8E8E8;
-  --ring: #0367FC;
+  --border: rgba(22, 21, 15, 0.14);
+  --input: rgba(22, 21, 15, 0.18);
+  --ring: #0A5BE0;
+
+  /* ── Brand & pilar ── */
+  --ink: #16150F;
+  --ink-soft: #4A4840;
+  --lime: #D2F801;             /* signature lime accent */
+  --lime-deep: #A9C400;
+  --eco: #0A5BE0;              /* Ekonomi  */
+  --soc: #D9741A;              /* Sosial   */
+  --grn: #1C9656;             /* Green Career Track */
 
   /* ── Custom tokens ── */
   --bg-elevated: #FFFFFF;
-  --surface: #F5F5F5;
-  --violet: #161616;
-  --teal: #D2F801;              /* Click Lime */
-  --warm: #D2F801;
-  --gold: #D2F801;
-  --danger: #DC2626;
-  --text-muted: #888888;
+  --surface: #FBF9F2;
+  --violet: #16150F;
+  --teal: #1C9656;             /* mapped to readable green for accents */
+  --warm: #0A5BE0;
+  --gold: #D9741A;             /* readable amber/orange (stars etc.) */
+  --danger: #C0341A;
+  --text-muted: #6B6658;
+
+  --shadow: 0 1px 0 rgba(22, 21, 15, 0.04), 0 10px 24px -16px rgba(22, 21, 15, 0.35);
+  --shadow-lg: 0 2px 0 rgba(22, 21, 15, 0.05), 0 28px 56px -28px rgba(22, 21, 15, 0.45);
 
   /* ── Sidebar ── */
   --sidebar: var(--card);
@@ -108,55 +132,76 @@
 @layer base {
   * { border-color: var(--color-border); }
   html, body {
-    background-color: #FFFFFF;
-    color: #161616;
+    background-color: var(--paper);
+    color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Display headings use Bricolage Grotesque, tight tracking */
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
-  /* ── Cards — flat, no blur, no transparency ── */
+  /* ── Cards — white on paper, warm soft shadow (editorial) ── */
   .glass {
     background: #FFFFFF;
-    border: 2px solid #999999;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
   }
   .glass-strong {
-    background: #FFFFFF;
-    border: 2px solid #888888;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+    background: rgba(244, 241, 232, 0.82);
+    backdrop-filter: saturate(140%) blur(10px);
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    border: 1px solid var(--border);
   }
 
-  /* ── Solid flat fills — NO gradients, NO opacity ── */
-  .gradient-primary { background: #0367FC; }
-  .gradient-success { background: #D2F801; }
-  .gradient-warm    { background: #0367FC; }
-  .gradient-gold    { background: #D2F801; }
+  /* ── Solid flat fills (BMC style, no gradients) ── */
+  .gradient-primary { background: var(--eco); }
+  .gradient-success { background: var(--lime); }
+  .gradient-warm    { background: var(--eco); }
+  .gradient-gold    { background: var(--lime); }
 
-  /* ── Solid text accents ── */
-  .text-gradient-primary { color: #0367FC; }
-  .text-gradient-warm    { color: #0367FC; }
+  /* ── Readable text accents (lime is unreadable as text → mapped) ── */
+  .text-gradient-primary { color: var(--eco); }
+  .text-gradient-warm    { color: var(--eco); }
+  .text-gold { color: var(--soc); }
+  .text-teal { color: var(--grn); }
+  .text-warm { color: var(--eco); }
 
-  /* ── Lime is unreadable as text on white — map to blue ── */
-  .text-gold { color: #0367FC; }
-  .text-teal { color: #0367FC; }
-  .text-warm { color: #0367FC; }
-
-  /* ── No glow box-shadows ── */
-  .glow-primary { box-shadow: none; }
-  .glow-success { box-shadow: none; }
-  .glow-warm    { box-shadow: none; }
+  /* ── Glow shadows kept off (flat editorial) ── */
+  .glow-primary { box-shadow: var(--shadow); }
+  .glow-success { box-shadow: var(--shadow); }
+  .glow-warm    { box-shadow: var(--shadow); }
 
   .font-mono { font-family: var(--font-mono); }
+  .font-display { font-family: var(--font-display); }
 
-  /* ── Grid background removed — clean white ── */
-  .grid-bg { background: #FFFFFF; }
+  /* ── Warm dot-grid texture for hero / atmosphere ── */
+  .grid-bg {
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(620px 320px at 88% -10%, rgba(210, 248, 1, 0.18), transparent 60%),
+      radial-gradient(560px 360px at 6% 120%, rgba(10, 91, 224, 0.12), transparent 60%),
+      radial-gradient(closest-side, rgba(22, 21, 15, 0.055) 1.1px, transparent 1.2px);
+    background-size: auto, auto, 22px 22px;
+  }
+  .paper-dots {
+    background-image: radial-gradient(closest-side, rgba(22, 21, 15, 0.06) 1.1px, transparent 1.2px);
+    background-size: 20px 20px;
+  }
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(28, 150, 86, 0.45); }
+  50%      { opacity: 0.65; box-shadow: 0 0 0 5px rgba(28, 150, 86, 0); }
 }
 @keyframes shimmer {
   0%   { background-position: -1000px 0; }
@@ -216,10 +261,15 @@
 .scroll-reveal {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .scroll-reveal-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float, .animate-marquee, [class*="animate-"] { animation: none !important; }
+  .scroll-reveal { opacity: 1; transform: none; transition: none; }
 }
