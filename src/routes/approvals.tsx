@@ -62,8 +62,8 @@ function ApprovalsPage() {
     setLoading(true);
     try {
       if (isMockMode()) {
-        setPendingApprovals(mockApprovals as ApprovalRequest[]);
-        setHistory(mockApprovalHistory as ApprovalRequest[]);
+        setPendingApprovals(mockApprovals as unknown as ApprovalRequest[]);
+        setHistory(mockApprovalHistory as unknown as ApprovalRequest[]);
         setLoading(false);
         return;
       }
@@ -71,8 +71,8 @@ function ApprovalsPage() {
         automationApi.getPendingApprovals(),
         automationApi.getApprovalHistory({ limit: 50 }),
       ]);
-      setPendingApprovals(pending);
-      setHistory(hist);
+      setPendingApprovals(pending as unknown as ApprovalRequest[]);
+      setHistory(hist as unknown as ApprovalRequest[]);
     } catch (error) {
       toast.error('Gagal memuat approvals');
     } finally {

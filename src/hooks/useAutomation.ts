@@ -100,9 +100,10 @@ export function useJobSearch() {
     try {
       setLoading(true)
       const data = await automationApi.searchJobs(params)
-      setResults(data.results || [])
-      setTotalJobs(data.total_jobs || 0)
-      return data.results || []
+      const grouped = [{ platform: 'all', jobs: (data.jobs as any[]) || [] }]
+      setResults(grouped)
+      setTotalJobs(data.total || 0)
+      return grouped
     } catch (error) {
       toast.error('Failed to search jobs')
       return []
@@ -126,7 +127,7 @@ export function useAIPipeline() {
     try {
       setLoading(true)
       const result = await automationApi.generateCoverLetter(params)
-      return result.cover_letter || ''
+      return result.coverLetter || ''
     } catch (error) {
       toast.error('Failed to generate cover letter')
       return ''
@@ -293,8 +294,8 @@ export function useLinkedInSession() {
     try {
       setLoading(true)
       const result = await automationApi.verifyLinkedInSession()
-      toast.success(result.verified ? 'Session verified!' : 'Session invalid')
-      return result.verified
+      toast.success(result.valid ? 'Session verified!' : 'Session invalid')
+      return result.valid
     } catch (error) {
       toast.error('Failed to verify session')
       return false

@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut, Bot, ShieldCheck, Linkedin } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut, Bot, ShieldCheck, Linkedin, Leaf } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,6 +12,7 @@ const nav = [
   { to: "/linkedin-session", label: "LinkedIn", icon: Linkedin },
   { to: "/skill-radar", label: "Skill Radar", icon: Radar },
   { to: "/blind-mode", label: "Blind Merit Mode", icon: EyeOff },
+  { to: "/green-career", label: "Green Career", icon: Leaf },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

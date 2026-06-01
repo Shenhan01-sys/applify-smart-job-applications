@@ -31,7 +31,7 @@ export function PlatformSelector({ selected, onChange }: PlatformSelectorProps) 
     try {
       setLoading(true)
       const data = await automationApi.getPlatforms()
-      setPlatforms(data || [])
+      setPlatforms((data || []) as unknown as Platform[])
     } catch (error) {
       console.error('Failed to load platforms')
     } finally {

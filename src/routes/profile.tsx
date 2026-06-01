@@ -108,7 +108,7 @@ function ProfilePage() {
           location: data.location || "",
           experience_years: data.experience_years || 0,
           phone: data.phone || "",
-          email: MOCK_USER_ID + "@applify.id",
+          email: "demo@applify.id",
           linkedin_url: data.linkedin_url || "",
           portfolio_url: data.portfolio_url || "",
         });

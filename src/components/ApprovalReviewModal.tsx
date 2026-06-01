@@ -84,7 +84,8 @@ export default function ApprovalReviewModal({
         request.id,
         'Make it more concise and highlight relevant experience'
       )
-      toast.info(result.message)
+      if (result.cover_letter) setEditedCoverLetter(result.cover_letter)
+      toast.info('Cover letter berhasil di-regenerate')
     } catch (error: any) {
       toast.error(`Failed to regenerate: ${error.message}`)
     } finally {
@@ -170,7 +171,7 @@ export default function ApprovalReviewModal({
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium">{answer.question}</span>
                       {answer.needs_review && (
-                        <Badge variant="warning" className="text-xs">
+                        <Badge variant="outline" className="text-xs border-yellow-400 text-yellow-700">
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Needs review
                         </Badge>

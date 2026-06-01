@@ -28,9 +28,20 @@ async function apiFetch<T>(url: string, options?: RequestInit, mockFn?: () => T,
     if (delay > 0) await new Promise(r => setTimeout(r, delay))
     return mockFn()
   }
-  const res = await fetch(url, options)
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  try {
+    const res = await fetch(url, options)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  } catch (err) {
+    // Automation backend (Fastify) is optional/not-yet-hosted — degrade gracefully to
+    // placeholder data instead of crashing the page. Real automation arrives with the
+    // agent-browser MCP backend.
+    if (mockFn) {
+      console.warn(`[automationApi] backend unavailable for ${url}; using fallback data.`, err)
+      return mockFn()
+    }
+    throw err
+  }
 }
 
 export interface AutomationSettings {

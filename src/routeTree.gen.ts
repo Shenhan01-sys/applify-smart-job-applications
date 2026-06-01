@@ -15,6 +15,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LinkedinSessionRouteImport } from './routes/linkedin-session'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as GreenCareerRouteImport } from './routes/green-career'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
 import { Route as AutomationSettingsRouteImport } from './routes/automation-settings'
@@ -51,6 +52,11 @@ const LinkedinSessionRoute = LinkedinSessionRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GreenCareerRoute = GreenCareerRouteImport.update({
+  id: '/green-career',
+  path: '/green-career',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   AutomationSettingsRoute: typeof AutomationSettingsRoute
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
+  GreenCareerRoute: typeof GreenCareerRoute
   JobsRoute: typeof JobsRoute
   LinkedinSessionRoute: typeof LinkedinSessionRoute
   LoginRoute: typeof LoginRoute
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/green-career': {
+      id: '/green-career'
+      path: '/green-career'
+      fullPath: '/green-career'
+      preLoaderRoute: typeof GreenCareerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -302,6 +322,7 @@ const rootRouteChildren: RootRouteChildren = {
   AutomationSettingsRoute: AutomationSettingsRoute,
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
+  GreenCareerRoute: GreenCareerRoute,
   JobsRoute: JobsRoute,
   LinkedinSessionRoute: LinkedinSessionRoute,
   LoginRoute: LoginRoute,

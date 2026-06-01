@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { profileService, type FullProfile } from "./profileService";
-import { mockAIApplications, mockFullProfile, MOCK_USER_ID } from "@/mocks/mockData";
+import { mockAIApplications, mockAiAnalysis, MOCK_USER_ID } from "@/mocks/mockData";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -32,95 +31,36 @@ export interface AIApplicationInput {
   additionalNotes?: string;
 }
 
-// Simulasi AI generation (nanti bisa ganti dengan real AI API)
-function simulateAIGeneration(profile: FullProfile, job: any, tone: string): {
-  coverLetter: string;
-  optimizedCV: Record<string, any>;
-  tailoredSkills: string[];
-  aiNotes: string;
-} {
-  const userName = profile.profile?.full_name || "Candidate";
-  const company = job.company;
-  const role = job.title;
-  const userSkills = profile.skills.map((s) => s.name);
-  const jobSkills = job.requirements || [];
-  
-  // Find matching skills
-  const matchingSkills = userSkills.filter((skill) =>
-    jobSkills.some((req: string) => req.toLowerCase().includes(skill.toLowerCase()))
-  );
-  
-  // Find skill gaps
-  const skillGaps = jobSkills.filter((req: string) =>
-    !userSkills.some((skill) => req.toLowerCase().includes(skill.toLowerCase()))
-  );
-
-  // Generate cover letter
-  const toneMap: Record<string, string> = {
-    professional: "professional and confident",
-    casual: "friendly yet professional",
-    enthusiastic: "passionate and energetic",
-  };
-
-  const coverLetter = `Dear Hiring Manager at ${company},
-
-I am writing to express my strong interest in the ${role} position. With my background in ${profile.profile?.current_title || "software development"} and hands-on experience with ${matchingSkills.slice(0, 3).join(", ") || "modern technologies"}, I am excited about the opportunity to contribute to ${company}'s innovative projects.
-
-${profile.workExperiences?.[0] ? `In my role at ${profile.workExperiences[0].company_name}, I ${profile.workExperiences[0].description || "developed key technical skills and delivered impactful results"}.` : ""}
-
-${matchingSkills.length > 0 ? `My expertise in ${matchingSkills.join(", ")} directly aligns with your requirements, and I am confident in my ability to make an immediate impact.` : "I am eager to bring my unique perspective and dedication to your team."}
-
-${skillGaps.length > 0 ? `I am also actively developing my skills in ${skillGaps.slice(0, 2).join(" and ")} to further enhance my capabilities.` : ""}
-
-I would welcome the opportunity to discuss how my background and skills can contribute to ${company}'s continued success.
-
-Best regards,\n${userName}`;
-
-  // Generate optimized CV summary
-  const optimizedCV = {
-    summary: `${userName} is a ${profile.profile?.current_title || "dedicated professional"} with ${profile.profile?.experience_years || "several"} years of experience in ${matchingSkills.slice(0, 4).join(", ") || "relevant technologies"}. Proven track record of ${profile.workExperiences?.[0]?.achievements?.[0] || "delivering high-quality results"}.`,
-    highlighted_skills: matchingSkills,
-    relevant_experiences: profile.workExperiences?.slice(0, 2).map((exp) => ({
-      company: exp.company_name,
-      role: exp.role_title,
-      highlights: exp.achievements?.slice(0, 2) || [],
-    })),
-    education_summary: profile.education?.[0]
-      ? `${profile.education[0].degree} in ${profile.education[0].field_of_study} from ${profile.education[0].institution}`
-      : undefined,
-    certifications: profile.certifications?.slice(0, 3).map((c) => c.name),
-  };
-
-  // AI strategy notes
-  const aiNotes = `AI STRATEGY ANALYSIS:
-
-🎯 MATCH SCORE: ${job.match_score}%
-
-STRENGTHS TO HIGHLIGHT:
-${matchingSkills.map((s) => `  ✓ ${s}`).join("\n")}
-
-SKILL GAPS TO ADDRESS:
-${skillGaps.map((s) => `  ⚠ ${s}`).join("\n")}
-
-RECOMMENDED APPROACH:
-1. Emphasize ${matchingSkills[0] || "technical expertise"} in cover letter
-2. Reference ${profile.workExperiences?.[0]?.company_name || "previous experience"} as proof of capability
-3. Address ${skillGaps[0] || "any gaps"} with learning initiatives
-4. Follow up in 3-5 business days if no response
-
-TONE: ${toneMap[tone] || "professional"}
-ESTIMATED SUCCESS RATE: ${job.acceptance_potential}%`;
-
-  return {
-    coverLetter,
-    optimizedCV,
-    tailoredSkills: matchingSkills,
-    aiNotes,
-  };
+/**
+ * Calls the server-side `generate-application` Edge Function which enforces the
+ * monthly quota, picks the AI model by tier (Free = DeepSeek V4 Flash :free),
+ * calls OpenRouter with the key kept server-side, and (for mode "generate")
+ * persists the draft. The user's access token is attached automatically.
+ */
+async function invokeGenerate(
+  jobId: string,
+  mode: "generate" | "analyze",
+  tone = "professional"
+) {
+  const { data, error } = await supabase.functions.invoke("generate-application", {
+    body: { jobId, mode, tone },
+  });
+  if (error) {
+    // supabase-js wraps non-2xx responses; try to surface the real server message
+    let msg = error.message;
+    try {
+      const ctx = await (error as any).context?.json?.();
+      if (ctx?.error) msg = ctx.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return data as any;
 }
 
 export const aiApplicationService = {
-  // Create AI application draft
+  // Create AI application draft (real AI via Edge Function; consumes 1 monthly quota)
   async createDraft(input: AIApplicationInput): Promise<AIApplicationData> {
     if (isMockMode()) {
       await new Promise(r => setTimeout(r, 1500));
@@ -146,34 +86,9 @@ export const aiApplicationService = {
       return newApp as AIApplicationData;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
-
-    const [profile, { data: job }] = await Promise.all([
-      profileService.getFullProfile(user.id),
-      supabase.from("jobs").select("*").eq("id", input.jobId).single(),
-    ]);
-
-    if (!job) throw new Error("Job not found");
-
-    const aiResult = simulateAIGeneration(profile, job, input.tone || "professional");
-
-    const { data, error } = await supabase
-      .from("ai_applications")
-      .insert({
-        user_id: user.id,
-        job_id: input.jobId,
-        optimized_cv: aiResult.optimizedCV,
-        cover_letter: aiResult.coverLetter,
-        tailored_skills: aiResult.tailoredSkills,
-        ai_notes: aiResult.aiNotes,
-        status: "draft",
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const res = await invokeGenerate(input.jobId, "generate", input.tone || "professional");
+    if (!res?.application) throw new Error(res?.error || "Gagal membuat draft AI");
+    return res.application as AIApplicationData;
   },
 
   // Get all AI applications for user
@@ -199,7 +114,7 @@ export const aiApplicationService = {
   async getApplication(id: string): Promise<AIApplicationData & { job: any }> {
     if (isMockMode()) {
       const app = mockAppStore.find(a => a.id === id) || mockAppStore[0];
-      return { ...app, job: app.jobs } as any;
+      return { ...app, job: (app as any).jobs } as any;
     }
 
     const { data, error } = await supabase
@@ -209,7 +124,7 @@ export const aiApplicationService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as any;
   },
 
   // Update cover letter
@@ -232,7 +147,7 @@ export const aiApplicationService = {
     return data;
   },
 
-  // Submit application (mark as ready/submitted)
+  // Submit application (mark as submitted + schedule follow-up + mark job applied)
   async submitApplication(id: string) {
     if (isMockMode()) {
       mockAppStore = mockAppStore.map(a =>
@@ -260,12 +175,6 @@ export const aiApplicationService = {
       .single();
 
     if (error) throw error;
-
-    const app = await this.getApplication(id);
-    if (app.job_id) {
-      await supabase.from("jobs").update({ status: "applied" }).eq("id", app.job_id);
-    }
-
     return data;
   },
 
@@ -297,31 +206,39 @@ export const aiApplicationService = {
 
   // Delete application
   async deleteApplication(id: string) {
+    if (isMockMode()) {
+      mockAppStore = mockAppStore.filter(a => a.id !== id);
+      return;
+    }
     const { error } = await supabase.from("ai_applications").delete().eq("id", id);
     if (error) throw error;
   },
 
-  // Get AI insights for job
+  // Get AI insights for a job (preview — does NOT consume monthly quota)
   async getJobInsights(jobId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    if (isMockMode()) {
+      return {
+        coverLetter: mockAiAnalysis.coverLetter,
+        optimizedCV: mockAiAnalysis.optimizedCV,
+        tailoredSkills: mockAiAnalysis.tailoredSkills,
+        aiNotes: mockAiAnalysis.aiNotes,
+        matchScore: 85,
+        acceptancePotential: 78,
+        skillGaps: [] as string[],
+      };
+    }
 
-    const [profile, { data: job }] = await Promise.all([
-      profileService.getFullProfile(user.id),
-      supabase.from("jobs").select("*").eq("id", jobId).single(),
-    ]);
-
-    if (!job) throw new Error("Job not found");
-
-    const aiResult = simulateAIGeneration(profile, job, "professional");
-
+    const res = await invokeGenerate(jobId, "analyze");
+    const a = res?.analysis ?? {};
     return {
-      coverLetter: aiResult.coverLetter,
-      optimizedCV: aiResult.optimizedCV,
-      tailoredSkills: aiResult.tailoredSkills,
-      aiNotes: aiResult.aiNotes,
-      matchScore: job.match_score,
-      acceptancePotential: job.acceptance_potential,
+      coverLetter: a.coverLetter ?? "",
+      optimizedCV: a.optimizedCV ?? {},
+      tailoredSkills: a.tailoredSkills ?? [],
+      aiNotes: a.aiNotes ?? "",
+      matchScore: a.matchScore ?? 0,
+      acceptancePotential: a.acceptancePotential ?? 0,
+      skillGaps: a.skillGaps ?? [],
+      quota: res?.quota,
     };
   },
 };

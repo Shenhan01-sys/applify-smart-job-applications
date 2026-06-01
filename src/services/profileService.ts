@@ -133,7 +133,7 @@ export const profileService = {
   // Fetch full profile
   async getFullProfile(userId: string): Promise<FullProfile> {
     if (isMockMode()) {
-      return mockFullProfile as FullProfile;
+      return mockFullProfile as unknown as FullProfile;
     }
 
     const [
