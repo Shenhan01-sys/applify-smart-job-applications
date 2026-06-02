@@ -56,6 +56,9 @@
   --color-brand-lime: #A3E635;   /* hero v4 "Agent Workspace" accent lime */
   --color-brand-dark: #0A0A0A;   /* manifesto bento near-black */
   --color-brand-paper: #FDFBF7;  /* manifesto bento off-white */
+  --color-brand-blue: #0A5BE0;   /* pilar Ekonomi */
+  --color-brand-orange: #D9741A; /* pilar Sosial */
+  --color-brand-green: #1C9656;  /* Green Career */
 
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -366,6 +369,63 @@
   40%, 85% { transform: scale(1) translateY(0); opacity: 1; }
   90%, 100% { transform: scale(0.3) translateY(10px); opacity: 0; }
 }
+
+/* ────────── How It Works (Spatial) section — animations & utilities ────────── */
+.radar-cone { background: conic-gradient(from 0deg, transparent 70%, rgba(217, 116, 26, 0.6) 100%); }
+.scene-viewport { width: 340px; height: 340px; position: relative; transform-origin: center center; }
+@media (max-width: 640px) { .scene-viewport { transform: scale(0.82); } }
+.dash-path { stroke-dasharray: 150; stroke-dashoffset: 150; }
+.offset-path-anim { offset-path: path("M 30,30 C 80,30 60,110 110,110"); }
+
+.animate-hiwProgress { animation: hiwProgress 5s linear forwards; }
+.animate-lineShoot { animation: lineShoot 0.5s ease-out forwards; }
+.animate-ambientGlow { animation: ambientGlow 4s ease-in-out infinite alternate; }
+.animate-scanDoc { animation: scanDoc 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-flyTag1 { animation: flyTag1 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-flyTag2 { animation: flyTag2 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-flyTag3 { animation: flyTag3 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-radarExpand { animation: radarExpand 4s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite; }
+.animate-feedScroll { animation: feedScroll 5s ease-in-out infinite; }
+.animate-cardHighlight { animation: cardHighlight 5s ease-in-out infinite; }
+.animate-agentHand { animation: agentHand 5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-blockDrag { animation: blockDrag 5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-cvSlot { animation: cvSlot 5s ease-in-out infinite; }
+.animate-cvSlotText { animation: cvSlotText 5s ease-in-out infinite; }
+.animate-cvAssembledText { animation: cvAssembledText 5s ease-in-out infinite; }
+.animate-floatEmail { animation: floatEmail 5s ease-in-out infinite; }
+.animate-drawSyncPath { animation: drawSyncPath 5s ease-in-out infinite; }
+.animate-dataTravel { animation: dataTravel 5s ease-in-out infinite; }
+.animate-calSlotActivate { animation: calSlotActivate 5s ease-in-out infinite; }
+.animate-popBadge { animation: popBadge 5s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite; }
+.animate-radarSpin { animation: radarSpin 4s linear infinite; }
+.animate-pingTopLeft { animation: pingTopLeft 4s ease-in-out infinite; }
+.animate-pingRight { animation: pingRight 4s ease-in-out infinite; }
+.animate-pingBottomLeft { animation: pingBottomLeft 4s ease-in-out infinite; }
+
+@keyframes hiwProgress { 0% { width: 0%; } 100% { width: 100%; } }
+@keyframes lineShoot { 0% { width: 0%; opacity: 0; } 100% { width: 80px; opacity: 1; } }
+@keyframes ambientGlow { 0% { opacity: 0.2; transform: scale(0.8); } 100% { opacity: 0.5; transform: scale(1.2); } }
+@keyframes scanDoc { 0%, 15% { top: 0%; opacity: 0; } 20% { opacity: 1; } 45% { top: 100%; opacity: 1; } 50%, 100% { top: 100%; opacity: 0; } }
+@keyframes flyTag1 { 0%, 25% { transform: translate(0, 0) scale(1); opacity: 0; } 30% { opacity: 1; } 40%, 80% { transform: translate(125px, -30px) scale(1); opacity: 1; border-color: #0A5BE0; background-color: #eff6ff; color: #0A5BE0; } 85%, 100% { transform: translate(125px, -30px) scale(0.9); opacity: 0; } }
+@keyframes flyTag2 { 0%, 30% { transform: translate(0, 0) scale(1); opacity: 0; } 35% { opacity: 1; } 45%, 80% { transform: translate(125px, 0px) scale(1); opacity: 1; border-color: #D2F801; background-color: #fcfceb; color: #657c00; } 85%, 100% { transform: translate(125px, 0px) scale(0.9); opacity: 0; } }
+@keyframes flyTag3 { 0%, 35% { transform: translate(0, 0) scale(1); opacity: 0; } 40% { opacity: 1; } 50%, 80% { transform: translate(125px, 30px) scale(1); opacity: 1; border-color: #D9741A; background-color: #fff7ed; color: #D9741A; } 85%, 100% { transform: translate(125px, 30px) scale(0.9); opacity: 0; } }
+@keyframes radarExpand { 0%, 40% { transform: scale(0.2); opacity: 0; } 50%, 80% { transform: scale(1); opacity: 1; } 90%, 100% { transform: scale(0.2); opacity: 0; } }
+@keyframes feedScroll { 0%, 10% { transform: translateY(20px); } 20%, 65% { transform: translateY(-45px); } 75%, 100% { transform: translateY(-110px); } }
+@keyframes cardHighlight { 0%, 20% { border-color: #f5f5f5; transform: scale(1); } 25%, 60% { border-color: #D2F801; transform: scale(1.05); box-shadow: 0 0 10px rgba(210, 248, 1, 0.3); } 65%, 100% { border-color: #f5f5f5; transform: scale(1); box-shadow: none; } }
+@keyframes agentHand { 0%, 10% { transform: translate(-50px, 30px); } 20%, 30% { transform: translate(-50px, -15px); } 35%, 45% { transform: translate(-5px, -15px); } 50%, 60% { transform: translate(60px, -5px); } 70% { transform: translate(60px, 20px); } 85%, 100% { transform: translate(-50px, 30px); } }
+@keyframes blockDrag { 0%, 30% { opacity: 0; transform: translate(-50px, -15px) scale(0.5); } 35%, 45% { opacity: 1; transform: translate(-5px, -15px) scale(1); } 50%, 60% { opacity: 1; transform: translate(60px, -5px) scale(1); } 65%, 100% { opacity: 0; transform: translate(60px, -5px) scale(1); } }
+@keyframes cvSlot { 0%, 55% { border-color: #d4d4d8; background-color: #fafafa; } 60%, 65% { border-color: transparent; background-color: transparent; } 70%, 90% { border-color: transparent; background-color: #D2F801; box-shadow: 0 0 10px rgba(210, 248, 1, 0.4); } 95%, 100% { border-color: #d4d4d8; background-color: #fafafa; } }
+@keyframes cvSlotText { 0%, 55% { opacity: 1; } 60%, 100% { opacity: 0; } }
+@keyframes cvAssembledText { 0%, 65% { opacity: 0; } 70%, 90% { opacity: 1; } 95%, 100% { opacity: 0; } }
+@keyframes floatEmail { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+@keyframes drawSyncPath { 0%, 20% { stroke-dashoffset: 150; opacity: 0; } 30%, 85% { stroke-dashoffset: 0; opacity: 1; } 90%, 100% { stroke-dashoffset: 150; opacity: 0; } }
+@keyframes dataTravel { 0%, 35% { offset-distance: 0%; opacity: 0; } 40% { opacity: 1; } 55% { offset-distance: 100%; opacity: 1; } 60%, 100% { offset-distance: 100%; opacity: 0; } }
+@keyframes calSlotActivate { 0%, 50% { background-color: #f5f5f5; border-color: #e5e5e5; transform: scale(1); } 55%, 85% { background-color: #1C9656; border-color: #1C9656; transform: scale(1.1); box-shadow: 0 4px 10px rgba(28, 150, 86, 0.3); } 90%, 100% { background-color: #f5f5f5; border-color: #e5e5e5; transform: scale(1); } }
+@keyframes popBadge { 0%, 60% { transform: scale(0) translateY(10px); opacity: 0; } 65%, 85% { transform: scale(1) translateY(0); opacity: 1; } 90%, 100% { transform: scale(0) translateY(10px); opacity: 0; } }
+@keyframes radarSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes pingTopLeft { 0%, 80% { transform: scale(1); border-color: #e5e5e5; } 85%, 95% { transform: scale(1.05); border-color: #0A5BE0; box-shadow: 0 0 15px rgba(10, 91, 224, 0.3); } 100% { transform: scale(1); border-color: #e5e5e5; } }
+@keyframes pingRight { 0%, 20% { transform: scale(1); border-color: #e5e5e5; } 25%, 35% { transform: scale(1.05); border-color: #D9741A; box-shadow: 0 0 15px rgba(217, 116, 26, 0.3); } 40%, 100% { transform: scale(1); border-color: #e5e5e5; } }
+@keyframes pingBottomLeft { 0%, 55% { transform: scale(1); border-color: #e5e5e5; } 60%, 70% { transform: scale(1.05); border-color: #1C9656; box-shadow: 0 0 15px rgba(28, 150, 86, 0.3); } 75%, 100% { transform: scale(1); border-color: #e5e5e5; } }
 
 @keyframes blob {
   0%, 100% { transform: translate(0px, 0px) scale(1); }

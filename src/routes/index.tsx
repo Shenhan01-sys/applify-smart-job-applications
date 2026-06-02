@@ -294,6 +294,15 @@ const HIcons = {
   FileUp: (p: HSvg) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M12 12v6" /><path d="m15 15-3-3-3 3" /></svg>
   ),
+  Check: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="20 6 9 17 4 12" /></svg>
+  ),
+  Mail: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+  ),
+  Radar: (p: HSvg) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34" /><path d="M4 6h.01" /><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35" /><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67" /><path d="M12 18h.01" /><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67" /><circle cx="12" cy="12" r="2" /></svg>
+  ),
 };
 
 function SceneScraping() {
@@ -801,32 +810,272 @@ function ProblemSolution() {
 
 /* ─────────────────────────  How it works (pipeline)  ───────────────────────── */
 
+function HiwUpload() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute w-72 h-72 bg-brand-blue/15 rounded-full blur-3xl animate-ambientGlow z-0" />
+      <div className="scene-viewport flex items-center justify-between z-10 px-4">
+        <div className="relative w-[130px] h-[180px] bg-white border border-neutral-200 rounded-xl shadow-lg p-3 overflow-hidden flex flex-col gap-2 z-20">
+          <div className="w-3/4 h-2 bg-neutral-200 rounded" />
+          <div className="w-full h-px bg-neutral-100 my-1" />
+          <div className="relative h-4 w-full bg-neutral-50 rounded border border-neutral-100 flex items-center px-1">
+            <div className="absolute inset-0 rounded border border-neutral-200 bg-white shadow-sm flex items-center px-1.5 z-20 animate-flyTag1 origin-left">
+              <span className="text-[7px] font-bold text-neutral-600 uppercase">React.js</span>
+            </div>
+          </div>
+          <div className="relative h-4 w-[85%] bg-neutral-50 rounded border border-neutral-100 flex items-center px-1">
+            <div className="absolute inset-0 rounded border border-neutral-200 bg-white shadow-sm flex items-center px-1.5 z-20 animate-flyTag2 origin-left">
+              <span className="text-[7px] font-bold text-neutral-600 uppercase">Leadership</span>
+            </div>
+          </div>
+          <div className="relative h-4 w-[90%] bg-neutral-50 rounded border border-neutral-100 flex items-center px-1">
+            <div className="absolute inset-0 rounded border border-neutral-200 bg-white shadow-sm flex items-center px-1.5 z-20 animate-flyTag3 origin-left">
+              <span className="text-[7px] font-bold text-neutral-600 uppercase">Node.js</span>
+            </div>
+          </div>
+          <div className="w-full h-1.5 bg-neutral-100 rounded mt-auto" />
+          <div className="absolute left-0 right-0 h-0.5 bg-brand-blue shadow-[0_0_12px_#0A5BE0] z-30 animate-scanDoc" />
+        </div>
+        <div className="relative w-[140px] h-[140px] border-2 border-neutral-200 rounded-2xl p-2 flex items-center justify-center bg-white shadow-md z-10">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-blue text-white px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest shadow-sm">AI Profile</div>
+          <div className="relative w-full h-full">
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+              <polygon points="50,10 90,38 75,85 25,85 10,38" fill="none" stroke="#e5e5e5" strokeWidth="1" />
+              <polygon points="50,25 75,45 65,75 35,75 25,45" fill="none" stroke="#e5e5e5" strokeWidth="1" />
+              <line x1="50" y1="50" x2="50" y2="10" stroke="#e5e5e5" strokeWidth="1" />
+              <line x1="50" y1="50" x2="90" y2="38" stroke="#e5e5e5" strokeWidth="1" />
+              <line x1="50" y1="50" x2="75" y2="85" stroke="#e5e5e5" strokeWidth="1" />
+              <line x1="50" y1="50" x2="25" y2="85" stroke="#e5e5e5" strokeWidth="1" />
+              <line x1="50" y1="50" x2="10" y2="38" stroke="#e5e5e5" strokeWidth="1" />
+              <polygon points="50,15 80,45 60,80 30,75 20,40" fill="rgba(10,91,224,0.3)" stroke="#0A5BE0" strokeWidth="2" className="animate-radarExpand" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HiwAgent() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute w-72 h-72 bg-[#D2F801]/15 rounded-full blur-3xl animate-ambientGlow z-0" />
+      <div className="scene-viewport flex items-center justify-between z-10 px-2 relative w-full">
+        <div className="w-[100px] h-[140px] bg-white border border-neutral-200 rounded-xl p-2 shadow-md relative z-10 overflow-hidden flex flex-col">
+          <div className="text-[6px] font-bold text-neutral-400 mb-1 border-b border-neutral-100 pb-1 flex justify-between items-center bg-white z-20">
+            <span>Job Feed</span>
+            <div className="w-3 h-1 bg-neutral-200 rounded-full" />
+          </div>
+          <div className="relative flex-1 w-full overflow-hidden">
+            <div className="absolute w-full flex flex-col gap-2 animate-feedScroll pt-1">
+              <div className="w-full p-2 border border-neutral-100 rounded-md bg-neutral-50">
+                <div className="w-6 h-6 bg-neutral-200 rounded mb-1" />
+                <div className="w-full h-1 bg-neutral-200 rounded" />
+              </div>
+              <div className="w-full p-2 border-2 border-neutral-100 rounded-md bg-white animate-cardHighlight">
+                <div className="flex gap-1 mb-1.5 items-center">
+                  <div className="w-4 h-4 bg-blue-500 rounded-sm" />
+                  <div className="w-12 h-1.5 bg-neutral-800 rounded" />
+                </div>
+                <div className="w-full h-1 bg-neutral-200 rounded mb-1" />
+                <div className="w-[80%] h-1 bg-neutral-200 rounded" />
+              </div>
+              <div className="w-full p-2 border border-neutral-100 rounded-md bg-neutral-50">
+                <div className="w-6 h-6 bg-neutral-200 rounded mb-1" />
+                <div className="w-full h-1 bg-neutral-200 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="relative flex items-center justify-center w-[40px] z-20">
+          <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center text-[#D2F801] z-20 shadow-[0_0_15px_rgba(210,248,1,0.4)] border border-neutral-800">
+            <HIcons.Bot />
+          </div>
+          <div className="absolute w-3 h-3 bg-[#D2F801]/80 backdrop-blur-sm rounded-full shadow-[0_0_10px_#D2F801] z-40 animate-agentHand border border-white flex items-center justify-center">
+            <div className="w-1 h-1 bg-white rounded-full" />
+          </div>
+          <div className="absolute w-[60px] h-[16px] bg-[#D2F801] border border-lime-600 rounded flex items-center px-1 shadow-lg z-30 animate-blockDrag overflow-hidden">
+            <span className="text-[5px] font-mono font-bold text-brand-dark whitespace-nowrap">Senior Frontend</span>
+          </div>
+        </div>
+        <div className="w-[110px] bg-white border border-neutral-200 rounded-xl p-2.5 shadow-lg relative flex flex-col z-10 h-[140px]">
+          <div className="flex items-center gap-2 mb-2 border-b border-neutral-100 pb-1.5">
+            <div className="w-4 h-4 bg-neutral-200 rounded-full" />
+            <div className="space-y-1">
+              <div className="h-1.5 w-12 bg-neutral-300 rounded" />
+              <div className="h-1 w-8 bg-neutral-200 rounded" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5 relative flex-1">
+            <div className="w-full h-1 bg-neutral-200 rounded" />
+            <div className="w-[80%] h-1 bg-neutral-200 rounded" />
+            <div className="w-full h-[18px] border border-dashed rounded mt-1 flex items-center px-1 animate-cvSlot relative overflow-hidden">
+              <span className="text-[4px] font-mono text-neutral-400 animate-cvSlotText absolute left-1">Drop tailored role...</span>
+              <span className="text-[5px] font-mono font-bold text-brand-dark absolute left-1 animate-cvAssembledText whitespace-nowrap">Senior Frontend</span>
+            </div>
+            <div className="w-[90%] h-1 bg-neutral-200 rounded mt-1" />
+            <div className="w-[60%] h-1 bg-neutral-200 rounded" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HiwInterview() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute w-72 h-72 bg-brand-green/10 rounded-full blur-3xl animate-ambientGlow z-0" />
+      <div className="scene-viewport relative flex z-10 w-full h-full">
+        <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 340 340">
+          <path d="M 120,110 C 200,110 180,210 240,210" fill="none" stroke="#e5e5e5" strokeWidth="2" strokeDasharray="4 4" />
+          <path d="M 120,110 C 200,110 180,210 240,210" fill="none" stroke="#1C9656" strokeWidth="2" className="dash-path animate-drawSyncPath" />
+        </svg>
+        <div className="absolute w-3 h-3 bg-brand-green rounded-full shadow-[0_0_10px_#1C9656] z-10 offset-path-anim animate-dataTravel" style={{ offsetPath: 'path("M 120,110 C 200,110 180,210 240,210")' }} />
+        <div className="absolute top-[80px] left-[30px] w-[130px] bg-white border border-neutral-200 p-3 rounded-xl shadow-xl animate-floatEmail z-20">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 bg-green-50 text-brand-green rounded-full flex items-center justify-center"><HIcons.Mail /></div>
+            <div>
+              <div className="text-[9px] font-bold text-neutral-900">Tech Corp HR</div>
+              <div className="text-[7px] text-neutral-500">Interview Invite</div>
+            </div>
+          </div>
+          <div className="bg-neutral-50 border border-neutral-100 rounded px-2 py-1 inline-block">
+            <span className="text-[8px] font-mono font-bold text-brand-green">14 OCT, 10:00 AM</span>
+          </div>
+        </div>
+        <div className="absolute top-[160px] right-[20px] w-[140px] bg-white rounded-xl shadow-lg border border-neutral-200 p-3 z-10 flex flex-col">
+          <div className="text-[10px] font-bold text-center mb-2 uppercase tracking-widest text-neutral-400">October</div>
+          <div className="grid grid-cols-4 gap-1.5 flex-1 relative">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className={`rounded border border-neutral-100 transition-all duration-300 h-5 ${i === 6 ? "animate-calSlotActivate relative z-20" : "bg-neutral-50"}`} />
+            ))}
+            <div className="absolute -bottom-4 -left-6 bg-brand-dark text-white px-2 py-1 rounded-md shadow-xl animate-popBadge z-30 flex items-center gap-1 border border-neutral-700">
+              <HIcons.Check /> <span className="text-[7px] font-bold uppercase tracking-widest text-[#D2F801]">Auto-Confirmed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HiwTracking() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute w-72 h-72 bg-brand-orange/10 rounded-full blur-3xl animate-ambientGlow z-0" />
+      <div className="scene-viewport flex items-center justify-center z-10">
+        <div className="relative w-[220px] h-[220px] flex items-center justify-center">
+          <div className="absolute inset-0 border border-neutral-200 rounded-full" />
+          <div className="absolute inset-8 border border-neutral-200/70 rounded-full" />
+          <div className="absolute inset-16 border border-neutral-200/40 rounded-full" />
+          <div className="absolute inset-0 rounded-full radar-cone animate-radarSpin opacity-50 z-10" />
+          <div className="relative z-20 w-10 h-10 bg-brand-dark rounded-full border-2 border-brand-orange flex items-center justify-center text-brand-orange shadow-[0_0_15px_rgba(217,116,26,0.4)]">
+            <HIcons.Radar />
+          </div>
+          <div className="absolute top-[5%] left-[5%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingTopLeft z-30">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[8px] font-bold text-neutral-800">GOTO</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-blue-50 text-brand-blue uppercase">Viewed</span>
+            </div>
+            <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-1/3 bg-brand-blue" /></div>
+          </div>
+          <div className="absolute top-[40%] -right-[5%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingRight z-30">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[8px] font-bold text-neutral-800">Shopee</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-orange-50 text-brand-orange uppercase">Assessed</span>
+            </div>
+            <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-2/3 bg-brand-orange" /></div>
+          </div>
+          <div className="absolute bottom-[5%] left-[10%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingBottomLeft z-30">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[8px] font-bold text-neutral-800">Traveloka</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-green-50 text-brand-green uppercase">Interview</span>
+            </div>
+            <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-full bg-brand-green" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HowItWorks() {
   const steps = [
-    { icon: Brain, title: "Upload Profil Sekali", desc: "Agen mempelajari pengalaman & preferensi kariermu dalam hitungan menit." },
-    { icon: Bot, title: "Agen Bekerja 24/7", desc: "Memindai 7 platform, menulis ulang CV per lowongan, dan melamar otomatis." },
-    { icon: CalendarCheck, title: "Terima Undangan Interview", desc: "Fokus persiapan interview — biarkan agen mengurus sisanya." },
+    { id: "01", title: "Upload Profil Sekali", desc: "AI mengekstrak dan memetakan skill-mu menjadi profil digital." },
+    { id: "02", title: "Otomasi Tailoring 24/7", desc: "Agen membaca syarat lowongan dan menulis ulang CV secara spesifik." },
+    { id: "03", title: "Auto-Sync Interview", desc: "Sistem menyinkronkan jadwal otomatis. Kamu tinggal bersiap diri." },
+    { id: "04", title: "Radar Pemantauan", desc: "Lacak seluruh status lamaran dari berbagai platform di satu layar." },
   ];
+  const [activeStep, setActiveStep] = useState(0);
+  const timerRef = useRef<number | null>(null);
+
+  const startTimer = () => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = window.setInterval(() => {
+      setActiveStep((prev) => (prev + 1) % steps.length);
+    }, 5000);
+  };
+
+  useEffect(() => {
+    startTimer();
+    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleManualClick = (idx: number) => {
+    if (idx !== activeStep) { setActiveStep(idx); startTimer(); }
+  };
+
   return (
     <ScrollReveal>
-      <section id="cara-kerja" className="mx-auto max-w-7xl px-4 py-20 md:px-8">
-        <div className="text-center max-w-2xl mx-auto">
-          <p className="text-xs uppercase tracking-[0.22em] text-[#0A5BE0] font-bold">Cara Kerja</p>
-          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight">Tiga langkah sampai interview.</h2>
+      <section id="cara-kerja" className="w-full py-20 relative overflow-hidden bg-brand-paper">
+        <div className="text-center max-w-2xl mx-auto mb-16 relative z-10 px-4">
+          <p className="text-xs uppercase tracking-[0.22em] text-brand-blue font-bold">Cara Kerja</p>
+          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight text-neutral-900">Empat langkah sampai bekerja.</h2>
+          <p className="mt-4 text-neutral-500 text-sm md:text-base max-w-lg mx-auto">Sistem yang dirancang untuk memangkas friksi. Sekali pengaturan, biarkan agen kecerdasan buatan mengambil alih sisanya.</p>
         </div>
-        <div className="mt-14 grid gap-8 md:grid-cols-3 relative">
-          <div className="hidden md:block absolute top-16 left-[16%] right-[16%] h-0.5 bg-[#0A5BE0]/30" />
-          {steps.map((s, i) => (
-            <div key={i} className="relative glass rounded-3xl p-7 text-center">
-              <StepIllo step={(i + 1) as 1 | 2 | 3} />
-              <div className="mx-auto h-14 w-14 rounded-2xl bg-[#0A5BE0] grid place-items-center text-white shadow-lg">
-                <s.icon className="h-6 w-6" />
-              </div>
-              <p className="mt-4 font-mono text-xs text-muted-foreground">LANGKAH 0{i + 1}</p>
-              <h3 className="mt-2 text-xl font-display font-bold">{s.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10 px-4 md:px-8">
+          <div className="lg:col-span-5 flex flex-col justify-center space-y-4">
+            {steps.map((step, idx) => {
+              const isActive = activeStep === idx;
+              return (
+                <div
+                  key={step.id}
+                  onClick={() => handleManualClick(idx)}
+                  className={`relative group cursor-pointer p-4 rounded-2xl transition-all duration-300 ease-out border-2 ${
+                    isActive ? "bg-white border-transparent shadow-[0_8px_30px_rgb(0,0,0,0.04)] scale-100" : "bg-transparent border-transparent hover:bg-neutral-100/50 scale-[0.98]"
+                  }`}
+                >
+                  {isActive && <div className="hidden lg:block absolute top-1/2 left-full w-8 h-[2px] bg-brand-blue/20 animate-lineShoot origin-left z-0" />}
+                  <div className="flex items-start gap-4">
+                    <span className={`font-mono text-xl sm:text-2xl font-extrabold transition-colors mt-0.5 ${isActive ? "text-brand-blue" : "text-neutral-300"}`}>{step.id}.</span>
+                    <div className="flex-1">
+                      <h3 className={`font-display text-lg sm:text-xl font-bold leading-tight transition-colors ${isActive ? "text-neutral-900" : "text-neutral-500"}`}>{step.title}</h3>
+                      <div className={`grid transition-all duration-500 ease-in-out overflow-hidden ${isActive ? "grid-rows-[1fr] mt-2 opacity-100" : "grid-rows-[0fr] mt-0 opacity-0"}`}>
+                        <p className="font-sans text-sm text-neutral-600 leading-relaxed pr-4 min-h-0">{step.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="absolute bottom-0 left-4 right-4 h-[2px] bg-neutral-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-blue animate-hiwProgress origin-left" key={`progress-${activeStep}`} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="lg:col-span-7 relative w-full aspect-square sm:aspect-auto sm:h-[450px] flex items-center justify-center bg-white/60 border border-white backdrop-blur-md rounded-[3rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="absolute inset-0 w-full h-full">
+              {activeStep === 0 && <HiwUpload key="scene0" />}
+              {activeStep === 1 && <HiwAgent key="scene1" />}
+              {activeStep === 2 && <HiwInterview key="scene2" />}
+              {activeStep === 3 && <HiwTracking key="scene3" />}
             </div>
-          ))}
+          </div>
         </div>
       </section>
     </ScrollReveal>
