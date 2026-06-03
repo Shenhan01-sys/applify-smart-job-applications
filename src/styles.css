@@ -60,6 +60,7 @@
   --color-brand-orange: #D9741A; /* pilar Sosial */
   --color-brand-green: #1C9656;  /* Green Career */
   --color-brand-teal: #14B8A6;   /* dashboard callback accent */
+  --color-brand-emerald: #10B981; /* green career accent */
 
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -546,6 +547,27 @@
 @keyframes dbFadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
 @keyframes dbSpinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes dbPingSubtle { 75%, 100% { transform: scale(2); opacity: 0; } }
+
+/* ────────── Green Career (P0) — AI scan diorama ────────── */
+.animate-gcMagnifyMove { animation: gcMagnifyMove 5s ease-in-out infinite; }
+.animate-gcPopWord1 { animation: gcPopWord1 5s ease-in-out infinite; }
+.animate-gcPopWord2 { animation: gcPopWord2 5s ease-in-out infinite; }
+.animate-gcPopWord3 { animation: gcPopWord3 5s ease-in-out infinite; }
+.animate-gcPulseNode { animation: gcPulseNode 3s ease-in-out infinite alternate; }
+
+@keyframes gcMagnifyMove {
+  0% { transform: translate(0px, 0px) scale(1); }
+  15% { transform: translate(120px, 0px) scale(1.1); }
+  25% { transform: translate(10px, 25px) scale(1); }
+  45% { transform: translate(150px, 25px) scale(1.1); }
+  60% { transform: translate(20px, 50px) scale(1); }
+  80% { transform: translate(100px, 50px) scale(1.1); }
+  90%, 100% { transform: translate(0px, 0px) scale(1); }
+}
+@keyframes gcPopWord1 { 0%, 10%, 20%, 100% { background-color: #e5e5e5; transform: scale(1); } 15% { background-color: #10b981; transform: scale(1.2); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); } }
+@keyframes gcPopWord2 { 0%, 35%, 55%, 100% { background-color: #e5e5e5; transform: scale(1); } 45% { background-color: #10b981; transform: scale(1.2); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); } }
+@keyframes gcPopWord3 { 0%, 70%, 90%, 100% { background-color: #e5e5e5; transform: scale(1); } 80% { background-color: #10b981; transform: scale(1.2); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); } }
+@keyframes gcPulseNode { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 15px rgba(16, 185, 129, 0.6); } }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float, .animate-marquee { animation: none !important; }
