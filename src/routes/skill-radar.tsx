@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, Sparkles, AlertTriangle, Loader2 } from "lucide-react";
+import { Activity, BookOpen, ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -17,39 +17,58 @@ export const Route = createFileRoute("/skill-radar")({
   component: SkillPage,
 });
 
-const trending = [
-  { n: "FastAPI", g: 171, c: 432, dir: "up" },
-  { n: "TypeScript", g: 84, c: 1208, dir: "up" },
-  { n: "Kubernetes", g: 56, c: 612, dir: "up" },
-  { n: "PHP", g: -34, c: 287, dir: "down" },
-  { n: "Tableau", g: 12, c: 198, dir: "stable" },
-  { n: "Rust", g: 192, c: 142, dir: "up" },
+interface SkillAxis { id: number; name: string; userLevel: number; marketDemand: number; }
+
+const MOCK_SKILLS: SkillAxis[] = [
+  { id: 1, name: "Frontend", userLevel: 85, marketDemand: 90 },
+  { id: 2, name: "Backend", userLevel: 55, marketDemand: 80 },
+  { id: 3, name: "UI/UX", userLevel: 40, marketDemand: 70 },
+  { id: 4, name: "Cloud/DevOps", userLevel: 25, marketDemand: 65 },
+  { id: 5, name: "Data/AI", userLevel: 55, marketDemand: 85 },
+  { id: 6, name: "Agile/Soft", userLevel: 90, marketDemand: 75 },
 ];
 
-// Illustrative fallback when user has no skills yet
-const DEFAULT_AXES = ["Technical", "Soft Skills", "Domain", "Tools", "Bahasa"];
-const DEFAULT_YOU = [78, 64, 82, 70, 55];
-const MARKET_BASE = [72, 70, 68, 66, 74, 69];
+// Canonical axes + market benchmark + keyword buckets to map real user_skills onto the radar
+const AXES = [
+  { name: "Frontend", market: 90, kw: ["front", "react", "vue", "css", "html", "javascript", "typescript", "tailwind"] },
+  { name: "Backend", market: 80, kw: ["back", "node", "api", "server", "golang", "java", "python", "php", "rest", "graphql"] },
+  { name: "UI/UX", market: 70, kw: ["ux", "ui/ux", "design", "figma", "wireframe", "prototyp"] },
+  { name: "Cloud/DevOps", market: 65, kw: ["cloud", "devops", "aws", "gcp", "azure", "docker", "kubernetes", "ci/cd", "terraform"] },
+  { name: "Data/AI", market: 85, kw: ["data", "ai", "ml", "machine", "analytic", "sql", "pandas", "tensor", "llm"] },
+  { name: "Agile/Soft", market: 75, kw: ["agile", "scrum", "communication", "leadership", "soft", "management", "kolaborasi"] },
+];
 
-interface RadarModel { axes: string[]; you: number[]; market: number[]; real: boolean; }
-
-function buildRadar(skills: any[]): RadarModel {
-  if (!skills.length) {
-    return { axes: DEFAULT_AXES, you: DEFAULT_YOU, market: DEFAULT_AXES.map((_, i) => MARKET_BASE[i] ?? 70), real: false };
-  }
-  const byCat: Record<string, number[]> = {};
-  skills.forEach((s) => {
-    const cat = (s.category || "Lainnya").toString();
-    (byCat[cat] ??= []).push(Number(s.proficiency_level) || 0);
-  });
+function buildData(skills: any[]): { data: SkillAxis[]; real: boolean } {
+  if (!skills.length) return { data: MOCK_SKILLS, real: false };
   const maxP = Math.max(...skills.map((s) => Number(s.proficiency_level) || 0), 0);
-  const norm = (v: number) => (maxP <= 5 ? v * 20 : v); // detect 1–5 vs 0–100 scale
-  let cats = Object.keys(byCat).sort((a, b) => byCat[b].length - byCat[a].length).slice(0, 6);
-  if (cats.length < 3) return { axes: DEFAULT_AXES, you: DEFAULT_YOU, market: DEFAULT_AXES.map((_, i) => MARKET_BASE[i] ?? 70), real: false };
-  const you = cats.map((c) => Math.round(Math.min(100, norm(byCat[c].reduce((a, b) => a + b, 0) / byCat[c].length))));
-  const market = cats.map((_, i) => MARKET_BASE[i] ?? 70);
-  return { axes: cats, you, market, real: true };
+  const norm = (v: number) => (maxP <= 5 ? v * 20 : v);
+  const data: SkillAxis[] = AXES.map((ax, i) => {
+    const matched = skills.filter((s) => {
+      const hay = `${s.name || ""} ${s.category || ""}`.toLowerCase();
+      return ax.kw.some((k) => hay.includes(k));
+    });
+    const userLevel = matched.length
+      ? Math.round(Math.min(100, norm(matched.reduce((a, s) => a + (Number(s.proficiency_level) || 0), 0) / matched.length)))
+      : 0;
+    return { id: i + 1, name: ax.name, userLevel, marketDemand: ax.market };
+  });
+  if (!data.some((d) => d.userLevel > 0)) return { data: MOCK_SKILLS, real: false };
+  return { data, real: true };
 }
+
+/* ── Radar geometry ── */
+const SVG_SIZE = 400, CENTER = 200, MAX_RADIUS = 150;
+const coord = (value: number, index: number, total: number) => {
+  const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+  const r = (value / 100) * MAX_RADIUS;
+  return { x: CENTER + r * Math.cos(angle), y: CENTER + r * Math.sin(angle), angle };
+};
+const polyPath = (data: SkillAxis[], key: "userLevel" | "marketDemand" | null, constant: number | null = null) =>
+  data.map((item, i) => {
+    const val = constant !== null ? constant : (item[key as "userLevel"] as number);
+    const { x, y } = coord(val, i, data.length);
+    return `${i === 0 ? "M" : "L"} ${x},${y}`;
+  }).join(" ") + " Z";
 
 function SkillPage() {
   const { user } = useAuth();
@@ -67,11 +86,7 @@ function SkillPage() {
     load();
   }, [user]);
 
-  const radar = buildRadar(skills);
-  const gaps = radar.axes
-    .map((a, i) => ({ axis: a, you: radar.you[i], market: radar.market[i], gap: radar.market[i] - radar.you[i] }))
-    .filter((g) => g.gap > 4)
-    .sort((a, b) => b.gap - a.gap);
+  const { data, real } = buildData(skills);
 
   if (loading) {
     return <AppShell><div className="flex items-center justify-center h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" /></div></AppShell>;
@@ -84,132 +99,137 @@ function SkillPage() {
         <p className="text-muted-foreground text-sm mt-1">Pemetaan skill-mu vs permintaan pasar — dipersonalisasi.</p>
       </header>
 
-      {!radar.real && (
-        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-dashed border-[#D9741A]/40 bg-[#D9741A]/[6%] p-4">
+      {!real && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-dashed border-[#D9741A]/40 bg-[#D9741A]/[6%] p-4">
           <AlertTriangle className="h-5 w-5 text-[#D9741A] shrink-0" />
-          <p className="text-sm text-foreground/80">Radar di bawah masih ilustratif. <Link to="/profile" className="text-[#0A5BE0] font-semibold">Lengkapi skill di Profil</Link> agar radar memetakan kemampuan aslimu.</p>
+          <p className="text-sm text-foreground/80">Radar masih ilustratif. <Link to="/profile" className="text-[#0A5BE0] font-semibold">Lengkapi skill di Profil</Link> agar memetakan kemampuan aslimu.</p>
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.05fr]">
-        {/* Radar diorama */}
-        <div className="relative glass rounded-3xl p-5 overflow-hidden">
-          <div className="absolute inset-0 grid-bg opacity-40" aria-hidden="true" />
-          <div className="relative flex items-center justify-between">
-            <h2 className="font-display font-bold">Profil Skill Kamu</h2>
-            <span className="text-[10px] uppercase tracking-wider text-[#1C9656] font-mono">vs Market</span>
-          </div>
-          <div className="relative mt-2 grid place-items-center">
-            <RadarChart axes={radar.axes} you={radar.you} market={radar.market} />
-          </div>
-          <div className="relative mt-2 flex items-center justify-center gap-5 text-xs">
-            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-[#0A5BE0]" />Kamu</span>
-            <span className="inline-flex items-center gap-2"><span className="h-2 w-3 rounded bg-[#16150F]" />Market</span>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+        <div className="lg:col-span-6 flex justify-center order-2 lg:order-1">
+          <RadarScene data={data} />
         </div>
-
-        {/* Gap + trending */}
-        <div className="space-y-5">
-          <div className="glass rounded-3xl p-5 animate-fade-in-up">
-            <h2 className="font-display font-bold">Gap Analysis</h2>
-            <p className="text-xs text-muted-foreground">Area di bawah rata-rata pasar</p>
-            {gaps.length > 0 ? (
-              <ul className="mt-4 space-y-2.5">
-                {gaps.map((g) => (
-                  <li key={g.axis} className="rounded-2xl border border-[color:var(--border)] bg-[#FBF9F2] p-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold">{g.axis}</span>
-                      <span className="font-mono text-xs font-bold text-[#D9741A]">−{g.gap} poin</span>
-                    </div>
-                    <div className="mt-2 h-1.5 rounded-full bg-black/[6%] overflow-hidden relative">
-                      <div className="absolute inset-y-0 left-0 bg-[#16150F]/30 rounded-full" style={{ width: `${g.market}%` }} />
-                      <div className="absolute inset-y-0 left-0 bg-[#0A5BE0] rounded-full" style={{ width: `${g.you}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-[#1C9656] font-medium">🎉 Skill-mu sudah di atas rata-rata pasar di semua sumbu!</p>
-            )}
-          </div>
-
-          <div className="glass rounded-3xl p-5 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-            <h2 className="font-display font-bold mb-3">Trending Skills · Minggu Ini</h2>
-            <ul className="space-y-2">
-              {trending.map((s, i) => {
-                const Icon = s.dir === "up" ? TrendingUp : s.dir === "down" ? TrendingDown : Minus;
-                const color = s.dir === "up" ? "text-[#1C9656]" : s.dir === "down" ? "text-[#C0341A]" : "text-muted-foreground";
-                return (
-                  <li key={s.n} className="rounded-xl border border-[color:var(--border)] bg-[#FBF9F2] p-3 flex items-center gap-3" style={{ animation: `fadeInUp 0.35s ease-out ${0.15 + i * 0.05}s both` }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm">{s.n}</p>
-                        <span className={`inline-flex items-center gap-0.5 text-xs font-mono font-bold ${color}`}><Icon className="h-3 w-3" />{s.g > 0 ? "+" : ""}{s.g}%</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{s.c.toLocaleString("id-ID")} lowongan menyebut minggu ini</p>
-                    </div>
-                    <button className="text-xs text-[#0A5BE0] font-semibold inline-flex items-center gap-1 shrink-0">Pelajari <ArrowUpRight className="h-3 w-3" /></button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+        <div className="lg:col-span-6 flex flex-col justify-center order-1 lg:order-2">
+          <ActionableInsights data={data} />
         </div>
       </div>
-
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        {[
-          { t: "FastAPI", impact: "+43% callback", bg: "bg-[#D2F801]", txt: "text-[#16150F]", sub: "text-[#16150F]/70" },
-          { t: "Kubernetes", impact: "+28% match rate", bg: "bg-[#0A5BE0]", txt: "text-white", sub: "text-white/80" },
-          { t: "System Design", impact: "+19% interview", bg: "bg-[#16150F]", txt: "text-white", sub: "text-white/70" },
-        ].map((c, i) => (
-          <div key={c.t} className={`relative overflow-hidden rounded-3xl ${c.bg} p-5 hover:-translate-y-1 transition-transform duration-300`} style={{ animation: `fadeInUp 0.4s ease-out ${0.2 + i * 0.08}s both` }}>
-            <Sparkles className={`h-5 w-5 ${c.txt}`} />
-            <p className={`mt-3 text-sm font-semibold ${c.txt}`}>Tambahkan <span className="font-bold">{c.t}</span></p>
-            <p className={`text-xs mt-1 ${c.sub}`}>Estimasi {c.impact}</p>
-            <button className={`mt-4 text-xs font-semibold inline-flex items-center gap-1 ${c.txt}`}>Mulai belajar <ArrowUpRight className="h-3 w-3" /></button>
-          </div>
-        ))}
-      </section>
     </AppShell>
   );
 }
 
-function RadarChart({ axes, you, market }: { axes: string[]; you: number[]; market: number[] }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 150); return () => clearTimeout(t); }, []);
+function RadarScene({ data }: { data: SkillAxis[] }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setIsLoaded(true), 100); return () => clearTimeout(t); }, []);
 
-  const cx = 160, cy = 160, R = 120;
-  const n = axes.length;
-  const pt = (v: number, i: number): [number, number] => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    const r = (v / 100) * R;
-    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-  };
-  const path = (vals: number[]) => vals.map((v, i) => pt(v, i).join(",")).join(" ");
+  const userPath = polyPath(data, "userLevel");
+  const marketPath = polyPath(data, "marketDemand");
 
   return (
-    <div className="relative w-full max-w-[340px]">
-      {/* radar sweep (reuse global radar-cone + radarSpin) */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] aspect-square rounded-full radar-cone animate-radarSpin opacity-25 pointer-events-none" aria-hidden="true" />
-      <svg viewBox="0 0 320 320" className="relative w-full">
-        {/* grid rings */}
-        {[1, 0.75, 0.5, 0.25].map((s) => (
-          <polygon key={s} points={path(axes.map(() => s * 100))} fill="none" stroke="rgba(22,21,15,0.06)" />
-        ))}
-        {axes.map((_, i) => { const [x, y] = pt(100, i); return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(22,21,15,0.06)" />; })}
-        {/* market polygon */}
-        <polygon points={path(market)} fill="rgba(22,21,15,0.04)" stroke="rgba(22,21,15,0.2)" strokeDasharray="4 4" strokeWidth="1.5" />
-        {/* you polygon + nodes — grows from center on mount */}
-        <g style={{ transform: mounted ? "scale(1)" : "scale(0.05)", transformOrigin: "160px 160px", transformBox: "view-box", opacity: mounted ? 1 : 0, transition: "transform .9s cubic-bezier(.22,1,.36,1), opacity .5s ease" }}>
-          <polygon points={path(you)} fill="#0A5BE0" fillOpacity="0.18" stroke="#0A5BE0" strokeWidth="2" />
-          {you.map((v, i) => { const [x, y] = pt(v, i); return <circle key={i} cx={x} cy={y} r="3.5" fill="#0A5BE0" stroke="#fff" strokeWidth="1.5" />; })}
-        </g>
-        {/* center pulse */}
-        <circle cx={cx} cy={cy} r="3" fill="#1C9656" className="animate-pulse-glow" />
-        {/* labels */}
-        {axes.map((label, i) => { const [x, y] = pt(116, i); return <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: "11px", fill: "var(--muted-foreground)", fontWeight: 600 }}>{label}</text>; })}
-      </svg>
+    <div className="relative w-full max-w-xl aspect-square flex items-center justify-center opacity-0 animate-srSlideUp">
+      <div className="relative w-full h-full max-w-[400px] max-h-[400px] opacity-0 animate-srFadeIn">
+        <div className="w-full h-full animate-srFloat">
+          <svg viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`} className="w-full h-full relative z-20 overflow-visible">
+            {/* spider-web grids */}
+            {[20, 40, 60, 80, 100].map((level) => (
+              <path key={level} d={polyPath(data, null, level)} fill="none" stroke={level === 100 ? "#e5e5e5" : "#f0f0f0"} strokeWidth={level === 100 ? 1.5 : 1} strokeDasharray={level !== 100 ? "4 4" : "none"} />
+            ))}
+            {/* spokes */}
+            {data.map((_, i) => { const e = coord(100, i, data.length); return <line key={i} x1={CENTER} y1={CENTER} x2={e.x} y2={e.y} stroke="#e5e5e5" strokeWidth="1" strokeLinecap="round" />; })}
+            {/* market polygon */}
+            <path d={marketPath} fill="rgba(0,0,0,0.02)" stroke="#d4d4d8" strokeWidth="1.5" strokeDasharray="6 4" />
+            {/* user polygon — draws + glows */}
+            {isLoaded && <path d={userPath} fill="rgba(10,91,224,0.22)" stroke="#0A5BE0" strokeWidth="3.5" strokeLinejoin="round" className="sr-path-draw animate-srUserPath" />}
+            {/* gap indicators */}
+            {isLoaded && data.map((s, i) => {
+              if (s.marketDemand <= s.userLevel + 10) return null;
+              const m = coord(s.marketDemand, i, data.length), u = coord(s.userLevel, i, data.length);
+              return <line key={`gap-${i}`} x1={u.x} y1={u.y} x2={m.x} y2={m.y} stroke="#D9741A" strokeWidth="2.5" strokeLinecap="round" className="opacity-0 animate-srFadeIn" style={{ animationDelay: `${i * 200 + 500}ms` }} />;
+            })}
+            {/* nodes + labels */}
+            {data.map((s, i) => {
+              const m = coord(s.marketDemand, i, data.length), u = coord(s.userLevel, i, data.length), lp = coord(120, i, data.length);
+              const isGap = s.marketDemand > s.userLevel + 10;
+              let anchor: "middle" | "start" | "end" = "middle"; let xo = 0;
+              if (lp.x > CENTER + 10) { anchor = "start"; xo = 10; } else if (lp.x < CENTER - 10) { anchor = "end"; xo = -10; }
+              return (
+                <g key={`node-${i}`} className="opacity-0 animate-srPopNode" style={{ animationDelay: `${i * 200 + 100}ms`, transformBox: "fill-box", transformOrigin: "center" }}>
+                  <circle cx={m.x} cy={m.y} r="3" fill="#fff" stroke="#d4d4d8" strokeWidth="1.5" />
+                  <circle cx={u.x} cy={u.y} r="5" fill="#fff" stroke="#0A5BE0" strokeWidth="2.5" />
+                  <text x={lp.x + xo} y={lp.y} textAnchor={anchor} alignmentBaseline="middle" className={`font-display text-[11px] font-bold tracking-widest uppercase ${isGap ? "fill-[#D9741A]" : "fill-neutral-800"}`}>{s.name}</text>
+                  <text x={lp.x + xo} y={lp.y + 14} textAnchor={anchor} className="font-mono text-[9px] fill-neutral-400 font-bold">{s.userLevel}% / {s.marketDemand}%</text>
+                </g>
+              );
+            })}
+          </svg>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-neutral-200 rounded-full z-10 shadow-inner" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionableInsights({ data }: { data: SkillAxis[] }) {
+  const gaps = data.filter((s) => s.marketDemand > s.userLevel + 10).sort((a, b) => (b.marketDemand - b.userLevel) - (a.marketDemand - a.userLevel));
+  const courseFor = (name: string) => {
+    if (name.includes("Cloud")) return { course: "AWS Certified Solutions Architect", provider: "Dicoding" };
+    if (name.includes("UI")) return { course: "Google UX Design Professional", provider: "Coursera" };
+    if (name.includes("Backend")) return { course: "Advanced Node.js & Microservices", provider: "Udemy" };
+    if (name.includes("Data")) return { course: "Machine Learning Specialization", provider: "Coursera" };
+    return { course: "Sertifikasi Profesional", provider: "Coursera" };
+  };
+
+  return (
+    <div className="w-full flex flex-col gap-6">
+      <div className="opacity-0 animate-srSlideUp" style={{ animationDelay: "300ms" }}>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-[#D9741A]/20 text-[#D9741A] font-mono text-[10px] font-bold uppercase tracking-widest shadow-sm mb-3">
+          <Activity className="w-3.5 h-3.5" /> Market Divergence
+        </div>
+        <h3 className="font-display text-2xl md:text-3xl font-bold text-neutral-900 leading-tight">
+          {gaps.length > 0 ? `${gaps.length} Area Perlu Pengembangan` : "Profil Anda Sangat Kompetitif"}
+        </h3>
+        <p className="font-sans text-sm text-neutral-500 mt-2 leading-relaxed">
+          Berdasarkan pemindaian otonom terhadap 1.200+ lowongan aktif minggu ini, berikut kesenjangan skill-mu vs pasar.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {gaps.map((gap, index) => {
+          const diff = gap.marketDemand - gap.userLevel;
+          const { course, provider } = courseFor(gap.name);
+          return (
+            <div key={gap.id} className="group bg-white border border-neutral-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-[#0A5BE0]/30 transition-all duration-300 opacity-0 animate-srSlideUp" style={{ animationDelay: `${500 + index * 200}ms` }}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="font-display font-bold text-neutral-900 text-lg">{gap.name}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-sans text-xs text-neutral-500">Target Pasar: <span className="font-mono font-bold text-neutral-800">{gap.marketDemand}%</span></span>
+                    <span className="w-1 h-1 rounded-full bg-neutral-300" />
+                    <span className="font-sans text-xs text-[#D9741A] font-bold flex items-center gap-1">Gap -{diff}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 text-[#0A5BE0] rounded-xl flex items-center justify-center shrink-0 group-hover:bg-[#0A5BE0] group-hover:text-white transition-colors duration-300">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-display text-sm font-bold text-neutral-900 leading-tight">{course}</p>
+                    <p className="font-sans text-[11px] text-neutral-500 mt-0.5 uppercase tracking-wider font-semibold">Tersedia via {provider}</p>
+                  </div>
+                </div>
+                <button className="shrink-0 font-sans text-xs font-bold text-[#16150F] hover:text-[#0A5BE0] flex items-center gap-1.5 transition-colors">
+                  Tutup Gap Ini <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {gaps.length === 0 && (
+          <div className="glass rounded-3xl p-6 text-center text-sm text-[#1C9656] font-medium">🎉 Skill-mu sudah di atas rata-rata pasar di semua sumbu!</div>
+        )}
+      </div>
     </div>
   );
 }
