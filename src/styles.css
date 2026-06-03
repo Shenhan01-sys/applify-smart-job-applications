@@ -59,6 +59,7 @@
   --color-brand-blue: #0A5BE0;   /* pilar Ekonomi */
   --color-brand-orange: #D9741A; /* pilar Sosial */
   --color-brand-green: #1C9656;  /* Green Career */
+  --color-brand-teal: #14B8A6;   /* dashboard callback accent */
 
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -515,6 +516,36 @@
 @keyframes srSlideUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
 @keyframes srFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
 @keyframes srGlowPulse { 0%, 100% { filter: drop-shadow(0 0 4px rgba(10, 91, 224, 0.3)); } 50% { filter: drop-shadow(0 0 15px rgba(10, 91, 224, 0.6)); } }
+
+/* ────────── Dashboard "Mission Control" (P0) — animations & utilities ────────── */
+.bg-tech-grid {
+  background-size: 30px 30px;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+}
+.glass-solid {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+.path-flow { stroke-dasharray: 6 4; }
+.animate-dbBotIdle { animation: dbBotIdle 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-dbDataFlow { animation: dbDataFlow 30s linear infinite; }
+.animate-dbPopIn { animation: dbPopIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+.animate-dbFadeUp { animation: dbFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-dbSpinSlow { animation: dbSpinSlow 12s linear infinite; }
+.animate-dbSpinSlowRev { animation: dbSpinSlow 15s linear infinite reverse; }
+.animate-dbPingSubtle { animation: dbPingSubtle 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+@keyframes dbBotIdle { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
+@keyframes dbDataFlow { 0% { stroke-dashoffset: 200; } 100% { stroke-dashoffset: 0; } }
+@keyframes dbPopIn { 0% { opacity: 0; transform: scale(0.8) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes dbFadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes dbSpinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes dbPingSubtle { 75%, 100% { transform: scale(2); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float, .animate-marquee { animation: none !important; }
