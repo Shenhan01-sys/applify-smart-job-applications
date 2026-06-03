@@ -119,10 +119,11 @@ function AgentToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }
 
 function MobileNav({ agentOn, setAgentOn }: { agentOn: boolean; setAgentOn: (v: boolean) => void }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
+  // 4 nav items + 1 center FAB = exactly 5 cells (grid-cols-5) → single row on mobile.
+  // (Approvals tetap diakses dari sidebar desktop & dashboard.)
   const items = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { to: "/jobs", icon: Briefcase, label: "Jobs" },
-    { to: "/approvals", icon: ShieldCheck, label: "Review" },
     { to: "/applications", icon: FileCheck2, label: "Apps" },
     { to: "/profile", icon: User, label: "Profile" },
   ] as const;
