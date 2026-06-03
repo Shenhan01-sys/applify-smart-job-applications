@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut, Bot, ShieldCheck, Linkedin, Leaf } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, Bell, Power, Sparkles, User, LogOut, Bot, ShieldCheck, Linkedin, Leaf, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -19,6 +19,7 @@ const nav = [
 export default function AppShell({ children, rightPanel }: { children: React.ReactNode; rightPanel?: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [agentOn, setAgentOn] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const email = user?.email ?? "";
@@ -72,10 +73,15 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
               <div className="grid h-8 w-8 place-items-center rounded-lg gradient-primary text-white font-bold">A</div>
               <span className="font-bold">Applify</span>
             </Link>
-            <button className="relative h-10 w-10 rounded-full glass grid place-items-center">
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-warm" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button className="relative h-10 w-10 rounded-full glass grid place-items-center">
+                <Bell className="h-4 w-4" />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-warm" />
+              </button>
+              <button onClick={() => setMenuOpen(true)} aria-label="Menu" className="h-10 w-10 rounded-full glass grid place-items-center">
+                <Menu className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           {children ?? <Outlet />}
         </div>
@@ -87,6 +93,60 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
       </main>
 
       <MobileNav agentOn={agentOn} setAgentOn={setAgentOn} />
+      {menuOpen && (
+        <MobileMenuDrawer
+          path={path}
+          email={email}
+          initials={initials}
+          agentOn={agentOn}
+          setAgentOn={setAgentOn}
+          onClose={() => setMenuOpen(false)}
+          onSignOut={handleSignOut}
+        />
+      )}
+    </div>
+  );
+}
+
+function MobileMenuDrawer({ path, email, initials, agentOn, setAgentOn, onClose, onSignOut }: {
+  path: string; email: string; initials: string; agentOn: boolean; setAgentOn: (v: boolean) => void; onClose: () => void; onSignOut: () => void;
+}) {
+  return (
+    <div className="lg:hidden fixed inset-0 z-[60]">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-72 max-w-[85%] bg-[#F4F1E8] border-l-2 border-[color:var(--border-strong)] shadow-2xl flex flex-col p-4 overflow-y-auto animate-slide-right">
+        <div className="flex items-center justify-between mb-4">
+          <Link to="/" onClick={onClose} className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg gradient-primary text-white font-bold">A</div>
+            <span className="font-display font-extrabold">Applify</span>
+          </Link>
+          <button onClick={onClose} aria-label="Tutup" className="h-9 w-9 rounded-lg border-2 border-[color:var(--border)] grid place-items-center hover:bg-black/[4%] transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="glass rounded-xl p-3 flex items-center gap-3 mb-4">
+          <div className="h-9 w-9 rounded-full gradient-primary grid place-items-center text-white text-sm font-bold">{initials}</div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold truncate">{email.split("@")[0] || "User"}</p>
+            <p className="text-[10px] uppercase tracking-wider text-primary font-mono">Member</p>
+          </div>
+        </div>
+        <nav className="flex-1 flex flex-col gap-1">
+          {nav.map((it) => {
+            const active = path === it.to;
+            return (
+              <Link key={it.to} to={it.to as any} onClick={onClose} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? "gradient-primary text-white shadow-md" : "text-muted-foreground hover:bg-black/[4%] hover:text-foreground"}`}>
+                <it.icon className="h-4 w-4" />
+                {it.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mt-3"><AgentToggle on={agentOn} setOn={setAgentOn} /></div>
+        <button onClick={onSignOut} className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition">
+          <LogOut className="h-4 w-4" /> Logout
+        </button>
+      </div>
     </div>
   );
 }
