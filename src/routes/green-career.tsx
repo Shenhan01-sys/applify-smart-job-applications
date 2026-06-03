@@ -109,7 +109,7 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
   return (
     <div className="glass-solid rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-300 group">
       <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 bg-neutral-100 border border-neutral-200 rounded-xl flex items-center justify-center text-neutral-500"><Building2 className="w-5 h-5" /></div>
+        <div className="w-10 h-10 bg-neutral-100 border-2 border-neutral-300 rounded-xl flex items-center justify-center text-neutral-500"><Building2 className="w-5 h-5" /></div>
         {typeof esg === "number" && (
           <div className="flex flex-col items-end">
             <span className="font-mono text-xl font-extrabold text-brand-emerald">{esg}</span>
@@ -121,7 +121,7 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
       <p className="font-sans text-sm text-neutral-500 mt-1">{job.company}</p>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-4">
-          {tags.slice(0, 3).map((tag) => <span key={tag} className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold uppercase border border-emerald-100">{tag}</span>)}
+          {tags.slice(0, 3).map((tag) => <span key={tag} className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-[9px] font-bold uppercase border-2 border-emerald-300">{tag}</span>)}
         </div>
       )}
       <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-3 mt-auto">
@@ -227,7 +227,7 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
                 ))}
               </div>
             ) : (
-              <textarea rows={3} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Jawabanmu..." className="w-full p-3 rounded-xl border border-neutral-200 bg-white text-sm resize-none focus:outline-none focus:border-brand-emerald" />
+              <textarea rows={3} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Jawabanmu..." className="w-full p-3 rounded-xl border-2 border-neutral-300 bg-white text-sm resize-none focus:outline-none focus:border-brand-emerald" />
             )}
           </div>
         ))}
@@ -255,7 +255,7 @@ function AnalyzingDiorama() {
             <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center animate-gcPulseNode shadow-lg border border-neutral-700"><Bot className="w-6 h-6" /></div>
             <div><h3 className="font-display text-xl font-bold text-neutral-900 leading-tight">AI Assessment Engine</h3><p className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">Mengekstrak substansi jawaban...</p></div>
           </div>
-          <div className="relative w-full max-w-md bg-neutral-50 border border-neutral-200 rounded-xl shadow-inner p-6 text-left overflow-hidden">
+          <div className="relative w-full max-w-md bg-neutral-50 border-2 border-neutral-300 rounded-xl shadow-inner p-6 text-left overflow-hidden">
             <div className="w-1/3 h-3 bg-neutral-300 rounded mb-4" />
             <div className="space-y-4">
               <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-neutral-300 shrink-0" /><div className="h-2.5 bg-neutral-200 rounded w-full flex items-center relative"><div className="absolute left-[15%] w-[25%] h-3 bg-neutral-300 rounded animate-gcPopWord1 origin-left" /></div></div>
@@ -303,8 +303,8 @@ function ResultView({ result, onBack }: { result: AssessmentResult; onBack: () =
             <span className="font-display text-4xl font-extrabold text-neutral-900">{score}%</span>
             <span className="font-mono text-[9px] font-bold uppercase tracking-widest mt-1" style={{ color: ready ? "#10b981" : "#D9741A" }}>Readiness</span>
           </div>
-          <div className="absolute -top-2 -right-6 bg-white border border-neutral-200 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d1"><CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" /><span className="text-[10px] font-bold text-neutral-800">Kekuatan</span></div>
-          <div className="absolute bottom-4 -left-8 bg-white border border-neutral-200 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d3"><AlertCircle className="w-3.5 h-3.5 text-[#D9741A]" /><span className="text-[10px] font-bold text-neutral-800">Area Gap</span></div>
+          <div className="absolute -top-2 -right-6 bg-white border-2 border-neutral-300 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d1"><CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" /><span className="text-[10px] font-bold text-neutral-800">Kekuatan</span></div>
+          <div className="absolute bottom-4 -left-8 bg-white border-2 border-neutral-300 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d3"><AlertCircle className="w-3.5 h-3.5 text-[#D9741A]" /><span className="text-[10px] font-bold text-neutral-800">Area Gap</span></div>
         </div>
 
         <div className="mt-12 rounded-xl p-5 text-left" style={{ background: ready ? "#ecfdf5" : "#fff7ed", border: `1px solid ${ready ? "#a7f3d0" : "#fed7aa"}` }}>

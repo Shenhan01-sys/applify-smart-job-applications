@@ -127,7 +127,7 @@ function AutomationSettingsPage() {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 isActive
                   ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
-                  : 'bg-black/[4%] text-muted-foreground border border-black/[8%] hover:bg-black/[7%]'
+                  : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -190,7 +190,7 @@ function AutomationSettingsPage() {
                     value={settings.cover_letter || ''}
                     onChange={(e) => updateField('cover_letter', e.target.value)}
                     placeholder="Template cover letter default kamu..."
-                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
                   />
                 </div>
               </div>
@@ -296,7 +296,7 @@ function InputField({ label, value, onChange, type = 'text', placeholder = '', i
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
       />
     </div>
   );
@@ -309,7 +309,7 @@ function SelectField({ label, value, options, onChange }: any) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
       >
         {options.map((opt: any) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -424,7 +424,7 @@ function AITierDisplay() {
           {currentModels.models.map((m, i) => (
             <div 
               key={m.name}
-              className="rounded-xl border border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all"
+              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all"
               style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
             >
               <div className="flex items-center justify-between">
@@ -451,7 +451,7 @@ function AITierDisplay() {
       </div>
       
       {/* Note */}
-      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+      <div className="rounded-xl bg-amber-50 border-2 border-amber-200 p-4 flex items-start gap-3">
         <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium text-amber-800">Catatan</p>

@@ -132,7 +132,7 @@ function LoginPage() {
           <button
             onClick={handleGoogleAuth}
             disabled={googleLoading}
-            className="w-full h-12 rounded-xl border border-black/[12%] bg-white text-[#161616] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full h-12 rounded-xl border-2 border-black/[12%] bg-white text-[#161616] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
           >
             {googleLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -162,7 +162,7 @@ function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@email.com"
                   required
-                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  className="w-full h-11 pl-10 pr-4 rounded-xl border-2 border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
               </div>
             </div>
@@ -178,7 +178,7 @@ function LoginPage() {
                   placeholder={isSignUp ? "Minimal 6 karakter" : "Masukkan password"}
                   required
                   minLength={6}
-                  className="w-full h-11 pl-10 pr-10 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  className="w-full h-11 pl-10 pr-10 rounded-xl border-2 border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
                 <button
                   type="button"
@@ -191,12 +191,12 @@ function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              <div className="rounded-xl bg-destructive/10 border-2 border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
             {successMsg && (
-              <div className="rounded-xl bg-teal/10 border border-teal/20 p-3 text-sm text-primary">
+              <div className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
                 {successMsg}
               </div>
             )}

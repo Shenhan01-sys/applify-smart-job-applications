@@ -187,7 +187,7 @@ function Navbar({ authLink }: { authLink: string }) {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border border-[color:var(--border)] bg-black/[3%] px-4 text-sm font-medium hover:bg-black/[6%] transition">
+              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border-2 border-[color:var(--border)] bg-black/[3%] px-4 text-sm font-medium hover:bg-black/[6%] transition">
                 Logout
               </button>
               <Link to="/dashboard" className="inline-flex h-9 items-center rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white hover:opacity-90 transition">
@@ -238,7 +238,7 @@ function Hero({ authLink }: { authLink: string }) {
             <Link to={authLink} className="inline-flex h-12 items-center rounded-xl bg-[#16150F] px-6 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition">
               Aktifkan Agen Gratis <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <a href="#cara-kerja" className="inline-flex h-12 items-center rounded-xl border border-[color:var(--border)] bg-white px-6 text-sm font-semibold hover:bg-black/[3%] transition">
+            <a href="#cara-kerja" className="inline-flex h-12 items-center rounded-xl border-2 border-[color:var(--border)] bg-white px-6 text-sm font-semibold hover:bg-black/[3%] transition">
               Lihat Cara Kerja →
             </a>
           </div>
@@ -761,7 +761,7 @@ function ProblemSolution() {
                   { n: <>berminggu</>, l: "waktu terbuang menyalin data form yang sama", icon: Clock },
                 ].map((p, i) => (
                   <div key={i} className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-white border border-[color:var(--border)] grid place-items-center text-[#D9741A] shrink-0">
+                    <div className="h-12 w-12 rounded-2xl bg-white border-2 border-[color:var(--border)] grid place-items-center text-[#D9741A] shrink-0">
                       <p.icon className="h-5 w-5" />
                     </div>
                     <div>
@@ -1113,7 +1113,7 @@ function CapabilitiesBento() {
                 { c: "Tokopedia", ats: "Lever", m: 74 },
                 { c: "Shopee", ats: "Greenhouse", m: 92 },
               ].map((row) => (
-                <div key={row.c} className="rounded-xl border border-[color:var(--border)] bg-[#FBF9F2] p-3">
+                <div key={row.c} className="rounded-xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-3">
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <p className="font-semibold">{row.c}</p>
@@ -1229,7 +1229,7 @@ function ImpactPillars() {
 
 function PillarCard({ tone, tag, title, points, icon: Icon }: { tone: string; tag: string; title: string; points: string[]; icon: any }) {
   return (
-    <div className="rounded-3xl border border-[color:var(--border)] bg-[#FBF9F2] p-7">
+    <div className="rounded-3xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-7">
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 rounded-2xl grid place-items-center text-white" style={{ background: tone }}>
           <Icon className="h-6 w-6" />
@@ -1257,7 +1257,7 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
   return (
     <ScrollReveal>
       <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
-        <div className="relative overflow-hidden rounded-3xl border border-[color:var(--border)] text-white p-8 md:p-12" style={{ background: "linear-gradient(135deg, #1C9656 0%, #0F6B3D 100%)" }}>
+        <div className="relative overflow-hidden rounded-3xl border-2 border-[color:var(--border)] text-white p-8 md:p-12" style={{ background: "linear-gradient(135deg, #1C9656 0%, #0F6B3D 100%)" }}>
           <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-[#D2F801]/20 blur-3xl" aria-hidden="true" />
           <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
             <div>
@@ -1335,7 +1335,7 @@ function Testimonials() {
                 ))}
               </div>
               <p className="text-sm leading-relaxed text-foreground/80 flex-1">"{r.quote}"</p>
-              <div className="rounded-xl border border-[color:var(--border)] bg-[#FBF9F2] p-2.5 text-xs font-semibold font-mono" style={{ color: r.tone }}>
+              <div className="rounded-xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-2.5 text-xs font-semibold font-mono" style={{ color: r.tone }}>
                 📈 {r.stat}
               </div>
               <div className="flex items-center gap-3 mt-1 border-t border-[color:var(--border)] pt-4">
@@ -1385,7 +1385,7 @@ function Pricing({ authLink }: { authLink: string }) {
                   </li>
                 ))}
               </ul>
-              <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}>
+              <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}>
                 {t.name === "Free" ? "Mulai Gratis" : t.name === "Kampus" ? "Hubungi Kami" : "Pilih Paket"}
               </Link>
             </div>
@@ -1415,7 +1415,7 @@ function BehindApplify() {
               { icon: BadgeCheck, t: "Produk nyata", d: "Bukan sekadar prototipe — AI & otomasi sudah berjalan." },
               { icon: Globe, t: "Fokus Indonesia", d: "Dirancang untuk pasar & platform kerja lokal." },
             ].map((c) => (
-              <div key={c.t} className="rounded-2xl border border-[color:var(--border)] bg-[#FBF9F2] p-6">
+              <div key={c.t} className="rounded-2xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-6">
                 <div className="mx-auto h-11 w-11 rounded-xl bg-[#16150F] grid place-items-center text-[#D2F801]">
                   <c.icon className="h-5 w-5" />
                 </div>
@@ -1489,7 +1489,7 @@ function Footer() {
 function MobileStickyBar({ authLink }: { authLink: string }) {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong px-4 py-3 flex gap-2">
-      <Link to={authLink} className="flex-1 h-11 rounded-xl border border-[color:var(--border)] bg-white grid place-items-center text-sm font-semibold hover:bg-black/[3%] transition">Masuk</Link>
+      <Link to={authLink} className="flex-1 h-11 rounded-xl border-2 border-[color:var(--border)] bg-white grid place-items-center text-sm font-semibold hover:bg-black/[3%] transition">Masuk</Link>
       <Link to={authLink} className="flex-[2] h-11 rounded-xl bg-[#16150F] grid place-items-center text-sm font-semibold text-[#F4F1E8] hover:bg-black transition">Aktifkan Agen Gratis</Link>
     </div>
   );

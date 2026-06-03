@@ -155,7 +155,7 @@ function LinkedInSessionPage() {
                   <button
                     onClick={handleVerify}
                     disabled={verifying}
-                    className="h-9 px-3 rounded-lg border border-black/[8%] bg-white text-xs font-medium hover:bg-black/[4%] transition inline-flex items-center gap-1.5"
+                    className="h-9 px-3 rounded-lg border-2 border-black/[8%] bg-white text-xs font-medium hover:bg-black/[4%] transition inline-flex items-center gap-1.5"
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${verifying ? 'animate-spin' : ''}`} />
                     {verifying ? 'Verifying...' : 'Verify'}
@@ -199,7 +199,7 @@ function LinkedInSessionPage() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                       activeTab === tab.key
                         ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
-                        : 'bg-black/[4%] text-muted-foreground border border-black/[8%] hover:bg-black/[7%]'
+                        : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
                     }`}
                   >
                     <Icon className="h-4 w-4" /> {tab.label}
@@ -215,7 +215,7 @@ function LinkedInSessionPage() {
                   <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cookies JSON</label>
                   <textarea
                     rows={6}
-                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
                     placeholder={`Paste cookies di sini dalam format JSON:\n[\n  {"name": "li_at", "value": "...", "domain": ".linkedin.com"}\n]`}
                     value={cookiesJson}
                     onChange={(e) => setCookiesJson(e.target.value)}
@@ -242,7 +242,7 @@ function LinkedInSessionPage() {
                   <li>Cari dan copy cookies: <code>li_at</code>, <code>JSESSIONID</code>, <code>bcookie</code></li>
                   <li>Paste dalam format JSON di tab Manual Import</li>
                 </ol>
-                <div className="mt-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800">
+                <div className="mt-3 p-3 rounded-xl bg-blue-50 border-2 border-blue-200 text-blue-800">
                   <p className="font-medium text-xs">Catatan Keamanan</p>
                   <p className="text-[11px] mt-1 opacity-80">
                     Cookies dienkripsi sebelum disimpan dan tidak pernah dibagikan. Kamu bisa mencabut akses kapan saja dengan logout dari LinkedIn di browser.
@@ -270,7 +270,7 @@ function LinkedInSessionPage() {
                 return (
                   <div 
                     key={i} 
-                    className="flex items-start gap-3 p-3 rounded-xl bg-black/[2%] border border-black/[6%] hover:border-black/[10%] transition-all"
+                    className="flex items-start gap-3 p-3 rounded-xl bg-black/[2%] border-2 border-black/[6%] hover:border-black/[10%] transition-all"
                     style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.08}s both` }}
                   >
                     <Icon className={`h-5 w-5 ${item.color} shrink-0 mt-0.5`} />

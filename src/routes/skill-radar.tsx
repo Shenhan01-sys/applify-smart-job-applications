@@ -100,7 +100,7 @@ function SkillPage() {
       </header>
 
       {!real && (
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-dashed border-[#D9741A]/40 bg-[#D9741A]/[6%] p-4">
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#D9741A]/55 bg-[#D9741A]/[10%] p-4">
           <AlertTriangle className="h-5 w-5 text-[#D9741A] shrink-0" />
           <p className="text-sm text-foreground/80">Radar masih ilustratif. <Link to="/profile" className="text-[#0A5BE0] font-semibold">Lengkapi skill di Profil</Link> agar memetakan kemampuan aslimu.</p>
         </div>
@@ -182,7 +182,7 @@ function ActionableInsights({ data }: { data: SkillAxis[] }) {
   return (
     <div className="w-full flex flex-col gap-6">
       <div className="opacity-0 animate-srSlideUp" style={{ animationDelay: "300ms" }}>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-[#D9741A]/20 text-[#D9741A] font-mono text-[10px] font-bold uppercase tracking-widest shadow-sm mb-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-100 border-2 border-[#D9741A]/45 text-[#D9741A] font-mono text-[10px] font-bold uppercase tracking-widest shadow-sm mb-3">
           <Activity className="w-3.5 h-3.5" /> Market Divergence
         </div>
         <h3 className="font-display text-2xl md:text-3xl font-bold text-neutral-900 leading-tight">
@@ -198,7 +198,7 @@ function ActionableInsights({ data }: { data: SkillAxis[] }) {
           const diff = gap.marketDemand - gap.userLevel;
           const { course, provider } = courseFor(gap.name);
           return (
-            <div key={gap.id} className="group bg-white border border-neutral-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-[#0A5BE0]/30 transition-all duration-300 opacity-0 animate-srSlideUp" style={{ animationDelay: `${500 + index * 200}ms` }}>
+            <div key={gap.id} className="group bg-white border-2 border-neutral-300 rounded-[1.5rem] p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-[#0A5BE0]/30 transition-all duration-300 opacity-0 animate-srSlideUp" style={{ animationDelay: `${500 + index * 200}ms` }}>
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h4 className="font-display font-bold text-neutral-900 text-lg">{gap.name}</h4>

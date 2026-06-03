@@ -366,7 +366,7 @@ function JobsPage() {
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
               userTier === "pro" 
                 ? "bg-[#D2F801] text-[#161616]" 
-                : "bg-[#F5F5F5] text-muted-foreground border border-[#999999]"
+                : "bg-[#F5F5F5] text-muted-foreground border-2 border-[#999999]"
             }`}>
               {userTier === "pro" ? <Crown className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
               {userTier === "pro" ? "PRO" : "FREE"}

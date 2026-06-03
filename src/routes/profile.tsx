@@ -206,7 +206,7 @@ function ProfilePage() {
                         ? 'bg-[#0367FC] text-white shadow-lg scale-110' 
                         : isCompleted 
                           ? 'bg-[#0367FC]/20 text-[#0367FC] border-2 border-[#0367FC]' 
-                          : 'bg-black/[4%] text-muted-foreground border border-black/[8%]'
+                          : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%]'
                     }`}
                     style={isActive ? { animation: 'pulse-ring 2s infinite' } : {}}
                   >
@@ -266,7 +266,7 @@ function ProfilePage() {
             <button 
               onClick={() => changeStep(step - 1, 'prev')} 
               disabled={step === 1}
-              className="h-11 px-5 rounded-xl border border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              className="h-11 px-5 rounded-xl border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
               <ChevronLeft className="h-4 w-4" /> Kembali
             </button>
@@ -275,7 +275,7 @@ function ProfilePage() {
               <button 
                 onClick={handleSave} 
                 disabled={saving} 
-                className="h-11 px-5 rounded-xl border border-[#0367FC]/30 bg-[#0367FC]/5 text-[#0367FC] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0367FC]/10 transition disabled:opacity-60"
+                className="h-11 px-5 rounded-xl border-2 border-[#0367FC]/30 bg-[#0367FC]/5 text-[#0367FC] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0367FC]/10 transition disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Simpan
@@ -317,7 +317,7 @@ function ProfilePage() {
             </button>
           </div>
           
-          <div className="rounded-xl bg-black/[4%] border border-black/[8%] p-5 text-sm space-y-4 overflow-y-auto max-h-[600px]">
+          <div className="rounded-xl bg-black/[4%] border-2 border-black/[8%] p-5 text-sm space-y-4 overflow-y-auto max-h-[600px]">
             {/* Header */}
             <div className={`pb-4 border-b border-black/[8%] transition-all duration-500 ${blind ? 'opacity-30 blur-[2px]' : ''}`}>
               <div className="flex items-center gap-3">
@@ -392,7 +392,7 @@ function ProfilePage() {
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {certs.map((c, i) => (
-                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">
+                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
                     {c.name}
                   </span>
                 ))}
@@ -401,7 +401,7 @@ function ProfilePage() {
 
             {/* Blind Mode Notice */}
             {blind && (
-              <div className="mt-3 p-3 rounded-lg bg-violet-50 border border-violet-200 animate-[fadeInUp_0.4s_ease-out]">
+              <div className="mt-3 p-3 rounded-lg bg-violet-50 border-2 border-violet-200 animate-[fadeInUp_0.4s_ease-out]">
                 <p className="text-xs text-violet-700 font-medium">Blind Mode Aktif</p>
                 <p className="text-[10px] text-violet-600 mt-0.5">Nama institusi & latar belakang sosial disembunyikan. Skill diprioritaskan.</p>
               </div>
@@ -409,7 +409,7 @@ function ProfilePage() {
           </div>
           
           <div className="mt-4 flex gap-2">
-            <button className="flex-1 h-10 rounded-lg border border-black/[8%] bg-black/[4%] text-sm inline-flex items-center justify-center gap-2 hover:bg-black/[7%] transition hover:-translate-y-0.5">
+            <button className="flex-1 h-10 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm inline-flex items-center justify-center gap-2 hover:bg-black/[7%] transition hover:-translate-y-0.5">
               <Download className="h-4 w-4"/> Unduh PDF
             </button>
             <button className="flex-1 h-10 rounded-lg bg-[#D2F801] text-[#161616] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:brightness-95 transition hover:-translate-y-0.5 shadow-sm">
@@ -457,7 +457,7 @@ function Step1Basic({ formData, setFormData }: {
               value={formData[field.key] || ''}
               onChange={(e) => setFormData({...formData, [field.key]: field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value})}
               placeholder={field.placeholder}
-              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all duration-200 hover:border-black/[12%]"
+              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all duration-200 hover:border-black/[12%]"
             />
           </div>
         );
@@ -472,7 +472,7 @@ function Step2Experience({ workExps }: { workExps: any[] }) {
       {workExps.map((exp, i) => (
         <div 
           key={exp.id} 
-          className="rounded-xl border border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 hover:bg-[#0367FC]/[2%] transition-all duration-300 group"
+          className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 hover:bg-[#0367FC]/[2%] transition-all duration-300 group"
           style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
         >
           <div className="flex items-start justify-between">
@@ -527,7 +527,7 @@ function Step3Education({ educations, userSkills }: { educations: any[], userSki
           {educations.map((edu, i) => (
             <div 
               key={edu.id} 
-              className="rounded-xl border border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all duration-300"
+              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all duration-300"
               style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
             >
               <div className="flex items-center gap-3">
@@ -611,7 +611,7 @@ function Step4Preferences({ preferences, setPreferences }: {
                   onChange={(e) => setPreferences({...preferences, [field.key]: parseInt(e.target.value) || 0})}
                   min={field.min}
                   step={field.step}
-                  className={`w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
+                  className={`w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
                 />
               </div>
             </div>
@@ -672,7 +672,7 @@ function Step4Preferences({ preferences, setPreferences }: {
           value={preferences.search_location}
           onChange={(e) => setPreferences({...preferences, search_location: e.target.value})}
           placeholder="Contoh: Jakarta, Singapore, Remote"
-          className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all"
+          className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all"
         />
       </div>
     </div>
@@ -684,7 +684,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
     <div className="space-y-5">
       {/* Profile Summary */}
       <div 
-        className="rounded-xl bg-[#0367FC]/5 border border-[#0367FC]/20 p-4"
+        className="rounded-xl bg-[#0367FC]/5 border-2 border-[#0367FC]/20 p-4"
         style={{ animation: `fadeInUp 0.4s ease-out 0s both` }}
       >
         <div className="flex items-center gap-3">
@@ -709,7 +709,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
           return (
             <div 
               key={stat.label}
-              className={`rounded-xl ${stat.bg} border border-black/[6%] p-3 text-center transition-all duration-300 hover:scale-105 hover:shadow-sm`}
+              className={`rounded-xl ${stat.bg} border-2 border-black/[6%] p-3 text-center transition-all duration-300 hover:scale-105 hover:shadow-sm`}
               style={{ animation: `fadeInUp 0.4s ease-out ${0.1 + i * 0.1}s both` }}
             >
               <Icon className={`h-5 w-5 mx-auto ${stat.color} mb-1`} />
@@ -722,7 +722,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
 
       {/* Preferences Summary */}
       <div 
-        className="rounded-xl border border-black/[8%] bg-black/[2%] p-4 space-y-2"
+        className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 space-y-2"
         style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -754,7 +754,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
 
       {/* Completion Message */}
       <div 
-        className="rounded-xl bg-green-50 border border-green-200 p-4 text-center"
+        className="rounded-xl bg-green-50 border-2 border-green-200 p-4 text-center"
         style={{ animation: `fadeInUp 0.5s ease-out 0.6s both` }}
       >
         <div className="h-12 w-12 rounded-full bg-green-100 text-green-600 grid place-items-center mx-auto mb-2">

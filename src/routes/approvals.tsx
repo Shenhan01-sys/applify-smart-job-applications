@@ -144,7 +144,7 @@ function ApprovalsPage() {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
-                  : 'bg-black/[4%] text-muted-foreground border border-black/[8%] hover:bg-black/[7%]'
+                  : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -202,7 +202,7 @@ function ApprovalsPage() {
                         <StatusIcon className="h-3 w-3" />
                         {request.status}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border border-black/[6%]">
+                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
                         <Sparkles className="h-3 w-3" />
                         {request.platform}
                       </span>
@@ -219,7 +219,7 @@ function ApprovalsPage() {
                       </span>
                     </div>
                     {request.rejection_reason && (
-                      <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">
+                      <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg border-2 border-red-100">
                         Alasan: {request.rejection_reason}
                       </p>
                     )}

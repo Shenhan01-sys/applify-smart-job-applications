@@ -23,7 +23,7 @@ export const Route = createFileRoute("/settings")({
           { icon: Chrome, title: "Browser Extension", desc: "Install ekstensi agar agen bisa mengirim lamaran atas nama kamu di 7 platform.", color: "#0367FC", children: (
             <div className="flex flex-wrap gap-2 mt-4">
               <button className="h-10 px-4 rounded-lg bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition shadow-lg shadow-[#0367FC]/20 hover:-translate-y-0.5">Install untuk Chrome</button>
-              <button className="h-10 px-4 rounded-lg border border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">Install untuk Firefox</button>
+              <button className="h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">Install untuk Firefox</button>
             </div>
           )},
           { icon: Bell, title: "Notifikasi", desc: "Atur kapan kamu ingin diberi tahu.", color: "#D2F801", children: (
@@ -39,12 +39,12 @@ export const Route = createFileRoute("/settings")({
             </div>
           )},
           { icon: CreditCard, title: "Billing", desc: "Plan kamu saat ini: Pro · Rp 69.000/bulan, perpanjang otomatis.", color: "#059669", children: (
-            <button className="mt-4 h-10 px-4 rounded-lg border border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
+            <button className="mt-4 h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
               <CreditCard className="h-4 w-4" /> Kelola Tagihan
             </button>
           )},
           { icon: Lock, title: "Privasi & Keamanan", desc: "Kontrol siapa yang melihat data kamu.", color: "#6366F1", children: (
-            <button className="mt-4 h-10 px-4 rounded-lg border border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
+            <button className="mt-4 h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
               <Lock className="h-4 w-4" /> Ekspor Data
             </button>
           )},

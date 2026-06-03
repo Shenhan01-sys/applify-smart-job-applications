@@ -153,9 +153,9 @@ function DashboardPage() {
                 {applications.map((a, i) => {
                   const st = statusStyle(a.status);
                   return (
-                    <div key={a.id || i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-neutral-100 bg-neutral-50/50 hover:bg-white hover:shadow-md hover:scale-[1.01] transition-all duration-300 gap-4">
+                    <div key={a.id || i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border-2 border-neutral-200 bg-neutral-50/50 hover:bg-white hover:shadow-md hover:scale-[1.01] transition-all duration-300 gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white border border-neutral-200 rounded-xl flex items-center justify-center shrink-0 shadow-sm"><Bot className="w-5 h-5 text-neutral-600" /></div>
+                        <div className="w-10 h-10 bg-white border-2 border-neutral-300 rounded-xl flex items-center justify-center shrink-0 shadow-sm"><Bot className="w-5 h-5 text-neutral-600" /></div>
                         <div>
                           <p className="font-display font-bold text-neutral-900 text-sm">{a.role_title || "—"}</p>
                           <p className="font-sans text-xs text-neutral-500 mt-0.5">{a.company_name} <span className="mx-1">•</span> {relTime(a.applied_at)}</p>
@@ -184,14 +184,14 @@ function DashboardPage() {
               </div>
             </Link>
             <Link to="/green-career" className="w-full flex items-center gap-4 p-4 glass-solid rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-emerald-300 group">
-              <div className="w-10 h-10 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500"><Leaf className="w-5 h-5" /></div>
+              <div className="w-10 h-10 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500"><Leaf className="w-5 h-5" /></div>
               <div className="text-left">
                 <p className="font-display font-bold text-neutral-900 text-sm">Green Career</p>
                 <p className="font-sans text-xs text-neutral-500 mt-0.5 group-hover:text-neutral-700 transition-colors">Filter loker ber-ESG tinggi</p>
               </div>
             </Link>
             <Link to="/automation-settings" className="w-full flex items-center gap-4 p-4 glass-solid rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-neutral-400 group">
-              <div className="w-10 h-10 bg-neutral-50 border border-neutral-200 text-neutral-600 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-neutral-900 group-hover:text-white group-hover:border-neutral-900"><Settings className="w-5 h-5" /></div>
+              <div className="w-10 h-10 bg-neutral-50 border-2 border-neutral-300 text-neutral-600 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-neutral-900 group-hover:text-white group-hover:border-neutral-900"><Settings className="w-5 h-5" /></div>
               <div className="text-left">
                 <p className="font-display font-bold text-neutral-900 text-sm">Pengaturan Agen</p>
                 <p className="font-sans text-xs text-neutral-500 mt-0.5 group-hover:text-neutral-700 transition-colors">Ubah kriteria otomatisasi</p>
@@ -214,11 +214,11 @@ function MissionControlStage({ sent, atsPassed, callback }: { sent: number; atsP
       <div className="relative z-20 flex flex-col items-center group">
         <div className="relative animate-dbBotIdle transition-transform duration-500 group-hover:-translate-y-2">
           <div className="absolute -inset-4 border border-[#A3E635]/30 rounded-full animate-dbSpinSlow" />
-          <div className="absolute -inset-8 border border-neutral-200/80 rounded-full animate-dbSpinSlowRev" />
+          <div className="absolute -inset-8 border-2 border-neutral-300/80 rounded-full animate-dbSpinSlowRev" />
           <div className="w-20 h-20 bg-[#16150F] rounded-2xl border-2 border-neutral-800 shadow-[0_10px_30px_rgba(0,0,0,0.15)] flex items-center justify-center text-[#A3E635] relative z-10 transition-shadow duration-300 group-hover:shadow-[0_15px_40px_rgba(163,230,53,0.3)]">
             <Bot className="w-8 h-8 transition-transform duration-300 group-hover:scale-110" />
           </div>
-          <div className="absolute -top-3 -right-6 bg-white border border-neutral-200 px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-20">
+          <div className="absolute -top-3 -right-6 bg-white border-2 border-neutral-300 px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-20">
             <span className="relative flex h-2 w-2">
               <span className="animate-dbPingSubtle absolute inline-flex h-full w-full rounded-full bg-[#A3E635] opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#A3E635]" />

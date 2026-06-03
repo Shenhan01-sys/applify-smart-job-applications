@@ -32,6 +32,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
@@ -92,8 +93,9 @@
   --destructive: #C0341A;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(22, 21, 15, 0.14);
-  --input: rgba(22, 21, 15, 0.18);
+  --border: rgba(22, 21, 15, 0.22);
+  --border-strong: rgba(22, 21, 15, 0.34);
+  --input: rgba(22, 21, 15, 0.28);
   --ring: #0A5BE0;
 
   /* ── Brand & pilar ── */
@@ -157,7 +159,7 @@
   /* ── Cards — white on paper, warm soft shadow (editorial) ── */
   .glass {
     background: #FFFFFF;
-    border: 1px solid var(--border);
+    border: 2px solid var(--border-strong);
     box-shadow: var(--shadow);
   }
   .glass-strong {
@@ -529,8 +531,8 @@
 }
 .glass-solid {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border: 2px solid var(--border-strong);
+  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
 }
 .path-flow { stroke-dasharray: 6 4; }
 .animate-dbBotIdle { animation: dbBotIdle 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
