@@ -35,8 +35,8 @@ export const Route = createFileRoute("/applications")({
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: "Draft", color: "bg-[#999999] text-white", icon: FileText },
-  ready: { label: "Ready", color: "bg-[#0367FC] text-white", icon: CheckCircle2 },
-  submitted: { label: "Submitted", color: "bg-[#D2F801] text-[#161616]", icon: Send },
+  ready: { label: "Ready", color: "bg-[#0A5BE0] text-white", icon: CheckCircle2 },
+  submitted: { label: "Submitted", color: "bg-[#D2F801] text-[#16150F]", icon: Send },
   follow_up: { label: "Follow-up", color: "bg-[#F59E0B] text-white", icon: Mail },
   responded: { label: "Responded", color: "bg-green-500 text-white", icon: CheckCircle2 },
   closed: { label: "Closed", color: "bg-[#999999] text-white", icon: X },
@@ -56,13 +56,13 @@ function DraggableKanbanCard({ app, onClick }: { app: AIApplicationData; onClick
           // Only trigger click if not dragging
           if (!isDragging) onClick();
         }}
-        className="rounded-xl bg-[#F5F5F5] border border-[#E0E0E0] p-3 cursor-pointer hover:border-[#0367FC] hover:shadow-md transition relative"
+        className="rounded-xl bg-[#F5F5F5] border border-[#E0E0E0] p-3 cursor-pointer hover:border-[#0A5BE0] hover:shadow-md transition relative"
       >
-        <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0367FC]/10 text-[#0367FC] grid place-items-center opacity-0 group-hover:opacity-100 transition">
+        <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
           <GripVertical className="h-3 w-3" />
         </div>
         <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-[#0367FC]" />
+          <Bot className="h-4 w-4 text-[#0A5BE0]" />
           <p className="text-sm font-semibold truncate">{(app as any).jobs?.title || "Job"}</p>
         </div>
         <p className="text-xs text-muted-foreground mt-1 truncate">{(app as any).jobs?.company || "Company"}</p>
@@ -91,7 +91,7 @@ function DroppableColumn({ status, label, color, apps, children }: {
     <div
       ref={setNodeRef}
       className={`rounded-2xl border-2 p-3 min-h-[400px] transition-colors ${
-        isOver ? 'border-[#0367FC] bg-[#0367FC]/5' : 'border-[#999999] bg-white'
+        isOver ? 'border-[#0A5BE0] bg-[#0A5BE0]/5' : 'border-[#999999] bg-white'
       }`}
     >
       <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${color}`}>
@@ -207,7 +207,7 @@ function AppsPage() {
     return (
       <AppShell>
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
           <span className="ml-3 text-muted-foreground">Memuat aplikasi...</span>
         </div>
       </AppShell>
@@ -230,7 +230,7 @@ function AppsPage() {
             onClick={() => handleViewChange("kanban")}
             className={`hidden md:inline-flex h-10 px-3 rounded-lg items-center gap-2 text-sm border-2 transition ${
               view === "kanban"
-                ? "bg-[#0367FC] text-white border-[#0367FC]"
+                ? "bg-[#0A5BE0] text-white border-[#0A5BE0]"
                 : "border-[#999999] text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -240,7 +240,7 @@ function AppsPage() {
             onClick={() => handleViewChange("list")}
             className={`h-10 px-3 rounded-lg inline-flex items-center gap-2 text-sm border-2 transition ${
               view === "list"
-                ? "bg-[#0367FC] text-white border-[#0367FC]"
+                ? "bg-[#0A5BE0] text-white border-[#0A5BE0]"
                 : "border-[#999999] text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -304,7 +304,7 @@ function AppsPage() {
           </div>
           <DragOverlay>
             {activeDragApp ? (
-              <div className="rounded-xl bg-white border-2 border-[#0367FC] p-3 shadow-lg rotate-2">
+              <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
                 <p className="text-sm font-semibold">{(activeDragApp as any).jobs?.title || "Job"}</p>
                 <p className="text-xs text-muted-foreground">{(activeDragApp as any).jobs?.company || "Company"}</p>
               </div>
@@ -321,10 +321,10 @@ function AppsPage() {
               <div
                 key={app.id}
                 onClick={() => { setSelectedApp(app); setShowDetail(true); }}
-                className="rounded-xl border-2 border-[#999999] bg-white p-4 flex items-center gap-4 cursor-pointer hover:border-[#0367FC] transition"
+                className="rounded-xl border-2 border-[#999999] bg-white p-4 flex items-center gap-4 cursor-pointer hover:border-[#0A5BE0] transition"
               >
-                <div className="h-10 w-10 rounded-lg bg-[#0367FC]/10 grid place-items-center shrink-0">
-                  <Bot className="h-5 w-5 text-[#0367FC]" />
+                <div className="h-10 w-10 rounded-lg bg-[#0A5BE0]/10 grid place-items-center shrink-0">
+                  <Bot className="h-5 w-5 text-[#0A5BE0]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">
@@ -358,7 +358,7 @@ function AppsPage() {
           <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl border-2 border-[#999999] overflow-hidden flex flex-col">
             <div className="p-5 border-b border-[#E0E0E0] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Bot className="h-5 w-5 text-[#0367FC]" />
+                <Bot className="h-5 w-5 text-[#0A5BE0]" />
                 <div>
                   <h3 className="font-bold">{(selectedApp as any).jobs?.title || "Application"}</h3>
                   <p className="text-sm text-muted-foreground">{(selectedApp as any).jobs?.company || "Company"}</p>
@@ -366,7 +366,7 @@ function AppsPage() {
               </div>
               <button
                 onClick={() => setShowDetail(false)}
-                className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
+                className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -386,7 +386,7 @@ function AppsPage() {
 
               <div>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  <FileText className="h-4 w-4 text-[#0367FC]" />
+                  <FileText className="h-4 w-4 text-[#0A5BE0]" />
                   AI Cover Letter
                 </h4>
                 <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap leading-relaxed">
@@ -397,12 +397,12 @@ function AppsPage() {
               {selectedApp.tailored_skills?.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-[#0367FC]" />
+                    <Zap className="h-4 w-4 text-[#0A5BE0]" />
                     Tailored Skills
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedApp.tailored_skills.map((skill, i) => (
-                      <span key={i} className="text-xs bg-[#0367FC]/10 text-[#0367FC] px-2.5 py-1 rounded-full font-medium">
+                      <span key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
                         {skill}
                       </span>
                     ))}
@@ -413,7 +413,7 @@ function AppsPage() {
               {selectedApp.ai_notes && (
                 <div>
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                    <Bot className="h-4 w-4 text-[#0367FC]" />
+                    <Bot className="h-4 w-4 text-[#0A5BE0]" />
                     AI Strategy Notes
                   </h4>
                   <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap">

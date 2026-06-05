@@ -110,7 +110,7 @@ function LoginPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen grid-bg flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
         <span className="ml-3 text-muted-foreground">Memuat...</span>
       </div>
     );
@@ -132,7 +132,7 @@ function LoginPage() {
           <button
             onClick={handleGoogleAuth}
             disabled={googleLoading}
-            className="w-full h-12 rounded-xl border-2 border-black/[12%] bg-white text-[#161616] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full h-12 rounded-xl border-2 border-black/[12%] bg-white text-[#16150F] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
           >
             {googleLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

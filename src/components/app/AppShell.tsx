@@ -193,7 +193,7 @@ function MobileNav({ agentOn, setAgentOn }: { agentOn: boolean; setAgentOn: (v: 
         {items.slice(0,2).map((it) => <NavBtn key={it.to} {...it} active={path===it.to} />)}
         <button onClick={()=>setAgentOn(!agentOn)} className="flex flex-col items-center justify-center -mt-6">
           <div className={`h-14 w-14 rounded-full grid place-items-center ${agentOn?'gradient-success glow-success':'bg-black/[8%] border border-black/[12%]'}`}>
-            <Sparkles className={`h-6 w-6 ${agentOn ? 'text-[#161616]' : 'text-foreground'}`} />
+            <Sparkles className={`h-6 w-6 ${agentOn ? 'text-[#16150F]' : 'text-foreground'}`} />
           </div>
           <span className="text-[10px] mt-1 text-muted-foreground">{agentOn?'Agen ON':'Agen OFF'}</span>
         </button>

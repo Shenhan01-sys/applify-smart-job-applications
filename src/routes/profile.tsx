@@ -203,9 +203,9 @@ function ProfilePage() {
                   <div 
                     className={`relative h-10 w-10 rounded-full grid place-items-center text-sm font-bold transition-all duration-300 ${
                       isActive 
-                        ? 'bg-[#0367FC] text-white shadow-lg scale-110' 
+                        ? 'bg-[#0A5BE0] text-white shadow-lg scale-110' 
                         : isCompleted 
-                          ? 'bg-[#0367FC]/20 text-[#0367FC] border-2 border-[#0367FC]' 
+                          ? 'bg-[#0A5BE0]/20 text-[#0A5BE0] border-2 border-[#0A5BE0]' 
                           : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%]'
                     }`}
                     style={isActive ? { animation: 'pulse-ring 2s infinite' } : {}}
@@ -214,7 +214,7 @@ function ProfilePage() {
                   </div>
                   {i < steps.length - 1 && (
                     <div className={`flex-1 h-1 mx-2 rounded-full transition-all duration-500 ${
-                      isCompleted ? 'bg-[#0367FC]' : 'bg-black/[6%]'
+                      isCompleted ? 'bg-[#0A5BE0]' : 'bg-black/[6%]'
                     }`} />
                   )}
                 </div>
@@ -225,7 +225,7 @@ function ProfilePage() {
           {/* Step Info */}
           <div className="mb-5">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-[#0367FC] font-bold bg-[#0367FC]/10 px-2 py-1 rounded-full">
+              <span className="text-[10px] uppercase tracking-wider text-[#0A5BE0] font-bold bg-[#0A5BE0]/10 px-2 py-1 rounded-full">
                 Langkah {step}/{steps.length}
               </span>
               {step === 5 && (
@@ -275,7 +275,7 @@ function ProfilePage() {
               <button 
                 onClick={handleSave} 
                 disabled={saving} 
-                className="h-11 px-5 rounded-xl border-2 border-[#0367FC]/30 bg-[#0367FC]/5 text-[#0367FC] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0367FC]/10 transition disabled:opacity-60"
+                className="h-11 px-5 rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/10 transition disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Simpan
@@ -284,7 +284,7 @@ function ProfilePage() {
               {step < steps.length ? (
                 <button 
                   onClick={() => changeStep(step + 1, 'next')} 
-                  className="h-11 px-5 rounded-xl bg-[#0367FC] text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0367FC]/90 transition shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5 active:translate-y-0"
+                  className="h-11 px-5 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/90 transition shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Lanjut <ChevronRight className="h-4 w-4" />
                 </button>
@@ -310,7 +310,7 @@ function ProfilePage() {
             <button 
               onClick={() => setBlind(!blind)} 
               className={`text-xs px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 transition-all duration-300 ${
-                blind ? 'border-[#161616] bg-[#161616] text-white' : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:bg-black/[7%]'
+                blind ? 'border-[#16150F] bg-[#16150F] text-white' : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:bg-black/[7%]'
               }`}
             >
               <EyeOff className="h-3.5 w-3.5"/> {blind ? 'Blind On' : 'Blind Mode'}
@@ -321,7 +321,7 @@ function ProfilePage() {
             {/* Header */}
             <div className={`pb-4 border-b border-black/[8%] transition-all duration-500 ${blind ? 'opacity-30 blur-[2px]' : ''}`}>
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-[#0367FC] text-white grid place-items-center text-lg font-bold">
+                <div className="h-12 w-12 rounded-full bg-[#0A5BE0] text-white grid place-items-center text-lg font-bold">
                   {displayName.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -339,12 +339,12 @@ function ProfilePage() {
 
             {/* Skills */}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-[#0367FC] font-bold flex items-center gap-1">
+              <p className="text-[10px] uppercase tracking-wider text-[#0A5BE0] font-bold flex items-center gap-1">
                 <Wrench className="h-3 w-3" /> Skill Utama
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {userSkills.length > 0 ? userSkills.map(s => (
-                  <span key={s.name} className="text-[11px] px-2.5 py-1 rounded-full bg-[#0367FC] text-white font-medium">{s.name}</span>
+                  <span key={s.name} className="text-[11px] px-2.5 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">{s.name}</span>
                 )) : (
                   <span className="text-xs text-muted-foreground">Belum ada skill</span>
                 )}
@@ -412,7 +412,7 @@ function ProfilePage() {
             <button className="flex-1 h-10 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm inline-flex items-center justify-center gap-2 hover:bg-black/[7%] transition hover:-translate-y-0.5">
               <Download className="h-4 w-4"/> Unduh PDF
             </button>
-            <button className="flex-1 h-10 rounded-lg bg-[#D2F801] text-[#161616] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:brightness-95 transition hover:-translate-y-0.5 shadow-sm">
+            <button className="flex-1 h-10 rounded-lg bg-[#D2F801] text-[#16150F] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:brightness-95 transition hover:-translate-y-0.5 shadow-sm">
               <FileCheck2 className="h-4 w-4"/> Test ATS
             </button>
           </div>
@@ -450,14 +450,14 @@ function Step1Basic({ formData, setFormData }: {
             style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.05}s both` }}
           >
             <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-              <Icon className="h-3.5 w-3.5 text-[#0367FC]" /> {field.label}
+              <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" /> {field.label}
             </label>
             <input 
               type={field.type}
               value={formData[field.key] || ''}
               onChange={(e) => setFormData({...formData, [field.key]: field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value})}
               placeholder={field.placeholder}
-              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all duration-200 hover:border-black/[12%]"
+              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%]"
             />
           </div>
         );
@@ -472,12 +472,12 @@ function Step2Experience({ workExps }: { workExps: any[] }) {
       {workExps.map((exp, i) => (
         <div 
           key={exp.id} 
-          className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 hover:bg-[#0367FC]/[2%] transition-all duration-300 group"
+          className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 hover:bg-[#0A5BE0]/[2%] transition-all duration-300 group"
           style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-[#0367FC]/10 text-[#0367FC] grid place-items-center">
+              <div className="h-10 w-10 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center">
                 <Building2 className="h-5 w-5" />
               </div>
               <div>
@@ -508,7 +508,7 @@ function Step2Experience({ workExps }: { workExps: any[] }) {
         </div>
       ))}
       
-      <button className="w-full h-11 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0367FC]/40 hover:text-[#0367FC] hover:bg-[#0367FC]/[2%] transition-all duration-300 inline-flex items-center justify-center gap-2">
+      <button className="w-full h-11 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] hover:bg-[#0A5BE0]/[2%] transition-all duration-300 inline-flex items-center justify-center gap-2">
         <Briefcase className="h-4 w-4" /> Tambah Pengalaman Kerja
       </button>
     </div>
@@ -521,13 +521,13 @@ function Step3Education({ educations, userSkills }: { educations: any[], userSki
       {/* Education Section */}
       <div>
         <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <GraduationCap className="h-4 w-4 text-[#0367FC]" /> Pendidikan
+          <GraduationCap className="h-4 w-4 text-[#0A5BE0]" /> Pendidikan
         </h3>
         <div className="space-y-3">
           {educations.map((edu, i) => (
             <div 
               key={edu.id} 
-              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all duration-300"
+              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 transition-all duration-300"
               style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
             >
               <div className="flex items-center gap-3">
@@ -546,7 +546,7 @@ function Step3Education({ educations, userSkills }: { educations: any[], userSki
             </div>
           ))}
         </div>
-        <button className="mt-3 w-full h-10 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0367FC]/40 hover:text-[#0367FC] transition-all inline-flex items-center justify-center gap-2">
+        <button className="mt-3 w-full h-10 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] transition-all inline-flex items-center justify-center gap-2">
           <GraduationCap className="h-4 w-4" /> Tambah Pendidikan
         </button>
       </div>
@@ -554,7 +554,7 @@ function Step3Education({ educations, userSkills }: { educations: any[], userSki
       {/* Skills Section */}
       <div>
         <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <Wrench className="h-4 w-4 text-[#0367FC]" /> Skills & Keahlian
+          <Wrench className="h-4 w-4 text-[#0A5BE0]" /> Skills & Keahlian
         </h3>
         <div className="flex flex-wrap gap-2">
           {userSkills.map((skill, i) => (
@@ -563,14 +563,14 @@ function Step3Education({ educations, userSkills }: { educations: any[], userSki
               className="group relative"
               style={{ animation: `fadeInUp 0.3s ease-out ${i * 0.03}s both` }}
             >
-              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#0367FC] text-white font-medium hover:bg-[#0367FC]/90 transition-all cursor-default">
+              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#0A5BE0] text-white font-medium hover:bg-[#0A5BE0]/90 transition-all cursor-default">
                 {skill.name}
                 <span className="text-[10px] opacity-70">{skill.proficiency_level}/5</span>
               </span>
             </div>
           ))}
         </div>
-        <button className="mt-3 h-10 px-4 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0367FC]/40 hover:text-[#0367FC] transition-all inline-flex items-center gap-2">
+        <button className="mt-3 h-10 px-4 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] transition-all inline-flex items-center gap-2">
           <Wrench className="h-4 w-4" /> Tambah Skill
         </button>
       </div>
@@ -599,7 +599,7 @@ function Step4Preferences({ preferences, setPreferences }: {
               style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both` }}
             >
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 text-[#0367FC]" /> {field.label}
+                <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" /> {field.label}
               </label>
               <div className="mt-1.5 relative">
                 {field.prefix && (
@@ -611,7 +611,7 @@ function Step4Preferences({ preferences, setPreferences }: {
                   onChange={(e) => setPreferences({...preferences, [field.key]: parseInt(e.target.value) || 0})}
                   min={field.min}
                   step={field.step}
-                  className={`w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
+                  className={`w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
                 />
               </div>
             </div>
@@ -622,7 +622,7 @@ function Step4Preferences({ preferences, setPreferences }: {
       {/* Job Type */}
       <div style={{ animation: `fadeInUp 0.4s ease-out 0.24s both` }}>
         <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <Briefcase className="h-3.5 w-3.5 text-[#0367FC]" /> Tipe Pekerjaan
+          <Briefcase className="h-3.5 w-3.5 text-[#0A5BE0]" /> Tipe Pekerjaan
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {['full-time', 'part-time', 'contract', 'internship'].map((type) => (
@@ -631,7 +631,7 @@ function Step4Preferences({ preferences, setPreferences }: {
               onClick={() => setPreferences({...preferences, job_type: type})}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-all duration-200 ${
                 preferences.job_type === type 
-                  ? 'border-[#0367FC] bg-[#0367FC] text-white shadow-md' 
+                  ? 'border-[#0A5BE0] bg-[#0A5BE0] text-white shadow-md' 
                   : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:border-black/[12%]'
               }`}
             >
@@ -644,7 +644,7 @@ function Step4Preferences({ preferences, setPreferences }: {
       {/* Work Type */}
       <div style={{ animation: `fadeInUp 0.4s ease-out 0.32s both` }}>
         <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-[#0367FC]" /> Model Kerja
+          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" /> Model Kerja
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {['remote', 'hybrid', 'on-site'].map((type) => (
@@ -653,7 +653,7 @@ function Step4Preferences({ preferences, setPreferences }: {
               onClick={() => setPreferences({...preferences, work_type: type})}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-all duration-200 ${
                 preferences.work_type === type 
-                  ? 'border-[#0367FC] bg-[#0367FC] text-white shadow-md' 
+                  ? 'border-[#0A5BE0] bg-[#0A5BE0] text-white shadow-md' 
                   : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:border-black/[12%]'
               }`}
             >
@@ -666,13 +666,13 @@ function Step4Preferences({ preferences, setPreferences }: {
       {/* Location */}
       <div style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}>
         <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-[#0367FC]" /> Lokasi Pencarian
+          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" /> Lokasi Pencarian
         </label>
         <input 
           value={preferences.search_location}
           onChange={(e) => setPreferences({...preferences, search_location: e.target.value})}
           placeholder="Contoh: Jakarta, Singapore, Remote"
-          className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all"
+          className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all"
         />
       </div>
     </div>
@@ -684,11 +684,11 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
     <div className="space-y-5">
       {/* Profile Summary */}
       <div 
-        className="rounded-xl bg-[#0367FC]/5 border-2 border-[#0367FC]/20 p-4"
+        className="rounded-xl bg-[#0A5BE0]/5 border-2 border-[#0A5BE0]/20 p-4"
         style={{ animation: `fadeInUp 0.4s ease-out 0s both` }}
       >
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-[#0367FC] text-white grid place-items-center text-sm font-bold">
+          <div className="h-10 w-10 rounded-full bg-[#0A5BE0] text-white grid place-items-center text-sm font-bold">
             {formData.full_name?.slice(0, 2)?.toUpperCase() || 'U'}
           </div>
           <div>
@@ -703,7 +703,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
         {[
           { label: 'Pengalaman', value: workExps.length, icon: Briefcase, color: 'text-teal-600', bg: 'bg-teal-50' },
           { label: 'Pendidikan', value: educations.length, icon: GraduationCap, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Skills', value: userSkills.length, icon: Wrench, color: 'text-[#0367FC]', bg: 'bg-blue-50' },
+          { label: 'Skills', value: userSkills.length, icon: Wrench, color: 'text-[#0A5BE0]', bg: 'bg-blue-50' },
         ].map((stat, i) => {
           const Icon = stat.icon;
           return (
@@ -726,7 +726,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
         style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Target className="h-4 w-4 text-[#0367FC]" /> Preferensi
+          <Target className="h-4 w-4 text-[#0A5BE0]" /> Preferensi
         </h3>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center gap-2">

@@ -178,12 +178,12 @@ function RadarChart({ skills }: { skills: { name: string; value: number }[] }) {
         <polygon
           points={polyPoints}
           fill="rgba(3, 103, 252, 0.15)"
-          stroke="#0367FC"
+          stroke="#0A5BE0"
           strokeWidth={2}
         />
         {/* Data points */}
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={3} fill="#0367FC" />
+          <circle key={i} cx={p.x} cy={p.y} r={3} fill="#0A5BE0" />
         ))}
         {/* Labels */}
         {skills.map((skill, i) => {
@@ -213,7 +213,7 @@ function RadarChart({ skills }: { skills: { name: string; value: number }[] }) {
 function TimelineItem({ action, isLast }: { action: AIAction; isLast: boolean }) {
   const statusColors = {
     done: "bg-green-500",
-    "in-progress": "bg-[#0367FC] animate-pulse",
+    "in-progress": "bg-[#0A5BE0] animate-pulse",
     pending: "bg-[#E0E0E0]",
   };
 
@@ -259,17 +259,17 @@ function SalaryBar({ current, marketAvg, marketHigh, marketLow }: { current: num
           style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%`, opacity: 0.3 }}
         />
         <div
-          className="absolute top-0 bottom-0 bg-[#0367FC] rounded-full"
+          className="absolute top-0 bottom-0 bg-[#0A5BE0] rounded-full"
           style={{ left: `${avgPct - 0.5}%`, width: "1%" }}
         />
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#0367FC] rounded-full border-2 border-white shadow-md"
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#0A5BE0] rounded-full border-2 border-white shadow-md"
           style={{ left: `${currentPct}%` }}
         />
       </div>
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{formatCurrency(marketLow)}</span>
-        <span className="text-[#0367FC] font-semibold">Market Avg</span>
+        <span className="text-[#0A5BE0] font-semibold">Market Avg</span>
         <span className="text-muted-foreground">{formatCurrency(marketHigh)}</span>
       </div>
     </div>
@@ -305,18 +305,18 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
     { name: "Tools", value: job.skill_matches.find((s) => s.skill.includes("Tools"))?.level || 65 },
   ];
 
-  const matchColor = job.match_score >= 80 ? "#22C55E" : job.match_score >= 60 ? "#0367FC" : "#F59E0B";
-  const acceptanceColor = job.acceptance_potential >= 70 ? "#22C55E" : job.acceptance_potential >= 50 ? "#0367FC" : "#F59E0B";
+  const matchColor = job.match_score >= 80 ? "#22C55E" : job.match_score >= 60 ? "#0A5BE0" : "#F59E0B";
+  const acceptanceColor = job.acceptance_potential >= 70 ? "#22C55E" : job.acceptance_potential >= 50 ? "#0A5BE0" : "#F59E0B";
 
   return (
-    <div className="rounded-2xl border-2 border-[#999999] bg-white overflow-hidden hover:border-[#0367FC] transition-colors">
+    <div className="rounded-2xl border-2 border-[#999999] bg-white overflow-hidden hover:border-[#0A5BE0] transition-colors">
       {/* Header */}
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-lg truncate">{job.title}</h3>
-              <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#161616] px-2 py-0.5 rounded-full font-semibold">
+              <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
                 <Sparkles className="h-3 w-3" />
                 AI Matched
               </span>
@@ -345,10 +345,10 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           <div className="flex items-center gap-2">
             <button
               onClick={onToggleSave}
-              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
+              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
             >
               {isSaved ? (
-                <BookmarkCheck className="h-4 w-4 text-[#0367FC]" />
+                <BookmarkCheck className="h-4 w-4 text-[#0A5BE0]" />
               ) : (
                 <Bookmark className="h-4 w-4 text-[#666666]" />
               )}
@@ -366,7 +366,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
 
         {/* Salary & Platform */}
         <div className="flex items-center justify-between mt-4 text-sm">
-          <div className="inline-flex items-center gap-1.5 text-[#0367FC] font-semibold">
+          <div className="inline-flex items-center gap-1.5 text-[#0A5BE0] font-semibold">
             <DollarSign className="h-4 w-4" />
             {salaryText}
             <span className="text-xs text-muted-foreground font-normal">/{job.salary_period}</span>
@@ -387,9 +387,9 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
       {expanded && (
         <div className="border-t border-[#E0E0E0] p-5 space-y-6">
           {/* AI Strategy */}
-          <div className="rounded-xl bg-[#0367FC]/5 border border-[#0367FC]/20 p-4">
+          <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Brain className="h-4 w-4 text-[#0367FC]" />
+              <Brain className="h-4 w-4 text-[#0A5BE0]" />
               <span className="font-semibold text-sm">AI Strategy</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">{job.ai_strategy}</p>
@@ -399,7 +399,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             {/* Skill Radar */}
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
-                <Target className="h-4 w-4 text-[#0367FC]" />
+                <Target className="h-4 w-4 text-[#0A5BE0]" />
                 Skill Match Analysis
               </h4>
               <RadarChart skills={radarSkills} />
@@ -423,7 +423,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             {/* Salary Benchmark */}
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 text-[#0367FC]" />
+                <TrendingUp className="h-4 w-4 text-[#0A5BE0]" />
                 Salary Benchmark
               </h4>
               {job.salary_min && job.salary_max && job.salary_benchmark && (
@@ -436,7 +436,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
                   />
                   <div className="flex items-center justify-between text-xs bg-[#F5F5F5] p-3 rounded-lg">
                     <span>
-                      <span className="text-[#0367FC] font-bold text-lg">{job.salary_benchmark.percentile}th</span>
+                      <span className="text-[#0A5BE0] font-bold text-lg">{job.salary_benchmark.percentile}th</span>
                       <span className="text-muted-foreground ml-1">percentile</span>
                     </span>
                     <span className="text-muted-foreground">
@@ -451,7 +451,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           {/* AI Action Timeline */}
           <div>
             <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
-              <Bot className="h-4 w-4 text-[#0367FC]" />
+              <Bot className="h-4 w-4 text-[#0A5BE0]" />
               AI Application Plan
             </h4>
             <div className="space-y-0">
@@ -468,7 +468,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
               <ul className="space-y-1.5">
                 {job.requirements.slice(0, 4).map((req, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#0367FC] mt-0.5 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#0A5BE0] mt-0.5 shrink-0" />
                     {req}
                   </li>
                 ))}
@@ -482,7 +482,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
       <div className="border-t border-[#E0E0E0] p-4 flex items-center gap-3">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="h-10 px-4 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0367FC] transition flex items-center gap-1.5"
+          className="h-10 px-4 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition flex items-center gap-1.5"
         >
           {expanded ? (
             <>
@@ -498,7 +498,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
         </button>
         <button
           onClick={onApply}
-          className="flex-1 h-10 rounded-lg bg-[#0367FC] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+          className="flex-1 h-10 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
         >
           <Send className="h-4 w-4" />
           AI Apply Sekarang
@@ -508,7 +508,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             href={job.external_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 w-10 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
+            className="h-10 w-10 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
           >
             <ExternalLink className="h-4 w-4" />
           </a>

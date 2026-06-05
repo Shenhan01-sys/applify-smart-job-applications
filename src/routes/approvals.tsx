@@ -112,7 +112,7 @@ function ApprovalsPage() {
     return (
       <AppShell>
         <div className="flex items-center justify-center h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
         </div>
       </AppShell>
     );
@@ -143,7 +143,7 @@ function ApprovalsPage() {
               onClick={() => handleTabChange(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
+                  ? 'bg-[#0A5BE0] text-white shadow-lg shadow-[#0A5BE0]/20'
                   : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
               }`}
             >
@@ -191,7 +191,7 @@ function ApprovalsPage() {
             return (
               <div
                 key={request.id}
-                className="rounded-2xl border-2 border-[#999999] bg-white p-4 hover:border-[#0367FC]/40 hover:shadow-md transition-all duration-200 group"
+                className="rounded-2xl border-2 border-[#999999] bg-white p-4 hover:border-[#0A5BE0]/40 hover:shadow-md transition-all duration-200 group"
                 style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both` }}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -227,7 +227,7 @@ function ApprovalsPage() {
                   {activeTab === 'pending' && (
                     <button
                       onClick={() => handleReview(request)}
-                      className="h-9 px-4 rounded-lg bg-[#0367FC] text-white text-xs font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"
+                      className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"
                     >
                       Review <ChevronRight className="h-3 w-3" />
                     </button>

@@ -35,7 +35,7 @@ export function AutomationStatusCard() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-[#0367FC]" />
+            <Bot className="h-5 w-5 text-[#0A5BE0]" />
             <CardTitle className="text-base">Automation Status</CardTitle>
           </div>
           <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -119,7 +119,7 @@ export function AutomationStatusCard() {
             <Button
               variant={pending.length > 0 ? 'default' : 'outline'}
               size="sm"
-              className={`w-full text-xs ${pending.length > 0 ? 'bg-[#0367FC]' : ''}`}
+              className={`w-full text-xs ${pending.length > 0 ? 'bg-[#0A5BE0]' : ''}`}
             >
               Review ({pending.length})
             </Button>

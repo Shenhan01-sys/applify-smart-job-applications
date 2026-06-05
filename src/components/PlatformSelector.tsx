@@ -51,7 +51,7 @@ export function PlatformSelector({ selected, onChange }: PlatformSelectorProps) 
     return (
       <Card>
         <CardContent className="py-6 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#0367FC]" />
+          <Loader2 className="h-6 w-6 animate-spin text-[#0A5BE0]" />
         </CardContent>
       </Card>
     )
@@ -61,7 +61,7 @@ export function PlatformSelector({ selected, onChange }: PlatformSelectorProps) 
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Globe className="h-5 w-5 text-[#0367FC]" />
+          <Globe className="h-5 w-5 text-[#0A5BE0]" />
           <CardTitle className="text-base">Job Platforms</CardTitle>
         </div>
       </CardHeader>

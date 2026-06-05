@@ -111,7 +111,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Brain className="h-5 w-5 text-[#0367FC]" />
+            <Brain className="h-5 w-5 text-[#0A5BE0]" />
             <h2 className="text-lg font-bold">AI Job Scanner</h2>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -121,7 +121,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
         <Button
           onClick={startScan}
           disabled={isScanning || selectedPlatforms.length === 0}
-          className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#0367FC] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isScanning || loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -143,7 +143,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
               disabled={isScanning}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
                 selectedPlatforms.includes(platform.id)
-                  ? 'bg-[#0367FC] text-white'
+                  ? 'bg-[#0A5BE0] text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } disabled:opacity-50`}
             >
@@ -159,7 +159,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
           {/* Progress bar */}
           <div className="h-2 bg-[#EFEFEF] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#0367FC] rounded-full transition-all duration-500"
+              className="h-full bg-[#0A5BE0] rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -177,7 +177,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                     !isSelected
                       ? 'border-gray-200 opacity-50'
                       : isScanning && !platformResult
-                      ? 'border-[#0367FC] bg-[#0367FC]/5'
+                      ? 'border-[#0A5BE0] bg-[#0A5BE0]/5'
                       : platformResult
                       ? 'border-[#D2F801] bg-[#D2F801]/10'
                       : 'border-[#E0E0E0]'
@@ -186,12 +186,12 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                   <div className="text-2xl mb-1">{platform.icon}</div>
                   <div className="text-xs font-medium truncate">{platform.name}</div>
                   {platformResult && (
-                    <div className="text-xs text-[#0367FC] font-bold mt-1">
+                    <div className="text-xs text-[#0A5BE0] font-bold mt-1">
                       +{platformResult.jobs.length}
                     </div>
                   )}
                   {isScanning && !platformResult && isSelected && (
-                    <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0367FC]" />
+                    <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0A5BE0]" />
                   )}
                 </div>
               )
@@ -208,7 +208,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                     stage.type === 'success'
                       ? 'text-green-600'
                       : stage.type === 'analysis'
-                      ? 'text-[#0367FC]'
+                      ? 'text-[#0A5BE0]'
                       : stage.type === 'error'
                       ? 'text-red-600'
                       : 'text-[#666666]'
@@ -223,7 +223,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       )}
 
       {totalJobs > 0 && !isScanning && !loading && (
-        <div className="flex items-center justify-center gap-2 py-4 text-[#0367FC] font-semibold">
+        <div className="flex items-center justify-center gap-2 py-4 text-[#0A5BE0] font-semibold">
           <Sparkles className="h-5 w-5" />
           <span>{totalJobs} lowongan berhasil ditemukan!</span>
         </div>

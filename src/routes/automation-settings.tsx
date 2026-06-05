@@ -92,7 +92,7 @@ function AutomationSettingsPage() {
     return (
       <AppShell>
         <div className="flex items-center justify-center h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
         </div>
       </AppShell>
     );
@@ -126,7 +126,7 @@ function AutomationSettingsPage() {
               onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 isActive
-                  ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
+                  ? 'bg-[#0A5BE0] text-white shadow-lg shadow-[#0A5BE0]/20'
                   : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
               }`}
             >
@@ -146,7 +146,7 @@ function AutomationSettingsPage() {
           {activeTab === 'personal' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <User className="h-5 w-5 text-[#0367FC]" /> Personal Information
+                <User className="h-5 w-5 text-[#0A5BE0]" /> Personal Information
               </h2>
               <p className="text-sm text-muted-foreground">Data ini digunakan untuk mengisi form lamaran otomatis</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +165,7 @@ function AutomationSettingsPage() {
           {activeTab === 'answers' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-[#0367FC]" /> Application Answers
+                <FileText className="h-5 w-5 text-[#0A5BE0]" /> Application Answers
               </h2>
               <p className="text-sm text-muted-foreground">Jawaban yang sudah dikonfigurasi untuk pertanyaan umum lamaran</p>
               <div className="space-y-4">
@@ -190,7 +190,7 @@ function AutomationSettingsPage() {
                     value={settings.cover_letter || ''}
                     onChange={(e) => updateField('cover_letter', e.target.value)}
                     placeholder="Template cover letter default kamu..."
-                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all resize-y"
                   />
                 </div>
               </div>
@@ -200,7 +200,7 @@ function AutomationSettingsPage() {
           {activeTab === 'search' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Search className="h-5 w-5 text-[#0367FC]" /> Search Preferences
+                <Search className="h-5 w-5 text-[#0A5BE0]" /> Search Preferences
               </h2>
               <div className="space-y-4">
                 <InputField 
@@ -239,7 +239,7 @@ function AutomationSettingsPage() {
           {activeTab === 'behavior' && (
             <div className="space-y-6">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Settings className="h-5 w-5 text-[#0367FC]" /> Automation Behavior
+                <Settings className="h-5 w-5 text-[#0A5BE0]" /> Automation Behavior
               </h2>
               <ToggleField 
                 label="Pause Before Submit" 
@@ -271,7 +271,7 @@ function AutomationSettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="h-11 px-8 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
+              className="h-11 px-8 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? 'Menyimpan...' : 'Simpan Settings'}
@@ -288,7 +288,7 @@ function InputField({ label, value, onChange, type = 'text', placeholder = '', i
   return (
     <div>
       <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-        {Icon && <Icon className="h-3.5 w-3.5 text-[#0367FC]" />}
+        {Icon && <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" />}
         {label}
       </label>
       <input
@@ -296,7 +296,7 @@ function InputField({ label, value, onChange, type = 'text', placeholder = '', i
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all hover:border-black/[12%]"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all hover:border-black/[12%]"
       />
     </div>
   );
@@ -309,7 +309,7 @@ function SelectField({ label, value, options, onChange }: any) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all appearance-none cursor-pointer"
+        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all appearance-none cursor-pointer"
       >
         {options.map((opt: any) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -328,7 +328,7 @@ function ToggleField({ label, description, checked, onChange }: any) {
       </div>
       <button
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0367FC]' : 'bg-black/[12%]'}`}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0A5BE0]' : 'bg-black/[12%]'}`}
       >
         <span
           className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'left-[22px]' : 'left-0.5'}`}
@@ -352,10 +352,10 @@ function AITierDisplay() {
     },
     pro: { 
       label: 'Pro', 
-      color: 'text-[#0367FC]', 
-      bg: 'bg-[#0367FC]/5', 
-      border: 'border-[#0367FC]/20',
-      badge: 'bg-[#0367FC]/10 text-[#0367FC] border-[#0367FC]/20',
+      color: 'text-[#0A5BE0]', 
+      bg: 'bg-[#0A5BE0]/5', 
+      border: 'border-[#0A5BE0]/20',
+      badge: 'bg-[#0A5BE0]/10 text-[#0A5BE0] border-[#0A5BE0]/20',
       icon: Zap 
     },
     ultimate: { 
@@ -363,7 +363,7 @@ function AITierDisplay() {
       color: 'text-[#D2F801]', 
       bg: 'bg-[#D2F801]/10', 
       border: 'border-[#D2F801]/30',
-      badge: 'bg-[#D2F801]/20 text-[#161616] border-[#D2F801]/30',
+      badge: 'bg-[#D2F801]/20 text-[#16150F] border-[#D2F801]/30',
       icon: Crown 
     },
   };
@@ -399,13 +399,13 @@ function AITierDisplay() {
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-bold flex items-center gap-2">
-        <Brain className="h-5 w-5 text-[#0367FC]" /> AI Settings
+        <Brain className="h-5 w-5 text-[#0A5BE0]" /> AI Settings
       </h2>
       
       {/* Tier Badge */}
       <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-4 flex items-center gap-3`}>
-        <div className={`h-10 w-10 rounded-xl grid place-items-center ${tier === 'ultimate' ? 'bg-[#D2F801]' : 'bg-[#0367FC]'}`}>
-          <TierIcon className={`h-5 w-5 ${tier === 'ultimate' ? 'text-[#161616]' : 'text-white'}`} />
+        <div className={`h-10 w-10 rounded-xl grid place-items-center ${tier === 'ultimate' ? 'bg-[#D2F801]' : 'bg-[#0A5BE0]'}`}>
+          <TierIcon className={`h-5 w-5 ${tier === 'ultimate' ? 'text-[#16150F]' : 'text-white'}`} />
         </div>
         <div>
           <p className="text-sm font-bold">Plan {config.label}</p>
@@ -418,18 +418,18 @@ function AITierDisplay() {
       {/* Model Distribution */}
       <div>
         <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <BarChart3 className="h-4 w-4 text-[#0367FC]" /> Model Distribution
+          <BarChart3 className="h-4 w-4 text-[#0A5BE0]" /> Model Distribution
         </h3>
         <div className="space-y-3">
           {currentModels.models.map((m, i) => (
             <div 
               key={m.name}
-              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0367FC]/30 transition-all"
+              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 transition-all"
               style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-[#0367FC]/10 text-[#0367FC] grid place-items-center text-xs font-bold">
+                  <div className="h-8 w-8 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center text-xs font-bold">
                     {i + 1}
                   </div>
                   <div>
@@ -437,11 +437,11 @@ function AITierDisplay() {
                     <p className="text-xs text-muted-foreground">{m.desc}</p>
                   </div>
                 </div>
-                <span className="text-sm font-mono font-bold text-[#0367FC]">{m.pct}</span>
+                <span className="text-sm font-mono font-bold text-[#0A5BE0]">{m.pct}</span>
               </div>
               <div className="mt-3 h-1.5 bg-black/[5%] rounded-full overflow-hidden">
                 <div 
-                  className="h-full rounded-full bg-[#0367FC] transition-all duration-700"
+                  className="h-full rounded-full bg-[#0A5BE0] transition-all duration-700"
                   style={{ width: m.pct, animation: `fadeInUp 0.6s ease-out ${0.2 + i * 0.1}s both` }}
                 />
               </div>
@@ -461,7 +461,7 @@ function AITierDisplay() {
       
       {/* Upgrade CTA for Free */}
       {tier === 'free' && (
-        <button className="w-full h-11 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center justify-center gap-2 shadow-lg shadow-[#0367FC]/20 hover:-translate-y-0.5">
+        <button className="w-full h-11 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center justify-center gap-2 shadow-lg shadow-[#0A5BE0]/20 hover:-translate-y-0.5">
           <Zap className="h-4 w-4" /> Upgrade ke Pro
         </button>
       )}

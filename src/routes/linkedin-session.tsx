@@ -198,7 +198,7 @@ function LinkedInSessionPage() {
                     onClick={() => handleTabChange(tab.key)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                       activeTab === tab.key
-                        ? 'bg-[#0367FC] text-white shadow-lg shadow-[#0367FC]/20'
+                        ? 'bg-[#0A5BE0] text-white shadow-lg shadow-[#0A5BE0]/20'
                         : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
                     }`}
                   >
@@ -215,7 +215,7 @@ function LinkedInSessionPage() {
                   <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cookies JSON</label>
                   <textarea
                     rows={6}
-                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-3 font-mono text-xs focus:border-[#0367FC]/40 focus:outline-none focus:ring-2 focus:ring-[#0367FC]/10 transition-all resize-y"
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-3 font-mono text-xs focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all resize-y"
                     placeholder={`Paste cookies di sini dalam format JSON:\n[\n  {"name": "li_at", "value": "...", "domain": ".linkedin.com"}\n]`}
                     value={cookiesJson}
                     onChange={(e) => setCookiesJson(e.target.value)}
@@ -224,7 +224,7 @@ function LinkedInSessionPage() {
                 <button
                   onClick={handleImport}
                   disabled={importing || !cookiesJson.trim()}
-                  className="h-10 px-5 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0367FC]/20 hover:shadow-[#0367FC]/30 hover:-translate-y-0.5"
+                  className="h-10 px-5 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
                 >
                   {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                   {importing ? 'Importing...' : 'Import Session'}
@@ -257,12 +257,12 @@ function LinkedInSessionPage() {
         <div className="space-y-5">
           <div className="glass rounded-2xl p-5">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Lock className="h-5 w-5 text-[#0367FC]" /> Informasi Keamanan
+              <Lock className="h-5 w-5 text-[#0A5BE0]" /> Informasi Keamanan
             </h2>
             <div className="space-y-4">
               {[
                 { icon: CheckCircle2, color: 'text-green-500', title: 'Encrypted Storage', desc: 'Session cookies dienkripsi dengan AES-256 sebelum disimpan' },
-                { icon: Shield, color: 'text-[#0367FC]', title: 'User Control', desc: 'Kamu bisa mencabut akses kapan saja dengan logout dari LinkedIn' },
+                { icon: Shield, color: 'text-[#0A5BE0]', title: 'User Control', desc: 'Kamu bisa mencabut akses kapan saja dengan logout dari LinkedIn' },
                 { icon: Clock, color: 'text-amber-500', title: 'Session Expiry', desc: 'Session expired setelah 30 hari dan harus di-import ulang' },
                 { icon: Trash2, color: 'text-red-500', title: 'One-Click Revoke', desc: 'Hapus session kapan saja dari halaman ini' },
               ].map((item, i) => {

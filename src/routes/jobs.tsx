@@ -365,19 +365,19 @@ function JobsPage() {
             {/* Tier Badge */}
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
               userTier === "pro" 
-                ? "bg-[#D2F801] text-[#161616]" 
+                ? "bg-[#D2F801] text-[#16150F]" 
                 : "bg-[#F5F5F5] text-muted-foreground border-2 border-[#999999]"
             }`}>
               {userTier === "pro" ? <Crown className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
               {userTier === "pro" ? "PRO" : "FREE"}
             </span>
             {/* Quota */}
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0367FC]/10 text-[#0367FC] px-3 py-1.5 text-xs font-bold">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] px-3 py-1.5 text-xs font-bold">
               <Target className="h-3.5 w-3.5" />
               {remainingQuota} apply tersisa
             </span>
             {goldenWindows > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#161616] px-3 py-1.5 text-xs font-bold">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#16150F] px-3 py-1.5 text-xs font-bold">
                 <Zap className="h-3.5 w-3.5" /> {goldenWindows} Golden Window
               </span>
             )}
@@ -388,7 +388,7 @@ function JobsPage() {
         <div className="mt-5">
           <button
             onClick={() => setShowScanner(!showScanner)}
-            className="w-full h-12 rounded-xl border-2 border-[#0367FC] bg-[#0367FC]/5 text-[#0367FC] font-semibold text-sm hover:bg-[#0367FC]/10 transition flex items-center justify-center gap-2"
+            className="w-full h-12 rounded-xl border-2 border-[#0A5BE0] bg-[#0A5BE0]/5 text-[#0A5BE0] font-semibold text-sm hover:bg-[#0A5BE0]/10 transition flex items-center justify-center gap-2"
           >
             <Brain className="h-4 w-4" />
             {showScanner ? "Sembunyikan AI Scanner" : "Buka AI Job Scanner"}
@@ -409,10 +409,10 @@ function JobsPage() {
               placeholder="Cari posisi, perusahaan, atau skill..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border-2 border-[#999999] pl-11 pr-4 h-12 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-[#0367FC] bg-white"
+              className="w-full rounded-xl border-2 border-[#999999] pl-11 pr-4 h-12 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-[#0A5BE0] bg-white"
             />
           </div>
-          <button className="h-12 px-5 rounded-xl border-2 border-[#999999] inline-flex items-center gap-2 text-sm hover:border-[#0367FC] transition bg-white">
+          <button className="h-12 px-5 rounded-xl border-2 border-[#999999] inline-flex items-center gap-2 text-sm hover:border-[#0A5BE0] transition bg-white">
             <SlidersHorizontal className="h-4 w-4" /> Filter
           </button>
         </div>
@@ -430,8 +430,8 @@ function JobsPage() {
               onClick={() => setActiveFilter(filter.key)}
               className={`text-xs px-3 py-1.5 rounded-full border-2 transition ${
                 activeFilter === filter.key
-                  ? "bg-[#0367FC] text-white border-[#0367FC]"
-                  : "border-[#999999] text-muted-foreground hover:text-foreground hover:border-[#0367FC]"
+                  ? "bg-[#0A5BE0] text-white border-[#0A5BE0]"
+                  : "border-[#999999] text-muted-foreground hover:text-foreground hover:border-[#0A5BE0]"
               }`}
             >
               {filter.label}
@@ -443,7 +443,7 @@ function JobsPage() {
       {/* Jobs List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0367FC]" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
           <span className="ml-3 text-muted-foreground">Memuat lowongan...</span>
         </div>
       ) : filteredJobs.length > 0 ? (
@@ -474,7 +474,7 @@ function JobsPage() {
             <div className="space-y-3">
               <button
                 onClick={generateMockJobs}
-                className="h-11 px-6 rounded-xl bg-[#0367FC] text-white font-semibold text-sm hover:opacity-90 transition inline-flex items-center gap-2"
+                className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition inline-flex items-center gap-2"
               >
                 <Zap className="h-4 w-4" />
                 Generate Demo Jobs

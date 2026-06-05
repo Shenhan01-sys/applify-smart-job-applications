@@ -175,8 +175,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         {/* Header */}
         <div className="p-5 border-b border-[#E0E0E0] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#0367FC]/10 grid place-items-center">
-              <Bot className="h-5 w-5 text-[#0367FC]" />
+            <div className="h-10 w-10 rounded-xl bg-[#0A5BE0]/10 grid place-items-center">
+              <Bot className="h-5 w-5 text-[#0A5BE0]" />
             </div>
             <div>
               <h2 className="font-bold text-lg">AI Auto-Apply</h2>
@@ -187,14 +187,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
           </div>
           <div className="flex items-center gap-3">
             <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold ${
-              tier === "pro" ? "bg-[#D2F801] text-[#161616]" : "bg-[#F5F5F5] text-muted-foreground"
+              tier === "pro" ? "bg-[#D2F801] text-[#16150F]" : "bg-[#F5F5F5] text-muted-foreground"
             }`}>
               {tier === "pro" ? <Crown className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
               {tier === "pro" ? "PRO" : "FREE"}
             </span>
             <button
               onClick={onClose}
-              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0367FC] transition"
+              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
             >
               <X className="h-4 w-4" />
             </button>
@@ -216,7 +216,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         <div className="flex-1 overflow-y-auto p-5">
           {generating ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#0367FC] mb-3" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" />
               <p className="text-sm text-muted-foreground">
                 {tier === "pro" ? "DeepSeek V4 Pro" : "DeepSeek V4 Flash"} sedang menulis lamaranmu...
               </p>
@@ -228,7 +228,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 <button
                   onClick={generate}
                   disabled={!canApply}
-                  className="h-10 px-4 rounded-lg bg-[#0367FC] text-white text-sm font-semibold disabled:opacity-60"
+                  className="h-10 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold disabled:opacity-60"
                 >
                   Coba lagi
                 </button>
@@ -237,8 +237,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
           ) : !application || !aiGenerated ? (
             /* Pre-generate preview screen */
             <div className="flex flex-col items-center justify-center py-10 text-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-[#0367FC]/10 grid place-items-center">
-                <Sparkles className="h-7 w-7 text-[#0367FC]" />
+              <div className="h-14 w-14 rounded-2xl bg-[#0A5BE0]/10 grid place-items-center">
+                <Sparkles className="h-7 w-7 text-[#0A5BE0]" />
               </div>
               <div className="max-w-md">
                 <h3 className="font-bold text-lg">Generate lamaran dengan AI</h3>
@@ -254,7 +254,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               <button
                 onClick={generate}
                 disabled={!canApply}
-                className="h-11 px-6 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center gap-2"
+                className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center gap-2"
               >
                 <Sparkles className="h-4 w-4" />
                 {canApply ? "Generate dengan AI (1 kuota)" : "Kuota Habis"}
@@ -276,13 +276,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
               {/* AI Scores */}
               <div className="grid grid-cols-4 gap-3">
-                <div className="rounded-xl bg-[#0367FC]/5 border border-[#0367FC]/20 p-3 text-center">
-                  <Target className="h-5 w-5 mx-auto text-[#0367FC] mb-1" />
-                  <div className="text-lg font-bold text-[#0367FC]">{aiGenerated.tailoredSkills?.length || 0}</div>
+                <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-3 text-center">
+                  <Target className="h-5 w-5 mx-auto text-[#0A5BE0] mb-1" />
+                  <div className="text-lg font-bold text-[#0A5BE0]">{aiGenerated.tailoredSkills?.length || 0}</div>
                   <div className="text-xs text-muted-foreground">Skill Match</div>
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
-                  <Sparkles className="h-5 w-5 mx-auto text-[#161616] mb-1" />
+                  <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" />
                   <div className="text-lg font-bold">{matchScore || (tier === "pro" ? 90 : 75)}%</div>
                   <div className="text-xs text-muted-foreground">Match Score</div>
                 </div>
@@ -310,7 +310,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                     onClick={() => setActiveTab(tab.key as any)}
                     className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
                       activeTab === tab.key
-                        ? "border-[#0367FC] text-[#0367FC]"
+                        ? "border-[#0A5BE0] text-[#0A5BE0]"
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -326,13 +326,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium flex items-center gap-1.5">
-                        <Bot className="h-4 w-4 text-[#0367FC]" />
+                        <Bot className="h-4 w-4 text-[#0A5BE0]" />
                         AI-Generated Cover Letter
                       </span>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setIsEditing(!isEditing)}
-                          className="h-8 px-3 rounded-lg border border-[#999999] text-xs font-medium hover:border-[#0367FC] transition flex items-center gap-1"
+                          className="h-8 px-3 rounded-lg border border-[#999999] text-xs font-medium hover:border-[#0A5BE0] transition flex items-center gap-1"
                         >
                           <Edit3 className="h-3 w-3" />
                           {isEditing ? "Batal" : "Edit"}
@@ -340,7 +340,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                         <button
                           onClick={regenerate}
                           disabled={regenerating}
-                          className="h-8 px-3 rounded-lg bg-[#0367FC]/10 text-[#0367FC] text-xs font-medium hover:bg-[#0367FC]/20 transition flex items-center gap-1"
+                          className="h-8 px-3 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] text-xs font-medium hover:bg-[#0A5BE0]/20 transition flex items-center gap-1"
                         >
                           {regenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                           Regenerate (gratis)
@@ -352,11 +352,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                         <textarea
                           value={editedCoverLetter}
                           onChange={(e) => setEditedCoverLetter(e.target.value)}
-                          className="w-full h-64 p-4 rounded-xl border-2 border-[#999999] text-sm resize-none focus:outline-none focus:border-[#0367FC]"
+                          className="w-full h-64 p-4 rounded-xl border-2 border-[#999999] text-sm resize-none focus:outline-none focus:border-[#0A5BE0]"
                         />
                         <button
                           onClick={handleSaveEdit}
-                          className="h-9 px-4 rounded-lg bg-[#0367FC] text-white text-xs font-semibold hover:opacity-90 transition"
+                          className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:opacity-90 transition"
                         >
                           Simpan Perubahan
                         </button>
@@ -380,7 +380,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Highlighted Skills</h4>
                         <div className="flex flex-wrap gap-2">
                           {aiGenerated.tailoredSkills?.map((skill: string, i: number) => (
-                            <span key={i} className="text-xs bg-[#0367FC]/10 text-[#0367FC] px-2.5 py-1 rounded-full font-medium">
+                            <span key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
                               {skill}
                             </span>
                           ))}
@@ -404,7 +404,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         <div className="p-5 border-t border-[#E0E0E0] flex items-center gap-3">
           <button
             onClick={onClose}
-            className="h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0367FC] transition"
+            className="h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition"
           >
             {application ? "Simpan Draft" : "Tutup"}
           </button>
@@ -412,7 +412,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
             <button
               onClick={handleAutoApply}
               disabled={enqueuing}
-              className="h-11 px-4 rounded-xl border-2 border-[#0367FC] text-[#0367FC] text-sm font-semibold hover:bg-[#0367FC]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               Auto-Apply
@@ -421,7 +421,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
           <button
             onClick={handleSubmit}
             disabled={submitting || !application}
-            className="flex-1 h-11 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 h-11 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {submitting ? "Mengirim..." : "Kirim Lamaran"}

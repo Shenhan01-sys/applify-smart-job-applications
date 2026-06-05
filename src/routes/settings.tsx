@@ -20,9 +20,9 @@ export const Route = createFileRoute("/settings")({
       </header>
       <div className="space-y-4 max-w-3xl">
         {[
-          { icon: Chrome, title: "Browser Extension", desc: "Install ekstensi agar agen bisa mengirim lamaran atas nama kamu di 7 platform.", color: "#0367FC", children: (
+          { icon: Chrome, title: "Browser Extension", desc: "Install ekstensi agar agen bisa mengirim lamaran atas nama kamu di 7 platform.", color: "#0A5BE0", children: (
             <div className="flex flex-wrap gap-2 mt-4">
-              <button className="h-10 px-4 rounded-lg bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition shadow-lg shadow-[#0367FC]/20 hover:-translate-y-0.5">Install untuk Chrome</button>
+              <button className="h-10 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition shadow-lg shadow-[#0A5BE0]/20 hover:-translate-y-0.5">Install untuk Chrome</button>
               <button className="h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">Install untuk Firefox</button>
             </div>
           )},
@@ -60,7 +60,7 @@ export const Route = createFileRoute("/settings")({
   ),
 });
 
-function Card({ icon: Icon, title, desc, children, color = '#0367FC' }: any) {
+function Card({ icon: Icon, title, desc, children, color = '#0A5BE0' }: any) {
   return (
     <div className="glass rounded-2xl p-5 hover:shadow-md transition-all duration-200">
       <div className="flex items-start gap-3">

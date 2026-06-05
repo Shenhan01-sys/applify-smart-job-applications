@@ -66,7 +66,7 @@ function AuthCallbackPage() {
         </div>
         <button
           onClick={() => navigate({ to: "/login" })}
-          className="h-11 px-6 rounded-xl bg-[#0367FC] text-white text-sm font-semibold hover:bg-[#0256d3] transition"
+          className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition"
         >
           Kembali ke Login
         </button>
@@ -76,7 +76,7 @@ function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <Loader2 className="h-10 w-10 animate-spin text-[#0367FC]" />
+      <Loader2 className="h-10 w-10 animate-spin text-[#0A5BE0]" />
       <div className="text-center">
         <p className="text-sm font-medium">Sedang memproses login...</p>
         <p className="text-xs text-muted-foreground mt-1">Tunggu sebentar</p>
