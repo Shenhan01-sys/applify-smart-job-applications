@@ -1,7 +1,8 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
-import { Chrome, Bell, CreditCard, Lock } from "lucide-react";
+import { Chrome, Bell, CreditCard, Lock, Sparkles, Calendar, Wallet, Smartphone, QrCode } from "lucide-react";
+import { useSubscription, PLAN_PRICE, type PlanTier, type PaymentMethod } from "@/lib/subscriptionStore";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -12,7 +13,28 @@ export const Route = createFileRoute("/settings")({
     if (!session) throw redirect({ to: "/login" });
   },
   head: () => ({ meta: [{ title: "Settings — Applify" }] }),
-  component: () => (
+  component: SettingsPage,
+});
+
+const TIER_LABEL: Record<PlanTier, string> = { free: "Free", pro: "Pro", kampus: "Kampus" };
+const METHOD_ICON: Record<PaymentMethod, typeof Wallet> = {
+  gopay: Smartphone,
+  ovo: Wallet,
+  dana: Wallet,
+  qris: QrCode,
+};
+const METHOD_NAME: Record<PaymentMethod, string> = {
+  gopay: "GoPay",
+  ovo: "OVO",
+  dana: "DANA",
+  qris: "QRIS",
+};
+
+function SettingsPage() {
+  const sub = useSubscription();
+  const price = PLAN_PRICE[sub.tier as PlanTier];
+
+  return (
     <AppShell>
       <header className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
@@ -38,11 +60,61 @@ export const Route = createFileRoute("/settings")({
               ))}
             </div>
           )},
-          { icon: CreditCard, title: "Billing", desc: "Plan kamu saat ini: Pro · Rp 69.000/bulan, perpanjang otomatis.", color: "#059669", children: (
-            <button className="mt-4 h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Kelola Tagihan
-            </button>
-          )},
+          {
+            icon: CreditCard,
+            title: "Billing",
+            desc: sub.tier === "free"
+              ? "Kamu saat ini di paket Free · upgrade untuk membuka semua fitur."
+              : `Paket ${TIER_LABEL[sub.tier]} · ${price.label}${price.period}, perpanjang otomatis.`,
+            color: "#059669",
+            children: (
+              <div className="mt-4 space-y-3">
+                {sub.tier !== "free" && sub.paymentMethod && (() => {
+                  const Icon = METHOD_ICON[sub.paymentMethod!];
+                  return (
+                  <div className="rounded-xl border border-[color:var(--border)] bg-white/60 p-3 text-xs text-muted-foreground space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" />
+                      <span className="font-semibold text-foreground">{METHOD_NAME[sub.paymentMethod!]}</span>
+                      {sub.transactionId && (
+                        <span className="font-mono text-[10px]">· {sub.transactionId}</span>
+                      )}
+                    </div>
+                    {sub.expiresAt && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-[#0A5BE0]" />
+                        <span>
+                          Aktif sampai{" "}
+                          <span className="font-semibold text-foreground">
+                            {new Date(sub.expiresAt).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  );
+                })()}
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    to="/subscription"
+                    className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition shadow-lg shadow-[#0A5BE0]/20"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {sub.tier === "free" ? "Upgrade Sekarang" : "Kelola Paket"}
+                  </Link>
+                  {sub.tier !== "free" && (
+                    <button className="h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" /> Riwayat Tagihan
+                    </button>
+                  )}
+                </div>
+              </div>
+            ),
+          },
           { icon: Lock, title: "Privasi & Keamanan", desc: "Kontrol siapa yang melihat data kamu.", color: "#6366F1", children: (
             <button className="mt-4 h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition inline-flex items-center gap-2">
               <Lock className="h-4 w-4" /> Ekspor Data
@@ -57,8 +129,8 @@ export const Route = createFileRoute("/settings")({
         ))}
       </div>
     </AppShell>
-  ),
-});
+  );
+}
 
 function Card({ icon: Icon, title, desc, children, color = '#0A5BE0' }: any) {
   return (

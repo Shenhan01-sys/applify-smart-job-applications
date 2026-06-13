@@ -1385,7 +1385,7 @@ function Pricing({ authLink }: { authLink: string }) {
                   </li>
                 ))}
               </ul>
-              <Link to={authLink} className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}>
+              <Link to="/subscription" className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}>
                 {t.name === "Free" ? "Mulai Gratis" : t.name === "Kampus" ? "Hubungi Kami" : "Pilih Paket"}
               </Link>
             </div>

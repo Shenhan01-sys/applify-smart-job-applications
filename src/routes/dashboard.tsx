@@ -21,8 +21,10 @@ export const Route = createFileRoute("/dashboard")({
 const TIER_LABEL: Record<string, string> = { free: "Free", pro: "Pro", ultimate: "Ultimate", kampus: "Kampus" };
 
 function CountUp({ to, duration = 1500 }: { to: number; duration?: number }) {
-  const [val, setVal] = useState(0);
+  const remotion = typeof window !== "undefined" && (window as any).__REMOTION_STATIC__;
+  const [val, setVal] = useState(remotion ? to : 0);
   useEffect(() => {
+    if (remotion) { setVal(to); return; }
     let raf = 0; let start: number | null = null;
     const step = (ts: number) => {
       if (start === null) start = ts;
@@ -32,7 +34,7 @@ function CountUp({ to, duration = 1500 }: { to: number; duration?: number }) {
     };
     raf = window.requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [to, duration]);
+  }, [to, duration, remotion]);
   return <span>{val}</span>;
 }
 
@@ -57,7 +59,7 @@ function statusStyle(status: string): { dot: string; bg: string } {
   }
 }
 
-function DashboardPage() {
+export function DashboardPage() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);

@@ -66,7 +66,7 @@ function GreenCareerPage() {
     <AppShell>
       <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
         {error && (
-          <div className="w-full rounded-2xl bg-[#C0341A]/[6%] border border-[#C0341A]/30 p-3 text-sm text-[#C0341A] mb-5 flex items-center gap-2">
+          <div className="w-full rounded-2xl bg-[#C0341A]/[6%] border-2 border-[#C0341A]/30 p-3 text-sm text-[#C0341A] mb-5 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" /> {error}
           </div>
         )}
@@ -134,7 +134,7 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
             <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden"><div className="h-full bg-neutral-800 rounded-full" style={{ width: `${match}%` }} /></div>
           </>
         )}
-        <button onClick={onStart} disabled={busy} className="w-full mt-2 bg-white border border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+        <button onClick={onStart} disabled={busy} className="w-full mt-2 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Ikuti Asesmen <ArrowRight className="w-3.5 h-3.5" /></>}
         </button>
         <p className="text-[9px] text-neutral-400 text-center">Rp15.000/sesi · opsional · refund 50% bila tak lolos</p>
@@ -168,11 +168,11 @@ function NeuralEcoHeader() {
   return (
     <div className="w-full bg-[#0A0A0A] rounded-[2rem] p-8 lg:p-12 border-4 border-neutral-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between min-h-[300px] mb-12">
       <div className="relative z-10 md:w-1/2 flex flex-col items-start gap-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase tracking-widest"><Leaf className="w-3.5 h-3.5" /> Eksklusif</div>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/50 border-2 border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase tracking-widest"><Leaf className="w-3.5 h-3.5" /> Eksklusif</div>
         <h1 className="font-display text-3xl md:text-5xl font-extrabold text-white leading-tight">Ekosistem <span className="text-brand-emerald">Green Career.</span></h1>
         <p className="font-sans text-neutral-400 text-sm md:text-base leading-relaxed">Applify memprioritaskan perusahaan ber-ESG tinggi. Lakukan asesmen AI otonom untuk memvalidasi kesiapan kompetensimu sebelum melamar.</p>
         <div className="mt-4 flex flex-col gap-2">
-          <div className="flex items-center gap-2 bg-neutral-900/80 px-3 py-2 rounded-lg border border-neutral-800 w-fit">
+          <div className="flex items-center gap-2 bg-neutral-900/80 px-3 py-2 rounded-lg border-2 border-neutral-800 w-fit">
             <Shield className="w-4 h-4 text-brand-emerald" />
             <span className="text-[10px] text-neutral-300 font-sans">AI menilai substansi murni, bukan wajah/emosi.</span>
           </div>
@@ -207,7 +207,7 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
     <div className="w-full max-w-2xl opacity-0 animate-fade-up">
       <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"><ArrowLeft className="h-4 w-4" /> Kembali</button>
       <div className="glass-solid rounded-3xl p-5 mb-5 flex items-center gap-4">
-        <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center shadow-lg border border-neutral-700"><Bot className="w-6 h-6" /></div>
+        <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center shadow-lg border-2 border-neutral-700"><Bot className="w-6 h-6" /></div>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg font-bold text-neutral-900 leading-tight">Asesmen Kesiapan</h3>
           <p className="font-sans text-sm text-neutral-500 truncate">{job?.title} · {job?.company}</p>
@@ -252,7 +252,7 @@ function AnalyzingDiorama() {
         <div className="absolute inset-0 bg-cyber-grid opacity-30 z-0" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center animate-gcPulseNode shadow-lg border border-neutral-700"><Bot className="w-6 h-6" /></div>
+            <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center animate-gcPulseNode shadow-lg border-2 border-neutral-700"><Bot className="w-6 h-6" /></div>
             <div><h3 className="font-display text-xl font-bold text-neutral-900 leading-tight">AI Assessment Engine</h3><p className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">Mengekstrak substansi jawaban...</p></div>
           </div>
           <div className="relative w-full max-w-md bg-neutral-50 border-2 border-neutral-300 rounded-xl shadow-inner p-6 text-left overflow-hidden">

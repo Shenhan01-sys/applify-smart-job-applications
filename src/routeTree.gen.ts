@@ -9,9 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PaymentRouteImport } from './routes/payment'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LinkedinSessionRouteImport } from './routes/linkedin-session'
 import { Route as JobsRouteImport } from './routes/jobs'
@@ -22,8 +24,14 @@ import { Route as AutomationSettingsRouteImport } from './routes/automation-sett
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
+const SubscriptionRoute = SubscriptionRouteImport.update({
+  id: '/subscription',
+  path: '/subscription',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SkillRadarRoute = SkillRadarRouteImport.update({
   id: '/skill-radar',
   path: '/skill-radar',
@@ -37,6 +45,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentRoute = PaymentRouteImport.update({
+  id: '/payment',
+  path: '/payment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -89,6 +102,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => PaymentRoute,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -106,10 +124,13 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
+  '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
+  '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -122,10 +143,13 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
+  '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
+  '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -139,10 +163,13 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
+  '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
+  '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -157,10 +184,13 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/linkedin-session'
     | '/login'
+    | '/payment'
     | '/profile'
     | '/settings'
     | '/skill-radar'
+    | '/subscription'
     | '/auth/callback'
+    | '/payment/success'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -173,10 +203,13 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/linkedin-session'
     | '/login'
+    | '/payment'
     | '/profile'
     | '/settings'
     | '/skill-radar'
+    | '/subscription'
     | '/auth/callback'
+    | '/payment/success'
   id:
     | '__root__'
     | '/'
@@ -189,10 +222,13 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/linkedin-session'
     | '/login'
+    | '/payment'
     | '/profile'
     | '/settings'
     | '/skill-radar'
+    | '/subscription'
     | '/auth/callback'
+    | '/payment/success'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -206,14 +242,23 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   LinkedinSessionRoute: typeof LinkedinSessionRoute
   LoginRoute: typeof LoginRoute
+  PaymentRoute: typeof PaymentRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
   SkillRadarRoute: typeof SkillRadarRoute
+  SubscriptionRoute: typeof SubscriptionRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/subscription': {
+      id: '/subscription'
+      path: '/subscription'
+      fullPath: '/subscription'
+      preLoaderRoute: typeof SubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/skill-radar': {
       id: '/skill-radar'
       path: '/skill-radar'
@@ -233,6 +278,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment': {
+      id: '/payment'
+      path: '/payment'
+      fullPath: '/payment'
+      preLoaderRoute: typeof PaymentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -305,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment/success': {
+      id: '/payment/success'
+      path: '/success'
+      fullPath: '/payment/success'
+      preLoaderRoute: typeof PaymentSuccessRouteImport
+      parentRoute: typeof PaymentRoute
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -314,6 +373,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface PaymentRouteChildren {
+  PaymentSuccessRoute: typeof PaymentSuccessRoute
+}
+
+const PaymentRouteChildren: PaymentRouteChildren = {
+  PaymentSuccessRoute: PaymentSuccessRoute,
+}
+
+const PaymentRouteWithChildren =
+  PaymentRoute._addFileChildren(PaymentRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -326,9 +396,11 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   LinkedinSessionRoute: LinkedinSessionRoute,
   LoginRoute: LoginRoute,
+  PaymentRoute: PaymentRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,
   SkillRadarRoute: SkillRadarRoute,
+  SubscriptionRoute: SubscriptionRoute,
   AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport

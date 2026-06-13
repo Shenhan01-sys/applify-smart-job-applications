@@ -56,7 +56,7 @@ function DraggableKanbanCard({ app, onClick }: { app: AIApplicationData; onClick
           // Only trigger click if not dragging
           if (!isDragging) onClick();
         }}
-        className="rounded-xl bg-[#F5F5F5] border border-[#E0E0E0] p-3 cursor-pointer hover:border-[#0A5BE0] hover:shadow-md transition relative"
+        className="rounded-xl bg-[#F5F5F5] border-2 border-[#E0E0E0] p-3 cursor-pointer hover:border-[#0A5BE0] hover:shadow-md transition relative"
       >
         <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
           <GripVertical className="h-3 w-3" />
@@ -105,7 +105,7 @@ function DroppableColumn({ status, label, color, apps, children }: {
   );
 }
 
-function AppsPage() {
+export function AppsPage() {
   const [applications, setApplications] = useState<AIApplicationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
@@ -366,7 +366,7 @@ function AppsPage() {
               </div>
               <button
                 onClick={() => setShowDetail(false)}
-                className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
+                className="h-9 w-9 rounded-lg border-2 border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -423,7 +423,7 @@ function AppsPage() {
               )}
 
               {selectedApp.status === "submitted" && selectedApp.follow_up_scheduled && !selectedApp.follow_up_sent && (
-                <div className="rounded-xl bg-[#FEF3C7] border border-[#FEF3C7] p-4">
+                <div className="rounded-xl bg-[#FEF3C7] border-2 border-[#FEF3C7] p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="h-4 w-4 text-[#92400E]" />
                     <span className="text-sm font-semibold text-[#92400E]">Follow-up Scheduled</span>
