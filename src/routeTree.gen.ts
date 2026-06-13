@@ -24,7 +24,9 @@ import { Route as AutomationSettingsRouteImport } from './routes/automation-sett
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
+import { Route as WaitinglistRouteImport } from './routes/waitinglist'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const SubscriptionRoute = SubscriptionRouteImport.update({
@@ -103,9 +105,14 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
-  id: '/success',
-  path: '/success',
-  getParentRoute: () => PaymentRoute,
+  id: '/payment/success',
+  path: '/payment/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WaitinglistRoute = WaitinglistRouteImport.update({
+  id: '/waitinglist',
+  path: '/waitinglist',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
@@ -130,7 +137,7 @@ export interface FileRoutesByFullPath {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
-  '/payment/success': typeof PaymentSuccessRoute
+  '/waitinglist': typeof WaitinglistRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,7 +156,7 @@ export interface FileRoutesByTo {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
-  '/payment/success': typeof PaymentSuccessRoute
+  '/waitinglist': typeof WaitinglistRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -169,7 +176,7 @@ export interface FileRoutesById {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
-  '/payment/success': typeof PaymentSuccessRoute
+  '/waitinglist': typeof WaitinglistRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -191,6 +198,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/auth/callback'
     | '/payment/success'
+    | '/waitinglist'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -210,6 +218,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/auth/callback'
     | '/payment/success'
+    | '/waitinglist'
   id:
     | '__root__'
     | '/'
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/subscription'
     | '/auth/callback'
     | '/payment/success'
+    | '/waitinglist'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -247,7 +257,10 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SkillRadarRoute: typeof SkillRadarRoute
   SubscriptionRoute: typeof SubscriptionRoute
+  PaymentRoute: typeof PaymentRoute
+  PaymentSuccessRoute: typeof PaymentSuccessRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  WaitinglistRoute: typeof WaitinglistRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -359,10 +372,17 @@ declare module '@tanstack/react-router' {
     }
     '/payment/success': {
       id: '/payment/success'
-      path: '/success'
+      path: '/payment/success'
       fullPath: '/payment/success'
       preLoaderRoute: typeof PaymentSuccessRouteImport
-      parentRoute: typeof PaymentRoute
+      parentRoute: typeof rootRouteImport
+    }
+    '/waitinglist': {
+      id: '/waitinglist'
+      path: '/waitinglist'
+      fullPath: '/waitinglist'
+      preLoaderRoute: typeof WaitinglistRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/callback': {
       id: '/auth/callback'
@@ -401,7 +421,10 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SkillRadarRoute: SkillRadarRoute,
   SubscriptionRoute: SubscriptionRoute,
+  PaymentRoute: PaymentRoute,
+  PaymentSuccessRoute: PaymentSuccessRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  WaitinglistRoute: WaitinglistRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

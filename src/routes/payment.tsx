@@ -105,8 +105,8 @@ function PaymentPage() {
     setProcessing(false);
     navigate({
       to: "/payment/success",
-      search: { txn: result.transactionId ?? "" } as any,
-    });
+      search: { txn: result.transactionId ?? "" },
+    } as any);
   };
 
   const currentMethod = METHODS.find((m) => m.id === selected) ?? null;

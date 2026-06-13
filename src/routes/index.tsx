@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { WaitinglistPopup } from "@/components/WaitinglistPopup";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -162,6 +163,7 @@ function Landing() {
       <FinalCTA authLink={authLink} />
       <Footer />
       <MobileStickyBar authLink={authLink} />
+      <WaitinglistPopup />
     </div>
   );
 }
