@@ -27,6 +27,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
 import { Route as WaitinglistRouteImport } from './routes/waitinglist'
+import { Route as AdminWaitinglistRouteImport } from './routes/admin.waitinglist'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const SubscriptionRoute = SubscriptionRouteImport.update({
@@ -114,6 +115,11 @@ const WaitinglistRoute = WaitinglistRouteImport.update({
   path: '/waitinglist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminWaitinglistRoute = AdminWaitinglistRouteImport.update({
+  id: '/admin/waitinglist',
+  path: '/admin/waitinglist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
+  '/admin/waitinglist': typeof AdminWaitinglistRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
+  '/admin/waitinglist': typeof AdminWaitinglistRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/subscription': typeof SubscriptionRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
+  '/admin/waitinglist': typeof AdminWaitinglistRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/payment/success'
     | '/waitinglist'
+    | '/admin/waitinglist'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/payment/success'
     | '/waitinglist'
+    | '/admin/waitinglist'
   id:
     | '__root__'
     | '/'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/payment/success'
     | '/waitinglist'
+    | '/admin/waitinglist'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -261,8 +273,8 @@ export interface RootRouteChildren {
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   WaitinglistRoute: typeof WaitinglistRoute
+  AdminWaitinglistRoute: typeof AdminWaitinglistRoute
 }
-
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/subscription': {
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WaitinglistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/waitinglist': {
+      id: '/admin/waitinglist'
+      path: '/admin/waitinglist'
+      fullPath: '/admin/waitinglist'
+      preLoaderRoute: typeof AdminWaitinglistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -425,6 +444,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentSuccessRoute: PaymentSuccessRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   WaitinglistRoute: WaitinglistRoute,
+  AdminWaitinglistRoute: AdminWaitinglistRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
