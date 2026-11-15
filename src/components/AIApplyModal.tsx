@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
+import { automationApi } from "@/services/automationApi";
+import { HitlTrack } from "@/components/HitlTrack";
 import { toast } from "sonner";
 import {
   X,
   Bot,
-  Send,
+  ShieldCheck,
+  ArrowRight,
   Loader2,
   Sparkles,
   CheckCircle2,
@@ -40,6 +44,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [regenerating, setRegenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [enqueuing, setEnqueuing] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [approvalId, setApprovalId] = useState<string | null>(null);
   const [application, setApplication] = useState<AIApplicationData | null>(null);
   const [activeTab, setActiveTab] = useState<"cover" | "cv" | "strategy">("cover");
   const [isEditing, setIsEditing] = useState(false);
@@ -54,6 +60,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     aiNotes: string;
   } | null>(null);
 
+  // Free-tier models rotate (see edge function FREE_MODELS), so the UI names the tier, not a slug.
+  const modelLabel = tier === "pro" ? "model Pro" : "model gratis OpenRouter";
   const matchScore: number = jobData?.match_score ?? 0;
   const canApply = quota.remaining > 0;
 
@@ -135,31 +143,65 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     }
   };
 
-  const handleSubmit = async () => {
+  const persistPendingEdit = async () => {
+    if (application && editedCoverLetter && editedCoverLetter !== application.cover_letter) {
+      await aiApplicationService.updateCoverLetter(application.id, editedCoverLetter);
+      setApplication({ ...application, cover_letter: editedCoverLetter });
+    }
+  };
+
+  // Human-in-the-loop gate: the reviewed draft goes to the approval queue. Only an approval
+  // (Approvals page -> POST /api/approvals/:id/approve) lets the agent submit it.
+  const handleRequestApproval = async () => {
+    if (!application) return;
+    try {
+      setRequesting(true);
+      setError("");
+      await persistPendingEdit();
+      const created: any = await automationApi.createApproval({
+        job_id: jobId,
+        application_id: application.id,
+        job_title: jobTitle,
+        company,
+        platform: jobData?.platform_source ?? null,
+        cover_letter: editedCoverLetter || application.cover_letter,
+      });
+      setApprovalId(created?.id ?? "pending");
+      toast.success("Draf masuk antrean persetujuan. Setujui di halaman Approvals.");
+      onSuccess();
+    } catch (err: any) {
+      setError(
+        `Gagal mengajukan persetujuan (${err.message || "backend otomasi tidak merespons"}). ` +
+          "Draf tetap tersimpan di Applications."
+      );
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  // The user sent this application outside Applify; record it without any automated sending.
+  const handleMarkSentManually = async () => {
     if (!application) return;
     try {
       setSubmitting(true);
-      // Persist any pending edit first
-      if (editedCoverLetter && editedCoverLetter !== application.cover_letter) {
-        await aiApplicationService.updateCoverLetter(application.id, editedCoverLetter);
-      }
+      await persistPendingEdit();
       await aiApplicationService.submitApplication(application.id);
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Gagal submit aplikasi");
+      setError(err.message || "Gagal menandai lamaran");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Hand the job to the background agent (worker) to fill & submit on the external site.
+  // Fill-only run: the worker fills the external form and stops before Submit (no approval yet).
   const handleAutoApply = async () => {
     try {
       setEnqueuing(true);
       setError("");
       await automationQueue.enqueueAutoApply(jobId);
-      toast.success("Agen Applify akan melamar di latar belakang. Pantau di Applications.");
+      toast.success("Agen akan mengisi formulir tanpa menekan kirim. Pantau di Applications.");
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -218,10 +260,10 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" />
               <p className="text-sm text-muted-foreground">
-                {tier === "pro" ? "DeepSeek V4 Pro" : "DeepSeek V4 Flash"} sedang menulis lamaranmu...
+                AI ({modelLabel}) sedang menulis lamaranmu...
               </p>
             </div>
-          ) : error ? (
+          ) : error && !application ? (
             <div className="space-y-3">
               <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-600">{error}</div>
               {!application && (
@@ -243,7 +285,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               <div className="max-w-md">
                 <h3 className="font-bold text-lg">Generate lamaran dengan AI</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  AI ({tier === "pro" ? "DeepSeek V4 Pro" : "DeepSeek V4 Flash"}) akan menulis cover letter
+                  AI ({modelLabel}) akan menulis cover letter
                   yang dioptimalkan ATS & menganalisis kecocokanmu untuk <b>{jobTitle}</b> di <b>{company}</b>.
                 </p>
               </div>
@@ -262,11 +304,25 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
             </div>
           ) : (
             <div className="space-y-5">
+              {/* Where this letter is in the human-in-the-loop flow */}
+              <HitlTrack
+                stage="gate"
+                caption={
+                  approvalId
+                    ? "Menunggu persetujuanmu di halaman Approvals (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim."
+                    : "Draf siap. Tinjau dan edit bila perlu, lalu ajukan ke persetujuan."
+                }
+              />
+
+              {error && (
+                <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              )}
+
               {/* AI Info */}
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Bot className="h-3 w-3" />
-                  Model: {tier === "pro" ? "DeepSeek V4 Pro" : "DeepSeek V4 Flash (free)"}
+                  Model: {modelLabel}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="h-3 w-3" />
@@ -401,31 +457,60 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 border-t border-[#E0E0E0] flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition"
-          >
-            {application ? "Simpan Draft" : "Tutup"}
-          </button>
-          {application && jobData?.external_url && (
+        <div className="p-5 border-t border-[#E0E0E0] space-y-3">
+          <div className="flex items-center gap-3">
             <button
-              onClick={handleAutoApply}
-              disabled={enqueuing}
-              className="h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              onClick={onClose}
+              className="h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition"
             >
-              {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-              Auto-Apply
+              {application ? "Simpan Draft" : "Tutup"}
             </button>
+            {application && jobData?.external_url && (
+              <button
+                onClick={handleAutoApply}
+                disabled={enqueuing}
+                title="Agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim."
+                className="h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                Isi Formulir Saja
+              </button>
+            )}
+            {approvalId ? (
+              <Link
+                to="/approvals"
+                className="flex-1 h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="h-4 w-4 text-[#D2F801]" />
+                Buka Approvals
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : application && (
+              <button
+                onClick={handleRequestApproval}
+                disabled={requesting}
+                className="flex-1 h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+              >
+                {requesting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 text-[#D2F801]" />
+                )}
+                {requesting ? "Mengajukan..." : "Ajukan ke Persetujuan"}
+              </button>
+            )}
+          </div>
+          {application && (
+            <div className="flex justify-end">
+              <button
+                onClick={handleMarkSentManually}
+                disabled={submitting}
+                className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-[#16150F] hover:underline disabled:opacity-60"
+              >
+                {submitting ? "Menyimpan..." : "Sudah kukirim sendiri di luar Applify — tandai terkirim"}
+              </button>
+            </div>
           )}
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !application}
-            className="flex-1 h-11 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {submitting ? "Mengirim..." : "Kirim Lamaran"}
-          </button>
         </div>
       </div>
     </div>

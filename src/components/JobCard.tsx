@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { platformLabel } from "@/lib/platforms";
 import {
   MapPin,
   Briefcase,
@@ -373,7 +374,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
-              Source: {job.platform_source}
+              Source: {platformLabel(job.platform_source)}
             </span>
             <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
               <Calendar className="h-3 w-3" />

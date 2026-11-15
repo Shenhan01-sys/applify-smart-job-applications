@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { automationApi } from '@/services/automationApi'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
+import { HitlTrack } from '@/components/HitlTrack'
+import { platformLabel } from '@/lib/platforms'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
-import { CheckCircle, XCircle, Clock, AlertTriangle, Loader2 } from 'lucide-react'
+import { ShieldCheck, XCircle, Clock, AlertTriangle, Loader2, Edit3, Eye, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ApprovalRequest {
@@ -50,15 +48,21 @@ export default function ApprovalReviewModal({
 
   const timeRemaining = new Date(request.expires_at).getTime() - Date.now()
   const isExpiringSoon = timeRemaining < 15 * 60 * 1000 // 15 minutes
+  const minutesLeft = Math.max(0, Math.round(timeRemaining / 60000))
+  const timeLeft = minutesLeft >= 120
+    ? { value: Math.round(minutesLeft / 60), unit: 'jam' }
+    : { value: minutesLeft, unit: 'menit' }
+  const edited = editedCoverLetter !== (request.cover_letter || '')
 
   const handleApprove = async () => {
     setLoading(true)
     try {
-      await automationApi.approveApplication(request.id)
-      toast.success('Application approved! Will be submitted automatically.')
+      // The version on screen (including edits) is the one being approved.
+      await automationApi.approveApplication(request.id, edited ? editedCoverLetter : undefined)
+      toast.success('Disetujui — lamaran masuk antrean agen.')
       onApproved()
     } catch (error: any) {
-      toast.error(`Failed to approve: ${error.message}`)
+      toast.error(`Gagal menyetujui: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -68,10 +72,10 @@ export default function ApprovalReviewModal({
     setLoading(true)
     try {
       await automationApi.rejectApplication(request.id, rejectReason)
-      toast.success('Application rejected. Feedback saved for future improvements.')
+      toast.success('Ditolak. Alasanmu dicatat sebagai preferensi.')
       onRejected()
     } catch (error: any) {
-      toast.error(`Failed to reject: ${error.message}`)
+      toast.error(`Gagal menolak: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -80,14 +84,20 @@ export default function ApprovalReviewModal({
   const handleRegenerate = async () => {
     setLoading(true)
     try {
-      const result = await automationApi.regenerateCoverLetter(
+      const result: any = await automationApi.regenerateCoverLetter(
         request.id,
         'Make it more concise and highlight relevant experience'
       )
-      if (result.cover_letter) setEditedCoverLetter(result.cover_letter)
-      toast.info('Cover letter berhasil di-regenerate')
+      if (result?.cover_letter) {
+        setEditedCoverLetter(result.cover_letter)
+        toast.success('Cover letter ditulis ulang.')
+      } else {
+        // Backend regenerate endpoint is not implemented yet; never pretend it worked.
+        toast.info('Tulis ulang otomatis belum tersedia. Edit langsung lalu setujui.')
+        setIsEditing(true)
+      }
     } catch (error: any) {
-      toast.error(`Failed to regenerate: ${error.message}`)
+      toast.error(`Gagal menulis ulang: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -95,91 +105,112 @@ export default function ApprovalReviewModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl">Review Application</DialogTitle>
-            <Badge
-              variant={isExpiringSoon ? 'destructive' : 'outline'}
-              className="flex items-center gap-1"
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col gap-4 rounded-2xl border-2 border-[#16150F]/15 bg-white p-0">
+        <DialogHeader className="px-6 pt-6">
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle className="font-display text-2xl text-[#16150F]">Gerbang Persetujuan</DialogTitle>
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border-2 px-2.5 py-1 text-xs font-semibold ${
+                isExpiringSoon
+                  ? 'border-red-300 bg-red-50 text-red-700'
+                  : 'border-[#16150F]/15 bg-[#F4F1E8] text-[#16150F]'
+              }`}
             >
               <Clock className="h-3 w-3" />
-              {isExpiringSoon ? 'Expiring soon' : 'Pending approval'}
-            </Badge>
+              <span className="font-mono">{timeLeft.value}</span> {timeLeft.unit} lagi
+            </span>
           </div>
-          <DialogDescription>
-            Review and edit before AI submits this application
+          <DialogDescription className="text-sm text-[#16150F]/70">
+            Tidak ada yang terkirim sebelum kamu menyetujui. Edit dulu bila perlu — versi di layar inilah yang disetujui.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
-          {/* Job Info */}
-          <div className="bg-slate-50 p-4 rounded-lg mb-4">
-            <h3 className="font-semibold text-lg">{request.job_title}</h3>
-            <p className="text-gray-600">{request.company}</p>
-            <Badge variant="secondary" className="mt-2">{request.platform}</Badge>
+        {/* Radix renders the viewport child as display:table, which lets content overflow sideways */}
+        <ScrollArea className="flex-1 px-6 [&_[data-radix-scroll-area-viewport]>div]:!block">
+          <HitlTrack
+            stage="gate"
+            caption="Setujui untuk memasukkan lamaran ke antrean agen, atau tolak bila tidak sesuai."
+            className="mb-4"
+          />
+
+          {/* Job */}
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border-2 border-[#16150F]/10 bg-[#F4F1E8] p-4">
+            <div className="min-w-0">
+              <h3 className="font-display text-lg font-bold text-[#16150F] truncate">{request.job_title}</h3>
+              <p className="text-sm text-[#16150F]/70">{request.company}</p>
+            </div>
+            <span className="shrink-0 rounded-full border-2 border-[#16150F]/15 bg-white px-2.5 py-1 text-xs font-semibold text-[#16150F]">
+              {platformLabel(request.platform)}
+            </span>
           </div>
 
-          {/* Cover Letter */}
+          {/* Cover letter */}
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium">Cover Letter</h4>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="flex items-center gap-1.5 text-sm font-semibold text-[#16150F]">
+                Cover Letter
+                {edited && (
+                  <span className="rounded-full bg-[#D2F801] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#16150F]">
+                    diedit
+                  </span>
+                )}
+              </h4>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => setIsEditing(!isEditing)}
+                  className="flex h-8 items-center gap-1 rounded-lg border-2 border-[#16150F]/15 px-3 text-xs font-semibold text-[#16150F] transition hover:border-[#0A5BE0]"
                 >
-                  {isEditing ? 'Preview' : 'Edit'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  {isEditing ? <Eye className="h-3 w-3" /> : <Edit3 className="h-3 w-3" />}
+                  {isEditing ? 'Pratinjau' : 'Edit'}
+                </button>
+                <button
                   onClick={handleRegenerate}
                   disabled={loading}
+                  className="flex h-8 items-center gap-1 rounded-lg bg-[#0A5BE0]/10 px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/20 disabled:opacity-60"
                 >
-                  Regenerate
-                </Button>
+                  <Sparkles className="h-3 w-3" />
+                  Tulis ulang
+                </button>
               </div>
             </div>
             {isEditing ? (
-              <Textarea
+              <textarea
                 value={editedCoverLetter}
                 onChange={(e) => setEditedCoverLetter(e.target.value)}
-                rows={8}
-                className="w-full"
+                rows={10}
+                className="w-full resize-none rounded-xl border-2 border-[#16150F]/15 p-4 text-sm leading-relaxed focus:border-[#0A5BE0] focus:outline-none"
               />
             ) : (
-              <div className="bg-white border rounded-md p-4 whitespace-pre-wrap text-sm">
-                {editedCoverLetter || 'No cover letter generated.'}
+              <div className="whitespace-pre-wrap rounded-xl border-2 border-[#16150F]/10 bg-white p-4 text-sm leading-relaxed">
+                {editedCoverLetter || 'Belum ada cover letter.'}
               </div>
             )}
           </div>
 
-          {/* Application Answers */}
+          {/* Form answers prepared by the agent */}
           {request.answers && request.answers.length > 0 && (
             <div className="mb-4">
-              <h4 className="font-medium mb-2">Application Answers</h4>
-              <div className="space-y-3">
+              <h4 className="mb-2 text-sm font-semibold text-[#16150F]">Jawaban formulir</h4>
+              <div className="space-y-2">
                 {request.answers.map((answer, index) => (
                   <div
                     key={index}
-                    className={`border rounded-md p-3 ${
-                      answer.needs_review ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'
+                    className={`rounded-xl border-2 p-3 ${
+                      answer.needs_review ? 'border-[#D9741A]/50 bg-[#D9741A]/5' : 'border-[#16150F]/10'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="mb-1 flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{answer.question}</span>
                       {answer.needs_review && (
-                        <Badge variant="outline" className="text-xs border-yellow-400 text-yellow-700">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Needs review
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D9741A]">
+                          <AlertTriangle className="h-3 w-3" />
+                          Perlu dicek
+                        </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700">{answer.answer}</p>
-                    <div className="mt-1 text-xs text-gray-500">
-                      Confidence: {Math.round(answer.confidence * 100)}%
+                    <p className="text-sm text-[#16150F]/80">{answer.answer}</p>
+                    <div className="mt-1 text-xs text-[#16150F]/50">
+                      Keyakinan: <span className="font-mono">{Math.round(answer.confidence * 100)}%</span>
                     </div>
                   </div>
                 ))}
@@ -187,95 +218,78 @@ export default function ApprovalReviewModal({
             </div>
           )}
 
-          {/* Resume */}
           {request.resume_url && (
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Resume</h4>
-              <a
-                href={request.resume_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline text-sm"
-              >
-                View attached resume
-              </a>
-            </div>
+            <a
+              href={request.resume_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-4 inline-block text-sm font-semibold text-[#0A5BE0] hover:underline"
+            >
+              Lihat CV terlampir
+            </a>
           )}
 
-          {/* Reject Form */}
           {showRejectForm && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-medium text-red-800 mb-2">Why are you rejecting this?</h4>
-              <p className="text-sm text-red-600 mb-2">
-                Your feedback helps AI learn and improve future applications.
-              </p>
-              <Textarea
-                placeholder="e.g., Not a good fit, salary too low, requires skills I don't have..."
+            <div className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-4">
+              <h4 className="mb-1 text-sm font-semibold text-red-800">Kenapa ditolak?</h4>
+              <p className="mb-2 text-xs text-red-700">Alasanmu dipakai sebagai preferensi untuk lamaran berikutnya.</p>
+              <textarea
+                placeholder="mis. tidak cocok, gaji terlalu rendah, butuh skill yang belum kupunya..."
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={3}
-                className="w-full bg-white"
+                className="w-full resize-none rounded-lg border-2 border-red-200 bg-white p-3 text-sm focus:outline-none"
               />
             </div>
           )}
         </ScrollArea>
 
-        <Separator className="my-4" />
-
-        <DialogFooter className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            Expires at: {new Date(request.expires_at).toLocaleString()}
-          </div>
-          <div className="flex gap-3">
+        <div className="flex flex-col gap-3 border-t-2 border-[#16150F]/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs text-[#16150F]/60">
+            Berlaku sampai {new Date(request.expires_at).toLocaleString('id-ID')}
+          </span>
+          <div className="flex gap-3 [&>button]:flex-1 sm:[&>button]:flex-none">
             {!showRejectForm ? (
               <>
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setShowRejectForm(true)}
                   disabled={loading}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
                 >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject
-                </Button>
-                <Button
+                  <XCircle className="h-4 w-4" />
+                  Tolak
+                </button>
+                <button
                   onClick={handleApprove}
                   disabled={loading}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:hover:translate-y-0"
                 >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Approve & Submit
-                </Button>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4 text-[#D2F801]" />}
+                  <span className="sm:hidden">Setujui</span>
+                  <span className="hidden sm:inline">Setujui &amp; Masukkan Antrean</span>
+                </button>
               </>
             ) : (
               <>
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setShowRejectForm(false)}
                   disabled={loading}
+                  className="h-11 rounded-xl border-2 border-[#16150F]/15 px-4 text-sm font-semibold text-[#16150F] disabled:opacity-60"
                 >
-                  Cancel
-                </Button>
-                <Button
+                  Batal
+                </button>
+                <button
                   onClick={handleReject}
                   disabled={loading || !rejectReason.trim()}
-                  variant="destructive"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <XCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Confirm Reject
-                </Button>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                  Konfirmasi Tolak
+                </button>
               </>
             )}
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

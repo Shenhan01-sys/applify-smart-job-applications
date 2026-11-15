@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WaitinglistRouteImport } from './routes/waitinglist'
 import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -24,12 +25,15 @@ import { Route as AutomationSettingsRouteImport } from './routes/automation-sett
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
-import { Route as WaitinglistRouteImport } from './routes/waitinglist'
-import { Route as AdminWaitinglistRouteImport } from './routes/admin.waitinglist'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AdminWaitinglistRouteImport } from './routes/admin.waitinglist'
 
+const WaitinglistRoute = WaitinglistRouteImport.update({
+  id: '/waitinglist',
+  path: '/waitinglist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubscriptionRoute = SubscriptionRouteImport.update({
   id: '/subscription',
   path: '/subscription',
@@ -106,23 +110,18 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
-  id: '/payment/success',
-  path: '/payment/success',
-  getParentRoute: () => rootRouteImport,
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => PaymentRoute,
 } as any)
-const WaitinglistRoute = WaitinglistRouteImport.update({
-  id: '/waitinglist',
-  path: '/waitinglist',
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminWaitinglistRoute = AdminWaitinglistRouteImport.update({
   id: '/admin/waitinglist',
   path: '/admin/waitinglist',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -142,9 +141,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -162,9 +162,10 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -183,9 +184,10 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/payment/success': typeof PaymentSuccessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -205,10 +207,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skill-radar'
     | '/subscription'
-    | '/auth/callback'
-    | '/payment/success'
     | '/waitinglist'
     | '/admin/waitinglist'
+    | '/auth/callback'
+    | '/payment/success'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -226,10 +228,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skill-radar'
     | '/subscription'
-    | '/auth/callback'
-    | '/payment/success'
     | '/waitinglist'
     | '/admin/waitinglist'
+    | '/auth/callback'
+    | '/payment/success'
   id:
     | '__root__'
     | '/'
@@ -247,10 +249,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skill-radar'
     | '/subscription'
-    | '/auth/callback'
-    | '/payment/success'
     | '/waitinglist'
     | '/admin/waitinglist'
+    | '/auth/callback'
+    | '/payment/success'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -269,14 +271,20 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SkillRadarRoute: typeof SkillRadarRoute
   SubscriptionRoute: typeof SubscriptionRoute
-  PaymentRoute: typeof PaymentRoute
-  PaymentSuccessRoute: typeof PaymentSuccessRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
   WaitinglistRoute: typeof WaitinglistRoute
   AdminWaitinglistRoute: typeof AdminWaitinglistRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
 }
+
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/waitinglist': {
+      id: '/waitinglist'
+      path: '/waitinglist'
+      fullPath: '/waitinglist'
+      preLoaderRoute: typeof WaitinglistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subscription': {
       id: '/subscription'
       path: '/subscription'
@@ -384,16 +392,16 @@ declare module '@tanstack/react-router' {
     }
     '/payment/success': {
       id: '/payment/success'
-      path: '/payment/success'
+      path: '/success'
       fullPath: '/payment/success'
       preLoaderRoute: typeof PaymentSuccessRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof PaymentRoute
     }
-    '/waitinglist': {
-      id: '/waitinglist'
-      path: '/waitinglist'
-      fullPath: '/waitinglist'
-      preLoaderRoute: typeof WaitinglistRouteImport
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/waitinglist': {
@@ -401,13 +409,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/waitinglist'
       fullPath: '/admin/waitinglist'
       preLoaderRoute: typeof AdminWaitinglistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -440,11 +441,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SkillRadarRoute: SkillRadarRoute,
   SubscriptionRoute: SubscriptionRoute,
-  PaymentRoute: PaymentRoute,
-  PaymentSuccessRoute: PaymentSuccessRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
   WaitinglistRoute: WaitinglistRoute,
   AdminWaitinglistRoute: AdminWaitinglistRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

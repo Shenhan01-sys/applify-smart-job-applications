@@ -1,6 +1,9 @@
 // Applify — generate-application Edge Function
 // Server-side AI: enforce monthly quota -> pick model by tier -> call OpenRouter -> persist draft.
-// Secrets needed: OPENROUTER_API_KEY (required). Optional: FREE_MODEL, PRO_MODEL.
+// Secrets needed: OPENROUTER_API_KEY (required). Optional: FREE_MODELS / PRO_MODELS (comma-separated,
+// tried in order) or the older single-model FREE_MODEL / PRO_MODEL.
+// Free OpenRouter slugs are retired regularly (deepseek-v4-flash:free became paid-only in 2026), so a
+// single hardcoded model breaks generation for every user. Keep a chain and update it via secrets.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 
@@ -13,8 +16,16 @@ const cors = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
-const FREE_MODEL = Deno.env.get("FREE_MODEL") ?? "deepseek/deepseek-v4-flash:free";
-const PRO_MODEL = Deno.env.get("PRO_MODEL") ?? "deepseek/deepseek-v4-pro";
+const modelList = (raw: string | undefined, fallback: string) =>
+  (raw ?? fallback).split(",").map((m) => m.trim()).filter(Boolean);
+const FREE_MODELS = modelList(
+  Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"),
+  "google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free,openrouter/free",
+);
+const PRO_MODELS = modelList(
+  Deno.env.get("PRO_MODELS") ?? Deno.env.get("PRO_MODEL"),
+  "deepseek/deepseek-v4-pro,deepseek/deepseek-v4-flash,google/gemma-4-31b-it:free",
+);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -65,20 +76,15 @@ Deno.serve(async (req: Request) => {
     const { data: sub } = await admin
       .from("subscriptions").select("ai_model_tier, plan_name").eq("user_id", userId).maybeSingle();
     const tier = sub?.ai_model_tier === "pro" ? "pro" : "free";
-    const model = tier === "pro" ? PRO_MODEL : FREE_MODEL;
+    const models = tier === "pro" ? PRO_MODELS : FREE_MODELS;
 
-    // 3) Quota (consume only when actually generating an application)
-    let quota: any = null;
-    if (mode === "analyze") {
-      const { data: q } = await admin.rpc("get_quota_status", { p_user_id: userId });
-      quota = q;
-    } else {
-      const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
-      if (qErr) return json({ error: "Quota check failed", detail: qErr.message }, 500);
-      quota = q;
-      if (q && q.allowed === false) {
-        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota: q }, 429);
-      }
+    // 3) Quota check. The quota is consumed only after the AI call succeeds (step 6b), so a failed
+    //    generation no longer costs the user one of their monthly applications.
+    const { data: quotaStatus, error: qsErr } = await admin.rpc("get_quota_status", { p_user_id: userId });
+    if (qsErr) return json({ error: "Quota check failed", detail: qsErr.message }, 500);
+    let quota: any = quotaStatus;
+    if (mode !== "analyze" && quotaStatus && Number(quotaStatus.remaining ?? 1) <= 0) {
+      return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
     }
 
     // 4) Context
@@ -126,32 +132,52 @@ Return JSON exactly in this shape:
   "aiNotes": "1-3 sentence strategy in Bahasa Indonesia"
 }`;
 
-    // 6) Call OpenRouter
-    const aiResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://applify.id",
-        "X-Title": "Applify",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.6,
-        max_tokens: 1600,
-      }),
-    });
-
-    if (!aiResp.ok) {
-      const detail = await aiResp.text();
-      return json({ error: "AI generation failed", detail, model, quota }, 502);
+    // 6) Call OpenRouter, trying each model of the tier's chain in order
+    let aiJson: any = null;
+    let model = models[0];
+    let lastDetail = "";
+    for (const candidate of models) {
+      model = candidate;
+      const aiResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://applify.id",
+          "X-Title": "Applify",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.6,
+          max_tokens: 1600,
+        }),
+      });
+      if (aiResp.ok) {
+        aiJson = await aiResp.json();
+        if (aiJson?.choices?.[0]?.message?.content) break;
+        lastDetail = `empty completion from ${model}`;
+        aiJson = null;
+        continue;
+      }
+      lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
+    }
+    if (!aiJson) {
+      return json({ error: "AI generation failed", detail: lastDetail, models, quota }, 502);
     }
 
-    const aiJson = await aiResp.json();
+    // 6b) Consume one monthly application only now that a draft exists
+    if (mode !== "analyze") {
+      const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
+      if (qErr) return json({ error: "Quota update failed", detail: qErr.message }, 500);
+      quota = q;
+      if (q && q.allowed === false) {
+        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota: q }, 429);
+      }
+    }
     const content: string = aiJson.choices?.[0]?.message?.content ?? "";
     const parsed = extractJson(content) ?? {
       coverLetter: content,

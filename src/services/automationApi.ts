@@ -23,20 +23,30 @@ async function getAuthHeaders() {
   }
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit, mockFn?: () => T, delay = 0): Promise<T> {
+async function apiFetch<T>(
+  url: string,
+  options?: RequestInit,
+  mockFn?: () => T,
+  delay = 0,
+  readOnly = false,
+): Promise<T> {
   if (isMockMode() && mockFn) {
     if (delay > 0) await new Promise(r => setTimeout(r, delay))
     return mockFn()
   }
+  // Only reads may fall back to placeholder data. A mocked "success" for approve/reject/queue/
+  // settings or for AI output would tell the user an action happened when nothing reached
+  // the backend, so those errors surface to the caller instead.
+  const method = (options?.method ?? 'GET').toUpperCase()
+  const canFallback = method === 'GET' || readOnly
   try {
     const res = await fetch(url, options)
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   } catch (err) {
     // Automation backend (Fastify) is optional/not-yet-hosted — degrade gracefully to
-    // placeholder data instead of crashing the page. Real automation arrives with the
-    // agent-browser MCP backend.
-    if (mockFn) {
+    // placeholder data for reads instead of crashing the page.
+    if (mockFn && canFallback) {
       console.warn(`[automationApi] backend unavailable for ${url}; using fallback data.`, err)
       return mockFn()
     }
@@ -119,6 +129,7 @@ export const automationApi = {
       },
       () => ({ jobs: mockJobs, total: mockJobs.length }),
       1500,
+      true, // search is a read even though it is a POST
     )
   },
 
@@ -183,10 +194,15 @@ export const automationApi = {
     )
   },
 
-  async approveApplication(id: string) {
+  /** Approve = consent to submit. `coverLetter` carries the user's edits from the review screen. */
+  async approveApplication(id: string, coverLetter?: string) {
     return apiFetch(
       `${API_BASE_URL}/api/approvals/${id}/approve`,
-      { method: 'POST', headers: await getAuthHeaders() },
+      {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify(coverLetter ? { cover_letter: coverLetter } : {}),
+      },
       () => ({ success: true, id, status: "approved" }),
     )
   },

@@ -87,32 +87,59 @@ export function useAutomationSettings() {
   return { settings, loading, saving, loadSettings, updateSettings, updateField }
 }
 
+export interface JobSearchSourceStat {
+  platform: string
+  displayName?: string
+  fetched: number
+  afterFilter: number
+  errors: string[]
+}
+
 export function useJobSearch() {
   const [results, setResults] = useState<Array<{ platform: string; jobs: any[] }>>([])
+  const [stats, setStats] = useState<JobSearchSourceStat[]>([])
   const [loading, setLoading] = useState(false)
   const [totalJobs, setTotalJobs] = useState(0)
 
+  /**
+   * POST /api/automation/search. Respons backend: { jobs, total, results: [{platform, jobs, errors}], stats, ingest }.
+   * Hasil dikelompokkan per sumber supaya kartu platform di AIJobScanner bisa menampilkan jumlahnya.
+   */
   const searchJobs = async (params: {
     keywords?: string
     location?: string
     platforms?: string[]
-  }) => {
+  }): Promise<{ groups: Array<{ platform: string; jobs: any[] }>; total: number; stats: JobSearchSourceStat[] }> => {
     try {
       setLoading(true)
-      const data = await automationApi.searchJobs(params)
-      const grouped = [{ platform: 'all', jobs: (data.jobs as any[]) || [] }]
-      setResults(grouped)
-      setTotalJobs(data.total || 0)
-      return grouped
+      const data: any = await automationApi.searchJobs(params)
+      const jobs: any[] = Array.isArray(data?.jobs) ? data.jobs : []
+      let groups: Array<{ platform: string; jobs: any[] }>
+      if (Array.isArray(data?.results) && data.results.every((r: any) => Array.isArray(r?.jobs))) {
+        groups = data.results.map((r: any) => ({ platform: String(r.platform), jobs: r.jobs }))
+      } else {
+        const byPlatform = new Map<string, any[]>()
+        for (const j of jobs) {
+          const key = String(j?.platform ?? j?.platform_source ?? 'all').toLowerCase()
+          byPlatform.set(key, [...(byPlatform.get(key) ?? []), j])
+        }
+        groups = Array.from(byPlatform, ([platform, list]) => ({ platform, jobs: list }))
+      }
+      const total = Number(data?.total ?? data?.total_jobs ?? jobs.length) || 0
+      const sourceStats: JobSearchSourceStat[] = Array.isArray(data?.stats) ? data.stats : []
+      setResults(groups)
+      setStats(sourceStats)
+      setTotalJobs(total)
+      return { groups, total, stats: sourceStats }
     } catch (error) {
       toast.error('Failed to search jobs')
-      return []
+      return { groups: [], total: 0, stats: [] }
     } finally {
       setLoading(false)
     }
   }
 
-  return { results, loading, totalJobs, searchJobs }
+  return { results, stats, loading, totalJobs, searchJobs }
 }
 
 export function useAIPipeline() {

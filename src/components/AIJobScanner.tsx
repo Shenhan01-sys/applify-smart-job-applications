@@ -11,14 +11,22 @@ interface Platform {
   id: string
 }
 
+// id harus sama dengan nama sumber di backend/services/mcp-registry.ts
 const PLATFORMS: Platform[] = [
-  { name: 'LinkedIn', icon: '💼', id: 'linkedin' },
+  { name: 'JobStreet', icon: '📋', id: 'jobstreet' },
+  { name: 'Glints', icon: '✨', id: 'glints' },
+  { name: 'Kalibrr', icon: '🇮🇩', id: 'kalibrr' },
   { name: 'Greenhouse', icon: '🌱', id: 'greenhouse' },
   { name: 'Lever', icon: '🔄', id: 'lever' },
   { name: 'Ashby', icon: '⚡', id: 'ashby' },
+  { name: 'SmartRecruiters', icon: '🧩', id: 'smartrecruiters' },
   { name: 'Workable', icon: '🔧', id: 'workable' },
-  { name: 'JobStreet', icon: '📋', id: 'jobstreet' },
+  { name: 'LinkedIn', icon: '💼', id: 'linkedin' },
 ]
+
+// Default: sumber yang bisa diakses tanpa login dan punya papan default di backend.
+// LinkedIn butuh sesi browser; Workable belum punya papan default (config/job-boards.json).
+const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'greenhouse', 'lever', 'ashby', 'smartrecruiters']
 
 interface ScanStage {
   message: string
@@ -28,7 +36,7 @@ interface ScanStage {
 export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   const [isScanning, setIsScanning] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['greenhouse', 'lever', 'ashby', 'workable'])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(DEFAULT_PLATFORMS)
   const [stages, setStages] = useState<ScanStage[]>([])
   const { results, loading, totalJobs, searchJobs } = useJobSearch()
 
@@ -64,37 +72,35 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
       // Stage 2: Search
       addStage('🔍 Mencari lowongan...', 'info')
-      const searchResults = await searchJobs({
+      const { groups: searchResults, total, stats } = await searchJobs({
         platforms: selectedPlatforms,
       })
 
       setProgress(60)
-      
-      if (searchResults.length === 0) {
+
+      // Ringkasan per sumber dari backend (jumlah lolos filter / error)
+      const failed = stats.filter((s) => s.errors.length > 0 && s.afterFilter === 0).map((s) => s.platform)
+      if (failed.length > 0) {
+        addStage(`⚠️ Sumber tidak merespons: ${failed.join(', ')}`, 'error')
+      }
+
+      if (total === 0) {
         addStage('⚠️ Tidak ada lowongan ditemukan', 'error')
         setIsScanning(false)
         return
       }
 
-      // Stage 3: AI Analysis
-      addStage('🧠 AI mulai menganalisis setiap lowongan...', 'analysis')
-      setProgress(70)
-      await sleep(800)
-
-      addStage('📊 Menghitung kecocokan dengan profil kamu...', 'analysis')
+      // Stage 3: tahap yang benar-benar dikerjakan backend (job-aggregation.service.ts)
+      addStage(`🧹 Menyaring lokasi & menghapus duplikat dari ${searchResults.length} sumber...`, 'analysis')
       setProgress(80)
-      await sleep(800)
+      await sleep(600)
 
-      addStage('🎯 Memprediksi potensi diterima untuk tiap posisi...', 'analysis')
-      setProgress(90)
-      await sleep(800)
-
-      addStage('📈 Menganalisis tren pasar & benchmark gaji...', 'analysis')
+      addStage('📊 Mengurutkan berdasarkan skor relevansi terhadap kata kunci & skill profil...', 'analysis')
       setProgress(95)
-      await sleep(800)
+      await sleep(600)
 
       setProgress(100)
-      addStage(`🎉 Selesai! ${totalJobs} lowongan ditemukan & dianalisis`, 'success')
+      addStage(`🎉 Selesai! ${total} lowongan ditemukan & diperingkat`, 'success')
       await sleep(1000)
 
       onComplete()
@@ -115,7 +121,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             <h2 className="text-lg font-bold">AI Job Scanner</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            AI akan mencari & menganalisis lowongan dari multiple platform sekaligus
+            Cari lowongan dari JobStreet, Glints, Kalibrr & papan karier perusahaan (ATS) sekaligus
           </p>
         </div>
         <Button
@@ -165,7 +171,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
           </div>
 
           {/* Platform scanning status */}
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
             {PLATFORMS.map((platform) => {
               const isSelected = selectedPlatforms.includes(platform.id)
               const platformResult = results.find((r) => r.platform === platform.id)

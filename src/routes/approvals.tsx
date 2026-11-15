@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { automationApi } from "@/services/automationApi";
 import ApprovalReviewModal from "@/components/ApprovalReviewModal";
+import { platformLabel } from "@/lib/platforms";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
 import {
   ShieldCheck, History, ChevronRight, Clock, CheckCircle2,
@@ -88,8 +89,7 @@ function ApprovalsPage() {
   const handleApproved = () => {
     setModalOpen(false);
     setSelectedRequest(null);
-    loadData();
-    toast.success('Aplikasi disetujui!');
+    loadData(); // the modal already confirmed the approval with a toast
   };
 
   const handleRejected = () => {
@@ -204,7 +204,7 @@ function ApprovalsPage() {
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
                         <Sparkles className="h-3 w-3" />
-                        {request.platform}
+                        {platformLabel(request.platform)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{request.company}</p>
