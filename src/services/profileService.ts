@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { mockFullProfile } from "@/mocks/mockData";
+import type { ExperienceRow, EducationRow, SkillRow } from "@/lib/profileForms";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -136,17 +137,8 @@ export const profileService = {
       return mockFullProfile as unknown as FullProfile;
     }
 
-    const [
-      { data: profile },
-      { data: workExperiences },
-      { data: education },
-      { data: certifications },
-      { data: projects },
-      { data: achievements },
-      { data: skills },
-      { data: events },
-    ] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).single(),
+    const results = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
       supabase.from("work_experiences").select("*").eq("user_id", userId).order("start_date", { ascending: false }),
       supabase.from("education").select("*").eq("user_id", userId).order("start_year", { ascending: false }),
       supabase.from("certifications").select("*").eq("user_id", userId).order("issue_date", { ascending: false }),
@@ -155,6 +147,13 @@ export const profileService = {
       supabase.from("user_skills").select("*").eq("user_id", userId).order("proficiency_level", { ascending: false }),
       supabase.from("events_activities").select("*").eq("user_id", userId).order("start_date", { ascending: false }),
     ]);
+
+    // A failed query must not look like an empty profile: the page would then offer to "add" data that
+    // already exists. Surface the first error instead.
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw new Error(failed.error.message);
+
+    const [profile, workExperiences, education, certifications, projects, achievements, skills, events] = results.map((r) => r.data) as any[];
 
     return {
       profile: profile || {},
@@ -169,12 +168,12 @@ export const profileService = {
   },
 
   // Work Experiences CRUD
-  async createWorkExperience(data: Omit<WorkExperience, "id" | "user_id" | "created_at" | "updated_at">) {
+  async createWorkExperience(data: ExperienceRow) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
     return supabase.from("work_experiences").insert({ ...data, user_id: user.id }).select().single();
   },
-  async updateWorkExperience(id: string, data: Partial<WorkExperience>) {
+  async updateWorkExperience(id: string, data: Partial<ExperienceRow>) {
     return supabase.from("work_experiences").update(data).eq("id", id).select().single();
   },
   async deleteWorkExperience(id: string) {
@@ -182,12 +181,12 @@ export const profileService = {
   },
 
   // Education CRUD
-  async createEducation(data: Omit<Education, "id" | "user_id" | "created_at" | "updated_at">) {
+  async createEducation(data: EducationRow) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
     return supabase.from("education").insert({ ...data, user_id: user.id }).select().single();
   },
-  async updateEducation(id: string, data: Partial<Education>) {
+  async updateEducation(id: string, data: Partial<EducationRow>) {
     return supabase.from("education").update(data).eq("id", id).select().single();
   },
   async deleteEducation(id: string) {
@@ -234,12 +233,12 @@ export const profileService = {
   },
 
   // Skills CRUD
-  async createSkill(data: Omit<UserSkill, "id" | "user_id" | "created_at" | "updated_at">) {
+  async createSkill(data: SkillRow) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
     return supabase.from("user_skills").insert({ ...data, user_id: user.id }).select().single();
   },
-  async updateSkill(id: string, data: Partial<UserSkill>) {
+  async updateSkill(id: string, data: Partial<SkillRow>) {
     return supabase.from("user_skills").update(data).eq("id", id).select().single();
   },
   async deleteSkill(id: string) {

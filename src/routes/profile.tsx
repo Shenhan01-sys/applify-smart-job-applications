@@ -5,18 +5,34 @@ import {
   EyeOff, Download, FileCheck2, ChevronRight, ChevronLeft, 
   Loader2, Save, Briefcase, GraduationCap, Award, Wrench, 
   Target, CheckCircle2, User, MapPin, Phone, Link2, Mail,
-  Building2, Calendar, Star, TrendingUp, DollarSign, Clock,
+  Calendar, DollarSign, Clock,
   Layers, Sparkles
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
+// Sample profile data is only used in the explicit demo mode (VITE_MOCK_MODE=true). A real user starts empty.
+import {
   mockProfile as mockProfileData,
   mockWorkExperiences,
   mockEducation,
   mockCertifications,
   mockUserSkills,
 } from "@/mocks/mockData";
+import { profileService } from "@/services/profileService";
+import { ExperienceEditor, EducationEditor, SkillsEditor } from "@/components/profile/ProfileEditors";
+import {
+  buildProfileRow,
+  formatMonthYear,
+  profileGaps,
+  sortExperiences,
+  sortEducation,
+  sortSkills,
+  EMPLOYMENT_TYPES,
+  type EducationRow,
+  type ExperienceRow,
+  type SkillRow,
+} from "@/lib/profileForms";
+import { toast } from "sonner";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -84,19 +100,22 @@ function ProfilePage() {
     linkedin_url: "",
     portfolio_url: "",
   });
-  
-  const [workExps, setWorkExps] = useState(mockWorkExperiences);
-  const [educations, setEducations] = useState(mockEducation);
-  const [certs, setCerts] = useState(mockCertifications);
-  const [userSkills, setUserSkills] = useState(mockUserSkills);
-  const [preferences, setPreferences] = useState({
-    desired_salary: 40000000,
-    current_ctc: 30000000,
-    notice_period: 30,
-    job_type: "full-time",
-    work_type: "hybrid",
-    search_location: "Jakarta",
-  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Real accounts start empty and fill these from the database; the sample rows are demo mode only.
+  const [workExps, setWorkExps] = useState<any[]>(() => (isMockMode() ? [...mockWorkExperiences] : []));
+  const [educations, setEducations] = useState<any[]>(() => (isMockMode() ? [...mockEducation] : []));
+  const [certs, setCerts] = useState<any[]>(() => (isMockMode() ? [...mockCertifications] : []));
+  const [userSkills, setUserSkills] = useState<any[]>(() => (isMockMode() ? [...mockUserSkills] : []));
+  // Preferences are not stored by this page yet (the agent criteria live in Pengaturan Agen), so a real
+  // account starts with neutral values instead of invented ones.
+  const [preferences, setPreferences] = useState(() =>
+    isMockMode()
+      ? { desired_salary: 40000000, current_ctc: 30000000, notice_period: 30, job_type: "full-time", work_type: "hybrid", search_location: "Jakarta" }
+      : { desired_salary: 0, current_ctc: 0, notice_period: 0, job_type: "full-time", work_type: "hybrid", search_location: "" },
+  );
 
   useEffect(() => {
     async function loadProfile() {
@@ -116,26 +135,33 @@ function ProfilePage() {
         return;
       }
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user?.id)
-        .single();
-      const d = data || mockProfileData;
-      setFormData({
-        full_name: d.full_name || "",
-        current_title: d.current_title || "",
-        location: d.location || "",
-        experience_years: d.experience_years || 0,
-        phone: d.phone || "",
-        email: user?.email || "",
-        linkedin_url: d.linkedin_url || "",
-        portfolio_url: d.portfolio_url || "",
-      });
-      setLoading(false);
+      try {
+        setLoadError("");
+        const full = await profileService.getFullProfile(user!.id);
+        const d = full.profile || {};
+        setFormData({
+          full_name: d.full_name || "",
+          current_title: d.current_title || "",
+          location: d.location || "",
+          experience_years: d.experience_years || 0,
+          phone: d.phone || "",
+          email: user?.email || "",
+          linkedin_url: d.linkedin_url || "",
+          portfolio_url: d.portfolio_url || "",
+        });
+        setWorkExps(full.workExperiences);
+        setEducations(full.education);
+        setCerts(full.certifications);
+        setUserSkills(full.skills);
+      } catch (err: any) {
+        console.error("Error loading profile:", err);
+        setLoadError(err?.message || "Tidak dapat memuat profil.");
+      } finally {
+        setLoading(false);
+      }
     }
     if (user) loadProfile();
-  }, [user]);
+  }, [user, reloadKey]);
 
   const changeStep = (newStep: number, dir: 'next' | 'prev') => {
     if (newStep < 1 || newStep > steps.length) return;
@@ -145,18 +171,104 @@ function ProfilePage() {
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    if (!isMockMode()) {
-      await supabase.from("profiles").upsert({
-        id: user?.id,
-        ...formData,
-        updated_at: new Date().toISOString(),
-      });
+    const built = buildProfileRow(formData);
+    if (!built.ok) {
+      setFormErrors(built.errors as Record<string, string>);
+      setDirection('prev');
+      setAnimKey(prev => prev + 1);
+      setStep(1);
+      toast.error("Periksa kolom profil dasar yang ditandai merah.");
+      return;
     }
-    setSaving(false);
-    setShowSaveToast(true);
-    setTimeout(() => setShowSaveToast(false), 2000);
+    setFormErrors({});
+    setSaving(true);
+    try {
+      if (!isMockMode()) {
+        // Only real columns of `profiles`: `email` belongs to the login account, not to this table.
+        const { error } = await supabase.from("profiles").upsert({
+          id: user?.id,
+          ...built.row,
+          updated_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+      }
+      setShowSaveToast(true);
+      setTimeout(() => setShowSaveToast(false), 2000);
+    } catch (err: any) {
+      toast.error(`Gagal menyimpan profil: ${err?.message || "coba lagi"}`);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // ---- Experience / education / skills: each change is saved right away (no "Simpan" needed) ----
+  const newMockId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const saveExperience = useCallback(async (row: ExperienceRow, id: string | null) => {
+    let saved: any;
+    if (isMockMode()) {
+      saved = { ...(workExps.find((x) => x.id === id) ?? {}), ...row, id: id ?? newMockId("exp"), user_id: user?.id };
+    } else {
+      const res = id ? await profileService.updateWorkExperience(id, row) : await profileService.createWorkExperience(row);
+      if (res.error) throw new Error(res.error.message);
+      saved = res.data;
+    }
+    setWorkExps((prev) => (id ? prev.map((x) => (x.id === id ? saved : x)) : [saved, ...prev]));
+    toast.success(id ? "Pengalaman diperbarui." : "Pengalaman ditambahkan.");
+  }, [user, workExps]);
+
+  const deleteExperience = useCallback(async (id: string) => {
+    if (!isMockMode()) {
+      const res = await profileService.deleteWorkExperience(id);
+      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+    }
+    setWorkExps((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Pengalaman dihapus.");
+  }, []);
+
+  const saveEducation = useCallback(async (row: EducationRow, id: string | null) => {
+    let saved: any;
+    if (isMockMode()) {
+      saved = { ...(educations.find((x) => x.id === id) ?? {}), ...row, id: id ?? newMockId("edu"), user_id: user?.id };
+    } else {
+      const res = id ? await profileService.updateEducation(id, row) : await profileService.createEducation(row);
+      if (res.error) throw new Error(res.error.message);
+      saved = res.data;
+    }
+    setEducations((prev) => (id ? prev.map((x) => (x.id === id ? saved : x)) : [saved, ...prev]));
+    toast.success(id ? "Pendidikan diperbarui." : "Pendidikan ditambahkan.");
+  }, [user, educations]);
+
+  const deleteEducation = useCallback(async (id: string) => {
+    if (!isMockMode()) {
+      const res = await profileService.deleteEducation(id);
+      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+    }
+    setEducations((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Pendidikan dihapus.");
+  }, []);
+
+  const saveSkill = useCallback(async (row: SkillRow, id: string | null) => {
+    let saved: any;
+    if (isMockMode()) {
+      saved = { ...(userSkills.find((x) => x.id === id) ?? {}), ...row, id: id ?? newMockId("sk"), user_id: user?.id };
+    } else {
+      const res = id ? await profileService.updateSkill(id, row) : await profileService.createSkill(row);
+      if (res.error) throw new Error(res.error.message);
+      saved = res.data;
+    }
+    setUserSkills((prev) => (id ? prev.map((x) => (x.id === id ? saved : x)) : [saved, ...prev]));
+    toast.success(id ? "Skill diperbarui." : "Skill ditambahkan.");
+  }, [user, userSkills]);
+
+  const deleteSkill = useCallback(async (id: string) => {
+    if (!isMockMode()) {
+      const res = await profileService.deleteSkill(id);
+      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+    }
+    setUserSkills((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Skill dihapus.");
+  }, []);
 
   if (loading) {
     return (
@@ -187,6 +299,13 @@ function ProfilePage() {
         <h1 className="text-2xl md:text-3xl font-bold">Persona AI Kamu</h1>
         <p className="text-muted-foreground text-sm mt-1">Setup sekali, pakai untuk semua lamaran.</p>
       </header>
+
+      {loadError && (
+        <div role="alert" className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
+          <span>Profil tidak dapat dimuat dari server ({loadError}). Data yang tampil di bawah belum tentu lengkap.</span>
+          <button onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }} className="h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-semibold shrink-0">Coba lagi</button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         {/* LEFT: Form Card */}
@@ -237,8 +356,8 @@ function ProfilePage() {
             <h2 className="mt-2 text-xl font-bold">{steps[step-1].label}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {step === 1 && "Ceritakan tentang dirimu. Agen akan menggunakan ini untuk personalisasi lamaran."}
-              {step === 2 && "Tambahkan pengalaman kerja untuk menonjolkan keahlianmu."}
-              {step === 3 && "Lengkapi pendidikan dan skills untuk matching yang akurat."}
+              {step === 2 && "Tambahkan pengalaman kerja. Setiap perubahan langsung tersimpan."}
+              {step === 3 && "Lengkapi pendidikan dan skills. Setiap perubahan langsung tersimpan."}
               {step === 4 && "Atur preferensi agar AI mencari pekerjaan yang sesuai."}
               {step === 5 && "Review profil kamu sebelum AI mulai bekerja."}
             </p>
@@ -254,9 +373,24 @@ function ProfilePage() {
                 : 'slideInLeft 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            {step === 1 && <Step1Basic formData={formData} setFormData={setFormData} />}
-            {step === 2 && <Step2Experience workExps={workExps} />}
-            {step === 3 && <Step3Education educations={educations} userSkills={userSkills} />}
+            {step === 1 && <Step1Basic formData={formData} setFormData={setFormData} errors={formErrors} />}
+            {step === 2 && <ExperienceEditor items={workExps} onSave={saveExperience} onDelete={deleteExperience} />}
+            {step === 3 && (
+              <div className="space-y-6">
+                <section aria-labelledby="edu-heading">
+                  <h3 id="edu-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <GraduationCap className="h-4 w-4 text-[#0A5BE0]" /> Pendidikan
+                  </h3>
+                  <EducationEditor items={educations} onSave={saveEducation} onDelete={deleteEducation} />
+                </section>
+                <section aria-labelledby="skill-heading">
+                  <h3 id="skill-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Wrench className="h-4 w-4 text-[#0A5BE0]" /> Skills &amp; Keahlian
+                  </h3>
+                  <SkillsEditor items={userSkills} onSave={saveSkill} onDelete={deleteSkill} />
+                </section>
+              </div>
+            )}
             {step === 4 && <Step4Preferences preferences={preferences} setPreferences={setPreferences} />}
             {step === 5 && <Step5Review formData={formData} workExps={workExps} educations={educations} userSkills={userSkills} preferences={preferences} />}
           </div>
@@ -290,10 +424,10 @@ function ProfilePage() {
                 </button>
               ) : (
                 <button 
-                  onClick={() => alert("Profil siap! AI akan mulai mencari pekerjaan untuk kamu.")} 
+                  onClick={handleSave} 
                   className="h-11 px-5 rounded-xl bg-green-500 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-green-600 transition shadow-lg shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0"
                 >
-                  <CheckCircle2 className="h-4 w-4" /> Selesai
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Simpan &amp; Selesai
                 </button>
               )}
             </div>
@@ -343,8 +477,8 @@ function ProfilePage() {
                 <Wrench className="h-3 w-3" /> Skill Utama
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {userSkills.length > 0 ? userSkills.map(s => (
-                  <span key={s.name} className="text-[11px] px-2.5 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">{s.name}</span>
+                {userSkills.length > 0 ? sortSkills(userSkills).map(s => (
+                  <span key={s.id ?? s.name} className="text-[11px] px-2.5 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">{s.name}</span>
                 )) : (
                   <span className="text-xs text-muted-foreground">Belum ada skill</span>
                 )}
@@ -357,12 +491,13 @@ function ProfilePage() {
                 <Briefcase className="h-3 w-3" /> Pengalaman Kerja
               </p>
               <div className="mt-2 space-y-3">
-                {workExps.map((exp, i) => (
-                  <div key={i} className={`text-xs transition-all duration-300 ${blind && i > 0 ? 'opacity-30 blur-[2px]' : ''}`}>
+                {workExps.length === 0 && <span className="text-xs text-muted-foreground">Belum ada pengalaman kerja</span>}
+                {sortExperiences(workExps).map((exp, i) => (
+                  <div key={exp.id ?? i} className={`text-xs transition-all duration-300 ${blind && i > 0 ? 'opacity-30 blur-[2px]' : ''}`}>
                     <p className="font-semibold">{exp.role_title}</p>
-                    <p className="text-muted-foreground">{exp.company_name} · {exp.employment_type}</p>
+                    <p className="text-muted-foreground">{exp.company_name} · {EMPLOYMENT_TYPES.find((t) => t.value === exp.employment_type)?.label ?? exp.employment_type}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {exp.start_date} — {exp.end_date || "Sekarang"} · {exp.location_type}
+                      {formatMonthYear(exp.start_date)} — {exp.is_current ? "Sekarang" : formatMonthYear(exp.end_date) || "-"}
                     </p>
                   </div>
                 ))}
@@ -375,11 +510,12 @@ function ProfilePage() {
                 <GraduationCap className="h-3 w-3" /> Pendidikan
               </p>
               <div className="mt-2 space-y-2">
-                {educations.map((edu, i) => (
-                  <div key={i} className="text-xs">
+                {educations.length === 0 && <span className="text-xs text-muted-foreground">Belum ada riwayat pendidikan</span>}
+                {sortEducation(educations).map((edu, i) => (
+                  <div key={edu.id ?? i} className="text-xs">
                     <p className="font-semibold">{edu.institution}</p>
                     <p className="text-muted-foreground">{edu.degree} {edu.field_of_study && `· ${edu.field_of_study}`}</p>
-                    <p className="text-[10px] text-muted-foreground">{edu.start_year} — {edu.end_year || "Sekarang"} {edu.gpa && `· GPA ${edu.gpa}/${edu.max_gpa}`}</p>
+                    <p className="text-[10px] text-muted-foreground">{edu.start_year ?? "-"} — {edu.is_current ? "Sekarang" : edu.end_year ?? "-"} {edu.gpa != null && `· IPK ${edu.gpa}/${edu.max_gpa ?? 4}`}</p>
                   </div>
                 ))}
               </div>
@@ -391,8 +527,9 @@ function ProfilePage() {
                 <Award className="h-3 w-3" /> Sertifikasi
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
+                {certs.length === 0 && <span className="text-xs text-muted-foreground">Belum ada sertifikasi</span>}
                 {certs.map((c, i) => (
-                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
+                  <span key={c.id ?? i} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
                     {c.name}
                   </span>
                 ))}
@@ -424,9 +561,10 @@ function ProfilePage() {
 
 // ===== STEP COMPONENTS =====
 
-function Step1Basic({ formData, setFormData }: { 
+function Step1Basic({ formData, setFormData, errors }: { 
   formData: any, 
-  setFormData: React.Dispatch<React.SetStateAction<any>> 
+  setFormData: React.Dispatch<React.SetStateAction<any>>,
+  errors: Record<string, string>,
 }) {
   const fields = [
     { key: 'full_name', label: 'Nama Lengkap', placeholder: 'Contoh: Rizky Aditya', icon: User, type: 'text' },
@@ -457,123 +595,15 @@ function Step1Basic({ formData, setFormData }: {
               value={formData[field.key] || ''}
               onChange={(e) => setFormData({...formData, [field.key]: field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value})}
               placeholder={field.placeholder}
-              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%]"
+              readOnly={field.key === 'email'}
+              aria-invalid={!!errors[field.key]}
+              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%] aria-[invalid=true]:border-red-400 read-only:opacity-70 read-only:cursor-not-allowed"
             />
+            {field.key === 'email' && <p className="mt-1 text-[11px] text-muted-foreground">Email akun login; tidak diubah dari halaman ini.</p>}
+            {errors[field.key] && <p className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function Step2Experience({ workExps }: { workExps: any[] }) {
-  return (
-    <div className="space-y-4">
-      {workExps.map((exp, i) => (
-        <div 
-          key={exp.id} 
-          className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 hover:bg-[#0A5BE0]/[2%] transition-all duration-300 group"
-          style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{exp.role_title}</p>
-                <p className="text-xs text-muted-foreground">{exp.company_name}</p>
-              </div>
-            </div>
-            <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${exp.is_current ? 'bg-green-100 text-green-700' : 'bg-black/[5%] text-muted-foreground'}`}>
-              {exp.is_current ? 'Current' : 'Past'}
-            </span>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> {exp.start_date} — {exp.end_date || "Sekarang"}</span>
-            <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {exp.location_type}</span>
-            <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" /> {exp.employment_type}</span>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{exp.description}</p>
-          {exp.achievements?.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {exp.achievements.map((a: string, j: number) => (
-                <div key={j} className="flex items-center gap-1.5 text-[11px]">
-                  <Star className="h-3 w-3 text-[#D2F801]" />
-                  <span className="text-muted-foreground">{a}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-      
-      <button className="w-full h-11 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] hover:bg-[#0A5BE0]/[2%] transition-all duration-300 inline-flex items-center justify-center gap-2">
-        <Briefcase className="h-4 w-4" /> Tambah Pengalaman Kerja
-      </button>
-    </div>
-  );
-}
-
-function Step3Education({ educations, userSkills }: { educations: any[], userSkills: any[] }) {
-  return (
-    <div className="space-y-5">
-      {/* Education Section */}
-      <div>
-        <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <GraduationCap className="h-4 w-4 text-[#0A5BE0]" /> Pendidikan
-        </h3>
-        <div className="space-y-3">
-          {educations.map((edu, i) => (
-            <div 
-              key={edu.id} 
-              className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 transition-all duration-300"
-              style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.1}s both` }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-100 text-amber-700 grid place-items-center">
-                  <GraduationCap className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{edu.institution}</p>
-                  <p className="text-xs text-muted-foreground">{edu.degree} {edu.field_of_study && `· ${edu.field_of_study}`}</p>
-                </div>
-              </div>
-              <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                <span>{edu.start_year} — {edu.end_year || "Sekarang"}</span>
-                {edu.gpa && <span className="font-mono">GPA: {edu.gpa}/{edu.max_gpa}</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-        <button className="mt-3 w-full h-10 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] transition-all inline-flex items-center justify-center gap-2">
-          <GraduationCap className="h-4 w-4" /> Tambah Pendidikan
-        </button>
-      </div>
-
-      {/* Skills Section */}
-      <div>
-        <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <Wrench className="h-4 w-4 text-[#0A5BE0]" /> Skills & Keahlian
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {userSkills.map((skill, i) => (
-            <div 
-              key={skill.id}
-              className="group relative"
-              style={{ animation: `fadeInUp 0.3s ease-out ${i * 0.03}s both` }}
-            >
-              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#0A5BE0] text-white font-medium hover:bg-[#0A5BE0]/90 transition-all cursor-default">
-                {skill.name}
-                <span className="text-[10px] opacity-70">{skill.proficiency_level}/5</span>
-              </span>
-            </div>
-          ))}
-        </div>
-        <button className="mt-3 h-10 px-4 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] transition-all inline-flex items-center gap-2">
-          <Wrench className="h-4 w-4" /> Tambah Skill
-        </button>
-      </div>
     </div>
   );
 }
@@ -590,6 +620,9 @@ function Step4Preferences({ preferences, setPreferences }: {
 
   return (
     <div className="space-y-5">
+      <p className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-3 leading-relaxed">
+        Preferensi di langkah ini belum disimpan ke server. Kriteria pencarian yang dipakai agen diatur di halaman Pengaturan Agen.
+      </p>
       <div className="space-y-4">
         {prefFields.map((field, i) => {
           const Icon = field.icon;
@@ -732,7 +765,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
           <div className="flex items-center gap-2">
             <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Gaji harapan:</span>
-            <span className="font-medium">Rp {(preferences.desired_salary / 1000000).toFixed(0)}jt</span>
+            <span className="font-medium">{preferences.desired_salary > 0 ? `Rp ${(preferences.desired_salary / 1000000).toFixed(0)}jt` : "-"}</span>
           </div>
           <div className="flex items-center gap-2">
             <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
@@ -747,22 +780,48 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
           <div className="flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Notice:</span>
-            <span className="font-medium">{preferences.notice_period} hari</span>
+            <span className="font-medium">{preferences.notice_period > 0 ? `${preferences.notice_period} hari` : "-"}</span>
           </div>
         </div>
       </div>
 
-      {/* Completion Message */}
-      <div 
-        className="rounded-xl bg-green-50 border-2 border-green-200 p-4 text-center"
-        style={{ animation: `fadeInUp 0.5s ease-out 0.6s both` }}
-      >
-        <div className="h-12 w-12 rounded-full bg-green-100 text-green-600 grid place-items-center mx-auto mb-2">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <p className="text-sm font-semibold text-green-800">Profil Siap!</p>
-        <p className="text-xs text-green-600 mt-1">AI akan menggunakan data ini untuk mencari dan melamar pekerjaan otomatis.</p>
-      </div>
+      {/* Completion Message: ready only when the data the draft prompt always uses is present */}
+      {(() => {
+        const gaps = profileGaps({
+          full_name: formData.full_name,
+          current_title: formData.current_title,
+          skills: userSkills.length,
+          experiences: workExps.length,
+          education: educations.length,
+        });
+        const ready = gaps.missing.length === 0;
+        return (
+          <div
+            className={`rounded-xl border-2 p-4 ${ready ? "bg-green-50 border-green-200 text-center" : "bg-amber-50 border-amber-200"}`}
+            style={{ animation: `fadeInUp 0.5s ease-out 0.6s both` }}
+          >
+            {ready && (
+              <div className="h-12 w-12 rounded-full bg-green-100 text-green-600 grid place-items-center mx-auto mb-2">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+            )}
+            <p className={`text-sm font-semibold ${ready ? "text-green-800" : "text-amber-800"}`}>{ready ? "Profil siap dipakai" : "Lengkapi dulu"}</p>
+            {gaps.missing.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-xs text-amber-800 list-disc pl-4">
+                {gaps.missing.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            )}
+            {gaps.tips.length > 0 && (
+              <ul className={`mt-2 space-y-0.5 text-xs list-disc pl-4 ${ready ? "text-green-700 text-left" : "text-muted-foreground"}`}>
+                {gaps.tips.map((t) => <li key={t}>{t}</li>)}
+              </ul>
+            )}
+            <p className={`text-xs mt-2 ${ready ? "text-green-700" : "text-muted-foreground"}`}>
+              Draf lamaran memakai nama, jabatan, lama pengalaman, skill, dan tiga pengalaman kerja terbaru dari profil ini.
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }
