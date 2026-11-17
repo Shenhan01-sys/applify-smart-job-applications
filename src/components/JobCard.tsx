@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { platformLabel } from "@/lib/platforms";
+import { listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "@/lib/jobCardData";
 import {
   MapPin,
   Briefcase,
@@ -297,17 +298,20 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
     ? `${formatCurrency(job.salary_min)} - ${formatCurrency(job.salary_max)}`
     : "Gaji kompetitif";
 
-  const radarSkills = [
-    { name: "Tech", value: job.skill_matches.find((s) => s.skill.includes("Tech"))?.level || 70 },
-    { name: "Exp", value: job.skill_matches.find((s) => s.skill.includes("Experience"))?.level || 80 },
-    { name: "Edu", value: job.skill_matches.find((s) => s.skill.includes("Education"))?.level || 90 },
-    { name: "Soft", value: job.skill_matches.find((s) => s.skill.includes("Soft"))?.level || 75 },
-    { name: "Lang", value: job.skill_matches.find((s) => s.skill.includes("Language"))?.level || 85 },
-    { name: "Tools", value: job.skill_matches.find((s) => s.skill.includes("Tools"))?.level || 65 },
-  ];
+  // A row from the job sources has none of the AI analysis (see lib/jobCardData.ts): show only what exists.
+  const radarSkills = radarFromMatches(job.skill_matches);
+  const skillGaps = listOrEmpty<SkillGap>(job.skill_gaps);
+  const aiActions = listOrEmpty<AIAction>(job.ai_actions);
+  const requirements = listOrEmpty<string>(job.requirements);
+  const matchScore = scoreOrNull(job.match_score);
+  const acceptanceScore = scoreOrNull(job.acceptance_potential);
+  const cultureScore = scoreOrNull(job.company_culture_score);
+  const growthScore = scoreOrNull(job.growth_potential);
+  const hasAnyScore = [matchScore, acceptanceScore, cultureScore, growthScore].some((v) => v !== null);
+  const posted = postedDate(job as { posted_at?: unknown; created_at?: unknown });
 
-  const matchColor = job.match_score >= 80 ? "#22C55E" : job.match_score >= 60 ? "#0A5BE0" : "#F59E0B";
-  const acceptanceColor = job.acceptance_potential >= 70 ? "#22C55E" : job.acceptance_potential >= 50 ? "#0A5BE0" : "#F59E0B";
+  const matchColor = (matchScore ?? 0) >= 80 ? "#22C55E" : (matchScore ?? 0) >= 60 ? "#0A5BE0" : "#F59E0B";
+  const acceptanceColor = (acceptanceScore ?? 0) >= 70 ? "#22C55E" : (acceptanceScore ?? 0) >= 50 ? "#0A5BE0" : "#F59E0B";
 
   return (
     <div className="rounded-2xl border-2 border-[#999999] bg-white overflow-hidden hover:border-[#0A5BE0] transition-colors">
@@ -317,10 +321,12 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-lg truncate">{job.title}</h3>
-              <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
-                <Sparkles className="h-3 w-3" />
-                AI Matched
-              </span>
+              {matchScore !== null && (
+                <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
+                  <Sparkles className="h-3 w-3" />
+                  AI Matched
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
               <span className="inline-flex items-center gap-1">
@@ -358,28 +364,36 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
         </div>
 
         {/* AI Scores Row */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
-          <CircularProgress value={job.match_score} label="Match" color={matchColor} size={70} />
-          <CircularProgress value={job.acceptance_potential} label="Acceptance" color={acceptanceColor} size={70} />
-          <CircularProgress value={job.company_culture_score} label="Culture" color="#8B5CF6" size={70} />
-          <CircularProgress value={job.growth_potential} label="Growth" color="#06B6D4" size={70} />
-        </div>
+        {hasAnyScore ? (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
+            {matchScore !== null && <CircularProgress value={matchScore} label="Match" color={matchColor} size={70} />}
+            {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Acceptance" color={acceptanceColor} size={70} />}
+            {cultureScore !== null && <CircularProgress value={cultureScore} label="Culture" color="#8B5CF6" size={70} />}
+            {growthScore !== null && <CircularProgress value={growthScore} label="Growth" color="#06B6D4" size={70} />}
+          </div>
+        ) : (
+          <p className="mt-4 pt-4 border-t border-[#E0E0E0] text-xs text-muted-foreground">
+            Skor kecocokan belum tersedia untuk lowongan ini. Buat draf lamaran untuk melihat analisis AI.
+          </p>
+        )}
 
         {/* Salary & Platform */}
         <div className="flex items-center justify-between mt-4 text-sm">
           <div className="inline-flex items-center gap-1.5 text-[#0A5BE0] font-semibold">
             <DollarSign className="h-4 w-4" />
             {salaryText}
-            <span className="text-xs text-muted-foreground font-normal">/{job.salary_period}</span>
+            {job.salary_period && <span className="text-xs text-muted-foreground font-normal">/{job.salary_period}</span>}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
               Source: {platformLabel(job.platform_source)}
             </span>
-            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {new Date(job.posted_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
-            </span>
+            {posted && (
+              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {posted.toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -388,13 +402,15 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
       {expanded && (
         <div className="border-t border-[#E0E0E0] p-5 space-y-6">
           {/* AI Strategy */}
-          <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Brain className="h-4 w-4 text-[#0A5BE0]" />
-              <span className="font-semibold text-sm">AI Strategy</span>
+          {job.ai_strategy && (
+            <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain className="h-4 w-4 text-[#0A5BE0]" />
+                <span className="font-semibold text-sm">AI Strategy</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{job.ai_strategy}</p>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">{job.ai_strategy}</p>
-          </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Skill Radar */}
@@ -403,15 +419,19 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
                 <Target className="h-4 w-4 text-[#0A5BE0]" />
                 Skill Match Analysis
               </h4>
-              <RadarChart skills={radarSkills} />
-              {job.skill_gaps.length > 0 && (
+              {radarSkills ? (
+                <RadarChart skills={radarSkills} />
+              ) : (
+                <p className="text-xs text-muted-foreground">Analisis kecocokan skill belum tersedia untuk lowongan ini.</p>
+              )}
+              {skillGaps.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs font-medium text-[#F59E0B] mb-1.5 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     Skill Gaps Detected:
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {job.skill_gaps.map((gap, i) => (
+                    {skillGaps.map((gap, i) => (
                       <span key={i} className="text-xs bg-[#FEF3C7] text-[#92400E] px-2 py-0.5 rounded-full">
                         {gap.skill} ({gap.user_level}/{gap.required_level})
                       </span>
@@ -450,24 +470,26 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           </div>
 
           {/* AI Action Timeline */}
-          <div>
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
-              <Bot className="h-4 w-4 text-[#0A5BE0]" />
-              AI Application Plan
-            </h4>
-            <div className="space-y-0">
-              {job.ai_actions.map((action, i) => (
-                <TimelineItem key={i} action={action} isLast={i === job.ai_actions.length - 1} />
-              ))}
+          {aiActions.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
+                <Bot className="h-4 w-4 text-[#0A5BE0]" />
+                AI Application Plan
+              </h4>
+              <div className="space-y-0">
+                {aiActions.map((action, i) => (
+                  <TimelineItem key={i} action={action} isLast={i === aiActions.length - 1} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Requirements Preview */}
-          {job.requirements.length > 0 && (
+          {requirements.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold mb-2">Key Requirements</h4>
               <ul className="space-y-1.5">
-                {job.requirements.slice(0, 4).map((req, i) => (
+                {requirements.slice(0, 4).map((req, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5 text-[#0A5BE0] mt-0.5 shrink-0" />
                     {req}

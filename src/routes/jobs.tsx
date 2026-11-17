@@ -6,7 +6,9 @@ import { AIJobScanner } from "@/components/AIJobScanner";
 import { AIApplyModal } from "@/components/AIApplyModal";
 import { JobCard, type JobData } from "@/components/JobCard";
 import { Search, SlidersHorizontal, Zap, Loader2, Brain, Crown, Sparkles, Target } from "lucide-react";
-import { mockJobs as mockJobsData, mockSavedJobIds, mockSubscription, MOCK_USER_ID } from "@/mocks/mockData";
+import { parseQuotaStatus } from "@/lib/quotaStatus";
+// Sample jobs, saved ids and quota exist only for the explicit demo mode (VITE_MOCK_MODE=true).
+import { mockJobs as mockJobsData, mockSavedJobIds, mockSubscription } from "@/mocks/mockData";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -30,14 +32,16 @@ function JobsPage() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
   const [userTier, setUserTier] = useState<"free" | "pro">("free");
-  const [remainingQuota, setRemainingQuota] = useState(10);
+  // Monthly AI-draft quota (get_quota_status). null = not known, so nothing is shown instead of a guess.
+  const [draftQuota, setDraftQuota] = useState<{ remaining: number; quota: number } | null>(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (isMockMode()) {
       setJobs(mockJobsData as JobData[]);
       setSavedJobs(new Set(mockSavedJobIds));
       setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
-      setRemainingQuota(mockSubscription.daily_apply_quota);
+      setDraftQuota({ quota: mockSubscription.monthly_quota, remaining: mockSubscription.monthly_quota - mockSubscription.used_quota });
       setLoading(false);
       return;
     }
@@ -50,27 +54,28 @@ function JobsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase
-        .from("subscriptions")
-        .select("ai_model_tier, daily_apply_quota")
-        .eq("user_id", user.id)
-        .single();
-      if (data) {
-        setUserTier(data.ai_model_tier as "free" | "pro");
-        setRemainingQuota(data.daily_apply_quota);
+      // Same source as the draft modal and the Edge Function: the plan is subscriptions.ai_model_tier, the
+      // monthly draft quota comes from get_quota_status (daily_apply_quota is only its limit column).
+      const [{ data: sub }, { data: status, error }] = await Promise.all([
+        supabase.from("subscriptions").select("ai_model_tier").eq("user_id", user.id).maybeSingle(),
+        supabase.rpc("get_quota_status", { p_user_id: user.id }),
+      ]);
+      setUserTier(sub?.ai_model_tier === "pro" ? "pro" : "free");
+      if (error) {
+        setDraftQuota(null);
       } else {
-        setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
-        setRemainingQuota(mockSubscription.daily_apply_quota);
+        const q = parseQuotaStatus(status);
+        setDraftQuota({ remaining: q.remaining, quota: q.quota });
       }
     } catch (err) {
       console.error("Error loading tier:", err);
-      setUserTier(mockSubscription.ai_model_tier as "free" | "pro");
-      setRemainingQuota(mockSubscription.daily_apply_quota);
+      setDraftQuota(null);
     }
   };
 
   const fetchJobs = async () => {
     try {
+      setLoadError("");
       const { data, error } = await supabase
         .from("jobs")
         .select("*")
@@ -79,10 +84,12 @@ function JobsPage() {
         .limit(50);
 
       if (error) throw error;
-      setJobs((data?.length ? data : mockJobsData) as JobData[]);
-    } catch (err) {
+      // No sample fallback for a real account: an empty table is an empty feed.
+      setJobs((data ?? []) as JobData[]);
+    } catch (err: any) {
       console.error("Error fetching jobs:", err);
-      setJobs(mockJobsData as JobData[]);
+      setJobs([]);
+      setLoadError(err?.message || "Tidak dapat memuat lowongan.");
     } finally {
       setLoading(false);
     }
@@ -102,7 +109,7 @@ function JobsPage() {
       setSavedJobs(new Set(data?.map((j) => j.job_id) || []));
     } catch (err) {
       console.error("Error fetching saved jobs:", err);
-      setSavedJobs(new Set(mockSavedJobIds));
+      setSavedJobs(new Set());
     }
   };
 
@@ -147,187 +154,6 @@ function JobsPage() {
     setShowApplyModal(true);
   };
 
-  // Generate mock jobs if none exist (for non-mock mode)
-  const generateMockJobs = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const mockJobs = [
-        {
-          title: "Senior Backend Engineer",
-          company: "Gojek",
-          location: "Jakarta",
-          type: "full-time",
-          workplace_type: "hybrid",
-          salary_min: 35000000,
-          salary_max: 50000000,
-          salary_currency: "IDR",
-          salary_period: "monthly",
-          description: "We are looking for a Senior Backend Engineer to join our growing team. You will be responsible for designing and implementing scalable backend services.",
-          requirements: ["5+ years experience with Go/Node.js", "Experience with microservices architecture", "Strong knowledge of PostgreSQL and Redis", "Experience with AWS/GCP"],
-          responsibilities: ["Design and implement backend services", "Optimize database performance", "Mentor junior developers", "Collaborate with product team"],
-          benefits: ["Health insurance", "Remote work options", "Learning budget", "Stock options"],
-          platform_source: "LinkedIn",
-          match_score: 92,
-          acceptance_potential: 85,
-          company_culture_score: 88,
-          growth_potential: 90,
-          ai_strategy: "AI akan mengoptimasi CV kamu dengan menekankan pengalaman backend dan leadership. Cover letter akan disesuaikan dengan kultur Gojek yang agile. Applify mengingatkanmu 4 hari setelah lamaran terkirim agar kamu bisa follow-up sendiri.",
-          ai_actions: [
-            { step: 1, title: "CV Optimization", description: "Menyesuaikan CV dengan keywords dari job description", status: "pending", estimated_time: "2 menit" },
-            { step: 2, title: "Cover Letter AI", description: "Generate cover letter yang personal dan relevan", status: "pending", estimated_time: "3 menit" },
-            { step: 3, title: "Isi Form & Kirim", description: "Mengisi form lamaran; tombol kirim hanya ditekan setelah kamu menyetujui", status: "pending", estimated_time: "1 menit" },
-            { step: 4, title: "Follow-up Strategy", description: "Pengingat follow-up 4 hari kemudian (kamu yang mengirim follow-up)", status: "pending", estimated_time: "30 detik" },
-          ],
-          skill_gaps: [{ skill: "Go Language", required_level: 8, user_level: 6, gap: 2 }],
-          skill_matches: [
-            { skill: "Backend Tech", level: 90, matched: true },
-            { skill: "Experience", level: 85, matched: true },
-            { skill: "Education", level: 80, matched: true },
-            { skill: "Soft Skills", level: 88, matched: true },
-            { skill: "Language", level: 85, matched: true },
-            { skill: "Tools", level: 75, matched: true },
-          ],
-          salary_benchmark: { market_average: 42000000, market_high: 60000000, market_low: 28000000, percentile: 65 },
-          status: "active",
-          posted_at: new Date().toISOString(),
-        },
-        {
-          title: "Product Manager - Fintech",
-          company: "Tokopedia",
-          location: "Jakarta",
-          type: "full-time",
-          workplace_type: "hybrid",
-          salary_min: 40000000,
-          salary_max: 60000000,
-          salary_currency: "IDR",
-          salary_period: "monthly",
-          description: "Lead product development for our fintech initiatives. You will work cross-functionally to deliver products that impact millions of users.",
-          requirements: ["4+ years in product management", "Experience in fintech/payments", "Data-driven decision making", "Strong stakeholder management"],
-          responsibilities: ["Define product roadmap", "Analyze user data and metrics", "Coordinate with engineering and design", "Present to leadership"],
-          benefits: ["Competitive salary", "Performance bonus", "Health & dental", "Flexible working hours"],
-          platform_source: "Jobstreet",
-          match_score: 84,
-          acceptance_potential: 72,
-          company_culture_score: 82,
-          growth_potential: 88,
-          ai_strategy: "AI akan menyoroti pengalaman product management dan data analysis kamu. Portfolio akan di-highlight dengan case studies yang relevan dengan fintech. AI juga akan research tentang produk Tokopedia Pay untuk personalisasi cover letter.",
-          ai_actions: [
-            { step: 1, title: "Portfolio Curation", description: "Pilih case studies yang paling relevan dengan fintech", status: "pending", estimated_time: "5 menit" },
-            { step: 2, title: "CV Tailoring", description: "Highlight product metrics dan achievements", status: "pending", estimated_time: "3 menit" },
-            { step: 3, title: "Research & Personalize", description: "Research produk Tokopedia Pay untuk cover letter", status: "pending", estimated_time: "4 menit" },
-            { step: 4, title: "Submit & Track", description: "Submit dan setup tracking untuk response", status: "pending", estimated_time: "2 menit" },
-          ],
-          skill_gaps: [{ skill: "Fintech Domain", required_level: 7, user_level: 5, gap: 2 }],
-          skill_matches: [
-            { skill: "Backend Tech", level: 70, matched: true },
-            { skill: "Experience", level: 80, matched: true },
-            { skill: "Education", level: 85, matched: true },
-            { skill: "Soft Skills", level: 90, matched: true },
-            { skill: "Language", level: 80, matched: true },
-            { skill: "Tools", level: 75, matched: true },
-          ],
-          salary_benchmark: { market_average: 48000000, market_high: 70000000, market_low: 32000000, percentile: 58 },
-          status: "active",
-          posted_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          title: "Data Analyst",
-          company: "Shopee",
-          location: "Jakarta",
-          type: "full-time",
-          workplace_type: "on-site",
-          salary_min: 18000000,
-          salary_max: 25000000,
-          salary_currency: "IDR",
-          salary_period: "monthly",
-          description: "Analyze large datasets to provide actionable insights for business decisions. Work with SQL, Python, and visualization tools.",
-          requirements: ["2+ years in data analysis", "Proficient in SQL and Python", "Experience with Tableau/PowerBI", "Strong analytical thinking"],
-          responsibilities: ["Analyze user behavior data", "Create dashboards and reports", "Support business decisions with data", "Collaborate with cross-functional teams"],
-          benefits: ["Competitive package", "Meal allowance", "Transport allowance", "Gym membership"],
-          platform_source: "Glints",
-          match_score: 76,
-          acceptance_potential: 68,
-          company_culture_score: 75,
-          growth_potential: 82,
-          ai_strategy: "AI akan membuat CV yang menonjolkan proyek data analysis dan visualisasi kamu. Sertifikat dan course completion akan di-highlight. AI akan juga menyarankan portfolio project yang bisa ditambahkan.",
-          ai_actions: [
-            { step: 1, title: "Skills Highlight", description: "Soroti SQL, Python, dan visualization skills", status: "pending", estimated_time: "2 menit" },
-            { step: 2, title: "Portfolio Enhancement", description: "Tambahkan link ke project dan portfolio", status: "pending", estimated_time: "3 menit" },
-            { step: 3, title: "CV Submission", description: "Submit dengan format yang ATS-friendly", status: "pending", estimated_time: "1 menit" },
-          ],
-          skill_gaps: [
-            { skill: "Python Advanced", required_level: 7, user_level: 5, gap: 2 },
-            { skill: "Tableau", required_level: 6, user_level: 4, gap: 2 },
-          ],
-          skill_matches: [
-            { skill: "Backend Tech", level: 60, matched: false },
-            { skill: "Experience", level: 70, matched: true },
-            { skill: "Education", level: 80, matched: true },
-            { skill: "Soft Skills", level: 75, matched: true },
-            { skill: "Language", level: 70, matched: true },
-            { skill: "Tools", level: 65, matched: false },
-          ],
-          salary_benchmark: { market_average: 20000000, market_high: 30000000, market_low: 14000000, percentile: 55 },
-          status: "active",
-          posted_at: new Date(Date.now() - 18000000).toISOString(),
-        },
-        {
-          title: "UI/UX Designer",
-          company: "BCA Digital",
-          location: "Jakarta",
-          type: "full-time",
-          workplace_type: "on-site",
-          salary_min: 20000000,
-          salary_max: 30000000,
-          salary_currency: "IDR",
-          salary_period: "monthly",
-          description: "Design intuitive and beautiful user interfaces for digital banking products. Collaborate with product and engineering teams.",
-          requirements: ["3+ years in UI/UX design", "Proficient in Figma", "Experience with design systems", "Understanding of accessibility"],
-          responsibilities: ["Design user interfaces", "Create prototypes and wireframes", "Conduct user research", "Maintain design system"],
-          benefits: ["Health insurance", "Annual bonus", "Training budget", "Work-life balance"],
-          platform_source: "Kalibrr",
-          match_score: 88,
-          acceptance_potential: 78,
-          company_culture_score: 85,
-          growth_potential: 80,
-          ai_strategy: "AI akan membuat portfolio showcase yang menonjolkan design thinking process kamu. Case studies akan di-struktur dengan problem-solution-outcome format. AI juga akan menyesuaikan design style dengan brand guidelines BCA Digital.",
-          ai_actions: [
-            { step: 1, title: "Portfolio Curation", description: "Pilih 3 case studies terbaik yang relevan dengan fintech", status: "pending", estimated_time: "5 menit" },
-            { step: 2, title: "Design Case Study", description: "Format case study dengan struktur yang jelas", status: "pending", estimated_time: "4 menit" },
-            { step: 3, title: "Brand Alignment", description: "Sesuaikan portfolio dengan estetik BCA Digital", status: "pending", estimated_time: "3 menit" },
-            { step: 4, title: "Submit Portfolio", description: "Submit CV dan portfolio link", status: "pending", estimated_time: "2 menit" },
-          ],
-          skill_gaps: [],
-          skill_matches: [
-            { skill: "Backend Tech", level: 50, matched: false },
-            { skill: "Experience", level: 85, matched: true },
-            { skill: "Education", level: 80, matched: true },
-            { skill: "Soft Skills", level: 88, matched: true },
-            { skill: "Language", level: 75, matched: true },
-            { skill: "Tools", level: 90, matched: true },
-          ],
-          salary_benchmark: { market_average: 24000000, market_high: 35000000, market_low: 16000000, percentile: 52 },
-          status: "active",
-          posted_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ];
-
-      // Insert mock jobs
-      for (const job of mockJobs) {
-        await supabase.from("jobs").insert(job);
-      }
-
-      await fetchJobs();
-    } catch (err) {
-      console.error("Error generating mock jobs:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Filter jobs
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
@@ -358,8 +184,8 @@ function JobsPage() {
             <h1 className="text-2xl md:text-3xl font-bold">AI Job Discovery</h1>
             <p className="text-muted-foreground text-sm mt-1">
               {jobs.length > 0
-                ? `${jobs.length} lowongan dianalisis oleh AI · Diperbarui real-time`
-                : "AI akan mencari & menganalisis lowongan untuk kamu"}
+                ? `${jobs.length} lowongan tersimpan dari sumber yang didukung`
+                : "Cari lowongan dengan AI Job Scanner"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -375,7 +201,7 @@ function JobsPage() {
             {/* Quota */}
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] px-3 py-1.5 text-xs font-bold">
               <Target className="h-3.5 w-3.5" />
-              {remainingQuota} apply tersisa
+              {draftQuota ? `${draftQuota.remaining} draf tersisa bulan ini` : "Kuota draf tidak diketahui"}
             </span>
             {goldenWindows > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#16150F] px-3 py-1.5 text-xs font-bold">
@@ -467,23 +293,19 @@ function JobsPage() {
             {jobs.length === 0 ? "Belum ada lowongan" : "Tidak ada lowongan yang cocok"}
           </h3>
           <p className="text-sm text-muted-foreground mb-6">
-            {jobs.length === 0
-              ? "AI belum melakukan scan. Klik tombol di atas untuk memulai."
-              : "Coba ubah filter atau kata kunci pencarian."}
+            {loadError
+              ? `Lowongan tidak dapat dimuat (${loadError}).`
+              : jobs.length === 0
+                ? "Belum ada lowongan tersimpan. Buka AI Job Scanner di atas untuk mencari lowongan dari sumber yang didukung."
+                : "Coba ubah filter atau kata kunci pencarian."}
           </p>
-          {jobs.length === 0 && (
-            <div className="space-y-3">
-              <button
-                onClick={generateMockJobs}
-                className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition inline-flex items-center gap-2"
-              >
-                <Zap className="h-4 w-4" />
-                Generate Demo Jobs
-              </button>
-              <p className="text-xs text-muted-foreground">
-                Ini akan membuat 4 lowongan contoh dengan analisis AI lengkap
-              </p>
-            </div>
+          {loadError && (
+            <button
+              onClick={() => { setLoading(true); fetchJobs(); }}
+              className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition"
+            >
+              Coba lagi
+            </button>
           )}
         </div>
       )}
