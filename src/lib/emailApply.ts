@@ -3,8 +3,9 @@
  *
  * Contract (read only, from backend/api/routes/automation.ts + backend/services/queue-guard.ts and
  * worker/src/handlers/emailApply.ts):
- *   POST /api/automation/queue  { job_type: "email_apply", payload: { job_id, apply_email, approval_request_id, application_id? } }
- * The backend ignores a client-sent `approved`, verifies that `approval_request_id` belongs to the user, has
+ *   POST /api/automation/queue  { job_type: "email_apply", payload: { approval_request_id, apply_email } }
+ * The backend fills job_id and application_id from the approval row itself, ignores a client-sent `approved`,
+ * verifies that `approval_request_id` belongs to the user, has
  * status "approved" and has not expired (otherwise 403 { code: "approval_required" }), and the worker sends
  * the approved cover letter verbatim through the user's Gmail. One approval is good for one sent
  * submission. The UI only shows the action for an approval that exists and is approved.
@@ -182,23 +183,21 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
 
 export interface EmailApplyRequest {
   job_type: typeof EMAIL_APPLY_JOB_TYPE;
-  payload: { job_id: string; apply_email: string; approval_request_id: string; application_id?: string };
+  payload: { approval_request_id: string; apply_email: string };
 }
 
 /**
- * Body of POST /api/automation/queue. There is no `approved` key on purpose: the server sets it only after
- * it has read the approval row, and drops any value a client sends. Returns null when the input is not enough.
+ * Body of POST /api/automation/queue. Only the approval id and the address: the job and application come from
+ * the approval row on the server, and there is no `approved` key on purpose (the server sets it only after it
+ * has read that row and drops any value a client sends). Returns null when the input is not enough.
  */
 export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: string): EmailApplyRequest | null {
   const check = validateRecruiterEmail(applyEmail);
   if (!check.ok || !approval.id || !approval.job_id) return null;
-  const payload: EmailApplyRequest["payload"] = {
-    job_id: approval.job_id,
-    apply_email: check.email,
-    approval_request_id: approval.id,
+  return {
+    job_type: EMAIL_APPLY_JOB_TYPE,
+    payload: { approval_request_id: approval.id, apply_email: check.email },
   };
-  if (approval.application_id) payload.application_id = approval.application_id;
-  return { job_type: EMAIL_APPLY_JOB_TYPE, payload };
 }
 
 /** Turn what apiFetch throws (the response text, usually JSON) into a message for the user. */

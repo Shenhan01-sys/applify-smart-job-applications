@@ -150,16 +150,17 @@ test("urutan alasan: kedaluwarsa mengalahkan semua, lalu dipakai, lalu Gmail, la
 
 // ---- permintaan ke antrean ----
 
-test("permintaan antrean: email_apply dengan job_id, apply_email, approval_request_id; tanpa kunci approved", () => {
+test("permintaan antrean mengikuti kontrak akhir backend: hanya approval_request_id dan apply_email, tanpa approved", () => {
   const req = buildEmailApplyRequest(approval(), " hrd@perusahaan.co.id ");
   assert.deepEqual(req, {
     job_type: "email_apply",
-    payload: { job_id: "job-1", apply_email: "hrd@perusahaan.co.id", approval_request_id: "apr-1", application_id: "app-1" },
+    payload: { approval_request_id: "apr-1", apply_email: "hrd@perusahaan.co.id" },
   });
+  assert.deepEqual(Object.keys(req!.payload).sort(), ["apply_email", "approval_request_id"]);
   assert.equal("approved" in req!.payload, false);
-  // application_id hanya dikirim bila ada
-  const noApp = buildEmailApplyRequest(approval({ application_id: null }), "hrd@perusahaan.co.id");
-  assert.equal("application_id" in noApp!.payload, false);
+  // job_id dan application_id diisi server dari baris persetujuan, jadi tidak dikirim UI
+  assert.equal("job_id" in req!.payload, false);
+  assert.equal("application_id" in req!.payload, false);
 });
 
 test("permintaan antrean tidak dibuat dari masukan yang belum cukup", () => {
