@@ -1,0 +1,220 @@
+/**
+ * Enabling logic and request building for the "Kirim lewat Email" action on an approved application.
+ *
+ * Contract (read only, from backend/api/routes/automation.ts + backend/services/queue-guard.ts and
+ * worker/src/handlers/emailApply.ts):
+ *   POST /api/automation/queue  { job_type: "email_apply", payload: { job_id, apply_email, approval_request_id, application_id? } }
+ * The backend ignores a client-sent `approved`, verifies that `approval_request_id` belongs to the user, has
+ * status "approved" and has not expired (otherwise 403 { code: "approval_required" }), and the worker sends
+ * the approved cover letter verbatim through the user's Gmail. One approval is good for one sent
+ * submission. The UI only shows the action for an approval that exists and is approved.
+ *
+ * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
+ */
+
+export const EMAIL_APPLY_JOB_TYPE = "email_apply";
+
+/** Shown next to the action: what is sent and under which conditions. */
+export const EMAIL_APPLY_EXPLANATION =
+  "Isi email adalah surat lamaran yang sudah kamu setujui, dikirim apa adanya tanpa diubah atau ditulis ulang AI. " +
+  "Email dikirim teks polos dari akun Gmail yang kamu hubungkan, tanpa lampiran, dengan subjek yang dibuat otomatis. " +
+  "Satu persetujuan hanya berlaku untuk satu pengiriman dan hanya selama masa berlakunya.";
+
+export const EMAIL_APPLY_TEST_MODE_NOTE =
+  "Bila server berjalan dalam mode uji (pengiriman nyata dimatikan), pekerjaan ini dicatat sebagai dilewati dan tidak ada email yang terkirim.";
+
+// ---------------------------------------------------------------------------------------------
+// Recruiter email
+// ---------------------------------------------------------------------------------------------
+
+export type EmailCheck = { ok: true; email: string } | { ok: false; error: string };
+
+const LOCAL_RE = /^[A-Za-z0-9._%+-]{1,64}$/;
+const LABEL_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+
+/**
+ * One plain address. The worker puts this string into the `To:` header unchanged, so anything that could add
+ * a second recipient or header (space, comma, semicolon, angle brackets, quotes, line breaks) is refused here.
+ */
+export function validateRecruiterEmail(raw: unknown): EmailCheck {
+  const email = typeof raw === "string" ? raw.trim() : "";
+  if (!email) return { ok: false, error: "Alamat email tujuan wajib diisi." };
+  if (email.length > 254) return { ok: false, error: "Alamat email terlalu panjang." };
+  if (/[\s,;<>"'()[\]\\\u0000-\u001f\u007f]/.test(email)) return { ok: false, error: "Isi satu alamat email saja, tanpa spasi atau tanda lain." };
+  const parts = email.split("@");
+  if (parts.length !== 2) return { ok: false, error: "Alamat email harus berbentuk nama@domain.com." };
+  const [local, domain] = parts;
+  if (!LOCAL_RE.test(local) || local.startsWith(".") || local.endsWith(".") || local.includes("..")) {
+    return { ok: false, error: "Bagian sebelum @ tidak valid." };
+  }
+  const labels = domain.split(".");
+  if (labels.length < 2 || !labels.every((l) => LABEL_RE.test(l)) || !/^[A-Za-z]{2,}$/.test(labels[labels.length - 1])) {
+    return { ok: false, error: "Domain email tidak valid." };
+  }
+  return { ok: true, email };
+}
+
+const IMAGE_SUFFIX = /\.(png|jpe?g|gif|svg|webp)$/i;
+
+/** Addresses written in a job posting, offered as suggestions (never filled in automatically). */
+export function extractRecruiterEmails(text: unknown, max = 5): string[] {
+  if (typeof text !== "string" || !text) return [];
+  const found = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of found) {
+    if (IMAGE_SUFFIX.test(candidate)) continue;
+    const c = validateRecruiterEmail(candidate);
+    if (!c.ok) continue;
+    const key = c.email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c.email);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Enabling logic
+// ---------------------------------------------------------------------------------------------
+
+export interface ApprovalLike {
+  id: string;
+  status?: string | null;
+  expires_at?: string | null;
+  job_id?: string | null;
+  application_id?: string | null;
+  cover_letter?: string | null;
+}
+
+export interface EmailQueueRow {
+  status?: string | null;
+  error_message?: string | null;
+}
+
+export interface EmailApplyContext {
+  now?: Date;
+  /** A successful application_logs row already consumed this approval (the worker refuses a second use). */
+  used: boolean;
+  /** Latest email_apply queue row for this approval, if there is one. */
+  job?: EmailQueueRow | null;
+  /** null = the status request failed, so it is unknown. */
+  gmailConnected: boolean | null;
+  /** What the user typed. */
+  applyEmail: string;
+}
+
+export type EmailApplyBlock =
+  | "expired"
+  | "no_job"
+  | "no_letter"
+  | "used"
+  | "queued"
+  | "do_not_resend"
+  | "gmail_off"
+  | "gmail_unknown"
+  | "bad_email";
+
+export interface EmailApplyState {
+  /** Show the action at all. Only an approval that exists and is "approved" gets it. */
+  visible: boolean;
+  /** The button can be pressed. */
+  enabled: boolean;
+  block?: EmailApplyBlock;
+  /** Why the button is off (or a note when it is on). */
+  message?: string;
+  /** Inline error for the email field (only when something was typed). */
+  emailError?: string;
+}
+
+const HIDDEN: EmailApplyState = { visible: false, enabled: false };
+
+export function getEmailApplyState(approval: ApprovalLike | null | undefined, ctx: EmailApplyContext): EmailApplyState {
+  if (!approval || approval.status !== "approved") return HIDDEN;
+
+  const now = (ctx.now ?? new Date()).getTime();
+  const expires = approval.expires_at ? new Date(approval.expires_at).getTime() : NaN;
+  const off = (block: EmailApplyBlock, message: string, extra: Partial<EmailApplyState> = {}): EmailApplyState => ({
+    visible: true,
+    enabled: false,
+    block,
+    message,
+    ...extra,
+  });
+
+  if (!Number.isFinite(expires) || expires <= now) {
+    return off("expired", "Persetujuan ini sudah kedaluwarsa. Ajukan draf lagi dari Job Feed untuk mendapat persetujuan baru.");
+  }
+  if (!approval.job_id) return off("no_job", "Persetujuan ini tidak terhubung ke lowongan, jadi email tidak bisa dikirim.");
+  if (typeof approval.cover_letter !== "string" || approval.cover_letter.trim() === "") {
+    return off("no_letter", "Surat lamaran pada persetujuan ini kosong. Email tidak dibuat dari AI, jadi tidak ada yang bisa dikirim.");
+  }
+  if (ctx.used) return off("used", "Persetujuan ini sudah dipakai untuk satu pengiriman. Satu persetujuan hanya berlaku untuk satu pengiriman.");
+
+  const job = ctx.job;
+  if (job && (job.status === "pending" || job.status === "processing")) {
+    return off("queued", job.status === "processing" ? "Email sedang diproses worker." : "Email sudah masuk antrean dan menunggu worker.");
+  }
+  if (job?.status === "failed" && /jangan kirim ulang/i.test(job.error_message ?? "")) {
+    return off("do_not_resend", job.error_message ?? "Email sudah terkirim; jangan kirim ulang.");
+  }
+
+  if (ctx.gmailConnected === false) return off("gmail_off", "Gmail belum terhubung. Hubungkan Gmail dulu agar email bisa dikirim dari akunmu.");
+  if (ctx.gmailConnected === null) return off("gmail_unknown", "Status Gmail tidak dapat diperiksa. Muat ulang halaman ini.");
+
+  const typed = (ctx.applyEmail ?? "").trim();
+  const check = validateRecruiterEmail(typed);
+  if (!check.ok) {
+    return off("bad_email", typed === "" ? "Isi alamat email rekruter dulu." : check.error, typed === "" ? {} : { emailError: check.error });
+  }
+
+  // On: a failed earlier job is only a note, the user may try again.
+  if (job?.status === "failed") {
+    return { visible: true, enabled: true, message: `Percobaan sebelumnya gagal: ${job.error_message ?? "tanpa keterangan"}` };
+  }
+  return { visible: true, enabled: true };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Request
+// ---------------------------------------------------------------------------------------------
+
+export interface EmailApplyRequest {
+  job_type: typeof EMAIL_APPLY_JOB_TYPE;
+  payload: { job_id: string; apply_email: string; approval_request_id: string; application_id?: string };
+}
+
+/**
+ * Body of POST /api/automation/queue. There is no `approved` key on purpose: the server sets it only after
+ * it has read the approval row, and drops any value a client sends. Returns null when the input is not enough.
+ */
+export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: string): EmailApplyRequest | null {
+  const check = validateRecruiterEmail(applyEmail);
+  if (!check.ok || !approval.id || !approval.job_id) return null;
+  const payload: EmailApplyRequest["payload"] = {
+    job_id: approval.job_id,
+    apply_email: check.email,
+    approval_request_id: approval.id,
+  };
+  if (approval.application_id) payload.application_id = approval.application_id;
+  return { job_type: EMAIL_APPLY_JOB_TYPE, payload };
+}
+
+/** Turn what apiFetch throws (the response text, usually JSON) into a message for the user. */
+export function describeQueueError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  let body: { error?: string; code?: string } | null = null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") body = parsed;
+  } catch {
+    /* not JSON */
+  }
+  if (body?.code === "approval_required") {
+    return `Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa (${body.error ?? "approval_required"}). Muat ulang halaman dan periksa statusnya.`;
+  }
+  if (body?.error) return `Gagal memasukkan ke antrean: ${body.error}`;
+  if (/failed to fetch|networkerror|load failed/i.test(raw)) return "Backend otomasi tidak dapat dihubungi. Coba lagi nanti.";
+  return raw ? `Gagal memasukkan ke antrean: ${raw}` : "Gagal memasukkan ke antrean.";
+}

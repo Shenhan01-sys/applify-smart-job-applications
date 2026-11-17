@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { automationApi } from "@/services/automationApi";
 import ApprovalReviewModal from "@/components/ApprovalReviewModal";
+import EmailApplyPanel from "@/components/EmailApplyPanel";
+import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
 import {
@@ -34,6 +36,9 @@ interface ApprovalRequest {
   created_at: string;
   reviewed_at?: string;
   rejection_reason?: string;
+  job_id?: string | null;
+  application_id?: string | null;
+  cover_letter?: string | null;
 }
 
 function ApprovalsPage() {
@@ -45,6 +50,8 @@ function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  // Data for the "Kirim lewat Email" action on approved history rows.
+  const [emailData, setEmailData] = useState<EmailApplyData>(emptyEmailApplyData());
 
   const tabOrder: ('pending' | 'history')[] = ['pending', 'history'];
   const handleTabChange = (tab: 'pending' | 'history') => {
@@ -65,6 +72,7 @@ function ApprovalsPage() {
       if (isMockMode()) {
         setPendingApprovals(mockApprovals as unknown as ApprovalRequest[]);
         setHistory(mockApprovalHistory as unknown as ApprovalRequest[]);
+        loadEmailApplyData(mockApprovalHistory as unknown as ApprovalRequest[]).then(setEmailData).catch(() => {});
         setLoading(false);
         return;
       }
@@ -74,6 +82,11 @@ function ApprovalsPage() {
       ]);
       setPendingApprovals(pending as unknown as ApprovalRequest[]);
       setHistory(hist as unknown as ApprovalRequest[]);
+      // Best effort: without it the email action just stays disabled with an explanation.
+      loadEmailApplyData(hist as unknown as ApprovalRequest[]).then(setEmailData).catch((err) => {
+        console.warn('[approvals] email action data unavailable:', err);
+        setEmailData(emptyEmailApplyData());
+      });
     } catch (error) {
       toast.error('Gagal memuat approvals');
     } finally {
@@ -222,6 +235,18 @@ function ApprovalsPage() {
                       <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg border-2 border-red-100">
                         Alasan: {request.rejection_reason}
                       </p>
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <EmailApplyPanel
+                        approval={request}
+                        gmailConnected={emailData.gmail}
+                        used={emailData.used.has(request.id)}
+                        job={emailData.jobs[request.id]}
+                        suggestions={emailData.suggestions[request.id]}
+                        onQueued={(id) =>
+                          setEmailData((d) => ({ ...d, jobs: { ...d.jobs, [id]: { status: 'pending', error_message: null } } }))
+                        }
+                      />
                     )}
                   </div>
                   {activeTab === 'pending' && (

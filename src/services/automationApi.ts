@@ -153,6 +153,25 @@ export const automationApi = {
     )
   },
 
+  /**
+   * Is the current user's Gmail connected (GET /api/oauth/status)? null = could not be checked. The email
+   * channel needs it, and a failed request must not look like "connected", so there is no placeholder fallback.
+   */
+  async getGmailStatus(): Promise<{ gmail: boolean } | null> {
+    if (isMockMode()) return { gmail: true }
+    try {
+      return await apiFetch<{ gmail: boolean }>(`${API_BASE_URL}/api/oauth/status`, { headers: await getAuthHeaders() })
+    } catch (err) {
+      console.warn('[automationApi] Gmail status unavailable:', err)
+      return null
+    }
+  },
+
+  /** Browser redirect that starts the Gmail OAuth flow (the backend route takes the user id as `uid`). */
+  getGmailConnectUrl(userId: string): string {
+    return `${API_BASE_URL}/api/oauth/google?uid=${encodeURIComponent(userId)}`
+  },
+
   async addToQueue(jobType: string, payload: any, priority?: number) {
     return apiFetch(
       `${API_BASE_URL}/api/automation/queue`,
