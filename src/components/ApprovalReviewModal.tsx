@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { automationApi } from '@/services/automationApi'
 import { HitlTrack } from '@/components/HitlTrack'
 import { platformLabel } from '@/lib/platforms'
+import {
+  LEVEL_LABEL,
+  SOURCE_LABEL,
+  confidenceLevel,
+  countNeedingAttention,
+  needsAttention,
+  normalizeAnswers,
+} from '@/lib/answerReview'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ShieldCheck, XCircle, Clock, AlertTriangle, Loader2, Edit3, Eye, Sparkles } from 'lucide-react'
@@ -13,12 +21,8 @@ interface ApprovalRequest {
   company: string
   platform: string
   cover_letter?: string
-  answers?: Array<{
-    question: string
-    answer: string
-    confidence: number
-    needs_review: boolean
-  }>
+  /** jsonb from approval_requests.answers; cleaned by normalizeAnswers() before use */
+  answers?: unknown
   resume_url?: string
   status: string
   expires_at: string
@@ -53,6 +57,8 @@ export default function ApprovalReviewModal({
     ? { value: Math.round(minutesLeft / 60), unit: 'jam' }
     : { value: minutesLeft, unit: 'menit' }
   const edited = editedCoverLetter !== (request.cover_letter || '')
+  const answers = normalizeAnswers(request.answers)
+  const needAttention = countNeedingAttention(answers)
 
   const handleApprove = async () => {
     setLoading(true)
@@ -72,7 +78,7 @@ export default function ApprovalReviewModal({
     setLoading(true)
     try {
       await automationApi.rejectApplication(request.id, rejectReason)
-      toast.success('Ditolak. Alasanmu dicatat sebagai preferensi.')
+      toast.success('Ditolak. Alasanmu tersimpan di riwayat persetujuan.')
       onRejected()
     } catch (error: any) {
       toast.error(`Gagal menolak: ${error.message}`)
@@ -92,8 +98,8 @@ export default function ApprovalReviewModal({
         setEditedCoverLetter(result.cover_letter)
         toast.success('Cover letter ditulis ulang.')
       } else {
-        // Backend regenerate endpoint is not implemented yet; never pretend it worked.
-        toast.info('Tulis ulang otomatis belum tersedia. Edit langsung lalu setujui.')
+        // The backend answered without a new letter: keep the current text, never pretend it was rewritten.
+        toast.info('AI tidak mengembalikan surat baru. Edit langsung lalu setujui.')
         setIsEditing(true)
       }
     } catch (error: any) {
@@ -187,33 +193,54 @@ export default function ApprovalReviewModal({
             )}
           </div>
 
-          {/* Form answers prepared by the agent */}
-          {request.answers && request.answers.length > 0 && (
+          {/* Form answers prepared by the agent, with how sure it is about each one */}
+          {answers.length > 0 && (
             <div className="mb-4">
-              <h4 className="mb-2 text-sm font-semibold text-[#16150F]">Jawaban formulir</h4>
+              <h4 className="mb-1 text-sm font-semibold text-[#16150F]">Jawaban formulir</h4>
+              <p className="mb-2 text-xs text-[#16150F]/60">
+                Jawaban standar yang disiapkan agen dari Pengaturan Otomasi-mu.{' '}
+                {needAttention > 0 ? (
+                  <span className="font-semibold text-[#D9741A]">
+                    {needAttention} dari {answers.length} perlu dicek sebelum kamu menyetujui.
+                  </span>
+                ) : (
+                  <span>Semua berkeyakinan tinggi.</span>
+                )}{' '}
+                Isian pada formulir lowongan yang sebenarnya dibaca agen setelah persetujuan.
+              </p>
               <div className="space-y-2">
-                {request.answers.map((answer, index) => (
-                  <div
-                    key={index}
-                    className={`rounded-xl border-2 p-3 ${
-                      answer.needs_review ? 'border-[#D9741A]/50 bg-[#D9741A]/5' : 'border-[#16150F]/10'
-                    }`}
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{answer.question}</span>
-                      {answer.needs_review && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D9741A]">
-                          <AlertTriangle className="h-3 w-3" />
-                          Perlu dicek
+                {answers.map((answer, index) => {
+                  const level = confidenceLevel(answer.confidence)
+                  const attention = needsAttention(answer)
+                  return (
+                    <div
+                      key={index}
+                      data-confidence={level}
+                      className={`rounded-xl border-2 p-3 ${
+                        attention ? 'border-[#D9741A]/50 bg-[#D9741A]/5' : 'border-[#16150F]/10'
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">{answer.question}</span>
+                        {attention && (
+                          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#D9741A]">
+                            <AlertTriangle className="h-3 w-3" />
+                            Perlu dicek
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-[#16150F]/80">
+                        {answer.answer.trim() ? answer.answer : <em className="text-[#16150F]/50">(kosong: isi dulu di Pengaturan Otomasi)</em>}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-[#16150F]/50">
+                        <span>
+                          Keyakinan: <span className="font-mono">{Math.round(answer.confidence * 100)}%</span> ({LEVEL_LABEL[level]})
                         </span>
-                      )}
+                        {answer.source && <span>{SOURCE_LABEL[answer.source]}</span>}
+                      </div>
                     </div>
-                    <p className="text-sm text-[#16150F]/80">{answer.answer}</p>
-                    <div className="mt-1 text-xs text-[#16150F]/50">
-                      Keyakinan: <span className="font-mono">{Math.round(answer.confidence * 100)}%</span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -232,7 +259,9 @@ export default function ApprovalReviewModal({
           {showRejectForm && (
             <div className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-4">
               <h4 className="mb-1 text-sm font-semibold text-red-800">Kenapa ditolak?</h4>
-              <p className="mb-2 text-xs text-red-700">Alasanmu dipakai sebagai preferensi untuk lamaran berikutnya.</p>
+              <p className="mb-2 text-xs text-red-700">
+                Alasanmu disimpan di riwayat persetujuan. Belum dipakai untuk mengubah hasil AI secara otomatis.
+              </p>
               <textarea
                 placeholder="mis. tidak cocok, gaji terlalu rendah, butuh skill yang belum kupunya..."
                 value={rejectReason}

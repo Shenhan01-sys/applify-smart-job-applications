@@ -5,6 +5,15 @@ import { aiApplicationService, type AIApplicationData } from "@/services/aiAppli
 import { automationQueue } from "@/services/automationQueue";
 import { automationApi } from "@/services/automationApi";
 import { HitlTrack } from "@/components/HitlTrack";
+import {
+  LEVEL_LABEL,
+  SOURCE_LABEL,
+  confidenceLevel,
+  countNeedingAttention,
+  needsAttention,
+  normalizeAnswers,
+  type ApprovalAnswer,
+} from "@/lib/answerReview";
 import { toast } from "sonner";
 import {
   X,
@@ -46,6 +55,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [enqueuing, setEnqueuing] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [approvalId, setApprovalId] = useState<string | null>(null);
+  // Standard form answers the backend prepared for this approval, each with a confidence score.
+  const [preparedAnswers, setPreparedAnswers] = useState<ApprovalAnswer[]>([]);
   const [application, setApplication] = useState<AIApplicationData | null>(null);
   const [activeTab, setActiveTab] = useState<"cover" | "cv" | "strategy">("cover");
   const [isEditing, setIsEditing] = useState(false);
@@ -167,7 +178,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         cover_letter: editedCoverLetter || application.cover_letter,
       });
       setApprovalId(created?.id ?? "pending");
-      toast.success("Draf masuk antrean persetujuan. Setujui di halaman Approvals.");
+      const answers = normalizeAnswers(created?.answers);
+      setPreparedAnswers(answers);
+      const check = countNeedingAttention(answers);
+      toast.success(
+        check > 0
+          ? `Draf masuk antrean persetujuan. ${check} jawaban formulir perlu kamu cek di halaman Approvals.`
+          : "Draf masuk antrean persetujuan. Setujui di halaman Approvals."
+      );
       onSuccess();
     } catch (err: any) {
       setError(
@@ -318,6 +336,45 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
               )}
 
+              {/* Form answers prepared for the approval, low-confidence ones highlighted */}
+              {approvalId && preparedAnswers.length > 0 && (
+                <div className="rounded-xl border-2 border-[#16150F]/10 p-4">
+                  <h4 className="text-sm font-semibold">Jawaban formulir yang disiapkan agen</h4>
+                  <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                    {countNeedingAttention(preparedAnswers) > 0
+                      ? `${countNeedingAttention(preparedAnswers)} dari ${preparedAnswers.length} perlu dicek. `
+                      : "Semua berkeyakinan tinggi. "}
+                    Tinjau lengkapnya di halaman Approvals sebelum menyetujui.
+                  </p>
+                  <ul className="space-y-1.5">
+                    {preparedAnswers.map((a, i) => {
+                      const attention = needsAttention(a);
+                      return (
+                        <li
+                          key={i}
+                          data-confidence={confidenceLevel(a.confidence)}
+                          className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-xs ${
+                            attention ? "bg-[#D9741A]/10 border border-[#D9741A]/40" : "bg-[#F5F5F5]"
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className="font-medium">{a.question}</span>
+                            <span className="block truncate text-muted-foreground">
+                              {a.answer.trim() || "(kosong)"}
+                              {a.source ? ` · ${SOURCE_LABEL[a.source]}` : ""}
+                            </span>
+                          </span>
+                          <span className={`shrink-0 font-mono ${attention ? "font-semibold text-[#D9741A]" : "text-muted-foreground"}`}>
+                            {attention && <AlertTriangle className="mr-1 inline h-3 w-3" />}
+                            {Math.round(a.confidence * 100)}% {LEVEL_LABEL[confidenceLevel(a.confidence)]}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
               {/* AI Info */}
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
@@ -339,7 +396,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
                   <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" />
-                  <div className="text-lg font-bold">{matchScore || (tier === "pro" ? 90 : 75)}%</div>
+                  <div className="text-lg font-bold">{matchScore ? `${matchScore}%` : "—"}</div>
                   <div className="text-xs text-muted-foreground">Match Score</div>
                 </div>
                 <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
