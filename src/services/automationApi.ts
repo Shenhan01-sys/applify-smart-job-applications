@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { ApiError } from '../lib/apiErrors'
 import {
   mockJobs,
   mockAutomationSettings,
@@ -41,7 +42,12 @@ async function apiFetch<T>(
   const canFallback = method === 'GET' || readOnly
   try {
     const res = await fetch(url, options)
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) {
+      // Keep the response text as the message (callers parse it) and add the status and Retry-After header,
+      // so describeApiError() can tell 401, 429 quota_exhausted, 429 rate_limited and 503 apart.
+      const retryAfter = Number(res.headers.get('Retry-After'))
+      throw new ApiError(res.status, await res.text(), Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
+    }
     return res.json()
   } catch (err) {
     // Automation backend (Fastify) is optional/not-yet-hosted — degrade gracefully to

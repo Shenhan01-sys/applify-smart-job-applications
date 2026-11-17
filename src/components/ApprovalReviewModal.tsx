@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { automationApi } from '@/services/automationApi'
+import { describeApiError } from '@/lib/apiErrors'
 import { HitlTrack } from '@/components/HitlTrack'
 import { platformLabel } from '@/lib/platforms'
 import {
@@ -70,7 +71,7 @@ export default function ApprovalReviewModal({
       toast.success('Disetujui — lamaran masuk antrean agen.')
       onApproved()
     } catch (error: any) {
-      toast.error(`Gagal menyetujui: ${error.message}`)
+      toast.error(describeApiError(error, 'Gagal menyetujui'))
     } finally {
       setLoading(false)
     }
@@ -83,7 +84,7 @@ export default function ApprovalReviewModal({
       toast.success('Ditolak. Alasanmu tersimpan di riwayat persetujuan.')
       onRejected()
     } catch (error: any) {
-      toast.error(`Gagal menolak: ${error.message}`)
+      toast.error(describeApiError(error, 'Gagal menolak'))
     } finally {
       setLoading(false)
     }
@@ -110,7 +111,7 @@ export default function ApprovalReviewModal({
         setIsEditing(true)
       }
     } catch (error: any) {
-      toast.error(`Gagal menulis ulang: ${error.message}`)
+      toast.error(describeApiError(error, 'Gagal menulis ulang'))
     } finally {
       setLoading(false)
     }

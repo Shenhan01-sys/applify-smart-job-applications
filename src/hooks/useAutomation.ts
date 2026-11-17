@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { automationApi } from '@/services/automationApi'
 import { toast } from 'sonner'
+import { describeApiError, parseApiError } from '@/lib/apiErrors'
 
 export interface AutomationSettings {
   first_name?: string
@@ -132,7 +133,7 @@ export function useJobSearch() {
       setTotalJobs(total)
       return { groups, total, stats: sourceStats }
     } catch (error) {
-      toast.error('Failed to search jobs')
+      toast.error(describeApiError(error, 'Gagal mencari lowongan.'))
       return { groups: [], total: 0, stats: [] }
     } finally {
       setLoading(false)
@@ -156,7 +157,8 @@ export function useAIPipeline() {
       const result = await automationApi.generateCoverLetter(params)
       return result.coverLetter || ''
     } catch (error) {
-      toast.error('Failed to generate cover letter')
+      // 429 quota_exhausted / rate_limited and 503 *_check_failed each get their own message.
+      toast.error(describeApiError(error, 'Gagal membuat surat lamaran.'))
       return ''
     } finally {
       setLoading(false)
@@ -169,7 +171,7 @@ export function useAIPipeline() {
       const result = await automationApi.analyzeMatch(jobDescription, userSkills)
       return result
     } catch (error) {
-      toast.error('Failed to analyze job match')
+      toast.error(describeApiError(error, 'Gagal menganalisis kecocokan lowongan.'))
       return null
     } finally {
       setLoading(false)
@@ -182,7 +184,7 @@ export function useAIPipeline() {
       const result = await automationApi.extractSkills(jobDescription)
       return result.skills || []
     } catch (error) {
-      toast.error('Failed to extract skills')
+      toast.error(describeApiError(error, 'Gagal mengambil daftar skill dari lowongan.'))
       return []
     } finally {
       setLoading(false)
@@ -248,7 +250,7 @@ export function useApprovalQueue() {
       toast.success('Cover letter regenerated!')
       return result.cover_letter || ''
     } catch (error) {
-      toast.error('Failed to regenerate cover letter')
+      toast.error(describeApiError(error, 'Gagal menulis ulang surat lamaran.'))
       return ''
     }
   }
@@ -287,6 +289,8 @@ export function useRateLimits() {
 export function useLinkedInSession() {
   const [sessionStatus, setSessionStatus] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  // Last import/verify failure, kept so the page can show it (a toast alone disappears).
+  const [sessionError, setSessionError] = useState<{ code?: string; message: string } | null>(null)
 
   const checkSession = async () => {
     try {
@@ -305,12 +309,17 @@ export function useLinkedInSession() {
   const importSession = async (cookies: any, userAgent?: string) => {
     try {
       setLoading(true)
+      setSessionError(null)
       const result = await automationApi.importLinkedInSession(cookies, userAgent)
-      toast.success('LinkedIn session imported successfully!')
+      toast.success('Sesi LinkedIn berhasil diimpor.')
       await checkSession()
       return result
     } catch (error) {
-      toast.error('Failed to import LinkedIn session')
+      // 503 session_encryption_not_configured and 422 session_undecryptable are server-side problems:
+      // say so instead of a generic failure, and keep the message on screen (see sessionError).
+      const message = describeApiError(error, 'Gagal mengimpor sesi LinkedIn.')
+      setSessionError({ code: parseApiError(error).code, message })
+      toast.error(message)
       return null
     } finally {
       setLoading(false)
@@ -320,11 +329,15 @@ export function useLinkedInSession() {
   const verifySession = async () => {
     try {
       setLoading(true)
+      setSessionError(null)
       const result = await automationApi.verifyLinkedInSession()
-      toast.success(result.valid ? 'Session verified!' : 'Session invalid')
+      if (result.valid) toast.success('Sesi terverifikasi.')
+      else toast.error('Sesi tidak valid. Impor ulang cookie LinkedIn.')
       return result.valid
     } catch (error) {
-      toast.error('Failed to verify session')
+      const message = describeApiError(error, 'Gagal memverifikasi sesi.')
+      setSessionError({ code: parseApiError(error).code, message })
+      toast.error(message)
       return false
     } finally {
       setLoading(false)
@@ -332,6 +345,7 @@ export function useLinkedInSession() {
   }
 
   return {
+    sessionError,
     sessionStatus,
     loading,
     checkSession,

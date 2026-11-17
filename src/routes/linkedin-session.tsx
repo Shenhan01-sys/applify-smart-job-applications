@@ -24,7 +24,7 @@ export const Route = createFileRoute("/linkedin-session")({
 });
 
 function LinkedInSessionPage() {
-  const { sessionStatus, loading: hookLoading, checkSession, importSession, verifySession } = useLinkedInSession();
+  const { sessionStatus, sessionError, loading: hookLoading, checkSession, importSession, verifySession } = useLinkedInSession();
   const [cookiesJson, setCookiesJson] = useState('');
   const [importing, setImporting] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -61,10 +61,12 @@ function LinkedInSessionPage() {
       if (isMockMode()) {
         setStatus({ hasSession: true, isValid: true, lastUsed: new Date().toISOString(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() });
         toast.success('Session berhasil di-import!');
+        setCookiesJson('');
       } else {
-        await importSession(cookies);
+        // Keep what the user pasted when the import failed (server configuration or session errors).
+        const imported = await importSession(cookies);
+        if (imported) setCookiesJson('');
       }
-      setCookiesJson('');
     } catch (error) {
       toast.error('Format JSON tidak valid. Periksa cookies kamu.');
     } finally {
@@ -207,6 +209,13 @@ function LinkedInSessionPage() {
                 );
               })}
             </div>
+
+            {sessionError && (
+              <div role="alert" className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{sessionError.message}</span>
+              </div>
+            )}
 
             <div key={tabKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
             {activeTab === 'manual' && (
