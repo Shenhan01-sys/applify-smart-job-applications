@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { automationApi, AutomationSettings } from "@/services/automationApi";
 import { mockAutomationSettings, mockSubscription } from "@/mocks/mockData";
+import { PLAN_MODELS } from "@/lib/planInfo";
 import { 
   Loader2, Save, User, FileText, Search, Settings, Brain,
   Briefcase, MapPin, DollarSign, Clock, CheckCircle2, ToggleLeft,
@@ -339,7 +340,17 @@ function ToggleField({ label, description, checked, onChange }: any) {
 }
 
 function AITierDisplay() {
-  const tier = isMockMode() ? mockSubscription.ai_model_tier : 'pro';
+  // The plan that picks the AI model is subscriptions.ai_model_tier (Edge Function and worker read the same column).
+  const [tier, setTier] = useState<'free' | 'pro'>(isMockMode() && mockSubscription.ai_model_tier === 'pro' ? 'pro' : 'free');
+  useEffect(() => {
+    if (isMockMode()) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: sub } = await supabase.from('subscriptions').select('ai_model_tier').eq('user_id', user.id).maybeSingle();
+      setTier(sub?.ai_model_tier === 'pro' ? 'pro' : 'free');
+    })();
+  }, []);
   
   const tierConfig: Record<string, { label: string; color: string; bg: string; border: string; badge: string; icon: any }> = {
     free: { 
@@ -358,43 +369,12 @@ function AITierDisplay() {
       badge: 'bg-[#0A5BE0]/10 text-[#0A5BE0] border-[#0A5BE0]/20',
       icon: Zap 
     },
-    ultimate: { 
-      label: 'Ultimate', 
-      color: 'text-[#D2F801]', 
-      bg: 'bg-[#D2F801]/10', 
-      border: 'border-[#D2F801]/30',
-      badge: 'bg-[#D2F801]/20 text-[#16150F] border-[#D2F801]/30',
-      icon: Crown 
-    },
   };
   
-  const config = tierConfig[tier] || tierConfig.pro;
+  const config = tierConfig[tier];
   const TierIcon = config.icon;
   
-  const modelConfig: Record<string, { models: { name: string; pct: string; desc: string }[]; note: string }> = {
-    free: {
-      models: [
-        { name: 'DeepSeek v4 Flash', pct: '100%', desc: 'Model cepat untuk generasi cover letter dan analisis dasar' },
-      ],
-      note: 'Upgrade ke Pro untuk akses model AI yang lebih powerful dengan hasil optimal.',
-    },
-    pro: {
-      models: [
-        { name: 'DeepSeek v4 Pro', pct: '60%', desc: 'Model utama untuk cover letter & analisis mendalam' },
-        { name: 'DeepSeek v4 Flash', pct: '40%', desc: 'Model pendukung untuk tugas cepat & ringan' },
-      ],
-      note: 'Model dipilih menurut paketmu; bila satu model sedang tidak tersedia, sistem beralih ke model cadangan.',
-    },
-    ultimate: {
-      models: [
-        { name: 'Claude Sonnet 4.6', pct: '60%', desc: 'Model premium untuk cover letter & strategi lanjutan' },
-        { name: 'DeepSeek v4 Pro', pct: '40%', desc: 'Model andalan untuk analisis & matching akurat' },
-      ],
-      note: 'Akses ke model AI paling canggih untuk hasil lamaran yang optimal dan personalisasi tingkat tinggi.',
-    },
-  };
-  
-  const currentModels = modelConfig[tier] || modelConfig.pro;
+  const currentModels = PLAN_MODELS[tier];
   
   return (
     <div className="space-y-5">
@@ -404,8 +384,8 @@ function AITierDisplay() {
       
       {/* Tier Badge */}
       <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-4 flex items-center gap-3`}>
-        <div className={`h-10 w-10 rounded-xl grid place-items-center ${tier === 'ultimate' ? 'bg-[#D2F801]' : 'bg-[#0A5BE0]'}`}>
-          <TierIcon className={`h-5 w-5 ${tier === 'ultimate' ? 'text-[#16150F]' : 'text-white'}`} />
+        <div className={`h-10 w-10 rounded-xl grid place-items-center bg-[#0A5BE0]`}>
+          <TierIcon className={`h-5 w-5 text-white`} />
         </div>
         <div>
           <p className="text-sm font-bold">Plan {config.label}</p>
@@ -418,7 +398,7 @@ function AITierDisplay() {
       {/* Model Distribution */}
       <div>
         <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <BarChart3 className="h-4 w-4 text-[#0A5BE0]" /> Model Distribution
+          <BarChart3 className="h-4 w-4 text-[#0A5BE0]" /> Model yang dipakai (urutan percobaan)
         </h3>
         <div className="space-y-3">
           {currentModels.models.map((m, i) => (
@@ -437,13 +417,7 @@ function AITierDisplay() {
                     <p className="text-xs text-muted-foreground">{m.desc}</p>
                   </div>
                 </div>
-                <span className="text-sm font-mono font-bold text-[#0A5BE0]">{m.pct}</span>
-              </div>
-              <div className="mt-3 h-1.5 bg-black/[5%] rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-[#0A5BE0] transition-all duration-700"
-                  style={{ width: m.pct, animation: `fadeInUp 0.6s ease-out ${0.2 + i * 0.1}s both` }}
-                />
+                <span className="text-xs font-semibold text-[#0A5BE0]">{m.role}</span>
               </div>
             </div>
           ))}

@@ -50,7 +50,7 @@ function SettingsPage() {
           )},
           { icon: Bell, title: "Notifikasi", desc: "Atur kapan kamu ingin diberi tahu.", color: "#D2F801", children: (
             <div className="mt-4 space-y-3">
-              {["Lamaran terkirim","Callback masuk","Golden Window","Skill gap baru"].map((n,i) => (
+              {["Lamaran terkirim","Callback masuk","Golden Window (segera hadir)","Skill gap baru"].map((n,i) => (
                 <div key={n} className="flex items-center justify-between text-sm py-1">
                   <span>{n}</span>
                   <button className={`h-6 w-11 rounded-full transition-colors duration-200 relative ${i<3?'bg-[#D2F801]':'bg-black/[12%]'}`}>

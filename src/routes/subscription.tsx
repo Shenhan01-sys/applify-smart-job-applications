@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-ro
 import { Check, Sparkles, ArrowRight, ArrowLeft, Building2, GraduationCap, Zap, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
 import {
   PLAN_PRICE,
   useSubscription,
@@ -36,14 +37,7 @@ const TIERS: Array<{
     name: "Free",
     blurb: "Mulai rasakan agen AI tanpa biaya.",
     icon: Zap,
-    features: [
-      "10 AI Apply per bulan",
-      "AI Basic (DeepSeek gratis)",
-      "Cover letter standar",
-      "3 platform utama",
-      "Skill radar dasar",
-      "Human approval",
-    ],
+    features: FREE_FEATURES,
   },
   {
     id: "pro",
@@ -52,16 +46,7 @@ const TIERS: Array<{
     icon: Sparkles,
     popular: true,
     highlight: "Paling Populer",
-    features: [
-      "Lamaran tak terbatas",
-      "AI Premium (90% akurasi)",
-      "Semua 7 platform",
-      "Golden Window Sniper",
-      "CV Optimization AI",
-      "Blind Merit Mode",
-      "Green Career Track",
-      "Prioritas dukungan",
-    ],
+    features: PRO_FEATURES,
   },
   {
     id: "kampus",

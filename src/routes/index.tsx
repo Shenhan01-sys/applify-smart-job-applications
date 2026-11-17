@@ -5,6 +5,7 @@ import {
   TrendingUp, Scale, Globe, Clock, BadgeCheck, Quote, Briefcase, GraduationCap,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
+import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
 import { useAuth } from "@/contexts/AuthContext";
 import { WaitinglistPopup } from "@/components/WaitinglistPopup";
 
@@ -1132,7 +1133,7 @@ function CapabilitiesBento() {
           </div>
 
           <BentoCard icon={EyeOff} badge="Social Impact" badgeTone="#16150F" title="Blind Merit Mode" desc="Sembunyikan identitas; biarkan skill dinilai lebih dulu." accent="#1C9656" />
-          <BentoCard icon={Zap} badge="Real-time" badgeTone="#0A5BE0" title="Golden Window Sniper" desc="Lamar di 2 jam pertama — callback 4× lebih tinggi." accent="#D9741A" />
+          <BentoCard icon={Zap} badge="Segera hadir" badgeTone="#0A5BE0" title="Golden Window Sniper" desc="Rencana fitur: memantau lowongan baru agar kamu bisa melamar lebih awal. Belum tersedia." accent="#D9741A" />
 
           {/* Wide cell 2x1 — Skill Radar with mini radar */}
           <div className="md:col-span-2 glass rounded-3xl p-6 flex items-center gap-5">
@@ -1359,8 +1360,8 @@ function Testimonials() {
 
 function Pricing({ authLink }: { authLink: string }) {
   const tiers = [
-    { name: "Free", price: "Gratis", per: "selamanya", features: ["10 AI Apply/bulan", "AI Basic (DeepSeek gratis)", "Cover letter standar", "3 platform utama", "Skill radar dasar", "Human approval"] },
-    { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: ["Lamaran tak terbatas", "AI Premium (90% akurasi)", "Semua 7 platform", "Golden Window Sniper", "CV Optimization AI", "Blind Merit Mode", "Green Career Track", "Prioritas dukungan"] },
+    { name: "Free", price: "Gratis", per: "selamanya", features: FREE_FEATURES },
+    { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: PRO_FEATURES },
     { name: "Kampus", price: "Rp 50jt", per: "/semester", features: ["Lisensi B2B2C kampus", "Dashboard karier kampus", "Semua fitur Pro untuk mahasiswa", "Laporan penempatan kerja", "Onboarding & pelatihan", "Co-branding"] },
   ];
   return (

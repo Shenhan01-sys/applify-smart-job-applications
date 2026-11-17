@@ -347,6 +347,7 @@ function JobsPage() {
     return matchesSearch && matchesFilter;
   });
 
+  // Active jobs with match score >= 85. This is only a count of strong matches, not the planned "Golden Window Sniper".
   const goldenWindows = jobs.filter((j) => j.match_score >= 85 && j.status === "active").length;
 
   return (
@@ -378,7 +379,7 @@ function JobsPage() {
             </span>
             {goldenWindows > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2F801] text-[#16150F] px-3 py-1.5 text-xs font-bold">
-                <Zap className="h-3.5 w-3.5" /> {goldenWindows} Golden Window
+                <Zap className="h-3.5 w-3.5" /> {goldenWindows} kecocokan tinggi
               </span>
             )}
           </div>
