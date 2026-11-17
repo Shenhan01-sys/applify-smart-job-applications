@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
 import { automationApi } from "@/services/automationApi";
+import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { HitlTrack } from "@/components/HitlTrack";
 import {
   LEVEL_LABEL,
@@ -84,14 +85,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("monthly_quota, used_quota, ai_model_tier")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      const q = sub?.monthly_quota ?? 10;
-      const used = sub?.used_quota ?? 0;
-      setQuota({ quota: q, used, remaining: Math.max(0, q - used) });
+      // Quota comes from the database function the Edge Function also uses (it counts this month's drafts);
+      // the plan tier comes from subscriptions. The old code read columns that do not exist in schema.sql.
+      const [{ data: status }, { data: sub }] = await Promise.all([
+        supabase.rpc("get_quota_status", { p_user_id: user.id }),
+        supabase.from("subscriptions").select("ai_model_tier").eq("user_id", user.id).maybeSingle(),
+      ]);
+      const q = parseQuotaStatus(status);
+      setQuota({ quota: q.quota, used: q.used, remaining: q.remaining });
       setTier(sub?.ai_model_tier === "pro" ? "pro" : "free");
     } catch (err) {
       console.error("Error loading quota:", err);

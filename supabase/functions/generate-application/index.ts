@@ -6,6 +6,7 @@
 // single hardcoded model breaks generation for every user. Keep a chain and update it via secrets.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
+import { parseQuotaStatus } from "../_shared/quota.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -82,8 +83,10 @@ Deno.serve(async (req: Request) => {
     //    generation no longer costs the user one of their monthly applications.
     const { data: quotaStatus, error: qsErr } = await admin.rpc("get_quota_status", { p_user_id: userId });
     if (qsErr) return json({ error: "Quota check failed", detail: qsErr.message }, 500);
-    let quota: any = quotaStatus;
-    if (mode !== "analyze" && quotaStatus && Number(quotaStatus.remaining ?? 1) <= 0) {
+    // The RPC returns an array of one row; parseQuotaStatus reads it (reading .remaining off the array
+    // was always undefined, so this check never blocked anyone).
+    let quota: any = parseQuotaStatus(quotaStatus);
+    if (mode !== "analyze" && quota.remaining <= 0) {
       return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
     }
 
@@ -173,9 +176,9 @@ Return JSON exactly in this shape:
     if (mode !== "analyze") {
       const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
       if (qErr) return json({ error: "Quota update failed", detail: qErr.message }, 500);
-      quota = q;
-      if (q && q.allowed === false) {
-        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota: q }, 429);
+      quota = parseQuotaStatus(q);
+      if (!quota.allowed) {
+        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
       }
     }
     const content: string = aiJson.choices?.[0]?.message?.content ?? "";
