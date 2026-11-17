@@ -1,10 +1,14 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
-import { Bot, Zap, Send, Clock, Search, Leaf, Settings, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
+import { Bot, Zap, Send, Search, Leaf, Settings, ChevronRight, CheckCircle2, FileText, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockProfile as mockProfileData, mockSubscription, mockApplications as mockAppData } from "@/mocks/mockData";
+// Sample data is only for the explicit demo mode (VITE_MOCK_MODE=true). A real account sees its own rows
+// or an honest empty state, never sample numbers.
+import { mockProfile as mockProfileData, mockSubscription, mockAIApplications } from "@/mocks/mockData";
+import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
+import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -38,23 +42,11 @@ function CountUp({ to, duration = 1500 }: { to: number; duration?: number }) {
   return <span>{val}</span>;
 }
 
-function relTime(d?: string): string {
-  if (!d) return "";
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m} mnt lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
-  return `${Math.floor(h / 24)} hari lalu`;
-}
-
-function statusStyle(status: string): { dot: string; bg: string } {
+function statusStyle(status: DashStatus): { dot: string; bg: string } {
   switch (status) {
-    case "Terkirim": return { dot: "bg-[#0A5BE0]", bg: "bg-blue-50 border-blue-200 text-blue-700" };
-    case "ATS Lolos": case "Lolos ATS": case "Offer": return { dot: "bg-[#A3E635]", bg: "bg-lime-50 border-lime-300 text-lime-800" };
-    case "Callback": case "Interview": return { dot: "bg-[#14B8A6]", bg: "bg-teal-50 border-teal-200 text-teal-700" };
-    case "Ditolak": return { dot: "bg-[#C0341A]", bg: "bg-red-50 border-red-200 text-red-700" };
+    case "submitted": return { dot: "bg-[#0A5BE0]", bg: "bg-blue-50 border-blue-200 text-blue-700" };
+    case "follow_up": return { dot: "bg-[#F59E0B]", bg: "bg-amber-50 border-amber-200 text-amber-800" };
+    case "responded": return { dot: "bg-[#14B8A6]", bg: "bg-teal-50 border-teal-200 text-teal-700" };
     default: return { dot: "bg-neutral-400", bg: "bg-neutral-100 border-neutral-200 text-neutral-700" };
   }
 }
@@ -62,28 +54,54 @@ function statusStyle(status: string): { dot: string; bg: string } {
 export function DashboardPage() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
-  const [applications, setApplications] = useState<any[]>([]);
+  const [applications, setApplications] = useState<DashApplication[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
+  // null = unknown (the call failed or there is no data), so the ring shows a dash instead of a made-up number
+  const [quota, setQuota] = useState<QuotaSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     async function loadData() {
       if (!user?.id) return;
+      setLoadError("");
       if (isMockMode()) {
-        setProfile(mockProfileData); setApplications(mockAppData as any[]); setSubscription(mockSubscription); setLoading(false); return;
+        setProfile(mockProfileData);
+        setApplications(mockAIApplications as unknown as DashApplication[]);
+        setSubscription(mockSubscription);
+        setQuota({ quota: mockSubscription.monthly_quota, used: mockSubscription.used_quota, remaining: mockSubscription.monthly_quota - mockSubscription.used_quota, allowed: true });
+        setLoading(false);
+        return;
       }
-      const [{ data: p }, { data: apps }, { data: sub }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase.from("applications").select("*").eq("user_id", user.id).order("applied_at", { ascending: false }).limit(6),
-        supabase.from("subscriptions").select("*").eq("user_id", user.id).single(),
-      ]);
-      setProfile(p || mockProfileData);
-      setApplications((apps?.length ? apps : mockAppData) as any[]);
-      setSubscription(sub || mockSubscription);
-      setLoading(false);
+      try {
+        // Same sources as the rest of the app: drafts and their status live in ai_applications (joined to
+        // jobs), the monthly draft quota comes from the get_quota_status function the Edge Function uses.
+        const [p, apps, sub, q] = await Promise.all([
+          supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+          supabase
+            .from("ai_applications")
+            .select("id, status, submitted_at, created_at, jobs(title, company)")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(500),
+          supabase.from("subscriptions").select("plan_name, ai_model_tier").eq("user_id", user.id).maybeSingle(),
+          supabase.rpc("get_quota_status", { p_user_id: user.id }),
+        ]);
+        if (apps.error) throw new Error(apps.error.message);
+        setProfile(p.data ?? null);
+        setApplications((apps.data ?? []) as unknown as DashApplication[]);
+        setSubscription(sub.data ?? null);
+        setQuota(q.error ? null : parseQuotaStatus(q.data));
+      } catch (err: any) {
+        console.error("Dashboard load failed:", err);
+        setLoadError(err?.message || "Tidak dapat memuat data.");
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
-  }, [user]);
+  }, [user, reloadKey]);
 
   if (loading) {
     return (
@@ -101,17 +119,13 @@ export function DashboardPage() {
   }
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "User";
-  const tier = TIER_LABEL[(subscription?.plan_name || "free").toLowerCase()] || "Free";
-  const quota = subscription?.monthly_quota || 10;
-  const used = subscription?.used_quota || 0;
-  const remaining = Math.max(quota - used, 0);
-
-  const sent = applications.length;
-  const atsPassed = applications.filter((a) => ["ATS Lolos", "Callback", "Interview", "Offer"].includes(a.status)).length;
-  const callback = applications.filter((a) => ["Callback", "Interview", "Offer"].includes(a.status)).length;
+  // The backend, worker and Edge Function read the plan from subscriptions.ai_model_tier.
+  const tier = TIER_LABEL[String(subscription?.ai_model_tier || subscription?.plan_name || "free").toLowerCase()] || "Free";
+  const stats = summarizeApplications(applications);
+  const activity = recentActivity(applications, 6);
 
   const C = 2 * Math.PI * 18;
-  const ringOffset = C - (Math.min(used / Math.max(quota, 1), 1)) * C;
+  const ringOffset = quota ? C - Math.min(quota.used / Math.max(quota.quota, 1), 1) * C : C;
 
   return (
     <AppShell>
@@ -123,7 +137,8 @@ export function DashboardPage() {
               <Zap className="text-[#A3E635] w-3.5 h-3.5" /> Tier {tier}
             </div>
             <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-900 mt-4 tracking-tight">Halo, {name}.</h1>
-            <p className="font-sans text-neutral-500 mt-1.5 text-sm sm:text-base">Agenmu aktif bekerja. Berikut pantauan hari ini.</p>
+            <p className="font-sans text-neutral-500 mt-1.5 text-sm sm:text-base">Berikut ringkasan lamaran di akunmu.</p>
+            {isMockMode() && <p className="mt-2 inline-block text-[10px] font-mono font-bold uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">Mode demo: data contoh</p>}
           </div>
           <div className="glass-solid rounded-2xl p-3 flex items-center gap-4 min-w-[200px] hover:shadow-md transition-shadow">
             <div className="relative w-12 h-12 shrink-0">
@@ -131,17 +146,24 @@ export function DashboardPage() {
                 <circle cx="24" cy="24" r="18" fill="none" stroke="#f5f5f5" strokeWidth="4" />
                 <circle cx="24" cy="24" r="18" fill="none" stroke="#A3E635" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={ringOffset} className="transition-all duration-1000 ease-out" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-neutral-900">{remaining}</div>
+              <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-neutral-900">{quota ? quota.remaining : "-"}</div>
             </div>
             <div>
-              <p className="font-display text-sm font-bold text-neutral-900">Sisa Kuota</p>
-              <p className="font-sans text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">Bulan Ini</p>
+              <p className="font-display text-sm font-bold text-neutral-900">Sisa Kuota Draf</p>
+              <p className="font-sans text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">{quota ? `Bulan ini, ${quota.used}/${quota.quota}` : "Tidak diketahui"}</p>
             </div>
           </div>
         </div>
 
+        {loadError && (
+          <div role="alert" className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" /> Data lamaran tidak dapat dimuat ({loadError}). Angka di bawah belum tentu benar.</span>
+            <button onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }} className="h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-semibold shrink-0">Coba lagi</button>
+          </div>
+        )}
+
         {/* Mission Control diorama */}
-        <MissionControlStage sent={sent} atsPassed={atsPassed} callback={callback} />
+        <MissionControlStage drafts={stats.drafts} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={stats.total === 0 && !loadError} />
 
         {/* Bottom: activity log + quick actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 opacity-0 animate-dbFadeUp" style={{ animationDelay: "300ms" }}>
@@ -150,29 +172,31 @@ export function DashboardPage() {
               <h3 className="font-display text-lg font-bold text-neutral-900">Jejak Aktivitas</h3>
               <Link to="/applications" className="text-xs font-bold text-[#0A5BE0] flex items-center gap-1 hover:underline">Lihat Semua <ChevronRight className="w-3 h-3" /></Link>
             </div>
-            {applications.length > 0 ? (
+            {activity.length > 0 ? (
               <div className="space-y-3">
-                {applications.map((a, i) => {
+                {activity.map((a) => {
                   const st = statusStyle(a.status);
                   return (
-                    <div key={a.id || i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border-2 border-neutral-200 bg-neutral-50/50 hover:bg-white hover:shadow-md hover:scale-[1.01] transition-all duration-300 gap-4">
+                    <div key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border-2 border-neutral-200 bg-neutral-50/50 hover:bg-white hover:shadow-md hover:scale-[1.01] transition-all duration-300 gap-4">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-white border-2 border-neutral-300 rounded-xl flex items-center justify-center shrink-0 shadow-sm"><Bot className="w-5 h-5 text-neutral-600" /></div>
                         <div>
-                          <p className="font-display font-bold text-neutral-900 text-sm">{a.role_title || "—"}</p>
-                          <p className="font-sans text-xs text-neutral-500 mt-0.5">{a.company_name} <span className="mx-1">•</span> {relTime(a.applied_at)}</p>
+                          <p className="font-display font-bold text-neutral-900 text-sm">{a.title}</p>
+                          <p className="font-sans text-xs text-neutral-500 mt-0.5">{a.company}{a.company && a.at ? <span className="mx-1">•</span> : null}{relativeTime(a.at)}</p>
                         </div>
                       </div>
                       <div className={`px-3 py-1.5 rounded-lg border shadow-sm flex items-center gap-2 w-fit ${st.bg}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${st.dot}`} />
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">{a.status}</span>
+                        <div className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">{a.label}</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-10 text-sm text-muted-foreground">Belum ada aktivitas. Mulai dari <Link to="/jobs" className="text-[#0A5BE0] font-semibold">Job Feed</Link>.</div>
+              <div className="text-center py-10 text-sm text-muted-foreground">
+                {loadError ? "Aktivitas tidak dapat dimuat." : <>Belum ada lamaran di akunmu. Pilih lowongan di <Link to="/jobs" className="text-[#0A5BE0] font-semibold">Job Feed</Link>, lalu buat draf lamaran.</>}
+              </div>
             )}
           </div>
 
@@ -206,7 +230,7 @@ export function DashboardPage() {
   );
 }
 
-function MissionControlStage({ sent, atsPassed, callback }: { sent: number; atsPassed: number; callback: number }) {
+function MissionControlStage({ drafts, sent, responded, followUp, empty }: { drafts: number; sent: number; responded: number; followUp: number; empty: boolean }) {
   return (
     <div className="relative w-full flex flex-col items-center pt-8 pb-12 opacity-0 animate-dbFadeUp" style={{ animationDelay: "100ms" }}>
       <div className="absolute inset-0 bg-tech-grid z-0 pointer-events-none" />
@@ -242,10 +266,19 @@ function MissionControlStage({ sent, atsPassed, callback }: { sent: number; atsP
 
       {/* stat orbs */}
       <div className="relative z-30 w-full max-w-3xl px-4 flex justify-between sm:justify-center sm:gap-12 lg:gap-24 -mt-4">
-        <Orb icon={Send} value={sent} label="Terkirim" accent="#0A5BE0" delay={100} />
-        <Orb icon={CheckCircle2} value={atsPassed} label="Lolos ATS" accent="#A3E635" delay={200} prominent />
-        <Orb icon={Clock} value={callback} label="Callback" accent="#14B8A6" delay={300} />
+        <Orb icon={FileText} value={drafts} label="Draf" accent="#999999" delay={100} />
+        <Orb icon={Send} value={sent} label="Terkirim" accent="#0A5BE0" delay={200} prominent />
+        <Orb icon={CheckCircle2} value={responded} label="Dibalas" accent="#14B8A6" delay={300} />
       </div>
+      {empty ? (
+        <p className="relative z-30 mt-6 text-sm text-neutral-500 text-center max-w-md px-4">
+          Belum ada lamaran, jadi semua angka masih 0. Angka dihitung dari draf dan lamaran nyata di akunmu.
+        </p>
+      ) : followUp > 0 ? (
+        <Link to="/applications" className="relative z-30 mt-6 text-xs font-bold text-[#B45309] bg-amber-50 border border-amber-200 rounded-full px-3 py-1 hover:underline">
+          {followUp} lamaran perlu follow-up
+        </Link>
+      ) : null}
     </div>
   );
 }
