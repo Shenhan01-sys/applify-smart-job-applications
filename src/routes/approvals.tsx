@@ -168,7 +168,7 @@ function ApprovalsPage() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Semua sudah di-review!</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Tidak ada pending approvals. AI akan memberitahu kamu saat ada aplikasi baru yang perlu di-review.
+                Tidak ada approval yang menunggu. Ajukan draf dari Job Feed (tombol "Ajukan ke Persetujuan"); permintaan baru muncul di halaman ini.
               </p>
             </>
           ) : (

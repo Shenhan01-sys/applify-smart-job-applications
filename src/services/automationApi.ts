@@ -224,6 +224,22 @@ export const automationApi = {
     )
   },
 
+  /**
+   * Ask the backend to announce this application's CURRENT status on Telegram. Best effort: the status
+   * itself was already saved by the caller, so a failure here is only logged, never shown as an error.
+   */
+  async notifyApplicationStatus(applicationId: string) {
+    return apiFetch(
+      `${API_BASE_URL}/api/notifications/application-status`,
+      {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ application_id: applicationId }),
+      },
+      () => ({ sent: false, reason: 'mock' }),
+    )
+  },
+
   async getApprovalHistory(params?: { limit?: number; offset?: number }) {
     const query = new URLSearchParams(params as any).toString()
     return apiFetch(

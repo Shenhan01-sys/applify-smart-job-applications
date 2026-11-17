@@ -74,12 +74,12 @@ export const mockJobs = [
     acceptance_potential: 85,
     company_culture_score: 88,
     growth_potential: 90,
-    ai_strategy: "AI akan mengoptimasi CV kamu dengan menekankan pengalaman backend dan leadership. Cover letter akan disesuaikan dengan kultur Gojek yang agile. AI juga akan follow-up 3 hari setelah lamaran untuk memaksimalkan visibility.",
+    ai_strategy: "AI akan mengoptimasi CV kamu dengan menekankan pengalaman backend dan leadership. Cover letter akan disesuaikan dengan kultur Gojek yang agile. Applify mengingatkanmu 4 hari setelah lamaran terkirim agar kamu bisa follow-up sendiri.",
     ai_actions: [
       { step: 1, title: "CV Optimization", description: "Menyesuaikan CV dengan keywords dari job description", status: "pending", estimated_time: "2 menit" },
       { step: 2, title: "Cover Letter AI", description: "Generate cover letter yang personal dan relevan", status: "pending", estimated_time: "3 menit" },
-      { step: 3, title: "Auto-Submit", description: "Mengisi form lamaran dan submit otomatis", status: "pending", estimated_time: "1 menit" },
-      { step: 4, title: "Follow-up Strategy", description: "Schedule follow-up email 3 hari kemudian", status: "pending", estimated_time: "30 detik" },
+      { step: 3, title: "Isi Form & Kirim", description: "Mengisi form lamaran; tombol kirim hanya ditekan setelah kamu menyetujui", status: "pending", estimated_time: "1 menit" },
+      { step: 4, title: "Follow-up Strategy", description: "Pengingat follow-up 4 hari kemudian (kamu yang mengirim follow-up)", status: "pending", estimated_time: "30 detik" },
     ],
     skill_gaps: [{ skill: "Go Language", required_level: 8, user_level: 6, gap: 2 }],
     skill_matches: [

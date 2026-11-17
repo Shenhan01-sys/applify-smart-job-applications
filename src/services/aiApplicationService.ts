@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { mockAIApplications, mockAiAnalysis, MOCK_USER_ID } from "@/mocks/mockData";
+import { automationApi } from "@/services/automationApi";
+import { followUpDueAt } from "@/lib/followUp";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -22,6 +24,17 @@ export interface AIApplicationData {
   response_received_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export const APPLICATION_STATUSES = ["draft", "ready", "submitted", "follow_up", "responded", "closed"] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+/** Tell the backend to announce the saved status on Telegram. Never throws: notification is best effort. */
+function announceStatus(id: string) {
+  if (isMockMode()) return;
+  automationApi.notifyApplicationStatus(id).catch((err) => {
+    console.warn("[aiApplicationService] status notification skipped:", err?.message ?? err);
+  });
 }
 
 export interface AIApplicationInput {
@@ -156,7 +169,7 @@ export const aiApplicationService = {
               ...a,
               status: "submitted",
               submitted_at: new Date().toISOString(),
-              follow_up_scheduled: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+              follow_up_scheduled: followUpDueAt(),
             }
           : a
       );
@@ -168,13 +181,47 @@ export const aiApplicationService = {
       .update({
         status: "submitted",
         submitted_at: new Date().toISOString(),
-        follow_up_scheduled: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+        follow_up_scheduled: followUpDueAt(),
+        follow_up_sent: false,
       })
       .eq("id", id)
       .select()
       .single();
 
     if (error) throw error;
+    announceStatus(id);
+    return data;
+  },
+
+  // Move an application to another status (board drag, manual updates) and announce it on Telegram.
+  async updateStatus(id: string, status: ApplicationStatus) {
+    if (!APPLICATION_STATUSES.includes(status)) throw new Error(`Status tidak dikenal: ${status}`);
+    if (isMockMode()) {
+      mockAppStore = mockAppStore.map(a => (a.id === id ? ({ ...a, status, updated_at: new Date().toISOString() } as any) : a));
+      return mockAppStore.find(a => a.id === id);
+    }
+
+    const patch: Record<string, any> = { status, updated_at: new Date().toISOString() };
+    if (status === "submitted") {
+      // First time submitted: record when, and when the follow-up reminder is due (FOLLOW_UP_DAYS).
+      const { data: current } = await supabase
+        .from("ai_applications")
+        .select("submitted_at, follow_up_scheduled")
+        .eq("id", id)
+        .single();
+      if (!current?.submitted_at) patch.submitted_at = new Date().toISOString();
+      if (!current?.follow_up_scheduled) patch.follow_up_scheduled = followUpDueAt();
+    }
+
+    const { data, error } = await supabase
+      .from("ai_applications")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    announceStatus(id);
     return data;
   },
 
@@ -191,7 +238,8 @@ export const aiApplicationService = {
     return data;
   },
 
-  // Mark follow-up as sent
+  // The user says she/he sent the follow-up herself/himself (Applify never sends it). A still-"submitted"
+  // application moves to "follow_up"; later stages (responded, closed) are left alone.
   async markFollowUpSent(id: string) {
     const { data, error } = await supabase
       .from("ai_applications")
@@ -201,6 +249,7 @@ export const aiApplicationService = {
       .single();
 
     if (error) throw error;
+    await supabase.from("ai_applications").update({ status: "follow_up" }).eq("id", id).eq("status", "submitted");
     return data;
   },
 

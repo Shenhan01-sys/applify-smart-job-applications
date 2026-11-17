@@ -151,13 +151,19 @@ export function AppsPage() {
     }
   };
 
+  // "Mark follow-up as sent" only records that the user sent a follow-up herself/himself. Applify does not
+  // send follow-up emails; its part is the Telegram reminder (worker) and the saved date.
   const handleFollowUp = async (appId: string) => {
+    const markDone = (a: AIApplicationData): AIApplicationData =>
+      a.id === appId ? { ...a, follow_up_sent: true, status: a.status === "submitted" ? "follow_up" : a.status } : a;
     try {
       if (isMockMode()) {
-        setApplications(prev => prev.map(a => a.id === appId ? { ...a, follow_up_sent: true } : a));
+        setApplications(prev => prev.map(markDone));
+        setSelectedApp(prev => (prev ? markDone(prev) : prev));
         return;
       }
       await aiApplicationService.markFollowUpSent(appId);
+      setSelectedApp(prev => (prev ? markDone(prev) : prev));
       loadApplications();
     } catch (err) {
       console.error("Error marking follow-up:", err);
@@ -179,7 +185,15 @@ export function AppsPage() {
 
     const targetStatus = over.data.current?.status as string;
     if (targetStatus && draggedApp.status !== targetStatus) {
+      const previousStatus = draggedApp.status;
       setApplications(prev => prev.map(a => a.id === draggedApp.id ? { ...a, status: targetStatus as any } : a));
+      // Save the move (the backend then announces it on Telegram); put the card back if saving fails.
+      if (!isMockMode()) {
+        aiApplicationService.updateStatus(draggedApp.id, targetStatus as any).catch((err) => {
+          console.error("Gagal menyimpan status:", err);
+          setApplications(prev => prev.map(a => a.id === draggedApp.id ? { ...a, status: previousStatus } : a));
+        });
+      }
     }
   }, [applications]);
 
@@ -422,24 +436,33 @@ export function AppsPage() {
                 </div>
               )}
 
-              {selectedApp.status === "submitted" && selectedApp.follow_up_scheduled && !selectedApp.follow_up_sent && (
+              {(selectedApp.status === "submitted" || selectedApp.status === "follow_up") &&
+                selectedApp.follow_up_scheduled &&
+                !selectedApp.follow_up_sent && (
                 <div className="rounded-xl bg-[#FEF3C7] border-2 border-[#FEF3C7] p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="h-4 w-4 text-[#92400E]" />
-                    <span className="text-sm font-semibold text-[#92400E]">Follow-up Scheduled</span>
+                    <span className="text-sm font-semibold text-[#92400E]">
+                      {selectedApp.status === "follow_up" ? "Waktunya Follow-up" : "Pengingat Follow-up"}
+                    </span>
                   </div>
                   <p className="text-xs text-[#92400E]">
-                    AI akan mengirim follow-up email pada{" "}
+                    {selectedApp.status === "follow_up"
+                      ? "Sudah lewat batas follow-up ("
+                      : "Applify mengingatkanmu lewat Telegram pada "}
                     {new Date(selectedApp.follow_up_scheduled).toLocaleDateString("id-ID", {
                       weekday: "long", day: "numeric", month: "long",
                     })}
+                    {selectedApp.status === "follow_up" ? "). " : ". "}
+                    Follow-up ke perusahaan kamu kirim sendiri; Applify tidak mengirim email follow-up.
                   </p>
                   <button
                     onClick={() => handleFollowUp(selectedApp.id)}
+                    title="Hanya mencatat bahwa kamu sudah follow-up. Tidak ada email yang dikirim."
                     className="mt-3 h-9 px-4 rounded-lg bg-[#92400E] text-white text-xs font-semibold hover:opacity-90 transition inline-flex items-center gap-1.5"
                   >
                     <Mail className="h-3.5 w-3.5" />
-                    Kirim Follow-up Sekarang
+                    Tandai Follow-up Sudah Kukirim
                   </button>
                 </div>
               )}

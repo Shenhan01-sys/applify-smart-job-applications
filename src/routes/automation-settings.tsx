@@ -383,7 +383,7 @@ function AITierDisplay() {
         { name: 'DeepSeek v4 Pro', pct: '60%', desc: 'Model utama untuk cover letter & analisis mendalam' },
         { name: 'DeepSeek v4 Flash', pct: '40%', desc: 'Model pendukung untuk tugas cepat & ringan' },
       ],
-      note: 'AI akan otomatis memilih model terbaik untuk setiap lamaran berdasarkan kompleksitas.',
+      note: 'Model dipilih menurut paketmu; bila satu model sedang tidak tersedia, sistem beralih ke model cadangan.',
     },
     ultimate: {
       models: [
