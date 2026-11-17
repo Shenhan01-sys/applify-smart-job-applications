@@ -7,6 +7,17 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
+import {
+  GROUNDING_RULES,
+  acceptCoverLetter,
+  buildGroundingSource,
+  checkGrounding,
+  formatWarningsText,
+  languageInstruction,
+  selectLanguage,
+  stripReasoning,
+  validateCoverLetter,
+} from "../_shared/output-guard.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +82,7 @@ Deno.serve(async (req: Request) => {
     const jobId: string | undefined = body?.jobId;
     const tone: string = body?.tone ?? "professional";
     const mode: string = body?.mode ?? "generate"; // "generate" (consumes quota + persists) | "analyze" (preview only)
+    const requestedLanguage: string | undefined = body?.language; // "id" | "en" | "auto" (default: Bahasa Indonesia)
     if (!jobId) return json({ error: "jobId is required" }, 400);
 
     // 2) Tier -> model
@@ -106,6 +118,22 @@ Deno.serve(async (req: Request) => {
     const workList = (work ?? [])
       .map((w: any) => `- ${w.role_title} @ ${w.company_name}: ${w.description ?? ""}`).join("\n");
 
+    // Language: Bahasa Indonesia by default; English only when the posting is clearly English (or asked for).
+    const language = selectLanguage({ requested: requestedLanguage, jobText: `${job.title ?? ""}\n${job.description ?? ""}` });
+    // Facts the cover letter may rely on (everything else it states is flagged as a warning).
+    const profileFacts = {
+      firstName: profile?.full_name ?? "",
+      currentTitle: profile?.current_title ?? "",
+      location: profile?.location ?? "",
+      yearsOfExperience: profile?.experience_years ?? 0,
+      skills: skillList ? skillList.split(",").map((x: string) => x.trim()).filter(Boolean) : [],
+      summary: profile?.summary ?? profile?.bio ?? "",
+      workExperiences: (work ?? []).map((w: any) => ({
+        role_title: w.role_title, company_name: w.company_name, start_date: w.start_date, end_date: w.end_date, description: w.description,
+      })),
+    };
+    const allowedContext = `${profile?.full_name ?? ""} ${job.company ?? ""} ${job.title ?? ""} ${job.description ?? ""} ${workList}`;
+
     // 5) Prompt
     const sys = `You are an expert Indonesian career assistant for "Applify". Analyze the candidate-job match and write a tailored, ATS-friendly cover letter. Respond with ONLY a valid JSON object (no markdown, no code fences).`;
     const userPrompt = `JOB
@@ -124,10 +152,14 @@ Recent experience:
 ${workList || "-"}
 
 TONE: ${tone}
+LANGUAGE: ${languageInstruction(language)}
+
+GROUNDING RULES (strict):
+${GROUNDING_RULES.map((r) => `- ${r}`).join("\n")}
 
 Return JSON exactly in this shape:
 {
-  "coverLetter": "250-400 word ${tone} cover letter, ready to send, no placeholders/brackets",
+  "coverLetter": "250-400 word ${tone} cover letter, ready to send, no placeholders/brackets, only facts from the candidate data above",
   "matchScore": 0-100,
   "acceptancePotential": 0-100,
   "tailoredSkills": ["skills from the candidate that match this job"],
@@ -135,10 +167,15 @@ Return JSON exactly in this shape:
   "aiNotes": "1-3 sentence strategy in Bahasa Indonesia"
 }`;
 
-    // 6) Call OpenRouter, trying each model of the tier's chain in order
-    let aiJson: any = null;
+    // 6) Call OpenRouter, trying each model of the tier's chain in order. A reply only counts when it passes the
+    //    quality gate (no chain-of-thought, no stray foreign script, a plausible letter body). Otherwise the next
+    //    model is tried, and if none passes the request fails explicitly: nothing is saved and no quota is used.
+    let parsed: any = null;
     let model = models[0];
+    let modelUsed = model;
+    let soft: { parsed: any; modelUsed: string } | null = null;
     let lastDetail = "";
+    const rejectedReasons: string[] = [];
     for (const candidate of models) {
       model = candidate;
       const aiResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -159,17 +196,44 @@ Return JSON exactly in this shape:
           max_tokens: 1600,
         }),
       });
-      if (aiResp.ok) {
-        aiJson = await aiResp.json();
-        if (aiJson?.choices?.[0]?.message?.content) break;
-        lastDetail = `empty completion from ${model}`;
-        aiJson = null;
+      if (!aiResp.ok) {
+        lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
         continue;
       }
-      lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
+      const aiJson = await aiResp.json();
+      const raw: string = aiJson?.choices?.[0]?.message?.content ?? "";
+      const cleaned = stripReasoning(raw).text;
+      if (!cleaned) {
+        lastDetail = `empty completion from ${model}`;
+        rejectedReasons.push("empty");
+        continue;
+      }
+      const attempt = extractJson(cleaned) ?? {
+        coverLetter: cleaned,
+        matchScore: job.match_score ?? 70,
+        acceptancePotential: job.acceptance_potential ?? 60,
+        tailoredSkills: [],
+        skillGaps: [],
+        aiNotes: "",
+      };
+      const verdict = acceptCoverLetter(String(attempt.coverLetter ?? ""), { language, allowedContext });
+      if (verdict.ok === true) {
+        parsed = { ...attempt, coverLetter: verdict.text };
+        modelUsed = aiJson.model ?? model;
+        break;
+      }
+      const why = (verdict as { reasons: string[] }).reasons;
+      rejectedReasons.push(...why);
+      lastDetail = `${model}: output rejected (${why.join(", ")})`;
+      const fallback = (verdict as { fallbackText?: string }).fallbackText;
+      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ?? model };
     }
-    if (!aiJson) {
-      return json({ error: "AI generation failed", detail: lastDetail, models, quota }, 502);
+    if (!parsed && soft) {
+      parsed = soft.parsed;
+      modelUsed = soft.modelUsed;
+    }
+    if (!parsed) {
+      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], models, quota }, 502);
     }
 
     // 6b) Consume one monthly application only now that a draft exists
@@ -181,25 +245,26 @@ Return JSON exactly in this shape:
         return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
       }
     }
-    const content: string = aiJson.choices?.[0]?.message?.content ?? "";
-    const parsed = extractJson(content) ?? {
-      coverLetter: content,
-      matchScore: job.match_score ?? 70,
-      acceptancePotential: job.acceptance_potential ?? 60,
-      tailoredSkills: [],
-      skillGaps: [],
-      aiNotes: "",
-    };
+    // Soft checks on the accepted letter: wrong language, and numbers/percentages the profile does not support.
+    // They are returned in analysis.warnings AND written into ai_notes, so the draft screen shows them.
+    const warnings = [
+      ...validateCoverLetter(parsed.coverLetter ?? "", { language, allowedContext }).warnings,
+      ...checkGrounding(parsed.coverLetter ?? "", buildGroundingSource(profileFacts), { sections: false }),
+    ];
+    const warningText = formatWarningsText(warnings);
+    const aiNotes = [parsed.aiNotes ?? "", warningText].filter(Boolean).join("\n\n");
 
     const result = {
       coverLetter: parsed.coverLetter ?? "",
       optimizedCV: { summary: parsed.aiNotes ?? "", highlighted_skills: parsed.tailoredSkills ?? [] },
       tailoredSkills: parsed.tailoredSkills ?? [],
-      aiNotes: parsed.aiNotes ?? "",
+      aiNotes,
       matchScore: clamp(parsed.matchScore ?? job.match_score),
       acceptancePotential: clamp(parsed.acceptancePotential ?? job.acceptance_potential),
       skillGaps: parsed.skillGaps ?? [],
-      modelUsed: aiJson.model ?? model,
+      warnings,
+      language,
+      modelUsed,
       tier,
     };
 

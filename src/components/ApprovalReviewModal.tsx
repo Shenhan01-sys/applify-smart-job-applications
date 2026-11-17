@@ -49,6 +49,8 @@ export default function ApprovalReviewModal({
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [editedCoverLetter, setEditedCoverLetter] = useState(request.cover_letter || '')
   const [isEditing, setIsEditing] = useState(false)
+  // Peringatan dari penjaga mutu backend setelah "Tulis ulang": angka yang tidak ada di surat asli.
+  const [regenWarnings, setRegenWarnings] = useState<string[]>([])
 
   const timeRemaining = new Date(request.expires_at).getTime() - Date.now()
   const isExpiringSoon = timeRemaining < 15 * 60 * 1000 // 15 minutes
@@ -96,6 +98,11 @@ export default function ApprovalReviewModal({
       )
       if (result?.cover_letter) {
         setEditedCoverLetter(result.cover_letter)
+        setRegenWarnings(
+          Array.isArray(result.warnings)
+            ? result.warnings.map((w: any) => String(w?.message ?? '')).filter(Boolean)
+            : []
+        )
         toast.success('Cover letter ditulis ulang.')
       } else {
         // The backend answered without a new letter: keep the current text, never pretend it was rewritten.
@@ -189,6 +196,19 @@ export default function ApprovalReviewModal({
             ) : (
               <div className="whitespace-pre-wrap rounded-xl border-2 border-[#16150F]/10 bg-white p-4 text-sm leading-relaxed">
                 {editedCoverLetter || 'Belum ada cover letter.'}
+              </div>
+            )}
+            {regenWarnings.length > 0 && (
+              <div role="alert" className="mt-2 rounded-xl border-2 border-[#D9741A]/40 bg-[#D9741A]/10 p-3 text-xs text-[#16150F]">
+                <p className="mb-1 flex items-center gap-1 font-semibold text-[#D9741A]">
+                  <AlertTriangle className="h-3 w-3" />
+                  Periksa dulu sebelum menyetujui
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {regenWarnings.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
