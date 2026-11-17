@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { mockAIApplications, mockAiAnalysis, MOCK_USER_ID } from "@/mocks/mockData";
 import { automationApi } from "@/services/automationApi";
 import { followUpDueAt } from "@/lib/followUp";
+import { cleanStringList } from "@/lib/jobCardData";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -35,6 +36,14 @@ function announceStatus(id: string) {
   automationApi.notifyApplicationStatus(id).catch((err) => {
     console.warn("[aiApplicationService] status notification skipped:", err?.message ?? err);
   });
+}
+
+/** What the Edge Function returns next to the saved draft (it is not stored; only the screen shows it). */
+export interface DraftAnalysis {
+  /** Skills the posting asks for that the profile does not list. An empty list means the model reported none. */
+  skillGaps: string[];
+  /** Warnings from the quality guard (wrong language, numbers the profile does not support). */
+  warnings: string[];
 }
 
 export interface AIApplicationInput {
@@ -75,6 +84,11 @@ async function invokeGenerate(
 export const aiApplicationService = {
   // Create AI application draft (real AI via Edge Function; consumes 1 monthly quota)
   async createDraft(input: AIApplicationInput): Promise<AIApplicationData> {
+    return (await this.createDraftWithAnalysis(input)).application;
+  },
+
+  // Same as createDraft, plus the analysis the Edge Function returns next to the draft (skill gaps, warnings).
+  async createDraftWithAnalysis(input: AIApplicationInput): Promise<{ application: AIApplicationData; analysis: DraftAnalysis }> {
     if (isMockMode()) {
       await new Promise(r => setTimeout(r, 1500));
       const newApp = {
@@ -96,12 +110,15 @@ export const aiApplicationService = {
         jobs: { title: "New Job", company: "Company" },
       };
       mockAppStore = [newApp as any, ...mockAppStore];
-      return newApp as AIApplicationData;
+      return { application: newApp as AIApplicationData, analysis: { skillGaps: [], warnings: [] } };
     }
 
     const res = await invokeGenerate(input.jobId, "generate", input.tone || "professional");
     if (!res?.application) throw new Error(res?.error || "Gagal membuat draft AI");
-    return res.application as AIApplicationData;
+    return {
+      application: res.application as AIApplicationData,
+      analysis: { skillGaps: cleanStringList(res.analysis?.skillGaps), warnings: cleanStringList(res.analysis?.warnings) },
+    };
   },
 
   // Get all AI applications for user
@@ -286,7 +303,7 @@ export const aiApplicationService = {
       aiNotes: a.aiNotes ?? "",
       matchScore: a.matchScore ?? 0,
       acceptancePotential: a.acceptancePotential ?? 0,
-      skillGaps: a.skillGaps ?? [],
+      skillGaps: cleanStringList(a.skillGaps),
       quota: res?.quota,
     };
   },

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "../src/lib/jobCardData.ts";
+import { cleanStringList, listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "../src/lib/jobCardData.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -45,6 +45,12 @@ test("tanggal tayang: posted_at, lalu created_at, lalu tidak ada (bukan 1 Jan 19
   assert.equal(postedDate({ posted_at: null, created_at: undefined }), null);
 });
 
+test("skillGaps dari model: string, objek {skill}, duplikat, kosong, dan bentuk salah dibersihkan", () => {
+  assert.deepEqual(cleanStringList(["SQL", " SQL ", "", "Docker", { skill: "Kubernetes" }, { message: "Bahasa Inggris" }, 5, null]), ["SQL", "Docker", "Kubernetes", "Bahasa Inggris"]);
+  assert.deepEqual(cleanStringList(undefined), []);
+  assert.deepEqual(cleanStringList("SQL"), []);
+});
+
 // ---- kabel antarmuka ----
 
 test("kolom jobs yang tidak ada di schema.sql tidak lagi diasumsikan ada oleh kartu lowongan", () => {
@@ -80,4 +86,17 @@ test("Job Feed: label kuota memakai get_quota_status (draf per bulan), bukan dai
   assert.match(page, /draf tersisa bulan ini/);
   assert.doesNotMatch(page, /apply tersisa/);
   assert.doesNotMatch(page, /select\("ai_model_tier, daily_apply_quota"\)/);
+});
+
+test("modal draf menampilkan skillGaps dari respons Edge Function (analysis.skillGaps), bukan kolom jobs.skill_gaps", () => {
+  const svc = read("../src/services/aiApplicationService.ts");
+  assert.match(svc, /createDraftWithAnalysis/);
+  assert.match(svc, /skillGaps: cleanStringList\(res\.analysis\?\.skillGaps\)/);
+  const modal = read("../src/components/AIApplyModal.tsx");
+  assert.match(modal, /createDraftWithAnalysis\(\{ jobId, tone: "professional" \}\)/);
+  assert.match(modal, /setSkillGaps\(analysis\.skillGaps\)/);
+  assert.match(modal, /Model tidak melaporkan kesenjangan skill/);
+  const fn = read("../supabase/functions/generate-application/index.ts");
+  assert.match(fn, /skillGaps: parsed\.skillGaps \?\? \[\]/);
+  assert.match(fn, /return json\(\{ application: app, analysis: result, quota \}\)/);
 });

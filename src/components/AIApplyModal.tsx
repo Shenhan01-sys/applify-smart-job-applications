@@ -65,6 +65,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [error, setError] = useState("");
   const [tier, setTier] = useState<"free" | "pro">("free");
   const [quota, setQuota] = useState<QuotaState>({ remaining: 10, quota: 10, used: 0 });
+  // Skill gaps the model reported for the last draft or preview (not stored in the database).
+  const [skillGaps, setSkillGaps] = useState<string[] | null>(null);
   const [aiGenerated, setAiGenerated] = useState<{
     coverLetter: string;
     optimizedCV: Record<string, any>;
@@ -104,8 +106,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     try {
       setGenerating(true);
       setError("");
-      const app = await aiApplicationService.createDraft({ jobId, tone: "professional" });
+      const { application: app, analysis } = await aiApplicationService.createDraftWithAnalysis({ jobId, tone: "professional" });
       setApplication(app);
+      setSkillGaps(analysis.skillGaps);
       setAiGenerated({
         coverLetter: app.cover_letter,
         optimizedCV: (app.optimized_cv as Record<string, any>) || {},
@@ -128,6 +131,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       setRegenerating(true);
       setError("");
       const insights = await aiApplicationService.getJobInsights(jobId);
+      setSkillGaps(insights.skillGaps);
       setEditedCoverLetter(insights.coverLetter);
       setAiGenerated({
         coverLetter: insights.coverLetter,
@@ -505,8 +509,27 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 )}
 
                 {activeTab === "strategy" && (
-                  <div className="rounded-xl bg-[#F5F5F5] p-5">
-                    <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes || "—"}</pre>
+                  <div className="space-y-3">
+                    <div className="rounded-xl bg-[#F5F5F5] p-5">
+                      <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes || "—"}</pre>
+                    </div>
+                    {skillGaps !== null && (
+                      <div className="rounded-xl border-2 border-[#FDE68A] bg-[#FFFBEB] p-4">
+                        <p className="text-xs font-semibold text-[#92400E] flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Skill yang diminta lowongan tetapi belum ada di profilmu
+                        </p>
+                        {skillGaps.length > 0 ? (
+                          <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Kesenjangan skill">
+                            {skillGaps.map((g) => (
+                              <li key={g} className="text-xs bg-white border border-[#FCD34D] text-[#92400E] px-2 py-0.5 rounded-full">{g}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-xs text-[#92400E]">Model tidak melaporkan kesenjangan skill.</p>
+                        )}
+                        <p className="mt-2 text-[10px] text-[#92400E]/80">Perkiraan model bahasa, bukan hasil pengukuran. Tambahkan skill yang benar-benar kamu kuasai di halaman Profil.</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
