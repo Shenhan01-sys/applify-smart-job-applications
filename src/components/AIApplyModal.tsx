@@ -5,6 +5,8 @@ import { aiApplicationService, type AIApplicationData } from "@/services/aiAppli
 import { automationQueue } from "@/services/automationQueue";
 import { automationApi } from "@/services/automationApi";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
+import { describeApiError } from "@/lib/apiErrors";
+import { scoreOrNull } from "@/lib/jobCardData";
 import { HitlTrack } from "@/components/HitlTrack";
 import {
   LEVEL_LABEL,
@@ -76,7 +78,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
   // Free-tier models rotate (see edge function FREE_MODELS), so the UI names the tier, not a slug.
   const modelLabel = tier === "pro" ? "model Pro" : "model gratis OpenRouter";
-  const matchScore: number = jobData?.match_score ?? 0;
+  // null = no score stored for this job (shown as a dash, never as 0% or a default)
+  const matchScore: number | null = scoreOrNull(jobData?.match_score);
   const canApply = quota.remaining > 0;
 
   useEffect(() => {
@@ -193,10 +196,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       );
       onSuccess();
     } catch (err: any) {
-      setError(
-        `Gagal mengajukan persetujuan (${err.message || "backend otomasi tidak merespons"}). ` +
-          "Draf tetap tersimpan di Applications."
-      );
+      setError(`${describeApiError(err, "Gagal mengajukan persetujuan")}. Draf tetap tersimpan di Applications.`);
     } finally {
       setRequesting(false);
     }
@@ -401,7 +401,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
                   <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" />
-                  <div className="text-lg font-bold">{matchScore ? `${matchScore}%` : "—"}</div>
+                  <div className="text-lg font-bold">{matchScore !== null ? `${matchScore}%` : "—"}</div>
                   <div className="text-xs text-muted-foreground">Match Score</div>
                 </div>
                 <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">

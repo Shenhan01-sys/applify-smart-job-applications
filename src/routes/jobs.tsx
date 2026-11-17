@@ -80,7 +80,9 @@ function JobsPage() {
         .from("jobs")
         .select("*")
         .eq("status", "active")
-        .order("match_score", { ascending: false })
+        // Postgres sorts NULL first on DESC; jobs without a score must not outrank scored ones.
+        .order("match_score", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) throw error;

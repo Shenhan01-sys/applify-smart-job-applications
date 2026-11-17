@@ -84,14 +84,15 @@ interface SalaryBenchmark {
   percentile: number;
 }
 
-function CircularProgress({ value, label, color, size = 80 }: { value: number; label: string; color: string; size?: number }) {
+function CircularProgress({ value, label, color, size = 80, title }: { value: number | null; label: string; color: string; size?: number; title?: string }) {
   const strokeWidth = 6;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (value / 100) * circumference;
+  // null = not measured: an empty ring and a dash, never 0% or a default number
+  const offset = circumference - ((value ?? 0) / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center" title={title}>
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="transform -rotate-90">
           <circle
@@ -116,8 +117,8 @@ function CircularProgress({ value, label, color, size = 80 }: { value: number; l
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold" style={{ color }}>
-            {value}%
+          <span className="text-lg font-bold" style={{ color: value === null ? "#999999" : color }}>
+            {value === null ? "—" : `${value}%`}
           </span>
         </div>
       </div>
@@ -307,7 +308,6 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
   const acceptanceScore = scoreOrNull(job.acceptance_potential);
   const cultureScore = scoreOrNull(job.company_culture_score);
   const growthScore = scoreOrNull(job.growth_potential);
-  const hasAnyScore = [matchScore, acceptanceScore, cultureScore, growthScore].some((v) => v !== null);
   const posted = postedDate(job as { posted_at?: unknown; created_at?: unknown });
 
   const matchColor = (matchScore ?? 0) >= 80 ? "#22C55E" : (matchScore ?? 0) >= 60 ? "#0A5BE0" : "#F59E0B";
@@ -364,18 +364,19 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
         </div>
 
         {/* AI Scores Row */}
-        {hasAnyScore ? (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
-            {matchScore !== null && <CircularProgress value={matchScore} label="Match" color={matchColor} size={70} />}
-            {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Acceptance" color={acceptanceColor} size={70} />}
-            {cultureScore !== null && <CircularProgress value={cultureScore} label="Culture" color="#8B5CF6" size={70} />}
-            {growthScore !== null && <CircularProgress value={growthScore} label="Growth" color="#06B6D4" size={70} />}
-          </div>
-        ) : (
-          <p className="mt-4 pt-4 border-t border-[#E0E0E0] text-xs text-muted-foreground">
-            Skor kecocokan belum tersedia untuk lowongan ini. Buat draf lamaran untuk melihat analisis AI.
-          </p>
-        )}
+        {/* Match is always shown: a score, or a dash when the job has none. The other three are never written by any flow, so they appear only if a row has them. */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
+          <CircularProgress
+            value={matchScore}
+            label="Match"
+            color={matchColor}
+            size={70}
+            title="Skor relevansi dari kata kunci pencarian dan skill profil. Tanda — berarti belum ada dasar penilaian."
+          />
+          {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Acceptance" color={acceptanceColor} size={70} />}
+          {cultureScore !== null && <CircularProgress value={cultureScore} label="Culture" color="#8B5CF6" size={70} />}
+          {growthScore !== null && <CircularProgress value={growthScore} label="Growth" color="#06B6D4" size={70} />}
+        </div>
 
         {/* Salary & Platform */}
         <div className="flex items-center justify-between mt-4 text-sm">

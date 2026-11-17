@@ -100,3 +100,20 @@ test("modal draf menampilkan skillGaps dari respons Edge Function (analysis.skil
   assert.match(fn, /skillGaps: parsed\.skillGaps \?\? \[\]/);
   assert.match(fn, /return json\(\{ application: app, analysis: result, quota \}\)/);
 });
+
+test("skor kecocokan dari backend (jobs.match_score 0-100 atau null): null tampil —, 0 tampil 0%, urutan menaruh yang tanpa skor di akhir", () => {
+  // satu fungsi skor dipakai kartu dan modal, jadi 0 (skor sah) tidak sama dengan null (belum ada dasar penilaian)
+  assert.equal(scoreOrNull(0), 0);
+  assert.equal(scoreOrNull(null), null);
+  const card = read("../src/components/JobCard.tsx");
+  assert.match(card, /value === null \? "—" : `\$\{value\}%`/);
+  assert.match(card, /<CircularProgress\s+value=\{matchScore\}\s+label="Match"/);
+  const modal = read("../src/components/AIApplyModal.tsx");
+  assert.match(modal, /const matchScore: number \| null = scoreOrNull\(jobData\?\.match_score\)/);
+  assert.match(modal, /matchScore !== null \? `\$\{matchScore\}%` : "—"/);
+  assert.doesNotMatch(modal, /match_score \?\? 0/);
+  const page = read("../src/routes/jobs.tsx");
+  assert.match(page, /\.order\("match_score", \{ ascending: false, nullsFirst: false \}\)/);
+  // backend: kolom diisi skor deterministik atau null (dibaca, tidak diubah)
+  assert.match(read("../../backend/services/job-ingest.service.ts"), /match_score/);
+});
