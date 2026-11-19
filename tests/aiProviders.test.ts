@@ -51,3 +51,12 @@ test("Edge Function memakai rantai penyedia dan batas waktu per panggilan", () =
   assert.match(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
   assert.doesNotMatch(src, /fetch\("https:\/\/openrouter\.ai/);
 });
+
+test("generate-application mencatat hasil tiap kandidat model tanpa isi surat", () => {
+  const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  for (const outcome of ["http_${aiResp.status}", '"empty"', '"accepted"', '"bad_json"', "rejected ${why"]) {
+    assert.ok(src.includes(`note(${outcome.startsWith('"') ? outcome : "`" + outcome}`), `tidak ada catatan untuk ${outcome}`);
+  }
+  assert.match(src, /console\.warn\(`\[generate-application\] \$\{entry\.model\} \$\{entry\.outcome\} \$\{entry\.ms\}ms`\)/);
+  assert.match(src, /attempts, models:/);
+});

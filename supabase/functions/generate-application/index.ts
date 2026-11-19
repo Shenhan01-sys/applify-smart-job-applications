@@ -186,8 +186,17 @@ Return JSON exactly in this shape:
     let soft: { parsed: any; modelUsed: string } | null = null;
     let lastDetail = "";
     const rejectedReasons: string[] = [];
+    // Satu baris per kandidat di log Edge Function, supaya alasan model gagal atau ditolak terlihat.
+    // Isi surat dan prompt tidak dicatat, hanya nama model, hasil, dan lama panggilan.
+    const attempts: { model: string; outcome: string; ms: number }[] = [];
+    const note = (outcome: string, started: number) => {
+      const entry = { model, outcome: outcome.slice(0, 200), ms: Date.now() - started };
+      attempts.push(entry);
+      console.warn(`[generate-application] ${entry.model} ${entry.outcome} ${entry.ms}ms`);
+    };
     for (const candidate of models) {
       model = candidate.entry;
+      const started = Date.now();
       let aiResp: Response;
       try {
         aiResp = await fetch(candidate.url, {
@@ -207,18 +216,29 @@ Return JSON exactly in this shape:
       } catch (e) {
         lastDetail = `${model}: ${String((e as Error)?.name ?? e)}`;
         rejectedReasons.push("timeout_or_network");
+        note(`error ${lastDetail}`, started);
         continue;
       }
       if (!aiResp.ok) {
         lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
+        note(`http_${aiResp.status}`, started);
         continue;
       }
-      const aiJson = await aiResp.json();
+      let aiJson: any;
+      try {
+        aiJson = await aiResp.json();
+      } catch {
+        lastDetail = `${model}: response is not JSON`;
+        rejectedReasons.push("bad_json");
+        note("bad_json", started);
+        continue;
+      }
       const raw: string = aiJson?.choices?.[0]?.message?.content ?? "";
       const cleaned = stripReasoning(raw).text;
       if (!cleaned) {
         lastDetail = `empty completion from ${model}`;
         rejectedReasons.push("empty");
+        note("empty", started);
         continue;
       }
       const attempt = extractJson(cleaned) ?? {
@@ -233,11 +253,13 @@ Return JSON exactly in this shape:
       if (verdict.ok === true) {
         parsed = { ...attempt, coverLetter: verdict.text };
         modelUsed = aiJson.model ? `${candidate.provider}:${aiJson.model}` : model;
+        note("accepted", started);
         break;
       }
       const why = (verdict as { reasons: string[] }).reasons;
       rejectedReasons.push(...why);
       lastDetail = `${model}: output rejected (${why.join(", ")})`;
+      note(`rejected ${why.join(",")}`, started);
       const fallback = (verdict as { fallbackText?: string }).fallbackText;
       if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ? `${candidate.provider}:${aiJson.model}` : model };
     }
@@ -246,7 +268,7 @@ Return JSON exactly in this shape:
       modelUsed = soft.modelUsed;
     }
     if (!parsed) {
-      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], models: models.map((m) => m.entry), quota }, 502);
+      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], attempts, models: models.map((m) => m.entry), quota }, 502);
     }
 
     // 6b) Consume one monthly application only now that a draft exists
