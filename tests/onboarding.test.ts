@@ -67,7 +67,7 @@ test("AIApplyModal menahan profil kosong sebelum memakai kuota dan menautkan ke 
   assert.match(src, /to="\/profile"/);
   assert.match(src, /Lengkapi profil/);
   // tombol generate dikunci oleh blokir profil
-  assert.match(src, /canApply = quota\.remaining > 0 && profileOk/);
+  assert.match(src, /canApply = !quotaExhausted && profileOk/);
 });
 
 test("preferensi: tanpa pilihan bawaan; kosong berarti tidak menyaring", () => {

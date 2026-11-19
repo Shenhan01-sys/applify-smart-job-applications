@@ -6,6 +6,7 @@ import { automationQueue } from "@/services/automationQueue";
 import { automationApi } from "@/services/automationApi";
 import { profileService } from "@/services/profileService";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
+import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeApiError } from "@/lib/apiErrors";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
@@ -75,7 +76,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
   const [error, setError] = useState("");
   const [tier, setTier] = useState<"free" | "pro">("free");
-  const [quota, setQuota] = useState<QuotaState>({ remaining: 10, quota: 10, used: 0 });
+  // null = belum diketahui (belum dimuat atau gagal dimuat): tidak pernah diisi angka bawaan 10 / 10.
+  const [quota, setQuota] = useState<QuotaState | null>(null);
+  const [quotaError, setQuotaError] = useState("");
+  // Model yang benar-benar menulis draf terakhir (`analysis.modelUsed`); null sebelum ada draf.
+  const [modelUsed, setModelUsed] = useState<string | null>(null);
   // Profil harus punya nama, jabatan, dan skill sebelum kuota dipakai: draf dari profil kosong sia-sia.
   const [profileCheck, setProfileCheck] = useState<ProfileCheck>({ state: "checking" });
   // Skill gaps the model reported for the last draft or preview (not stored in the database).
@@ -87,13 +92,19 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     aiNotes: string;
   } | null>(null);
 
-  // Free-tier models rotate (see edge function FREE_MODELS), so the UI names the tier, not a slug.
-  const modelLabel = tier === "pro" ? "model Pro" : "model gratis OpenRouter";
+  // The chain of models rotates (see PLAN_MODELS), so before a draft exists the UI names the plan, not a model.
+  // After a draft it names the model the Edge Function reports in analysis.modelUsed.
+  const planLabel = aiPlanLabel(tier);
+  const modelName = modelDisplay(modelUsed, tier);
   // null = no score stored for this job (shown as a dash, never as 0% or a default)
   const matchScore: number | null = scoreOrNull(jobData?.match_score);
   const profileOk = profileCheck.state === "ok";
-  const canApply = quota.remaining > 0 && profileOk;
-  const quotaExhausted = quota.remaining <= 0;
+  // An unknown quota does not block: the Edge Function enforces the limit and answers 429 when it is used up.
+  const quotaExhausted = quota !== null && quota.remaining <= 0;
+  const canApply = !quotaExhausted && profileOk;
+  const quotaText = quota
+    ? `${quota.remaining} / ${quota.quota} draf`
+    : "belum bisa dimuat";
 
   const checkProfile = useCallback(async () => {
     setProfileCheck({ state: "checking" });
@@ -122,15 +133,25 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       if (!user) return;
       // Quota comes from the database function the Edge Function also uses (it counts this month's drafts);
       // the plan tier comes from subscriptions. The old code read columns that do not exist in schema.sql.
-      const [{ data: status }, { data: sub }] = await Promise.all([
+      const [statusRes, subRes] = await Promise.all([
         supabase.rpc("get_quota_status", { p_user_id: user.id }),
         supabase.from("subscriptions").select("ai_model_tier").eq("user_id", user.id).maybeSingle(),
       ]);
-      const q = parseQuotaStatus(status);
-      setQuota({ quota: q.quota, used: q.used, remaining: q.remaining });
-      setTier(sub?.ai_model_tier === "pro" ? "pro" : "free");
+      if (statusRes.error) {
+        // A failed RPC must not look like a full quota: keep it unknown and say so.
+        console.error("Error loading quota:", statusRes.error);
+        setQuota(null);
+        setQuotaError(describeError(statusRes.error, "Sisa kuota belum bisa dimuat."));
+      } else {
+        const q = parseQuotaStatus(statusRes.data);
+        setQuota({ quota: q.quota, used: q.used, remaining: q.remaining });
+        setQuotaError("");
+      }
+      if (!subRes.error) setTier(subRes.data?.ai_model_tier === "pro" ? "pro" : "free");
     } catch (err) {
       console.error("Error loading quota:", err);
+      setQuota(null);
+      setQuotaError(describeError(err, "Sisa kuota belum bisa dimuat."));
     }
   };
 
@@ -143,6 +164,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       const { application: app, analysis } = await aiApplicationService.createDraftWithAnalysis({ jobId, tone: "professional" });
       setApplication(app);
       setSkillGaps(analysis.skillGaps);
+      setModelUsed(analysis.modelUsed);
       setAiGenerated({
         coverLetter: app.cover_letter,
         optimizedCV: (app.optimized_cv as Record<string, any>) || {},
@@ -150,7 +172,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
         aiNotes: app.ai_notes,
       });
       setEditedCoverLetter(app.cover_letter);
-      await loadQuota();
+      // The Edge Function reports the quota after this draft; use it so the screen is right at once.
+      // Without it (older response), ask the database again.
+      if (analysis.quota) {
+        setQuota({ quota: analysis.quota.quota, used: analysis.quota.used, remaining: analysis.quota.remaining });
+        setQuotaError("");
+      } else {
+        await loadQuota();
+      }
     } catch (err: any) {
       setError(describeError(err, "Draf belum bisa dibuat. Coba lagi."));
     } finally {
@@ -166,6 +195,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       setError("");
       const insights = await aiApplicationService.getJobInsights(jobId);
       setSkillGaps(insights.skillGaps);
+      if (insights.modelUsed) setModelUsed(insights.modelUsed);
       setEditedCoverLetter(insights.coverLetter);
       setAiGenerated({
         coverLetter: insights.coverLetter,
@@ -287,13 +317,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               </div>
             </div>
             <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[#F5F5F5] px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:inline-flex">
-              <Sparkles className="h-3 w-3" aria-hidden="true" /> {tier === "pro" ? "Model Pro" : "Model gratis"}
+              <Sparkles className="h-3 w-3" aria-hidden="true" /> {modelName}
             </span>
           </div>
         </DialogHeader>
 
         {/* Kuota habis: jelaskan kapan pulih dan apa yang masih bisa dilakukan */}
-        {quotaExhausted && (
+        {quota && quotaExhausted && (
           <div role="alert" className="mx-5 mt-4 rounded-xl border border-[#FDE68A] bg-[#FEF3C7] p-3">
             <p className="flex items-start gap-2 text-sm text-[#92400E]">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -315,7 +345,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
             <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
               <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">
-                AI ({modelLabel}) sedang menulis lamaranmu...
+                {planLabel} sedang menulis lamaranmu...
               </p>
             </div>
           ) : error && !application ? (
@@ -339,7 +369,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               <div className="max-w-md">
                 <h3 className="font-bold text-lg">Buat draf lamaran dengan AI</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  AI ({modelLabel}) akan menulis surat lamaran yang dioptimalkan untuk sistem seleksi (ATS)
+                  {planLabel} akan menulis surat lamaran yang dioptimalkan untuk sistem seleksi (ATS)
                   dan menganalisis kecocokanmu untuk <b>{jobTitle}</b> di <b>{company}</b>.
                 </p>
               </div>
@@ -380,8 +410,17 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
               <div className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" aria-hidden="true" />
-                Sisa kuota bulan ini: <b>{quota.remaining}</b> / {quota.quota} draf
+                {quota ? (
+                  <>Sisa kuota bulan ini: <b>{quota.remaining}</b> / {quota.quota} draf</>
+                ) : (
+                  <span role="status">Sisa kuota belum bisa dimuat. Server tetap membatasi kuota saat draf dibuat.</span>
+                )}
               </div>
+              {quotaError && !quota && (
+                <button type="button" onClick={loadQuota} className="min-h-11 rounded-lg border-2 border-[#999999] px-4 text-sm font-medium hover:border-[#0A5BE0]">
+                  Muat kuota lagi
+                </button>
+              )}
               <button
                 type="button"
                 onClick={generate}
@@ -451,11 +490,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Bot className="h-3 w-3" aria-hidden="true" />
-                  Model: {modelLabel}
+                  Model: {modelName}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="h-3 w-3" aria-hidden="true" />
-                  Sisa kuota: {quota.remaining} / {quota.quota} draf
+                  Sisa kuota: {quotaText}
                 </span>
               </div>
 
@@ -473,8 +512,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 </div>
                 <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
                   <Bot className="h-5 w-5 mx-auto text-purple-700 mb-1" aria-hidden="true" />
-                  <div className="text-sm font-bold text-purple-700">{tier === "pro" ? "Pro" : "Flash"}</div>
-                  <div className="text-xs text-muted-foreground">{tier === "pro" ? "Premium" : "Gratis"}</div>
+                  <div className="text-sm font-bold text-purple-700">{modelName}</div>
+                  <div className="text-xs text-muted-foreground">{tier === "pro" ? "Paket Pro" : "Paket Free"}</div>
                 </div>
                 <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-center">
                   <CheckCircle2 className="h-5 w-5 mx-auto text-green-700 mb-1" aria-hidden="true" />
@@ -583,6 +622,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
                 {activeTab === "strategy" && (
                   <div role="tabpanel" id="apply-panel-strategy" aria-labelledby="apply-tab-strategy" className="space-y-3">
+                    {formatModelUsed(modelUsed) && (
+                      <p className="text-xs text-muted-foreground">
+                        Model yang menulis draf: <b>{formatModelUsed(modelUsed)}</b> ({planLabel})
+                      </p>
+                    )}
                     <div className="rounded-xl bg-[#F5F5F5] p-5">
                       <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes || "—"}</pre>
                     </div>

@@ -3,6 +3,8 @@ import { mockAIApplications, mockAiAnalysis, MOCK_USER_ID } from "@/mocks/mockDa
 import { automationApi } from "@/services/automationApi";
 import { followUpDueAt } from "@/lib/followUp";
 import { cleanStringList } from "@/lib/jobCardData";
+import { rawModelUsed } from "@/lib/modelLabel";
+import { quotaFromEdgeResponse, type QuotaSummary } from "@/lib/quotaStatus";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -44,6 +46,10 @@ export interface DraftAnalysis {
   skillGaps: string[];
   /** Warnings from the quality guard (wrong language, numbers the profile does not support). */
   warnings: string[];
+  /** `analysis.modelUsed` as sent ("<provider>:<model>"); null when the response named none. Shown via lib/modelLabel.ts. */
+  modelUsed: string | null;
+  /** Monthly quota after this draft, as the Edge Function reports it; null when the response had none. */
+  quota: QuotaSummary | null;
 }
 
 export interface AIApplicationInput {
@@ -55,8 +61,8 @@ export interface AIApplicationInput {
 
 /**
  * Calls the server-side `generate-application` Edge Function which enforces the
- * monthly quota, picks the AI model by tier (Free = DeepSeek V4 Flash :free),
- * calls OpenRouter with the key kept server-side, and (for mode "generate")
+ * monthly quota, picks the model chain by tier (see lib/planInfo.ts PLAN_MODELS),
+ * calls the providers with the keys kept server-side, and (for mode "generate")
  * persists the draft. The user's access token is attached automatically.
  */
 async function invokeGenerate(
@@ -110,14 +116,19 @@ export const aiApplicationService = {
         jobs: { title: "New Job", company: "Company" },
       };
       mockAppStore = [newApp as any, ...mockAppStore];
-      return { application: newApp as AIApplicationData, analysis: { skillGaps: [], warnings: [] } };
+      return { application: newApp as AIApplicationData, analysis: { skillGaps: [], warnings: [], modelUsed: null, quota: null } };
     }
 
     const res = await invokeGenerate(input.jobId, "generate", input.tone || "professional");
     if (!res?.application) throw new Error(res?.error || "Gagal membuat draft AI");
     return {
       application: res.application as AIApplicationData,
-      analysis: { skillGaps: cleanStringList(res.analysis?.skillGaps), warnings: cleanStringList(res.analysis?.warnings) },
+      analysis: {
+        skillGaps: cleanStringList(res.analysis?.skillGaps),
+        warnings: cleanStringList(res.analysis?.warnings),
+        modelUsed: rawModelUsed(res.analysis?.modelUsed),
+        quota: quotaFromEdgeResponse(res.quota),
+      },
     };
   },
 
@@ -291,6 +302,8 @@ export const aiApplicationService = {
         matchScore: 85,
         acceptancePotential: 78,
         skillGaps: [] as string[],
+        modelUsed: null as string | null,
+        quota: null as QuotaSummary | null,
       };
     }
 
@@ -304,7 +317,8 @@ export const aiApplicationService = {
       matchScore: a.matchScore ?? 0,
       acceptancePotential: a.acceptancePotential ?? 0,
       skillGaps: cleanStringList(a.skillGaps),
-      quota: res?.quota,
+      modelUsed: rawModelUsed(a.modelUsed),
+      quota: quotaFromEdgeResponse(res?.quota),
     };
   },
 };
