@@ -1,12 +1,14 @@
 // Applify — generate-application Edge Function
 // Server-side AI: enforce monthly quota -> pick model by tier -> call OpenRouter -> persist draft.
-// Secrets needed: OPENROUTER_API_KEY (required). Optional: FREE_MODELS / PRO_MODELS (comma-separated,
-// tried in order) or the older single-model FREE_MODEL / PRO_MODEL.
+// Secrets: at least one of OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY. Optional: FREE_MODELS /
+// PRO_MODELS (comma-separated, tried in order; "gemini:<model>" and "anthropic:<model>" go to those providers,
+// anything else to OpenRouter) or the older single-model FREE_MODEL / PRO_MODEL. See ../_shared/providers.ts.
 // Free OpenRouter slugs are retired regularly (deepseek-v4-flash:free became paid-only in 2026), so a
 // single hardcoded model breaks generation for every user. Keep a chain and update it via secrets.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
+import { DEFAULT_FREE_MODELS, DEFAULT_PRO_MODELS, parseModelList, resolveChain } from "../_shared/providers.ts";
 import {
   GROUNDING_RULES,
   acceptCoverLetter,
@@ -28,16 +30,21 @@ const cors = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
-const modelList = (raw: string | undefined, fallback: string) =>
-  (raw ?? fallback).split(",").map((m) => m.trim()).filter(Boolean);
-const FREE_MODELS = modelList(
-  Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"),
-  "google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free,openrouter/free",
+const PROVIDER_KEYS = {
+  openrouter: OPENROUTER_API_KEY,
+  gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
+  anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
+};
+const FREE_MODELS = resolveChain(
+  parseModelList(Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"), DEFAULT_FREE_MODELS),
+  PROVIDER_KEYS,
 );
-const PRO_MODELS = modelList(
-  Deno.env.get("PRO_MODELS") ?? Deno.env.get("PRO_MODEL"),
-  "deepseek/deepseek-v4-pro,deepseek/deepseek-v4-flash,google/gemma-4-31b-it:free",
+const PRO_MODELS = resolveChain(
+  parseModelList(Deno.env.get("PRO_MODELS") ?? Deno.env.get("PRO_MODEL"), DEFAULT_PRO_MODELS),
+  PROVIDER_KEYS,
 );
+// One slow provider must not use up the whole request: each call gets its own time limit.
+const AI_CALL_TIMEOUT_MS = Number(Deno.env.get("AI_CALL_TIMEOUT_MS") ?? 40000);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -69,7 +76,9 @@ Deno.serve(async (req: Request) => {
   try {
     const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
     if (!token) return json({ error: "Missing auth token" }, 401);
-    if (!OPENROUTER_API_KEY) return json({ error: "AI not configured (OPENROUTER_API_KEY missing)" }, 503);
+    if (FREE_MODELS.length === 0 && PRO_MODELS.length === 0) {
+      return json({ error: "AI not configured (no provider key set)" }, 503);
+    }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
@@ -171,31 +180,35 @@ Return JSON exactly in this shape:
     //    quality gate (no chain-of-thought, no stray foreign script, a plausible letter body). Otherwise the next
     //    model is tried, and if none passes the request fails explicitly: nothing is saved and no quota is used.
     let parsed: any = null;
-    let model = models[0];
+    if (models.length === 0) return json({ error: "AI not configured for this plan" }, 503);
+    let model = models[0].entry;
     let modelUsed = model;
     let soft: { parsed: any; modelUsed: string } | null = null;
     let lastDetail = "";
     const rejectedReasons: string[] = [];
     for (const candidate of models) {
-      model = candidate;
-      const aiResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://applify.id",
-          "X-Title": "Applify",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.6,
-          max_tokens: 1600,
-        }),
-      });
+      model = candidate.entry;
+      let aiResp: Response;
+      try {
+        aiResp = await fetch(candidate.url, {
+          method: "POST",
+          headers: candidate.headers,
+          signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS),
+          body: JSON.stringify({
+            model: candidate.model,
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.6,
+            max_tokens: 1600,
+          }),
+        });
+      } catch (e) {
+        lastDetail = `${model}: ${String((e as Error)?.name ?? e)}`;
+        rejectedReasons.push("timeout_or_network");
+        continue;
+      }
       if (!aiResp.ok) {
         lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
         continue;
@@ -219,21 +232,21 @@ Return JSON exactly in this shape:
       const verdict = acceptCoverLetter(String(attempt.coverLetter ?? ""), { language, allowedContext });
       if (verdict.ok === true) {
         parsed = { ...attempt, coverLetter: verdict.text };
-        modelUsed = aiJson.model ?? model;
+        modelUsed = aiJson.model ? `${candidate.provider}:${aiJson.model}` : model;
         break;
       }
       const why = (verdict as { reasons: string[] }).reasons;
       rejectedReasons.push(...why);
       lastDetail = `${model}: output rejected (${why.join(", ")})`;
       const fallback = (verdict as { fallbackText?: string }).fallbackText;
-      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ?? model };
+      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ? `${candidate.provider}:${aiJson.model}` : model };
     }
     if (!parsed && soft) {
       parsed = soft.parsed;
       modelUsed = soft.modelUsed;
     }
     if (!parsed) {
-      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], models, quota }, 502);
+      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], models: models.map((m) => m.entry), quota }, 502);
     }
 
     // 6b) Consume one monthly application only now that a draft exists

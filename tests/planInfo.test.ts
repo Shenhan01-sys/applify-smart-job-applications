@@ -13,6 +13,7 @@ const project = join(here, "..", "..");
 const read = (rel: string) => readFileSync(join(project, rel), "utf8");
 
 const edgeFn = read("applify-smart-job-applications/supabase/functions/generate-application/index.ts");
+const providers = read("applify-smart-job-applications/supabase/functions/_shared/providers.ts");
 const workerAi = read("worker/src/lib/ai.ts");
 const backendAi = read("backend/services/ai-pipeline.service.ts");
 
@@ -28,17 +29,20 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 
 const allCopy = JSON.stringify([FREE_FEATURES, PRO_FEATURES, PLAN_MODELS]);
 
-test("tidak ada model atau klaim yang tidak dipakai kode (Claude, Sonnet, Gemini, GPT-4, Ultimate, 90% akurasi, tak terbatas)", () => {
-  for (const banned of [/claude/i, /sonnet/i, /gemini/i, /gpt-4/i, /ultimate/i, /90%/, /tak terbatas/i]) {
+test("tidak ada model atau klaim yang tidak dipakai kode (GPT-4, Ultimate, 90% akurasi, tak terbatas); Claude dan Gemini harus ada di rantai", () => {
+  for (const banned of [/gpt-4/i, /ultimate/i, /90%/, /tak terbatas/i]) {
     assert.doesNotMatch(allCopy, banned);
   }
+  // Claude dan Gemini sekarang benar-benar dipakai Edge Function (2026-11-19), jadi boleh disebut di planInfo.
+  if (/claude/i.test(allCopy)) assert.match(providers, /anthropic:claude-/);
+  if (/gemini/i.test(allCopy)) assert.match(providers, /gemini:gemini-/);
   const ui = ["subscription.tsx", "index.tsx", "automation-settings.tsx"].map((f) => read(`applify-smart-job-applications/src/routes/${f}`));
   for (const src of ui) {
     assert.doesNotMatch(src, /Claude Sonnet|Sonnet 4\.6|Ultimate|90% akurasi|4× lebih tinggi|Lamaran tak terbatas/);
   }
 });
 
-test("model paket Free ada di kode: Gemma, Nemotron, Qwen lewat OpenRouter dan Groq sebagai cadangan", () => {
+test("model paket Free ada di kode: Gemini lalu Claude Haiku untuk draf; Gemma, Nemotron, Qwen, Groq sebagai cadangan", () => {
   assert.match(workerAi, /gemma-4-26b-a4b-it:free/);
   assert.match(workerAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(workerAi, /qwen\/qwen3\.8-27b:free/);
@@ -47,22 +51,25 @@ test("model paket Free ada di kode: Gemma, Nemotron, Qwen lewat OpenRouter dan G
   assert.match(backendAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(backendAi, /qwen\/qwen3\.8-27b:free/);
   assert.match(backendAi, /GROQ_MODEL_FALLBACKS/);
-  assert.match(edgeFn, /gemma-4-26b-a4b-it:free/);
-  assert.match(edgeFn, /nemotron-3-super-120b-a12b:free/);
+  // Edge Function: rantai draf ada di _shared/providers.ts (Gemini, lalu Claude Haiku, lalu model gratis OpenRouter).
+  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"gemini:gemini-3\.5-flash-lite,anthropic:claude-haiku-5-5,google\/gemma-4-31b-it:free/);
+  assert.match(PLAN_MODELS.free.models[0].name, /Gemini/);
+  assert.match(PLAN_MODELS.free.models[1].name, /Claude Haiku/);
 
   const names = PLAN_MODELS.free.models.map((m) => m.name).join(" | ");
   for (const word of ["Gemma", "Nemotron", "Qwen", "Groq"]) assert.match(names, new RegExp(word));
   assert.equal(PLAN_MODELS.free.models[0].role, "Utama");
 });
 
-test("model paket Pro ada di kode: DeepSeek V4 Pro (utama) dan Flash (cadangan draf)", () => {
+test("model paket Pro ada di kode: DeepSeek V4 Pro (utama), Claude Sonnet dan Flash (cadangan draf)", () => {
   assert.match(workerAi, /deepseek\/deepseek-v4-pro/);
-  assert.match(edgeFn, /deepseek\/deepseek-v4-pro,deepseek\/deepseek-v4-flash/);
+  assert.match(providers, /DEFAULT_PRO_MODELS =\s*"deepseek\/deepseek-v4-pro,anthropic:claude-sonnet-5-5,deepseek\/deepseek-v4-flash/);
 
-  const [first, second] = PLAN_MODELS.pro.models;
+  const [first, second, third] = PLAN_MODELS.pro.models;
   assert.match(first.name, /DeepSeek V4 Pro/);
   assert.equal(first.role, "Utama");
-  assert.match(second.name, /DeepSeek V4 Flash/);
+  assert.match(second.name, /Claude Sonnet/);
+  assert.match(third.name, /DeepSeek V4 Flash/);
   assert.match(PRO_FEATURES.join(" "), /DeepSeek V4/);
 });
 

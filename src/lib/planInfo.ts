@@ -39,17 +39,20 @@ export interface PlanModel {
 export const PLAN_MODELS: Record<"free" | "pro", { models: PlanModel[]; note: string }> = {
   free: {
     models: [
-      { name: "Gemma 4 (26B, lalu 31B)", role: "Utama", desc: "Model gratis OpenRouter, dicoba lebih dulu" },
+      { name: "Gemini 3.5 Flash-Lite", role: "Utama", desc: "Model utama untuk draf surat lamaran (Google AI Studio)" },
+      { name: "Claude Haiku 5.5", role: "Cadangan", desc: "Dipakai untuk draf bila Gemini tidak menjawab (Anthropic)" },
+      { name: "Gemma 4 (26B, lalu 31B)", role: "Cadangan", desc: "Model gratis OpenRouter; utama untuk agen pengisi formulir dan backend" },
       { name: "NVIDIA Nemotron 3 Super", role: "Cadangan", desc: "Model gratis OpenRouter" },
       { name: "Qwen 3.8", role: "Cadangan", desc: "Model gratis OpenRouter untuk agen pengisi formulir dan backend" },
       { name: "Groq (gpt-oss, Qwen)", role: "Cadangan", desc: "Penyedia terpisah, dipakai bila model gratis OpenRouter tidak menjawab" },
     ],
-    note: "Daftar model gratis sering berganti; model yang sudah dicabut dilewati otomatis.",
+    note: "Model yang sedang tidak tersedia dilewati otomatis, lalu sistem beralih ke model berikutnya.",
   },
   pro: {
     models: [
       { name: "DeepSeek V4 Pro", role: "Utama", desc: "Model utama untuk surat lamaran dan pengisian formulir" },
-      { name: "DeepSeek V4 Flash", role: "Cadangan", desc: "Dipakai untuk draf bila model utama tidak tersedia" },
+      { name: "Claude Sonnet 5.5", role: "Cadangan", desc: "Cadangan pertama untuk draf bila DeepSeek V4 Pro tidak tersedia" },
+      { name: "DeepSeek V4 Flash", role: "Cadangan", desc: "Dipakai untuk draf bila model di atas tidak tersedia" },
       { name: "Model gratis OpenRouter dan Groq", role: "Cadangan", desc: "Cadangan terakhir, sama dengan paket Free" },
     ],
     note: "Model dipilih menurut paketmu; bila satu model sedang tidak tersedia, sistem beralih ke model cadangan. Fitur regenerate surat di layar persetujuan saat ini memakai rangkaian model gratis untuk semua paket.",
