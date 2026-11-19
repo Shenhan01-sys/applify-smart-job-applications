@@ -109,9 +109,8 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       await sleep(600)
 
       setProgress(100)
-      addStage(`Selesai. ${total} lowongan ditemukan dan diurutkan.`, 'success')
-      await sleep(1000)
-
+      addStage(`Selesai. ${total} lowongan ditemukan dan diurutkan. Daftar di bawah sudah diperbarui.`, 'success')
+      // Panel tidak ditutup otomatis: dulu tertutup satu detik sesudah selesai, sehingga hasilnya hampir tak terbaca.
       onComplete()
     } catch (error) {
       addStage('Terjadi kesalahan saat mencari lowongan.', 'error')
@@ -171,7 +170,8 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
         </div>
       </div>
 
-      {(isScanning || loading) && (
+      {/* Log tahap tetap tampil sesudah selesai, supaya pesan "tidak ada lowongan" atau galat tidak hilang. */}
+      {(isScanning || loading || stages.length > 0) && (
         <div className="space-y-4">
           {/* Progress bar */}
           <div

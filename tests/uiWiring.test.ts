@@ -33,3 +33,18 @@ test("Pemindai lowongan: Dealls bisa dipilih dan aktif bawaan, id sama dengan re
   const registry = read("../../backend/services/mcp-registry.ts");
   assert.match(registry, /this\.register\('dealls'/);
 });
+
+test("Lowongan: panel pencarian tidak menutup sendiri dan pesannya tetap terbaca sesudah selesai", () => {
+  const jobs = read("../src/routes/jobs.tsx");
+  assert.match(jobs, /<AIJobScanner onComplete=\{\(\) => fetchJobs\(searchQuery\)\} \/>/);
+  assert.doesNotMatch(jobs, /onComplete=\{[^}]*setShowScanner\(false\)/);
+  const scanner = read("../src/components/AIJobScanner.tsx");
+  assert.match(scanner, /\(isScanning \|\| loading \|\| stages\.length > 0\)/);
+  assert.doesNotMatch(scanner, /await sleep\(1000\)\s*\n\s*onComplete\(\)/);
+});
+
+test("Lowongan: judul halaman tidak menulis Mulai dengan menekan saat masih memuat, dan jujur soal batas 200", () => {
+  const jobs = read("../src/routes/jobs.tsx");
+  assert.match(jobs, /\{loading\s*\?\s*"Memuat lowongan\.\.\."/);
+  assert.match(jobs, /Menampilkan \$\{JOBS_PAGE_LIMIT\} lowongan terbaru/);
+});

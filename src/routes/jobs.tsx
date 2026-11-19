@@ -225,9 +225,13 @@ function JobsPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Cari Lowongan</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {jobs.length > 0
-                ? `${jobs.length} lowongan tersimpan dari sumber yang didukung`
-                : "Mulai dengan menekan tombol cari lowongan di bawah"}
+              {loading
+                ? "Memuat lowongan..."
+                : jobs.length >= JOBS_PAGE_LIMIT
+                  ? `Menampilkan ${JOBS_PAGE_LIMIT} lowongan terbaru. Pakai kotak cari untuk menemukan yang lain.`
+                  : jobs.length > 0
+                    ? `${jobs.length} lowongan tersimpan dari sumber yang didukung`
+                    : "Mulai dengan menekan tombol cari lowongan di bawah"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -263,7 +267,7 @@ function JobsPage() {
 
         {showScanner && (
           <div id="panel-pemindai" className="mt-4">
-            <AIJobScanner onComplete={() => { fetchJobs(searchQuery); setShowScanner(false); }} />
+            <AIJobScanner onComplete={() => fetchJobs(searchQuery)} />
           </div>
         )}
 
