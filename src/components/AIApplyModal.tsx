@@ -10,7 +10,7 @@ import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeApiError } from "@/lib/apiErrors";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
-import { scoreOrNull } from "@/lib/jobCardData";
+import { matchCaption, type JobMatch } from "@/lib/matchScore";
 import { HitlTrack } from "@/components/HitlTrack";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -45,6 +45,8 @@ interface AIApplyModalProps {
   jobTitle: string;
   company: string;
   jobData: any;
+  /** Per-user match for this job (lib/matchScore.ts); null when it could not be worked out. */
+  match?: JobMatch | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -61,7 +63,7 @@ type ProfileCheck =
   | { state: "blocked"; missing: string[] }
   | { state: "error"; message: string };
 
-export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuccess }: AIApplyModalProps) {
+export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, onClose, onSuccess }: AIApplyModalProps) {
   const [generating, setGenerating] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -98,8 +100,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   // After a draft it names the model the Edge Function reports in analysis.modelUsed.
   const planLabel = aiPlanLabel(tier);
   const modelName = modelDisplay(modelUsed, tier);
-  // null = no score stored for this job (shown as a dash, never as 0% or a default)
-  const matchScore: number | null = scoreOrNull(jobData?.match_score);
+  // The per-user score from the job list (profile skills against skills the posting names), never jobs.match_score,
+  // which is one global number. null = no basis for a score (shown as a dash, never as 0% or a default).
+  const matchScore: number | null = match?.score ?? null;
   const profileOk = profileCheck.state === "ok";
   // An unknown quota does not block: the Edge Function enforces the limit and answers 429 when it is used up.
   const quotaExhausted = quota !== null && quota.remaining <= 0;
@@ -514,6 +517,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                   <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" aria-hidden="true" />
                   <div className="text-lg font-bold">{matchScore !== null ? `${matchScore}%` : "—"}</div>
                   <div className="text-xs text-muted-foreground">Skor Kecocokan</div>
+                  {match && <div className="text-xs text-muted-foreground">{matchCaption(match)}</div>}
                 </div>
                 <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
                   <Bot className="h-5 w-5 mx-auto text-purple-700 mb-1" aria-hidden="true" />

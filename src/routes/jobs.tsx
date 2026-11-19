@@ -1,5 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
@@ -11,6 +11,16 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { visibleJobs } from "@/lib/jobFilters";
+import {
+  HIGH_MATCH_THRESHOLD,
+  NO_PROFILE_SKILLS_TEXT,
+  computeMatch,
+  hasUsableSkills,
+  profileSkillList,
+  sortByMatch,
+  type JobMatch,
+} from "@/lib/matchScore";
+import { profileService } from "@/services/profileService";
 import { useSubscription } from "@/hooks/useSubscription";
 // Lowongan contoh dan id tersimpan hanya untuk mode demo eksplisit (VITE_MOCK_MODE=true).
 import { mockJobs as mockJobsData, mockSavedJobIds } from "@/mocks/mockData";
@@ -44,10 +54,14 @@ function JobsPage() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
   const [loadError, setLoadError] = useState("");
+  // Skill profil untuk skor kecocokan per pengguna. null = belum dimuat atau gagal (lihat skillsError).
+  const [profileSkills, setProfileSkills] = useState<string[] | null>(null);
+  const [skillsError, setSkillsError] = useState("");
   // Kuota draf AI bulan ini dibaca dari database (get_quota_status). null = belum diketahui, jadi tidak ditampilkan.
   const { quota: draftQuota, reload: reloadQuota } = useSubscription();
 
   useEffect(() => {
+    loadProfileSkills();
     if (isMockMode()) {
       setJobs(mockJobsData as JobData[]);
       setSavedJobs(new Set(mockSavedJobIds));
@@ -58,6 +72,25 @@ function JobsPage() {
     fetchSavedJobs();
   }, []);
 
+  // Skill dari user_skills dan skills_used di pengalaman. Gagal memuat bukan berarti "tanpa skill": galatnya
+  // ditampilkan dan skor tidak dihitung.
+  const loadProfileSkills = async () => {
+    try {
+      setSkillsError("");
+      let userId = "mock-user";
+      if (!isMockMode()) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
+        userId = user.id;
+      }
+      setProfileSkills(profileSkillList(await profileService.getSkillSource(userId)));
+    } catch (err) {
+      console.error("Error loading profile skills:", err);
+      setProfileSkills(null);
+      setSkillsError(`Kecocokan belum bisa dihitung. ${describeError(err, "Skill di profilmu belum bisa dimuat.")}`);
+    }
+  };
+
   const fetchJobs = async () => {
     try {
       setLoadError("");
@@ -67,8 +100,7 @@ function JobsPage() {
         .eq("status", "active")
         // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
         .not("external_url", "is", null)
-        // Postgres mengurutkan NULL lebih dulu pada DESC; lowongan tanpa skor tidak boleh mengalahkan yang berskor.
-        .order("match_score", { ascending: false, nullsFirst: false })
+        // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -148,6 +180,16 @@ function JobsPage() {
     setShowApplyModal(true);
   };
 
+  // Skor kecocokan per pengguna: irisan skill profil dengan skill yang disebut lowongan (lib/matchScore.ts).
+  const matches = useMemo(
+    () => (profileSkills === null ? null : new Map(jobs.map((job) => [job.id, computeMatch(job, profileSkills)] as const))),
+    [jobs, profileSkills],
+  );
+  const matchOf = (job: JobData): JobMatch | null => matches?.get(job.id) ?? null;
+  const scoreOf = (job: JobData): number | null => matchOf(job)?.score ?? null;
+  const skillsReady = profileSkills !== null;
+  const profileHasSkills = skillsReady ? hasUsableSkills(profileSkills) : null;
+
   const filteredJobs = jobs.filter((job) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
@@ -161,14 +203,16 @@ function JobsPage() {
       (activeFilter === "remote" && job.workplace_type === "remote") ||
       (activeFilter === "hybrid" && job.workplace_type === "hybrid") ||
       (activeFilter === "onsite" && job.workplace_type === "on-site") ||
-      (activeFilter === "high-match" && job.match_score >= 80) ||
+      (activeFilter === "high-match" && (scoreOf(job) ?? -1) >= HIGH_MATCH_THRESHOLD) ||
       (activeFilter === "saved" && savedJobs.has(job.id));
 
     return matchesSearch && matchesFilter;
   });
+  // Skor tertinggi lebih dulu; yang tanpa skor di akhir, urutan sisanya tetap (terbaru lebih dulu).
+  const shownJobs = sortByMatch(filteredJobs, scoreOf);
 
-  // Lowongan aktif dengan skor kecocokan 85 ke atas. Ini hanya hitungan kecocokan tinggi, bukan fitur Golden Window.
-  const strongMatches = jobs.filter((j) => j.match_score >= 85 && j.status === "active").length;
+  // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
+  const strongMatches = jobs.filter((j) => (scoreOf(j) ?? -1) >= HIGH_MATCH_THRESHOLD).length;
 
   return (
     <AppShell>
@@ -265,12 +309,23 @@ function JobsPage() {
           message={loadError}
           onRetry={() => { setLoading(true); fetchJobs(); }}
         />
-      ) : filteredJobs.length > 0 ? (
+      ) : shownJobs.length > 0 ? (
+        <>
+          {skillsError && (
+            <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <span className="min-w-0 flex-1">{skillsError}</span>
+              <button type="button" onClick={loadProfileSkills} className="min-h-11 rounded-lg bg-red-600 px-4 font-semibold text-white">
+                Coba lagi
+              </button>
+            </div>
+          )}
         <ul className="space-y-4" aria-label="Daftar lowongan">
-          {filteredJobs.map((job, i) => (
+          {shownJobs.map((job, i) => (
             <li key={job.id} style={{ animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both` }}>
               <JobCard
                 job={job}
+                match={matchOf(job)}
+                matchUnavailable={skillsError ? "Kecocokan belum bisa dihitung. Skill profilmu belum termuat." : undefined}
                 isSaved={savedJobs.has(job.id)}
                 onToggleSave={() => toggleSaveJob(job.id)}
                 onApply={() => handleApply(job)}
@@ -278,6 +333,7 @@ function JobsPage() {
             </li>
           ))}
         </ul>
+        </>
       ) : (
         <div className="text-center py-16">
           <Brain className="h-12 w-12 mx-auto text-[#999999] mb-4" aria-hidden="true" />
@@ -287,8 +343,17 @@ function JobsPage() {
           <p className="mx-auto max-w-md text-sm text-muted-foreground mb-6">
             {jobs.length === 0
               ? "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan."
-              : "Coba ubah penyaring atau kata kunci pencarian."}
+              : activeFilter === "high-match" && profileHasSkills === false
+                ? NO_PROFILE_SKILLS_TEXT + "."
+                : activeFilter === "high-match" && skillsError
+                  ? skillsError
+                  : "Coba ubah penyaring atau kata kunci pencarian."}
           </p>
+          {jobs.length > 0 && activeFilter === "high-match" && profileHasSkills === false && (
+            <Link to="/profile" className="inline-flex min-h-11 items-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90 transition">
+              Buka Profil
+            </Link>
+          )}
           {jobs.length === 0 && !showScanner && (
             <button
               type="button"
@@ -308,6 +373,7 @@ function JobsPage() {
           jobTitle={selectedJob.title}
           company={selectedJob.company}
           jobData={selectedJob}
+          match={matchOf(selectedJob)}
           onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
           onSuccess={() => { fetchJobs(); reloadQuota(); }}
         />

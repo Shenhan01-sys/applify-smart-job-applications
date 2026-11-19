@@ -103,19 +103,23 @@ test("modal draf menampilkan skillGaps dari respons Edge Function (analysis.skil
   assert.match(fn, /return json\(\{ application: app, analysis: result, quota \}\)/);
 });
 
-test("skor kecocokan dari backend (jobs.match_score 0-100 atau null): null tampil —, 0 tampil 0%, urutan menaruh yang tanpa skor di akhir", () => {
-  // satu fungsi skor dipakai kartu dan modal, jadi 0 (skor sah) tidak sama dengan null (belum ada dasar penilaian)
+test("skor kecocokan per pengguna (lib/matchScore.ts): null tampil —, 0 tampil 0%, bukan jobs.match_score yang global", () => {
+  // 0 (skor sah) tidak sama dengan null (belum ada dasar penilaian)
   assert.equal(scoreOrNull(0), 0);
   assert.equal(scoreOrNull(null), null);
   const card = read("../src/components/JobCard.tsx");
   assert.match(card, /value === null \? "—" : `\$\{value\}%`/);
   assert.match(card, /<CircularProgress\s+value=\{matchScore\}\s+label=\{JOB_LABELS\.card\.matchLabel\}/);
+  assert.match(card, /const matchScore = match\?\.score \?\? null/);
   const modal = read("../src/components/AIApplyModal.tsx");
-  assert.match(modal, /const matchScore: number \| null = scoreOrNull\(jobData\?\.match_score\)/);
+  assert.match(modal, /const matchScore: number \| null = match\?\.score \?\? null/);
   assert.match(modal, /matchScore !== null \? `\$\{matchScore\}%` : "—"/);
-  assert.doesNotMatch(modal, /match_score \?\? 0/);
+  assert.doesNotMatch(modal, /match_score \?\? 0|jobData\?\.match_score/);
+  // urutan akhir dari skor per pengguna di klien; kolom match_score global tidak dipakai mengurutkan
   const page = read("../src/routes/jobs.tsx");
-  assert.match(page, /\.order\("match_score", \{ ascending: false, nullsFirst: false \}\)/);
-  // backend: kolom diisi skor deterministik atau null (dibaca, tidak diubah)
+  assert.doesNotMatch(page, /\.order\("match_score"/);
+  assert.match(page, /sortByMatch\(filteredJobs, scoreOf\)/);
+  assert.match(page, /match=\{matchOf\(selectedJob\)\}/);
+  // backend: kolom jobs.match_score diisi skor deterministik atau null (dibaca, tidak diubah)
   assert.match(read("../../backend/services/job-ingest.service.ts"), /match_score/);
 });

@@ -211,6 +211,24 @@ export const profileService = {
     };
   },
 
+  // Skills for the match score on the job list: user_skills names and work_experiences.skills_used.
+  // A failed query throws, so "no skills" is never shown for a profile that could not be read.
+  async getSkillSource(userId: string): Promise<{ skills: Array<{ name: string }>; experiences: Array<{ skills_used: unknown }> }> {
+    if (isMockMode()) {
+      return {
+        skills: (mockFullProfile as any).skills ?? [],
+        experiences: (mockFullProfile as any).workExperiences ?? [],
+      };
+    }
+    const [s, e] = await Promise.all([
+      supabase.from("user_skills").select("name").eq("user_id", userId),
+      supabase.from("work_experiences").select("skills_used").eq("user_id", userId),
+    ]);
+    if (s.error) throw new Error(s.error.message);
+    if (e.error) throw new Error(e.error.message);
+    return { skills: s.data ?? [], experiences: e.data ?? [] };
+  },
+
   // Work Experiences CRUD
   async createWorkExperience(data: ExperienceRow) {
     const { data: { user } } = await supabase.auth.getUser();

@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { platformLabel } from "@/lib/platforms";
-import { listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "@/lib/jobCardData";
+import { listOrEmpty, postedDate, radarFromMatches } from "@/lib/jobCardData";
+import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { JOB_LABELS, jobTypeLabel, marketPositionLabel, salaryPeriodLabel, workplaceLabel } from "@/lib/jobLabels";
 import {
   MapPin,
@@ -291,8 +293,12 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-export function JobCard({ job, isSaved, onToggleSave, onApply }: {
+export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, onApply }: {
   job: JobData;
+  /** Per-user match (lib/matchScore.ts); null while it is being worked out or when the profile could not be read. */
+  match: JobMatch | null;
+  /** Why `match` is null, when it is not just loading. */
+  matchUnavailable?: string;
   isSaved: boolean;
   onToggleSave: () => void;
   onApply: () => void;
@@ -308,14 +314,12 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
   const skillGaps = listOrEmpty<SkillGap>(job.skill_gaps);
   const aiActions = listOrEmpty<AIAction>(job.ai_actions);
   const requirements = listOrEmpty<string>(job.requirements);
-  const matchScore = scoreOrNull(job.match_score);
-  const acceptanceScore = scoreOrNull(job.acceptance_potential);
-  const cultureScore = scoreOrNull(job.company_culture_score);
-  const growthScore = scoreOrNull(job.growth_potential);
+  // The score is per user (skills in the profile against skills the posting names), never jobs.match_score, which is
+  // one global number. Acceptance, culture and growth scores are not shown: no flow measures them for anyone.
+  const matchScore = match?.score ?? null;
   const posted = postedDate(job as { posted_at?: unknown; created_at?: unknown });
 
-  const matchColor = (matchScore ?? 0) >= 80 ? "#22C55E" : (matchScore ?? 0) >= 60 ? "#0A5BE0" : "#F59E0B";
-  const acceptanceColor = (acceptanceScore ?? 0) >= 70 ? "#22C55E" : (acceptanceScore ?? 0) >= 50 ? "#0A5BE0" : "#F59E0B";
+  const matchColor = (matchScore ?? 0) >= HIGH_MATCH_THRESHOLD ? "#22C55E" : (matchScore ?? 0) >= 50 ? "#0A5BE0" : "#F59E0B";
 
   return (
     <div className="rounded-2xl border-2 border-[#999999] bg-white overflow-hidden hover:border-[#0A5BE0] transition-colors">
@@ -325,7 +329,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-lg truncate">{job.title}</h3>
-              {matchScore !== null && (
+              {matchScore !== null && matchScore >= HIGH_MATCH_THRESHOLD && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
                   <Sparkles className="h-3 w-3" aria-hidden="true" />
                   {JOB_LABELS.card.matchBadge}
@@ -370,19 +374,38 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           </div>
         </div>
 
-        {/* AI Scores Row */}
-        {/* Match is always shown: a score, or a dash when the job has none. The other three are never written by any flow, so they appear only if a row has them. */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
+        {/* Match: a percentage with its basis ("N dari M skill cocok"), or a dash with the reason it is missing. */}
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#E0E0E0]">
           <CircularProgress
             value={matchScore}
             label={JOB_LABELS.card.matchLabel}
             color={matchColor}
             size={70}
-            title="Skor relevansi dari kata kunci pencarian dan skill profil. Tanda — berarti belum ada dasar penilaian."
+            title="Persentase skill yang disebut lowongan dan ada di profilmu. Tanda — berarti belum bisa dihitung."
           />
-          {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Peluang diterima" color={acceptanceColor} size={70} />}
-          {cultureScore !== null && <CircularProgress value={cultureScore} label="Budaya" color="#8B5CF6" size={70} />}
-          {growthScore !== null && <CircularProgress value={growthScore} label="Pertumbuhan" color="#06B6D4" size={70} />}
+          <div className="min-w-0 text-sm">
+            {match === null ? (
+              <p className="text-muted-foreground" role={matchUnavailable ? "alert" : "status"}>
+                {matchUnavailable ?? "Menghitung kecocokan..."}
+              </p>
+            ) : match.status === "no-profile-skills" ? (
+              <Link to="/profile" className="inline-flex min-h-11 items-center font-medium text-[#0A5BE0] underline underline-offset-4">
+                {NO_PROFILE_SKILLS_TEXT}
+              </Link>
+            ) : (
+              <>
+                <p
+                  className="font-medium"
+                  title={match.matched.length > 0 ? `Cocok: ${match.matched.join(", ")}` : undefined}
+                >
+                  {matchCaption(match)}
+                </p>
+                {match.status === "ok" && (
+                  <p className="text-xs text-muted-foreground">{JOB_LABELS.card.matchBasis}</p>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Salary & Platform */}
@@ -429,11 +452,35 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
                 <Target className="h-4 w-4 text-[#0A5BE0]" />
                 {JOB_LABELS.card.skillAnalysis}
               </h4>
+              {match?.status === "ok" && (
+                <div className="mb-3 space-y-2">
+                  {match.matched.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-green-700">{JOB_LABELS.card.skillsMatched}</p>
+                      <ul className="flex flex-wrap gap-1.5" aria-label={JOB_LABELS.card.skillsMatched}>
+                        {match.matched.map((s) => (
+                          <li key={s} className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-800">{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {match.missing.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-[#92400E]">{JOB_LABELS.card.skillsMissing}</p>
+                      <ul className="flex flex-wrap gap-1.5" aria-label={JOB_LABELS.card.skillsMissing}>
+                        {match.missing.map((s) => (
+                          <li key={s} className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs text-[#92400E]">{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
               {radarSkills ? (
                 <RadarChart skills={radarSkills} />
-              ) : (
+              ) : match?.status !== "ok" ? (
                 <p className="text-xs text-muted-foreground">Analisis kecocokan skill belum tersedia untuk lowongan ini.</p>
-              )}
+              ) : null}
               {skillGaps.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs font-medium text-[#F59E0B] mb-1.5 flex items-center gap-1">
