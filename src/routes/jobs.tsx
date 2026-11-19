@@ -263,7 +263,7 @@ function JobsPage() {
 
         {showScanner && (
           <div id="panel-pemindai" className="mt-4">
-            <AIJobScanner onComplete={() => { fetchJobs(); setShowScanner(false); }} />
+            <AIJobScanner onComplete={() => { fetchJobs(searchQuery); setShowScanner(false); }} />
           </div>
         )}
 
@@ -379,7 +379,7 @@ function JobsPage() {
           jobData={selectedJob}
           match={matchOf(selectedJob)}
           onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
-          onSuccess={() => { fetchJobs(); reloadQuota(); }}
+          onSuccess={() => { fetchJobs(searchQuery); reloadQuota(); }}
         />
       )}
     </AppShell>

@@ -19,3 +19,9 @@ test("Gerbang Persetujuan dapat digulir sampai jawaban formulir (bukan ScrollAre
   assert.doesNotMatch(src, /<ScrollArea/);
   assert.match(src, /flex-1 min-h-0 overflow-y-auto/);
 });
+
+test("Lowongan: pemuatan ulang sesudah modal atau pemindai memakai kata kunci pencarian yang aktif", () => {
+  const src = read("../src/routes/jobs.tsx");
+  assert.doesNotMatch(src, /fetchJobs\(\)/, "fetchJobs() tanpa kata kunci mengosongkan hasil pencarian");
+  assert.match(src, /onSuccess=\{\(\) => \{ fetchJobs\(searchQuery\)/);
+});
