@@ -10,6 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
+import { visibleJobs } from "@/lib/jobFilters";
 import { useSubscription } from "@/hooks/useSubscription";
 // Lowongan contoh dan id tersimpan hanya untuk mode demo eksplisit (VITE_MOCK_MODE=true).
 import { mockJobs as mockJobsData, mockSavedJobIds } from "@/mocks/mockData";
@@ -64,14 +65,17 @@ function JobsPage() {
         .from("jobs")
         .select("*")
         .eq("status", "active")
+        // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
+        .not("external_url", "is", null)
         // Postgres mengurutkan NULL lebih dulu pada DESC; lowongan tanpa skor tidak boleh mengalahkan yang berskor.
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
-      // Akun asli tidak pernah diisi data contoh: tabel kosong berarti daftar kosong.
-      setJobs((data ?? []) as JobData[]);
+      // Akun asli tidak pernah diisi data contoh: tabel kosong berarti daftar kosong. Baris uji (localhost,
+      // 127.0.0.1, httpbin, sumber e2e-mock) disaring di sini; datanya di database tidak diubah.
+      setJobs(visibleJobs((data ?? []) as JobData[]));
     } catch (err) {
       console.error("Error fetching jobs:", err);
       setJobs([]);
