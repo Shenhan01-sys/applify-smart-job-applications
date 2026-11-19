@@ -571,7 +571,37 @@
 @keyframes gcPopWord3 { 0%, 70%, 90%, 100% { background-color: #e5e5e5; transform: scale(1); } 80% { background-color: #10b981; transform: scale(1.2); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); } }
 @keyframes gcPulseNode { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 15px rgba(16, 185, 129, 0.6); } }
 
+/* ── Aksesibilitas ─────────────────────────────────────────────────────────── */
+
+/* Gerak dikurangi: semua animasi langsung ke keadaan akhirnya. Animasi masuk memakai fill-mode forwards/both,
+   jadi elemen yang mulai dari opacity-0 tetap muncul. Animasi berulang (loop) dimatikan sama sekali. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
   .animate-float, .animate-marquee { animation: none !important; }
+  .animate-popUI { animation: none !important; opacity: 1 !important; }
   .scroll-reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* Fokus keyboard selalu terlihat. Kolom isian yang memakai ring sendiri tetap memakai ring itu. */
+:focus-visible {
+  outline: 3px solid #0A5BE0;
+  outline-offset: 2px;
+}
+.sr-only:focus-visible { outline: none; }
+
+/* Ponsel: kolom isian minimal 16px supaya iOS Safari tidak memperbesar halaman saat kolom disentuh.
+   Ditulis di luar @layer agar menang atas kelas utilitas seperti text-sm. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }

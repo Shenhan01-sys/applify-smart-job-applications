@@ -423,7 +423,7 @@ function AITierDisplay() {
         </div>
         <div>
           <p className="text-sm font-bold">Model {config.label}</p>
-          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.badge}`}>
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${config.badge}`}>
             Aktif
           </span>
         </div>

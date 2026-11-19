@@ -51,7 +51,7 @@ function Field({ label, error, hint, children, htmlFor }: { label: string; error
       {error ? (
         <p className="mt-1 text-xs text-red-600 flex items-center gap-1" role="alert"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>
       ) : hint ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
       ) : null}
     </div>
   );
@@ -95,8 +95,8 @@ function DeleteButton({ onConfirm, busy, label }: { onConfirm: () => void; busy:
   if (asking) {
     return (
       <span className="inline-flex items-center gap-1">
-        <button type="button" onClick={() => { setAsking(false); onConfirm(); }} disabled={busy} className="h-7 px-2 rounded-md bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 disabled:opacity-60">Hapus</button>
-        <button type="button" onClick={() => setAsking(false)} className="h-7 px-2 rounded-md border-2 border-black/[8%] text-[11px] hover:bg-black/[5%]">Batal</button>
+        <button type="button" onClick={() => { setAsking(false); onConfirm(); }} disabled={busy} className="h-7 px-2 rounded-md bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-60">Hapus</button>
+        <button type="button" onClick={() => setAsking(false)} className="h-7 px-2 rounded-md border-2 border-black/[8%] text-xs hover:bg-black/[5%]">Batal</button>
       </span>
     );
   }
@@ -173,12 +173,12 @@ export function ExperienceEditor({ items, onSave, onDelete, now }: {
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${exp.is_current ? "bg-green-100 text-green-700" : "bg-black/[5%] text-muted-foreground"}`}>{exp.is_current ? "Saat ini" : "Selesai"}</span>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${exp.is_current ? "bg-green-100 text-green-700" : "bg-black/[5%] text-muted-foreground"}`}>{exp.is_current ? "Saat ini" : "Selesai"}</span>
                 <button type="button" onClick={() => open(exp.id, experienceToForm(exp))} aria-label={`Ubah pengalaman ${exp.role_title}`} title="Ubah" className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-[#0A5BE0] hover:bg-[#0A5BE0]/10"><Pencil className="h-3.5 w-3.5" /></button>
                 <DeleteButton onConfirm={() => remove(exp.id)} busy={busyId === exp.id} label={`Hapus pengalaman ${exp.role_title}`} />
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatMonthYear(exp.start_date)} - {exp.is_current ? "Sekarang" : formatMonthYear(exp.end_date) || "-"}</span>
               {exp.location_type && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {labelOf(LOCATION_TYPES, exp.location_type)}</span>}
               {exp.employment_type && <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" /> {labelOf(EMPLOYMENT_TYPES, exp.employment_type)}</span>}
@@ -187,13 +187,13 @@ export function ExperienceEditor({ items, onSave, onDelete, now }: {
             {achievements.length > 0 && (
               <div className="mt-2 space-y-1">
                 {achievements.map((a, j) => (
-                  <div key={j} className="flex items-start gap-1.5 text-[11px]"><Star className="h-3 w-3 mt-0.5 text-[#D2F801] shrink-0" /><span className="text-muted-foreground">{a}</span></div>
+                  <div key={j} className="flex items-start gap-1.5 text-xs"><Star className="h-3 w-3 mt-0.5 text-[#D2F801] shrink-0" /><span className="text-muted-foreground">{a}</span></div>
                 ))}
               </div>
             )}
             {skills.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
-                {skills.map((s) => <span key={s} className="text-[10px] px-2 py-0.5 rounded-md bg-black/[5%] text-muted-foreground">{s}</span>)}
+                {skills.map((s) => <span key={s} className="text-xs px-2 py-0.5 rounded-md bg-black/[5%] text-muted-foreground">{s}</span>)}
               </div>
             )}
           </div>
@@ -310,7 +310,7 @@ export function EducationEditor({ items, onSave, onDelete, now }: {
                 <DeleteButton onConfirm={() => remove(edu.id)} busy={busyId === edu.id} label={`Hapus pendidikan ${edu.institution}`} />
               </div>
             </div>
-            <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+            <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
               <span>{edu.start_year ?? "-"} - {edu.is_current ? "Sekarang" : edu.end_year ?? "-"}</span>
               {edu.gpa != null && <span className="font-mono">IPK: {edu.gpa}/{edu.max_gpa ?? 4}</span>}
             </div>
@@ -412,7 +412,7 @@ export function SkillsEditor({ items, onSave, onDelete }: {
           {sorted.map((skill) => (
             <li key={skill.id} className="inline-flex items-center gap-1 text-xs pl-3 pr-1 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">
               <span>{skill.name}</span>
-              <span className="text-[10px] opacity-70" title={labelOf(PROFICIENCY_LEVELS, skill.proficiency_level)}>{skill.proficiency_level}/5</span>
+              <span className="text-xs opacity-70" title={labelOf(PROFICIENCY_LEVELS, skill.proficiency_level)}>{skill.proficiency_level}/5</span>
               <button type="button" onClick={() => open(skill.id, skillToForm(skill))} aria-label={`Ubah skill ${skill.name}`} title="Ubah" className="h-6 w-6 rounded-full grid place-items-center hover:bg-white/20"><Pencil className="h-3 w-3" /></button>
               <button type="button" onClick={() => remove(skill.id)} disabled={busyId === skill.id} aria-label={`Hapus skill ${skill.name}`} title="Hapus" className="h-6 w-6 rounded-full grid place-items-center hover:bg-white/20 disabled:opacity-50">
                 {busyId === skill.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}

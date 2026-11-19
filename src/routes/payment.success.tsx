@@ -106,7 +106,7 @@ function PaymentSuccessPage() {
         >
           <div className="flex items-center justify-between">
             <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground font-bold">Bukti Pembayaran</p>
-            <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#1C9656]/10 border border-[#1C9656]/30 text-[10px] font-bold text-[#1C9656] uppercase">
+            <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#1C9656]/10 border border-[#1C9656]/30 text-xs font-bold text-[#1C9656] uppercase">
               <Crown className="h-3 w-3" /> {tier.toUpperCase()}
             </span>
           </div>
@@ -175,15 +175,15 @@ function PaymentSuccessPage() {
           <p className="text-xs uppercase tracking-[0.22em] text-[#0A5BE0] font-bold">Apa selanjutnya?</p>
           <ol className="mt-3 space-y-2.5 text-sm text-muted-foreground">
             <li className="flex items-start gap-2.5">
-              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-[10px] font-bold grid place-items-center shrink-0">1</span>
+              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">1</span>
               <span>Lengkapi <span className="font-semibold text-foreground">profil singkat</span> supaya agen bisa matching ke lowongan yang relevan.</span>
             </li>
             <li className="flex items-start gap-2.5">
-              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-[10px] font-bold grid place-items-center shrink-0">2</span>
+              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">2</span>
               <span>Ajukan draf lamaran dari <span className="font-semibold text-foreground">Job Feed</span>. Agen mengisi formulir, dan baru mengirim setelah kamu menyetujuinya.</span>
             </li>
             <li className="flex items-start gap-2.5">
-              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-[10px] font-bold grid place-items-center shrink-0">3</span>
+              <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">3</span>
               <span>Pantau status lamaran di tab <span className="font-semibold text-foreground">Applications</span>. Pengingat follow-up dikirim lewat Telegram bila notifikasi Telegram aktif.</span>
             </li>
           </ol>

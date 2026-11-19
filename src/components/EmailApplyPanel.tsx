@@ -71,15 +71,15 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
       >
         <span className="inline-flex items-center gap-2 text-xs font-semibold">
           <Mail className="h-4 w-4 text-[#0A5BE0]" /> Kirim lewat Email
-          {state.block === "used" && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">sudah dipakai</span>}
-          {(state.block === "queued") && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">dalam antrean</span>}
+          {state.block === "used" && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">sudah dipakai</span>}
+          {(state.block === "queued") && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">dalam antrean</span>}
         </span>
         {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
 
       {open && (
         <div className="px-3 pb-3 space-y-3 border-t-2 border-black/[6%] pt-3">
-          <p className="text-[11px] text-muted-foreground leading-relaxed flex gap-1.5">
+          <p className="text-xs text-muted-foreground leading-relaxed flex gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#0A5BE0]" />
             <span>
               {EMAIL_APPLY_EXPLANATION}
@@ -93,7 +93,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
           </details>
 
           <div>
-            <label htmlFor={`${uid}-to`} className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            <label htmlFor={`${uid}-to`} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
               Email rekruter (tujuan)
             </label>
             <input
@@ -109,7 +109,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
               className="mt-1 w-full h-10 rounded-lg bg-white border-2 border-black/[10%] px-3 text-sm focus:border-[#0A5BE0]/50 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 aria-[invalid=true]:border-red-400"
             />
             {suggestions.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span>Ditemukan di lowongan:</span>
                 {suggestions.map((s) => (
                   <button key={s} type="button" onClick={() => { setEmail(s); setConfirming(false); setError(""); }} className="px-2 py-0.5 rounded-md border-2 border-black/[8%] bg-white hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0]">{s}</button>
@@ -120,7 +120,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
             {state.emailError && <p className="mt-1 text-xs text-red-600 flex items-center gap-1" role="alert"><AlertCircle className="h-3 w-3 shrink-0" /> {state.emailError}</p>}
           </div>
 
-          <p className="text-[11px] flex items-center gap-1.5">
+          <p className="text-xs flex items-center gap-1.5">
             {gmailConnected === true ? (
               <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle2 className="h-3.5 w-3.5" /> Gmail terhubung</span>
             ) : gmailConnected === false ? (
@@ -162,7 +162,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
             </button>
           )}
 
-          <p className="text-[10px] text-muted-foreground leading-relaxed">{EMAIL_APPLY_TEST_MODE_NOTE}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{EMAIL_APPLY_TEST_MODE_NOTE}</p>
         </div>
       )}
     </div>

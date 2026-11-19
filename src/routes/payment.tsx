@@ -138,7 +138,7 @@ function PaymentPage() {
             return (
               <div key={label} className="flex items-center gap-2">
                 <div
-                  className={`h-6 w-6 rounded-full grid place-items-center text-[10px] font-bold ${
+                  className={`h-6 w-6 rounded-full grid place-items-center text-xs font-bold ${
                     done
                       ? "bg-[#1C9656] text-white"
                       : active
@@ -188,7 +188,7 @@ function PaymentPage() {
                       }`}
                     >
                       {m.recommended && (
-                        <span className="absolute -top-2 right-3 inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[#D2F801] text-[#16150F] text-[10px] font-bold uppercase tracking-wider">
+                        <span className="absolute -top-2 right-3 inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[#D2F801] text-[#16150F] text-xs font-bold uppercase tracking-wider">
                           <Sparkles className="h-2.5 w-2.5" /> {m.badge}
                         </span>
                       )}
@@ -278,7 +278,7 @@ function PaymentPage() {
               <span className="font-display text-2xl font-extrabold">{formatRupiah(price.amount)}</span>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="h-3 w-3 text-[#1C9656]" /> PCI-DSS
               </div>
