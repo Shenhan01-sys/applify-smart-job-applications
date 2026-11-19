@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { 
@@ -19,6 +19,22 @@ import {
   mockUserSkills,
 } from "@/mocks/mockData";
 import { profileService } from "@/services/profileService";
+import { automationApi } from "@/services/automationApi";
+import { ErrorState } from "@/components/ErrorState";
+import { describeError } from "@/lib/authErrors";
+import { describeApiError } from "@/lib/apiErrors";
+import { WELCOME_STEPS } from "@/lib/onboarding";
+import {
+  EMPTY_PREFERENCES,
+  JOB_TYPE_OPTIONS,
+  WORK_TYPE_OPTIONS,
+  preferencesFromSettings,
+  preferencesToSettings,
+  toggleInList,
+  validatePreferences,
+  type PreferencesErrors,
+  type PreferencesForm,
+} from "@/lib/profilePreferences";
 import { ExperienceEditor, EducationEditor, SkillsEditor } from "@/components/profile/ProfileEditors";
 import {
   buildProfileRow,
@@ -42,7 +58,10 @@ export const Route = createFileRoute("/profile")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  head: () => ({ meta: [{ title: "Profile — Applify" }] }),
+  head: () => ({ meta: [{ title: "Profil — Applify" }] }),
+  // `?welcome=1` dikirim setelah daftar atau masuk pertama saat profil masih kosong (lihat lib/onboarding.ts).
+  validateSearch: (search: Record<string, unknown>): { welcome?: 1 } =>
+    search.welcome === 1 || search.welcome === "1" || search.welcome === true ? { welcome: 1 } : {},
   component: ProfilePage,
 });
 
@@ -81,13 +100,16 @@ const slideInRight = `
 
 function ProfilePage() {
   const { user } = useAuth();
+  const { welcome } = Route.useSearch();
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [animKey, setAnimKey] = useState(0);
   const [blind, setBlind] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showSaveToast, setShowSaveToast] = useState(false);
+  // true setelah "Simpan & Selesai" berhasil: menampilkan langkah lanjut (cari lowongan)
+  const [finished, setFinished] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -109,13 +131,30 @@ function ProfilePage() {
   const [educations, setEducations] = useState<any[]>(() => (isMockMode() ? [...mockEducation] : []));
   const [certs, setCerts] = useState<any[]>(() => (isMockMode() ? [...mockCertifications] : []));
   const [userSkills, setUserSkills] = useState<any[]>(() => (isMockMode() ? [...mockUserSkills] : []));
-  // Preferences are not stored by this page yet (the agent criteria live in Pengaturan Agen), so a real
-  // account starts with neutral values instead of invented ones.
-  const [preferences, setPreferences] = useState(() =>
+  // Preferensi langkah 4 disimpan ke user_automation_settings (lewat server otomasi). 'failed' = belum bisa
+  // dimuat, dan dalam keadaan itu preferensi tidak ikut disimpan supaya tidak menimpa nilai lama dengan kosong.
+  const [preferences, setPreferences] = useState<PreferencesForm>(() =>
     isMockMode()
-      ? { desired_salary: 40000000, current_ctc: 30000000, notice_period: 30, job_type: "full-time", work_type: "hybrid", search_location: "Jakarta" }
-      : { desired_salary: 0, current_ctc: 0, notice_period: 0, job_type: "full-time", work_type: "hybrid", search_location: "" },
+      ? { desired_salary: 40000000, current_ctc: 30000000, notice_period: 30, job_types: ["full-time"], work_types: ["hybrid"], search_location: "Jakarta" }
+      : EMPTY_PREFERENCES,
   );
+  const [prefsState, setPrefsState] = useState<"loading" | "ready" | "failed">(isMockMode() ? "ready" : "loading");
+  const [prefsError, setPrefsError] = useState("");
+  const [prefErrors, setPrefErrors] = useState<PreferencesErrors>({});
+
+  const loadPreferences = useCallback(async () => {
+    if (isMockMode()) return;
+    setPrefsState("loading");
+    setPrefsError("");
+    try {
+      const settings = await automationApi.getSettings();
+      setPreferences(preferencesFromSettings(settings as Record<string, unknown>));
+      setPrefsState("ready");
+    } catch (err) {
+      setPrefsError(describeApiError(err, "Preferensi kerjamu belum bisa dimuat."));
+      setPrefsState("failed");
+    }
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -155,7 +194,7 @@ function ProfilePage() {
         setUserSkills(full.skills);
       } catch (err: any) {
         console.error("Error loading profile:", err);
-        setLoadError(err?.message || "Tidak dapat memuat profil.");
+        setLoadError(describeError(err, "Profil belum bisa dimuat."));
       } finally {
         setLoading(false);
       }
@@ -163,14 +202,20 @@ function ProfilePage() {
     if (user) loadProfile();
   }, [user, reloadKey]);
 
+  useEffect(() => {
+    if (user) loadPreferences();
+  }, [user, loadPreferences]);
+
   const changeStep = (newStep: number, dir: 'next' | 'prev') => {
     if (newStep < 1 || newStep > steps.length) return;
     setDirection(dir);
     setAnimKey(prev => prev + 1);
     setStep(newStep);
+    setFinished(false);
   };
 
-  const handleSave = async () => {
+  // Menyimpan profil dasar dan preferensi. Mengembalikan true bila semuanya tersimpan.
+  const handleSave = async (): Promise<boolean> => {
     const built = buildProfileRow(formData);
     if (!built.ok) {
       setFormErrors(built.errors as Record<string, string>);
@@ -178,9 +223,19 @@ function ProfilePage() {
       setAnimKey(prev => prev + 1);
       setStep(1);
       toast.error("Periksa kolom profil dasar yang ditandai merah.");
-      return;
+      return false;
+    }
+    const prefProblems = validatePreferences(preferences);
+    if (Object.keys(prefProblems).length > 0) {
+      setPrefErrors(prefProblems);
+      setDirection('next');
+      setAnimKey(prev => prev + 1);
+      setStep(4);
+      toast.error("Periksa kolom preferensi yang ditandai merah.");
+      return false;
     }
     setFormErrors({});
+    setPrefErrors({});
     setSaving(true);
     try {
       if (!isMockMode()) {
@@ -192,13 +247,34 @@ function ProfilePage() {
         });
         if (error) throw error;
       }
-      setShowSaveToast(true);
-      setTimeout(() => setShowSaveToast(false), 2000);
     } catch (err: any) {
-      toast.error(`Gagal menyimpan profil: ${err?.message || "coba lagi"}`);
-    } finally {
+      toast.error(`Profil belum tersimpan. ${describeError(err, "Coba lagi.")}`);
       setSaving(false);
+      return false;
     }
+
+    // Profil sudah tersimpan; preferensi disimpan terpisah supaya galatnya bisa dijelaskan sendiri.
+    if (!isMockMode()) {
+      if (prefsState !== "ready") {
+        toast.warning("Profil tersimpan, tetapi preferensi kerja belum disimpan karena belum bisa dimuat. Buka langkah Preferensi lalu muat ulang.");
+        setSaving(false);
+        return false;
+      }
+      try {
+        await automationApi.updateSettings(preferencesToSettings(preferences));
+      } catch (err) {
+        toast.error(`Profil tersimpan, tetapi preferensi kerja belum. ${describeApiError(err, "Coba simpan lagi.")}`);
+        setSaving(false);
+        return false;
+      }
+    }
+    toast.success("Profil dan preferensi tersimpan.");
+    setSaving(false);
+    return true;
+  };
+
+  const handleFinish = async () => {
+    if (await handleSave()) setFinished(true);
   };
 
   // ---- Experience / education / skills: each change is saved right away (no "Simpan" needed) ----
@@ -220,7 +296,7 @@ function ProfilePage() {
   const deleteExperience = useCallback(async (id: string) => {
     if (!isMockMode()) {
       const res = await profileService.deleteWorkExperience(id);
-      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+      if (res.error) { toast.error(`Belum terhapus. ${describeError(res.error, "Coba lagi.")}`); return; }
     }
     setWorkExps((prev) => prev.filter((x) => x.id !== id));
     toast.success("Pengalaman dihapus.");
@@ -242,7 +318,7 @@ function ProfilePage() {
   const deleteEducation = useCallback(async (id: string) => {
     if (!isMockMode()) {
       const res = await profileService.deleteEducation(id);
-      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+      if (res.error) { toast.error(`Belum terhapus. ${describeError(res.error, "Coba lagi.")}`); return; }
     }
     setEducations((prev) => prev.filter((x) => x.id !== id));
     toast.success("Pendidikan dihapus.");
@@ -264,7 +340,7 @@ function ProfilePage() {
   const deleteSkill = useCallback(async (id: string) => {
     if (!isMockMode()) {
       const res = await profileService.deleteSkill(id);
-      if (res.error) { toast.error(`Gagal menghapus: ${res.error.message}`); return; }
+      if (res.error) { toast.error(`Belum terhapus. ${describeError(res.error, "Coba lagi.")}`); return; }
     }
     setUserSkills((prev) => prev.filter((x) => x.id !== id));
     toast.success("Skill dihapus.");
@@ -286,25 +362,43 @@ function ProfilePage() {
   return (
     <AppShell>
       <style>{slideInRight}</style>
-      
-      {/* Save Toast */}
-      {showSaveToast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-[fadeInUp_0.3s_ease-out]">
-          <CheckCircle2 className="h-4 w-4" />
-          <span className="text-sm font-semibold">Profil disimpan!</span>
-        </div>
-      )}
 
       <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Persona AI Kamu</h1>
-        <p className="text-muted-foreground text-sm mt-1">Setup sekali, pakai untuk semua lamaran.</p>
+        <h1 className="text-2xl md:text-3xl font-bold">Profil Saya</h1>
+        <p className="text-muted-foreground text-sm mt-1">Isi sekali, dipakai untuk semua lamaran.</p>
       </header>
 
+      {/* Banner sambutan: muncul setelah daftar atau masuk pertama saat profil masih kosong */}
+      {welcome === 1 && welcomeOpen && (
+        <section aria-labelledby="welcome-heading" className="mb-6 rounded-2xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="welcome-heading" className="text-lg font-bold">Selamat datang di Applify</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Agar AI bisa menulis lamaran yang pas untukmu, lengkapi profil dulu. Ini cuma sekali.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWelcomeOpen(false)}
+              className="min-h-11 shrink-0 rounded-lg px-3 text-sm font-medium text-[#0A5BE0] hover:bg-[#0A5BE0]/10"
+            >
+              Mengerti
+            </button>
+          </div>
+          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
+            {WELCOME_STEPS.map((t) => <li key={t}>{t}</li>)}
+          </ol>
+        </section>
+      )}
+
       {loadError && (
-        <div role="alert" className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
-          <span>Profil tidak dapat dimuat dari server ({loadError}). Data yang tampil di bawah belum tentu lengkap.</span>
-          <button onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }} className="h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-semibold shrink-0">Coba lagi</button>
-        </div>
+        <ErrorState
+          className="mb-4 text-left"
+          title="Profil belum bisa dimuat"
+          message={`${loadError} Data yang tampil di bawah belum tentu lengkap.`}
+          onRetry={() => { setLoading(true); setReloadKey((k) => k + 1); }}
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -320,6 +414,9 @@ function ProfilePage() {
               return (
                 <div key={s.id} className="flex items-center flex-1 last:flex-none">
                   <div 
+                    aria-current={isActive ? "step" : undefined}
+                    role="img"
+                    aria-label={`Langkah ${s.id}: ${s.label}${isCompleted ? ", selesai" : isActive ? ", sedang dibuka" : ""}`}
                     className={`relative h-10 w-10 rounded-full grid place-items-center text-sm font-bold transition-all duration-300 ${
                       isActive 
                         ? 'bg-[#0A5BE0] text-white shadow-lg scale-110' 
@@ -344,11 +441,11 @@ function ProfilePage() {
           {/* Step Info */}
           <div className="mb-5">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-[#0A5BE0] font-bold bg-[#0A5BE0]/10 px-2 py-1 rounded-full">
+              <span className="text-xs uppercase tracking-wider text-[#0A5BE0] font-bold bg-[#0A5BE0]/10 px-2 py-1 rounded-full">
                 Langkah {step}/{steps.length}
               </span>
               {step === 5 && (
-                <span className="text-[10px] uppercase tracking-wider text-green-600 font-bold bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="text-xs uppercase tracking-wider text-green-700 font-bold bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
                   <Sparkles className="h-3 w-3" /> Selesai
                 </span>
               )}
@@ -358,8 +455,8 @@ function ProfilePage() {
               {step === 1 && "Ceritakan tentang dirimu. Agen akan menggunakan ini untuk personalisasi lamaran."}
               {step === 2 && "Tambahkan pengalaman kerja. Setiap perubahan langsung tersimpan."}
               {step === 3 && "Lengkapi pendidikan dan skills. Setiap perubahan langsung tersimpan."}
-              {step === 4 && "Atur preferensi agar AI mencari pekerjaan yang sesuai."}
-              {step === 5 && "Review profil kamu sebelum AI mulai bekerja."}
+              {step === 4 && "Atur preferensi kerja. Semuanya boleh dikosongkan; pilihan yang kamu isi dipakai agen saat mencari lowongan dan mengisi formulir."}
+              {step === 5 && "Periksa profilmu, lalu tekan Simpan & Selesai."}
             </p>
           </div>
 
@@ -391,25 +488,41 @@ function ProfilePage() {
                 </section>
               </div>
             )}
-            {step === 4 && <Step4Preferences preferences={preferences} setPreferences={setPreferences} />}
-            {step === 5 && <Step5Review formData={formData} workExps={workExps} educations={educations} userSkills={userSkills} preferences={preferences} />}
+            {step === 4 && (
+              <Step4Preferences
+                preferences={preferences}
+                setPreferences={setPreferences}
+                errors={prefErrors}
+                state={prefsState}
+                loadError={prefsError}
+                onRetry={loadPreferences}
+              />
+            )}
+            {step === 5 && (
+              <>
+                {finished && <FinishedNextSteps />}
+                <Step5Review formData={formData} workExps={workExps} educations={educations} userSkills={userSkills} preferences={preferences} />
+              </>
+            )}
           </div>
 
           {/* Navigation Buttons */}
           <div className="mt-6 flex justify-between items-center pt-4 border-t border-black/[6%]">
             <button 
+              type="button"
               onClick={() => changeStep(step - 1, 'prev')} 
               disabled={step === 1}
-              className="h-11 px-5 rounded-xl border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              className="min-h-11 px-5 rounded-xl border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
               <ChevronLeft className="h-4 w-4" /> Kembali
             </button>
             
             <div className="flex gap-2">
               <button 
-                onClick={handleSave} 
+                type="button"
+                onClick={() => { void handleSave(); }} 
                 disabled={saving} 
-                className="h-11 px-5 rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/10 transition disabled:opacity-60"
+                className="min-h-11 px-5 rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/10 transition disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Simpan
@@ -418,14 +531,16 @@ function ProfilePage() {
               {step < steps.length ? (
                 <button 
                   onClick={() => changeStep(step + 1, 'next')} 
-                  className="h-11 px-5 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/90 transition shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5 active:translate-y-0"
+                  className="min-h-11 px-5 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/90 transition shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Lanjut <ChevronRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button 
-                  onClick={handleSave} 
-                  className="h-11 px-5 rounded-xl bg-green-500 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-green-600 transition shadow-lg shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0"
+                  type="button"
+                  onClick={handleFinish} 
+                  disabled={saving}
+                  className="min-h-11 px-5 rounded-xl bg-green-700 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-green-800 disabled:opacity-60 transition shadow-lg shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Simpan &amp; Selesai
                 </button>
@@ -438,16 +553,19 @@ function ProfilePage() {
         <div className="glass rounded-2xl p-5 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="font-semibold">Live Resume Preview</h2>
-              <p className="text-xs text-muted-foreground">Diperbarui otomatis dari profil kamu</p>
+              <h2 className="font-semibold">Pratinjau CV</h2>
+              <p className="text-xs text-muted-foreground">Diperbarui otomatis dari profilmu</p>
             </div>
             <button 
+              type="button"
               onClick={() => setBlind(!blind)} 
-              className={`text-xs px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 transition-all duration-300 ${
+              aria-pressed={blind}
+              title="Menyamarkan nama dan riwayat di pratinjau, untuk melihat bagaimana CV terbaca tanpa identitas"
+              className={`text-xs min-h-11 px-3 rounded-full border inline-flex items-center gap-1.5 transition-all duration-300 ${
                 blind ? 'border-[#16150F] bg-[#16150F] text-white' : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:bg-black/[7%]'
               }`}
             >
-              <EyeOff className="h-3.5 w-3.5"/> {blind ? 'Blind On' : 'Blind Mode'}
+              <EyeOff className="h-3.5 w-3.5"/> {blind ? 'Mode Anonim Aktif' : 'Mode Anonim'}
             </button>
           </div>
           
@@ -473,12 +591,12 @@ function ProfilePage() {
 
             {/* Skills */}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-[#0A5BE0] font-bold flex items-center gap-1">
+              <p className="text-xs uppercase tracking-wider text-[#0A5BE0] font-bold flex items-center gap-1">
                 <Wrench className="h-3 w-3" /> Skill Utama
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {userSkills.length > 0 ? sortSkills(userSkills).map(s => (
-                  <span key={s.id ?? s.name} className="text-[11px] px-2.5 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">{s.name}</span>
+                  <span key={s.id ?? s.name} className="text-xs px-2.5 py-1 rounded-full bg-[#0A5BE0] text-white font-medium">{s.name}</span>
                 )) : (
                   <span className="text-xs text-muted-foreground">Belum ada skill</span>
                 )}
@@ -487,7 +605,7 @@ function ProfilePage() {
 
             {/* Work Experience */}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-teal-600 font-bold flex items-center gap-1">
+              <p className="text-xs uppercase tracking-wider text-teal-700 font-bold flex items-center gap-1">
                 <Briefcase className="h-3 w-3" /> Pengalaman Kerja
               </p>
               <div className="mt-2 space-y-3">
@@ -496,7 +614,7 @@ function ProfilePage() {
                   <div key={exp.id ?? i} className={`text-xs transition-all duration-300 ${blind && i > 0 ? 'opacity-30 blur-[2px]' : ''}`}>
                     <p className="font-semibold">{exp.role_title}</p>
                     <p className="text-muted-foreground">{exp.company_name} · {EMPLOYMENT_TYPES.find((t) => t.value === exp.employment_type)?.label ?? exp.employment_type}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {formatMonthYear(exp.start_date)} — {exp.is_current ? "Sekarang" : formatMonthYear(exp.end_date) || "-"}
                     </p>
                   </div>
@@ -506,7 +624,7 @@ function ProfilePage() {
 
             {/* Education */}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-amber-600 font-bold flex items-center gap-1">
+              <p className="text-xs uppercase tracking-wider text-amber-700 font-bold flex items-center gap-1">
                 <GraduationCap className="h-3 w-3" /> Pendidikan
               </p>
               <div className="mt-2 space-y-2">
@@ -515,7 +633,7 @@ function ProfilePage() {
                   <div key={edu.id ?? i} className="text-xs">
                     <p className="font-semibold">{edu.institution}</p>
                     <p className="text-muted-foreground">{edu.degree} {edu.field_of_study && `· ${edu.field_of_study}`}</p>
-                    <p className="text-[10px] text-muted-foreground">{edu.start_year ?? "-"} — {edu.is_current ? "Sekarang" : edu.end_year ?? "-"} {edu.gpa != null && `· IPK ${edu.gpa}/${edu.max_gpa ?? 4}`}</p>
+                    <p className="text-xs text-muted-foreground">{edu.start_year ?? "-"} — {edu.is_current ? "Sekarang" : edu.end_year ?? "-"} {edu.gpa != null && `· IPK ${edu.gpa}/${edu.max_gpa ?? 4}`}</p>
                   </div>
                 ))}
               </div>
@@ -523,13 +641,13 @@ function ProfilePage() {
 
             {/* Certifications */}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-purple-600 font-bold flex items-center gap-1">
+              <p className="text-xs uppercase tracking-wider text-purple-700 font-bold flex items-center gap-1">
                 <Award className="h-3 w-3" /> Sertifikasi
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {certs.length === 0 && <span className="text-xs text-muted-foreground">Belum ada sertifikasi</span>}
                 {certs.map((c, i) => (
-                  <span key={c.id ?? i} className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
+                  <span key={c.id ?? i} className="text-xs px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
                     {c.name}
                   </span>
                 ))}
@@ -539,18 +657,19 @@ function ProfilePage() {
             {/* Blind Mode Notice */}
             {blind && (
               <div className="mt-3 p-3 rounded-lg bg-violet-50 border-2 border-violet-200 animate-[fadeInUp_0.4s_ease-out]">
-                <p className="text-xs text-violet-700 font-medium">Blind Mode Aktif</p>
-                <p className="text-[10px] text-violet-600 mt-0.5">Nama institusi & latar belakang sosial disembunyikan. Skill diprioritaskan.</p>
+                <p className="text-xs text-violet-700 font-medium">Mode Anonim aktif</p>
+                <p className="text-xs text-violet-700 mt-0.5">Nama dan sebagian riwayat disamarkan di pratinjau ini. Hanya tampilan; datamu tidak berubah.</p>
               </div>
             )}
           </div>
           
           <div className="mt-4 flex gap-2">
-            <button className="flex-1 h-10 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm inline-flex items-center justify-center gap-2 hover:bg-black/[7%] transition hover:-translate-y-0.5">
-              <Download className="h-4 w-4"/> Unduh PDF
+            {/* Belum ada fungsinya: dinonaktifkan dan diberi label, bukan tombol yang diam saat ditekan */}
+            <button type="button" disabled aria-disabled="true" title="Fitur ini belum tersedia" className="flex-1 min-h-11 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm inline-flex items-center justify-center gap-2 opacity-60 cursor-not-allowed">
+              <Download className="h-4 w-4" aria-hidden="true"/> Unduh PDF <span className="text-xs">(segera hadir)</span>
             </button>
-            <button className="flex-1 h-10 rounded-lg bg-[#D2F801] text-[#16150F] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:brightness-95 transition hover:-translate-y-0.5 shadow-sm">
-              <FileCheck2 className="h-4 w-4"/> Test ATS
+            <button type="button" disabled aria-disabled="true" title="Fitur ini belum tersedia" className="flex-1 min-h-11 rounded-lg bg-[#D2F801]/60 text-[#16150F] text-sm font-semibold inline-flex items-center justify-center gap-2 opacity-60 cursor-not-allowed">
+              <FileCheck2 className="h-4 w-4" aria-hidden="true"/> Cek ATS <span className="text-xs font-normal">(segera hadir)</span>
             </button>
           </div>
         </div>
@@ -587,20 +706,24 @@ function Step1Basic({ formData, setFormData, errors }: {
             className="group"
             style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.05}s both` }}
           >
-            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-              <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" /> {field.label}
+            <label htmlFor={`profile-${field.key}`} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+              <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> {field.label}{field.key === 'full_name' && <span className="text-red-600" aria-hidden="true"> *</span>}
             </label>
             <input 
+              id={`profile-${field.key}`}
+              inputMode={field.type === 'number' ? 'numeric' : field.type === 'url' ? 'url' : field.type === 'email' ? 'email' : field.key === 'phone' ? 'tel' : undefined}
+              aria-required={field.key === 'full_name' ? true : undefined}
+              aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : undefined}
               type={field.type}
               value={formData[field.key] || ''}
               onChange={(e) => setFormData({...formData, [field.key]: field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value})}
               placeholder={field.placeholder}
               readOnly={field.key === 'email'}
               aria-invalid={!!errors[field.key]}
-              className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%] aria-[invalid=true]:border-red-400 read-only:opacity-70 read-only:cursor-not-allowed"
+              className="mt-1.5 w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%] aria-[invalid=true]:border-red-400 read-only:opacity-70 read-only:cursor-not-allowed"
             />
-            {field.key === 'email' && <p className="mt-1 text-[11px] text-muted-foreground">Email akun login; tidak diubah dari halaman ini.</p>}
-            {errors[field.key] && <p className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}
+            {field.key === 'email' && <p id="profile-email-hint" className="mt-1 text-xs text-muted-foreground">Email akun login; tidak diubah dari halaman ini.</p>}
+            {errors[field.key] && <p id={`profile-${field.key}-error`} className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}
           </div>
         );
       })}
@@ -608,107 +731,145 @@ function Step1Basic({ formData, setFormData, errors }: {
   );
 }
 
-function Step4Preferences({ preferences, setPreferences }: { 
-  preferences: any, 
-  setPreferences: React.Dispatch<React.SetStateAction<any>>
+function Step4Preferences({ preferences, setPreferences, errors, state, loadError, onRetry }: {
+  preferences: PreferencesForm,
+  setPreferences: React.Dispatch<React.SetStateAction<PreferencesForm>>,
+  errors: PreferencesErrors,
+  state: "loading" | "ready" | "failed",
+  loadError: string,
+  onRetry: () => void,
 }) {
-  const prefFields = [
-    { key: 'desired_salary', label: 'Gaji Yang Diharapkan', icon: DollarSign, prefix: 'Rp ', min: 0, step: 1000000 },
-    { key: 'current_ctc', label: 'Gaji Saat Ini', icon: DollarSign, prefix: 'Rp ', min: 0, step: 1000000 },
-    { key: 'notice_period', label: 'Masa Notice (hari)', icon: Clock, prefix: '', min: 0, step: 1 },
+  if (state === "loading") {
+    return (
+      <div className="flex items-center justify-center gap-3 py-10 text-muted-foreground" role="status" aria-live="polite">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Memuat preferensimu...
+      </div>
+    );
+  }
+  if (state === "failed") {
+    return <ErrorState title="Preferensi belum bisa dimuat" message={`${loadError} Preferensi tidak akan ikut disimpan sampai berhasil dimuat, supaya isi lamamu tidak tertimpa kosong.`} onRetry={onRetry} />;
+  }
+
+  const numberFields: Array<{ key: "desired_salary" | "current_ctc" | "notice_period"; label: string; hint: string; icon: any; prefix: string; step: number }> = [
+    { key: 'desired_salary', label: 'Gaji yang diharapkan', hint: 'Dalam rupiah. Angka ini dipakai apa adanya saat agen mengisi kolom gaji di formulir, jadi tulis sesuai yang biasa diminta (misalnya per bulan).', icon: DollarSign, prefix: 'Rp ', step: 500000 },
+    { key: 'current_ctc', label: 'Gaji saat ini', hint: 'Boleh dikosongkan. Dipakai bila formulir menanyakannya.', icon: DollarSign, prefix: 'Rp ', step: 500000 },
+    { key: 'notice_period', label: 'Masa pemberitahuan (hari)', hint: 'Berapa hari kamu perlu memberi tahu tempat kerja sekarang sebelum pindah. Isi 0 bila bisa langsung.', icon: Clock, prefix: '', step: 1 },
   ];
+  const chip = (active: boolean) =>
+    `min-h-11 px-4 rounded-lg text-sm font-medium border-2 transition-all duration-200 ${
+      active ? 'border-[#0A5BE0] bg-[#0A5BE0] text-white shadow-md' : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:border-black/[16%]'
+    }`;
 
   return (
     <div className="space-y-5">
-      <p className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-3 leading-relaxed">
-        Preferensi di langkah ini belum disimpan ke server. Kriteria pencarian yang dipakai agen diatur di halaman Pengaturan Agen.
+      <p className="text-sm text-muted-foreground bg-black/[3%] border-2 border-black/[6%] rounded-lg p-3 leading-relaxed">
+        Preferensi ini disimpan di Pengaturan Agen, jadi perubahan di sini dan di sana saling terlihat.
       </p>
       <div className="space-y-4">
-        {prefFields.map((field, i) => {
+        {numberFields.map((field, i) => {
           const Icon = field.icon;
+          const id = `pref-${field.key}`;
           return (
-            <div 
-              key={field.key}
-              style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both` }}
-            >
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" /> {field.label}
+            <div key={field.key} style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both` }}>
+              <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> {field.label}
               </label>
               <div className="mt-1.5 relative">
                 {field.prefix && (
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{field.prefix}</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground" aria-hidden="true">{field.prefix}</span>
                 )}
-                <input 
+                <input
+                  id={id}
                   type="number"
-                  value={preferences[field.key]}
-                  onChange={(e) => setPreferences({...preferences, [field.key]: parseInt(e.target.value) || 0})}
-                  min={field.min}
+                  inputMode="numeric"
+                  value={preferences[field.key] || ''}
+                  placeholder="Kosongkan bila tidak ingin diisi"
+                  onChange={(e) => setPreferences({ ...preferences, [field.key]: Math.max(0, parseInt(e.target.value) || 0) })}
+                  min={0}
                   step={field.step}
-                  className={`w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
+                  aria-invalid={!!errors[field.key]}
+                  aria-describedby={`${id}-hint`}
+                  className={`w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all aria-[invalid=true]:border-red-400 ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
                 />
               </div>
+              <p id={`${id}-hint`} className="mt-1 text-xs text-muted-foreground">{field.hint}</p>
+              {errors[field.key] && <p className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}
             </div>
           );
         })}
       </div>
 
-      {/* Job Type */}
-      <div style={{ animation: `fadeInUp 0.4s ease-out 0.24s both` }}>
-        <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <Briefcase className="h-3.5 w-3.5 text-[#0A5BE0]" /> Tipe Pekerjaan
-        </label>
+      {/* Tipe pekerjaan: boleh lebih dari satu, boleh kosong */}
+      <fieldset style={{ animation: `fadeInUp 0.4s ease-out 0.24s both` }}>
+        <legend className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+          <Briefcase className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Tipe pekerjaan
+        </legend>
         <div className="mt-2 flex flex-wrap gap-2">
-          {['full-time', 'part-time', 'contract', 'internship'].map((type) => (
-            <button
-              key={type}
-              onClick={() => setPreferences({...preferences, job_type: type})}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-all duration-200 ${
-                preferences.job_type === type 
-                  ? 'border-[#0A5BE0] bg-[#0A5BE0] text-white shadow-md' 
-                  : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:border-black/[12%]'
-              }`}
-            >
-              {type === 'full-time' ? 'Full-time' : type === 'part-time' ? 'Part-time' : type === 'contract' ? 'Kontrak' : 'Magang'}
-            </button>
-          ))}
+          {JOB_TYPE_OPTIONS.map((o) => {
+            const active = preferences.job_types.includes(o.value);
+            return (
+              <button key={o.value} type="button" aria-pressed={active}
+                onClick={() => setPreferences({ ...preferences, job_types: toggleInList(preferences.job_types, o.value) })}
+                className={chip(active)}>{o.label}</button>
+            );
+          })}
         </div>
-      </div>
+      </fieldset>
 
-      {/* Work Type */}
-      <div style={{ animation: `fadeInUp 0.4s ease-out 0.32s both` }}>
-        <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" /> Model Kerja
-        </label>
+      {/* Model kerja: menyaring hasil pencarian, jadi tidak ada pilihan bawaan */}
+      <fieldset style={{ animation: `fadeInUp 0.4s ease-out 0.32s both` }}>
+        <legend className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Model kerja
+        </legend>
         <div className="mt-2 flex flex-wrap gap-2">
-          {['remote', 'hybrid', 'on-site'].map((type) => (
-            <button
-              key={type}
-              onClick={() => setPreferences({...preferences, work_type: type})}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-all duration-200 ${
-                preferences.work_type === type 
-                  ? 'border-[#0A5BE0] bg-[#0A5BE0] text-white shadow-md' 
-                  : 'border-black/[8%] bg-black/[4%] text-muted-foreground hover:border-black/[12%]'
-              }`}
-            >
-              {type === 'remote' ? 'Remote' : type === 'hybrid' ? 'Hybrid' : 'On-site'}
-            </button>
-          ))}
+          {WORK_TYPE_OPTIONS.map((o) => {
+            const active = preferences.work_types.includes(o.value);
+            return (
+              <button key={o.value} type="button" aria-pressed={active}
+                onClick={() => setPreferences({ ...preferences, work_types: toggleInList(preferences.work_types, o.value) })}
+                className={chip(active)}>{o.label}</button>
+            );
+          })}
         </div>
-      </div>
+        <p className="mt-1.5 text-xs text-muted-foreground">Bila ada yang dipilih, hasil pencarian agen hanya menampilkan lowongan dengan model kerja itu. Tanpa pilihan, semua model kerja ditampilkan.</p>
+      </fieldset>
 
-      {/* Location */}
+      {/* Lokasi */}
       <div style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}>
-        <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" /> Lokasi Pencarian
+        <label htmlFor="pref-search_location" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Lokasi pencarian
         </label>
-        <input 
+        <input
+          id="pref-search_location"
           value={preferences.search_location}
-          onChange={(e) => setPreferences({...preferences, search_location: e.target.value})}
-          placeholder="Contoh: Jakarta, Singapore, Remote"
-          className="mt-1.5 w-full h-11 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all"
+          onChange={(e) => setPreferences({ ...preferences, search_location: e.target.value })}
+          placeholder="Contoh: Yogyakarta, Jakarta, atau Remote"
+          aria-invalid={!!errors.search_location}
+          className="mt-1.5 w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all aria-[invalid=true]:border-red-400"
         />
+        {errors.search_location && <p className="mt-1 text-xs text-red-600" role="alert">{errors.search_location}</p>}
       </div>
     </div>
+  );
+}
+
+/** Muncul setelah "Simpan & Selesai" berhasil: langkah lanjut yang jelas. */
+function FinishedNextSteps() {
+  return (
+    <section aria-labelledby="finished-heading" role="status" className="mb-5 rounded-xl border-2 border-green-300 bg-green-50 p-4">
+      <h3 id="finished-heading" className="flex items-center gap-2 text-base font-bold text-green-900">
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> Profilmu tersimpan
+      </h3>
+      <p className="mt-1 text-sm text-green-900">Langkah berikutnya: cari lowongan yang cocok, lalu minta AI menyiapkan draf lamarannya.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link to="/jobs" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition">
+          Cari lowongan <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+        <Link to="/dashboard" className="inline-flex min-h-11 items-center rounded-xl border-2 border-green-700/30 px-5 text-sm font-semibold text-green-900 hover:bg-green-100 transition">
+          Ke dashboard
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -726,7 +887,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
           </div>
           <div>
             <p className="text-sm font-bold">{formData.full_name || "Nama belum diisi"}</p>
-            <p className="text-xs text-muted-foreground">{formData.current_title} · {formData.experience_years} tahun pengalaman</p>
+            <p className="text-xs text-muted-foreground">{formData.current_title || "Jabatan belum diisi"} · {formData.experience_years} tahun pengalaman</p>
           </div>
         </div>
       </div>
@@ -747,7 +908,7 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
             >
               <Icon className={`h-5 w-5 mx-auto ${stat.color} mb-1`} />
               <p className="text-lg font-bold font-mono">{stat.value}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
             </div>
           );
         })}
@@ -759,27 +920,27 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
         style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Target className="h-4 w-4 text-[#0A5BE0]" /> Preferensi
+          <Target className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> Preferensi
         </h3>
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div className="flex items-center gap-2">
-            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="text-muted-foreground">Gaji harapan:</span>
-            <span className="font-medium">{preferences.desired_salary > 0 ? `Rp ${(preferences.desired_salary / 1000000).toFixed(0)}jt` : "-"}</span>
+            <span className="font-medium">{preferences.desired_salary > 0 ? `Rp ${preferences.desired_salary.toLocaleString("id-ID")}` : "-"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="text-muted-foreground">Tipe:</span>
-            <span className="font-medium capitalize">{preferences.job_type}</span>
+            <span className="font-medium">{preferences.job_types.length ? preferences.job_types.map((v: string) => JOB_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v).join(", ") : "Semua"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+            <MapPin className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="text-muted-foreground">Model:</span>
-            <span className="font-medium capitalize">{preferences.work_type}</span>
+            <span className="font-medium">{preferences.work_types.length ? preferences.work_types.map((v: string) => WORK_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v).join(", ") : "Semua"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Notice:</span>
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <span className="text-muted-foreground">Pemberitahuan:</span>
             <span className="font-medium">{preferences.notice_period > 0 ? `${preferences.notice_period} hari` : "-"}</span>
           </div>
         </div>

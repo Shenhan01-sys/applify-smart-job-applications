@@ -72,16 +72,17 @@ export interface AutomationSettings {
   website?: string
   linkedin_url?: string
   us_citizenship?: string
-  desired_salary?: number
-  current_ctc?: number
-  notice_period?: number
+  // null = dikosongkan oleh pengguna (kolom database boleh null)
+  desired_salary?: number | null
+  current_ctc?: number | null
+  notice_period?: number | null
   linkedin_headline?: string
   linkedin_summary?: string
   cover_letter?: string
   recent_employer?: string
   confidence_level?: string
   search_keywords?: string[]
-  search_location?: string
+  search_location?: string | null
   experience_level_filter?: string[]
   job_type_filter?: string[]
   work_type_filter?: string[]

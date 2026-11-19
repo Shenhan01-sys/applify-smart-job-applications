@@ -1,17 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { profileService } from "@/services/profileService";
+import { describeAuthError } from "@/lib/authErrors";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
+  // `?mode=daftar` membuka formulir daftar (tombol "Daftar Gratis" di beranda); tanpa itu formulir masuk.
+  validateSearch: (search: Record<string, unknown>): { mode?: "daftar" } =>
+    search.mode === "daftar" ? { mode: "daftar" } : {},
   component: LoginPage,
 });
 
 function GoogleIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24">
+    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
         fill="#4285F4"
@@ -34,8 +38,9 @@ function GoogleIcon() {
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { mode } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(mode === "daftar");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,14 +48,30 @@ function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  // Mencegah dua navigasi sekaligus: efek "sudah masuk" dan hasil kirim formulir bisa terjadi hampir bersamaan.
+  const routing = useRef(false);
 
-  // Redirect to dashboard if already logged in (using useEffect to avoid blank page)
+  // Tombol "Daftar Gratis" membawa ?mode=daftar. Bila pengguna sudah di halaman ini lalu menekan tautan itu lagi,
+  // formulir ikut berganti.
   useEffect(() => {
-    if (user && !authLoading) {
-      console.log('[Login] User already authenticated, redirecting to dashboard...');
-      navigate({ to: "/dashboard" });
-    }
-  }, [user, authLoading, navigate]);
+    setIsSignUp(mode === "daftar");
+    setError("");
+    setSuccessMsg("");
+  }, [mode]);
+
+  // Setelah masuk: profil kosong ke /profile dengan banner sambutan, selain itu ke /dashboard.
+  const goAfterLogin = async (userId: string) => {
+    if (routing.current) return;
+    routing.current = true;
+    const target = await profileService.resolvePostLoginTarget(userId);
+    if (target.to === "/profile") navigate({ to: "/profile", search: { welcome: 1 } });
+    else navigate({ to: "/dashboard" });
+  };
+
+  useEffect(() => {
+    if (user && !authLoading) goAfterLogin(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,25 +81,32 @@ function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            // Tautan verifikasi kembali lewat /auth/callback supaya pengguna baru langsung diarahkan ke Profil.
+            emailRedirectTo: window.location.origin + "/auth/callback",
           },
         });
         if (error) throw error;
-        setSuccessMsg("Akun berhasil dibuat! Cek email untuk verifikasi.");
+        // Supabase tidak melempar galat untuk email yang sudah terdaftar; ia mengembalikan akun tanpa identitas.
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          throw { code: "user_already_exists", message: "User already registered" };
+        }
+        if (data.session && data.user) {
+          await goAfterLogin(data.user.id);
+          return;
+        }
+        setSuccessMsg("Akun berhasil dibuat. Buka email dari Applify (cek juga folder spam) dan klik tautan verifikasi, lalu kamu akan langsung masuk.");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/dashboard" });
+        await goAfterLogin(data.user.id);
+        return;
       }
     } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan");
+      setError(describeAuthError(err, isSignUp ? "Akun belum bisa dibuat. Periksa isian, lalu coba lagi." : "Belum bisa masuk. Periksa email dan kata sandi, lalu coba lagi."));
     } finally {
       setLoading(false);
     }
@@ -99,18 +127,18 @@ function LoginPage() {
         },
       });
       if (error) throw error;
-      // Browser will redirect to Google, no need to navigate
+      // Browser akan pindah ke Google, tidak perlu navigasi di sini.
     } catch (err: any) {
-      setError(err.message || "Gagal login dengan Google");
+      setError(describeAuthError(err, "Belum bisa masuk dengan Google. Coba lagi, atau pakai email dan kata sandi."));
       setGoogleLoading(false);
     }
   };
 
-  // Show loading while auth state is being determined (prevents blank page)
+  // Tampilkan pemuat selama status masuk ditentukan (mencegah halaman kosong)
   if (authLoading) {
     return (
-      <div className="min-h-screen grid-bg flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
+      <div className="min-h-screen grid-bg flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
         <span className="ml-3 text-muted-foreground">Memuat...</span>
       </div>
     );
@@ -120,22 +148,23 @@ function LoginPage() {
     <div className="min-h-screen grid-bg flex items-center justify-center px-4 py-20">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white font-bold text-xl mb-4">A</div>
+          <div className="inline-flex h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white font-bold text-xl mb-4" aria-hidden="true">A</div>
           <h1 className="text-2xl font-bold">{isSignUp ? "Buat Akun" : "Masuk ke Applify"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {isSignUp ? "Daftar untuk mulai menggunakan AI job agent" : "Masuk untuk melanjutkan"}
+            {isSignUp ? "Daftar gratis untuk mulai memakai asisten lamaran kerja berbasis AI" : "Masuk untuk melanjutkan"}
           </p>
         </div>
 
         <div className="glass rounded-3xl p-8">
           {/* Google OAuth Button */}
           <button
+            type="button"
             onClick={handleGoogleAuth}
             disabled={googleLoading}
-            className="w-full h-12 rounded-xl border-2 border-black/[12%] bg-white text-[#16150F] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full min-h-12 rounded-xl border-2 border-black/[12%] bg-white text-[#16150F] font-semibold text-sm hover:bg-black/[3%] transition disabled:opacity-60 flex items-center justify-center gap-3"
           >
             {googleLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <GoogleIcon />
             )}
@@ -153,50 +182,64 @@ function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium mb-1.5">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@email.com"
                   required
-                  className="w-full h-11 pl-10 pr-4 rounded-xl border-2 border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  className="w-full h-12 pl-10 pr-4 rounded-xl border-2 border-border bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="login-password" className="block text-sm font-medium">Kata sandi</label>
+                {!isSignUp && (
+                  <Link to="/forgot-password" className="text-sm text-primary hover:underline">Lupa kata sandi?</Link>
+                )}
+              </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignUp ? "Minimal 6 karakter" : "Masukkan password"}
+                  placeholder={isSignUp ? "Minimal 6 karakter" : "Masukkan kata sandi"}
                   required
                   minLength={6}
-                  className="w-full h-11 pl-10 pr-10 rounded-xl border-2 border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  className="w-full h-12 pl-10 pr-12 rounded-xl border-2 border-border bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  aria-pressed={showPassword}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="rounded-xl bg-destructive/10 border-2 border-destructive/20 p-3 text-sm text-destructive">
+              <div role="alert" className="rounded-xl bg-destructive/10 border-2 border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
             {successMsg && (
-              <div className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
+              <div role="status" className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
                 {successMsg}
               </div>
             )}
@@ -204,9 +247,9 @@ function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full min-h-12 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {isSignUp ? "Daftar Sekarang" : "Masuk"}
             </button>
           </form>
@@ -215,7 +258,7 @@ function LoginPage() {
             <button
               type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccessMsg(""); }}
-              className="text-sm text-primary hover:underline"
+              className="min-h-11 px-3 text-sm text-primary hover:underline"
             >
               {isSignUp ? "Sudah punya akun? Masuk" : "Belum punya akun? Daftar"}
             </button>
@@ -223,7 +266,7 @@ function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Dengan masuk atau mendaftar, kamu menyetujui Ketentuan Layanan dan Kebijakan Privasi Applify.
+          Dengan masuk atau mendaftar, kamu menyetujui <Link to="/terms" className="underline hover:text-foreground">Ketentuan &amp; Privasi</Link> Applify.
         </p>
       </div>
     </div>

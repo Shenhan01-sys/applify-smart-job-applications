@@ -36,11 +36,11 @@ export function HitlTrack({ stage, caption, className = "" }: HitlTrackProps) {
         >
           <div className="animate-dbBotIdle flex items-center gap-1 rounded-md border-2 border-[#16150F] bg-white px-1.5 py-0.5 shadow-[2px_2px_0_#16150F]">
             <FileText className="h-3 w-3 text-[#16150F]" />
-            <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#16150F]">CL</span>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#16150F]">CL</span>
           </div>
         </div>
 
-        <ol className="relative flex items-start justify-between">
+        <ol aria-label="Alur persetujuan lamaran" className="relative flex items-start justify-between">
           {/* flowing connector behind the nodes */}
           <svg className="pointer-events-none absolute left-4 right-4 top-4 h-1 w-[calc(100%-2rem)]" preserveAspectRatio="none" aria-hidden>
             <line x1="0" y1="2" x2="100%" y2="2" stroke="#16150F" strokeOpacity="0.25" strokeWidth="2" className="path-flow animate-dbDataFlow" />
@@ -52,7 +52,7 @@ export function HitlTrack({ stage, caption, className = "" }: HitlTrackProps) {
             const active = i === current;
             const isGate = step.key === "gate";
             return (
-              <li key={step.key} className="relative z-10 flex w-12 flex-col items-center gap-1.5 text-center sm:w-16">
+              <li key={step.key} aria-current={active ? "step" : undefined} className="relative z-10 flex w-12 flex-col items-center gap-1.5 text-center sm:w-16">
                 <span className="relative grid h-8 w-8 place-items-center">
                   {active && (
                     <span className="animate-dbPingSubtle absolute inset-0 rounded-full bg-[#D2F801]" aria-hidden />
@@ -68,12 +68,13 @@ export function HitlTrack({ stage, caption, className = "" }: HitlTrackProps) {
                           : "border-[#16150F]/20 bg-white text-[#16150F]/35"
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </span>
-                {/* on narrow screens only the active step keeps its label */}
+                {/* on narrow screens only the active step keeps its label (the others stay readable via sr-only) */}
+                {!active && <span className="sr-only sm:hidden">{step.label}</span>}
                 <span
-                  className={`whitespace-nowrap text-[10px] leading-tight font-semibold ${
+                  className={`whitespace-nowrap text-xs leading-tight font-semibold ${
                     active ? "text-[#16150F]" : done ? "text-[#0A5BE0]" : "text-[#16150F]/40"
                   } ${active ? "" : "hidden sm:block"}`}
                 >

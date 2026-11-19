@@ -10,15 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaitinglistRouteImport } from './routes/waitinglist'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PaymentRouteImport } from './routes/payment'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LinkedinSessionRouteImport } from './routes/linkedin-session'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as GreenCareerRouteImport } from './routes/green-career'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
 import { Route as AutomationSettingsRouteImport } from './routes/automation-settings'
@@ -34,6 +37,11 @@ const WaitinglistRoute = WaitinglistRouteImport.update({
   path: '/waitinglist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubscriptionRoute = SubscriptionRouteImport.update({
   id: '/subscription',
   path: '/subscription',
@@ -47,6 +55,11 @@ const SkillRadarRoute = SkillRadarRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -77,6 +90,11 @@ const JobsRoute = JobsRouteImport.update({
 const GreenCareerRoute = GreenCareerRouteImport.update({
   id: '/green-career',
   path: '/green-career',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -132,15 +150,18 @@ export interface FileRoutesByFullPath {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
+  '/terms': typeof TermsRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -153,15 +174,18 @@ export interface FileRoutesByTo {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
+  '/terms': typeof TermsRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -175,15 +199,18 @@ export interface FileRoutesById {
   '/automation-settings': typeof AutomationSettingsRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/green-career': typeof GreenCareerRoute
   '/jobs': typeof JobsRoute
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
+  '/terms': typeof TermsRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -198,15 +225,18 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/forgot-password'
     | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
     | '/payment'
     | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/skill-radar'
     | '/subscription'
+    | '/terms'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -219,15 +249,18 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/forgot-password'
     | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
     | '/payment'
     | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/skill-radar'
     | '/subscription'
+    | '/terms'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -240,15 +273,18 @@ export interface FileRouteTypes {
     | '/automation-settings'
     | '/blind-mode'
     | '/dashboard'
+    | '/forgot-password'
     | '/green-career'
     | '/jobs'
     | '/linkedin-session'
     | '/login'
     | '/payment'
     | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/skill-radar'
     | '/subscription'
+    | '/terms'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -262,15 +298,18 @@ export interface RootRouteChildren {
   AutomationSettingsRoute: typeof AutomationSettingsRoute
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   GreenCareerRoute: typeof GreenCareerRoute
   JobsRoute: typeof JobsRoute
   LinkedinSessionRoute: typeof LinkedinSessionRoute
   LoginRoute: typeof LoginRoute
   PaymentRoute: typeof PaymentRouteWithChildren
   ProfileRoute: typeof ProfileRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SkillRadarRoute: typeof SkillRadarRoute
   SubscriptionRoute: typeof SubscriptionRoute
+  TermsRoute: typeof TermsRoute
   WaitinglistRoute: typeof WaitinglistRoute
   AdminWaitinglistRoute: typeof AdminWaitinglistRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -283,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/waitinglist'
       fullPath: '/waitinglist'
       preLoaderRoute: typeof WaitinglistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscription': {
@@ -304,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -346,6 +399,13 @@ declare module '@tanstack/react-router' {
       path: '/green-career'
       fullPath: '/green-career'
       preLoaderRoute: typeof GreenCareerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -432,15 +492,18 @@ const rootRouteChildren: RootRouteChildren = {
   AutomationSettingsRoute: AutomationSettingsRoute,
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   GreenCareerRoute: GreenCareerRoute,
   JobsRoute: JobsRoute,
   LinkedinSessionRoute: LinkedinSessionRoute,
   LoginRoute: LoginRoute,
   PaymentRoute: PaymentRouteWithChildren,
   ProfileRoute: ProfileRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SkillRadarRoute: SkillRadarRoute,
   SubscriptionRoute: SubscriptionRoute,
+  TermsRoute: TermsRoute,
   WaitinglistRoute: WaitinglistRoute,
   AdminWaitinglistRoute: AdminWaitinglistRoute,
   AuthCallbackRoute: AuthCallbackRoute,

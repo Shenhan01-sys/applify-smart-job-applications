@@ -1,49 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { automationApi } from '@/services/automationApi'
+import { automationApi, type AutomationSettings } from '@/services/automationApi'
 import { toast } from 'sonner'
 import { describeApiError, parseApiError } from '@/lib/apiErrors'
 
-export interface AutomationSettings {
-  first_name?: string
-  last_name?: string
-  phone_number?: string
-  current_city?: string
-  street?: string
-  state?: string
-  zipcode?: string
-  country?: string
-  ethnicity?: string
-  gender?: string
-  disability_status?: string
-  veteran_status?: string
-  years_of_experience?: string
-  require_visa?: string
-  website?: string
-  linkedin_url?: string
-  us_citizenship?: string
-  desired_salary?: number
-  current_ctc?: number
-  notice_period?: number
-  linkedin_headline?: string
-  linkedin_summary?: string
-  cover_letter?: string
-  recent_employer?: string
-  confidence_level?: string
-  search_keywords?: string[]
-  search_location?: string
-  experience_level_filter?: string[]
-  job_type_filter?: string[]
-  work_type_filter?: string[]
-  easy_apply_only?: boolean
-  blacklist_companies?: string[]
-  blacklist_words?: string[]
-  whitelist_words?: string[]
-  pause_before_submit?: boolean
-  pause_at_failed_question?: boolean
-  overwrite_previous_answers?: boolean
-  ai_provider?: string
-  ai_model?: string
-}
+// Satu definisi saja, di services/automationApi.ts.
+export type { AutomationSettings }
 
 export function useAutomationSettings() {
   const [settings, setSettings] = useState<AutomationSettings>({})

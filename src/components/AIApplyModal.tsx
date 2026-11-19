@@ -1,13 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
 import { automationApi } from "@/services/automationApi";
+import { profileService } from "@/services/profileService";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { describeApiError } from "@/lib/apiErrors";
+import { describeError } from "@/lib/authErrors";
+import { applyBlockers } from "@/lib/onboarding";
 import { scoreOrNull } from "@/lib/jobCardData";
 import { HitlTrack } from "@/components/HitlTrack";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   LEVEL_LABEL,
   SOURCE_LABEL,
@@ -19,7 +23,6 @@ import {
 } from "@/lib/answerReview";
 import { toast } from "sonner";
 import {
-  X,
   Bot,
   ShieldCheck,
   ArrowRight,
@@ -33,7 +36,7 @@ import {
   Zap,
   Eye,
   AlertTriangle,
-  Crown,
+  UserCog,
 } from "lucide-react";
 
 interface AIApplyModalProps {
@@ -51,6 +54,12 @@ interface QuotaState {
   used: number;
 }
 
+type ProfileCheck =
+  | { state: "checking" }
+  | { state: "ok" }
+  | { state: "blocked"; missing: string[] }
+  | { state: "error"; message: string };
+
 export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuccess }: AIApplyModalProps) {
   const [generating, setGenerating] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -67,6 +76,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [error, setError] = useState("");
   const [tier, setTier] = useState<"free" | "pro">("free");
   const [quota, setQuota] = useState<QuotaState>({ remaining: 10, quota: 10, used: 0 });
+  // Profil harus punya nama, jabatan, dan skill sebelum kuota dipakai: draf dari profil kosong sia-sia.
+  const [profileCheck, setProfileCheck] = useState<ProfileCheck>({ state: "checking" });
   // Skill gaps the model reported for the last draft or preview (not stored in the database).
   const [skillGaps, setSkillGaps] = useState<string[] | null>(null);
   const [aiGenerated, setAiGenerated] = useState<{
@@ -80,11 +91,30 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const modelLabel = tier === "pro" ? "model Pro" : "model gratis OpenRouter";
   // null = no score stored for this job (shown as a dash, never as 0% or a default)
   const matchScore: number | null = scoreOrNull(jobData?.match_score);
-  const canApply = quota.remaining > 0;
+  const profileOk = profileCheck.state === "ok";
+  const canApply = quota.remaining > 0 && profileOk;
+  const quotaExhausted = quota.remaining <= 0;
+
+  const checkProfile = useCallback(async () => {
+    setProfileCheck({ state: "checking" });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setProfileCheck({ state: "error", message: "Sesi masuk berakhir. Masuk lagi untuk melanjutkan." });
+        return;
+      }
+      const missing = applyBlockers(await profileService.getSummary(user.id));
+      setProfileCheck(missing.length > 0 ? { state: "blocked", missing } : { state: "ok" });
+    } catch (err) {
+      // Gagal memeriksa profil = tombol tetap terkunci: lebih baik menunggu daripada membuang kuota.
+      setProfileCheck({ state: "error", message: describeError(err, "Profilmu belum bisa diperiksa.") });
+    }
+  }, []);
 
   useEffect(() => {
     loadQuota();
-  }, [jobId]);
+    checkProfile();
+  }, [jobId, checkProfile]);
 
   const loadQuota = async () => {
     try {
@@ -106,6 +136,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
   // Generate the application draft (server-side AI; consumes 1 monthly quota)
   const generate = async () => {
+    if (!profileOk) return; // penjaga kedua: tombol sudah terkunci, tetapi kuota tidak boleh terpakai karena celah
     try {
       setGenerating(true);
       setError("");
@@ -121,7 +152,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       setEditedCoverLetter(app.cover_letter);
       await loadQuota();
     } catch (err: any) {
-      setError(err.message || "Gagal generate aplikasi AI");
+      setError(describeError(err, "Draf belum bisa dibuat. Coba lagi."));
     } finally {
       setGenerating(false);
     }
@@ -145,7 +176,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       await aiApplicationService.updateCoverLetter(application.id, insights.coverLetter);
       setApplication({ ...application, cover_letter: insights.coverLetter });
     } catch (err: any) {
-      setError(err.message || "Gagal regenerate");
+      setError(describeError(err, "Surat belum bisa ditulis ulang. Coba lagi."));
     } finally {
       setRegenerating(false);
     }
@@ -158,7 +189,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       setApplication({ ...application, cover_letter: editedCoverLetter });
       setIsEditing(false);
     } catch (err: any) {
-      setError(err.message || "Gagal menyimpan perubahan");
+      setError(describeError(err, "Perubahan belum tersimpan. Coba lagi."));
     }
   };
 
@@ -191,12 +222,12 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       const check = countNeedingAttention(answers);
       toast.success(
         check > 0
-          ? `Draf masuk antrean persetujuan. ${check} jawaban formulir perlu kamu cek di halaman Approvals.`
-          : "Draf masuk antrean persetujuan. Setujui di halaman Approvals."
+          ? `Draf masuk antrean persetujuan. ${check} jawaban formulir perlu kamu cek di halaman Persetujuan.`
+          : "Draf masuk antrean persetujuan. Setujui di halaman Persetujuan."
       );
       onSuccess();
     } catch (err: any) {
-      setError(`${describeApiError(err, "Gagal mengajukan persetujuan")}. Draf tetap tersimpan di Applications.`);
+      setError(`${describeApiError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`);
     } finally {
       setRequesting(false);
     }
@@ -212,7 +243,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Gagal menandai lamaran");
+      setError(describeError(err, "Lamaran belum bisa ditandai terkirim. Coba lagi."));
     } finally {
       setSubmitting(false);
     }
@@ -228,101 +259,137 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Gagal menjadwalkan auto-apply");
+      setError(describeError(err, "Tugas belum bisa dimasukkan ke antrean. Coba lagi."));
     } finally {
       setEnqueuing(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl border-2 border-[#999999] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-5 border-b border-[#E0E0E0] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#0A5BE0]/10 grid place-items-center">
-              <Bot className="h-5 w-5 text-[#0A5BE0]" />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg">AI Auto-Apply</h2>
-              <p className="text-sm text-muted-foreground">
-                {company} · {jobTitle}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold ${
-              tier === "pro" ? "bg-[#D2F801] text-[#16150F]" : "bg-[#F5F5F5] text-muted-foreground"
-            }`}>
-              {tier === "pro" ? <Crown className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-              {tier === "pro" ? "PRO" : "FREE"}
-            </span>
-            <button
-              onClick={onClose}
-              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+  const tabs = [
+    { key: "cover", label: "Surat Lamaran", icon: FileText },
+    { key: "cv", label: "CV Hasil AI", icon: Eye },
+    { key: "strategy", label: "Strategi AI", icon: Zap },
+  ] as const;
 
-        {/* Quota Warning */}
-        {!canApply && (
-          <div className="mx-5 mt-4 p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-[#92400E] shrink-0" />
-            <p className="text-sm text-[#92400E]">
-              Kuota bulanan ({quota.quota} lamaran) sudah habis.
-              {tier === "free" && " Upgrade ke Pro untuk lebih banyak lamaran."}
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex w-full max-w-3xl max-h-[90vh] flex-col gap-0 overflow-hidden p-0">
+        {/* Header */}
+        <DialogHeader className="border-b border-[#E0E0E0] p-5 pr-14">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-left">
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-[#0A5BE0]/10 grid place-items-center" aria-hidden="true">
+                <Bot className="h-5 w-5 text-[#0A5BE0]" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-bold">Lamar dengan AI</DialogTitle>
+                <DialogDescription className="truncate">{company} · {jobTitle}</DialogDescription>
+              </div>
+            </div>
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[#F5F5F5] px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:inline-flex">
+              <Sparkles className="h-3 w-3" aria-hidden="true" /> {tier === "pro" ? "Model Pro" : "Model gratis"}
+            </span>
+          </div>
+        </DialogHeader>
+
+        {/* Kuota habis: jelaskan kapan pulih dan apa yang masih bisa dilakukan */}
+        {quotaExhausted && (
+          <div role="alert" className="mx-5 mt-4 rounded-xl border border-[#FDE68A] bg-[#FEF3C7] p-3">
+            <p className="flex items-start gap-2 text-sm text-[#92400E]">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                Kuota draf bulan ini sudah habis ({quota.used} dari {quota.quota} terpakai). Kuota dihitung per bulan dan akan
+                direset bulan depan. Sementara itu kamu masih bisa melihat lowongan dan memeriksa lamaran yang sudah ada.
+              </span>
             </p>
+            <div className="mt-2 flex flex-wrap gap-2 pl-6">
+              <Link to="/applications" onClick={onClose} className="inline-flex min-h-11 items-center rounded-lg border-2 border-[#92400E]/40 px-4 text-sm font-semibold text-[#92400E] hover:bg-[#92400E]/10">Lihat lamaranku</Link>
+              <Link to="/approvals" onClick={onClose} className="inline-flex min-h-11 items-center rounded-lg border-2 border-[#92400E]/40 px-4 text-sm font-semibold text-[#92400E] hover:bg-[#92400E]/10">Buka Persetujuan</Link>
+            </div>
           </div>
         )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {generating ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" />
+            <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
+              <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">
                 AI ({modelLabel}) sedang menulis lamaranmu...
               </p>
             </div>
           ) : error && !application ? (
             <div className="space-y-3">
-              <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-600">{error}</div>
-              {!application && (
-                <button
-                  onClick={generate}
-                  disabled={!canApply}
-                  className="h-10 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold disabled:opacity-60"
-                >
-                  Coba lagi
-                </button>
-              )}
+              <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">{error}</div>
+              <button
+                type="button"
+                onClick={generate}
+                disabled={!canApply}
+                className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold disabled:opacity-60"
+              >
+                Coba lagi
+              </button>
             </div>
           ) : !application || !aiGenerated ? (
-            /* Pre-generate preview screen */
+            /* Layar sebelum draf dibuat */
             <div className="flex flex-col items-center justify-center py-10 text-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-[#0A5BE0]/10 grid place-items-center">
+              <div className="h-14 w-14 rounded-2xl bg-[#0A5BE0]/10 grid place-items-center" aria-hidden="true">
                 <Sparkles className="h-7 w-7 text-[#0A5BE0]" />
               </div>
               <div className="max-w-md">
-                <h3 className="font-bold text-lg">Generate lamaran dengan AI</h3>
+                <h3 className="font-bold text-lg">Buat draf lamaran dengan AI</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  AI ({modelLabel}) akan menulis cover letter
-                  yang dioptimalkan ATS & menganalisis kecocokanmu untuk <b>{jobTitle}</b> di <b>{company}</b>.
+                  AI ({modelLabel}) akan menulis surat lamaran yang dioptimalkan untuk sistem seleksi (ATS)
+                  dan menganalisis kecocokanmu untuk <b>{jobTitle}</b> di <b>{company}</b>.
                 </p>
               </div>
-              <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                Sisa kuota bulan ini: <b>{quota.remaining}</b> / {quota.quota} lamaran
+
+              {/* Profil harus lengkap dulu: kuota tidak dipakai untuk profil kosong */}
+              {profileCheck.state === "checking" && (
+                <p role="status" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Memeriksa profilmu...
+                </p>
+              )}
+              {profileCheck.state === "blocked" && (
+                <div role="alert" className="w-full max-w-md rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-left">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    <UserCog className="h-4 w-4" aria-hidden="true" /> Lengkapi profil dulu
+                  </p>
+                  <p className="mt-1 text-sm text-amber-900">
+                    AI memakai profilmu untuk menulis lamaran. Dengan profil yang masih kosong, drafnya akan sia-sia dan kuotamu terbuang. Kuotamu belum dipakai.
+                  </p>
+                  <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-amber-900">
+                    {profileCheck.missing.map((m) => <li key={m}>{m}</li>)}
+                  </ul>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link to="/profile" onClick={onClose} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3]">
+                      Lengkapi profil <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                    <button type="button" onClick={checkProfile} className="min-h-11 rounded-xl border-2 border-amber-400 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100">
+                      Sudah kulengkapi, periksa lagi
+                    </button>
+                  </div>
+                </div>
+              )}
+              {profileCheck.state === "error" && (
+                <div role="alert" className="w-full max-w-md rounded-xl border-2 border-red-200 bg-red-50 p-4 text-left text-sm text-red-700">
+                  <p>{profileCheck.message} Draf belum bisa dibuat sebelum profilmu terperiksa, supaya kuota tidak terbuang.</p>
+                  <button type="button" onClick={checkProfile} className="mt-2 min-h-11 rounded-lg bg-red-600 px-4 font-semibold text-white">Coba lagi</button>
+                </div>
+              )}
+
+              <div className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" aria-hidden="true" />
+                Sisa kuota bulan ini: <b>{quota.remaining}</b> / {quota.quota} draf
               </div>
               <button
+                type="button"
                 onClick={generate}
                 disabled={!canApply}
-                className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center gap-2"
+                className="min-h-12 px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center gap-2"
               >
-                <Sparkles className="h-4 w-4" />
-                {canApply ? "Generate dengan AI (1 kuota)" : "Kuota Habis"}
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                {quotaExhausted ? "Kuota bulan ini habis" : !profileOk ? "Lengkapi profil dulu" : "Buat draf dengan AI (pakai 1 kuota)"}
               </button>
             </div>
           ) : (
@@ -332,13 +399,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 stage="gate"
                 caption={
                   approvalId
-                    ? "Menunggu persetujuanmu di halaman Approvals (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim."
+                    ? "Menunggu persetujuanmu di halaman Persetujuan (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim."
                     : "Draf siap. Tinjau dan edit bila perlu, lalu ajukan ke persetujuan."
                 }
               />
 
               {error && (
-                <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+                <div role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
               )}
 
               {/* Form answers prepared for the approval, low-confidence ones highlighted */}
@@ -349,7 +416,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                     {countNeedingAttention(preparedAnswers) > 0
                       ? `${countNeedingAttention(preparedAnswers)} dari ${preparedAnswers.length} perlu dicek. `
                       : "Semua berkeyakinan tinggi. "}
-                    Tinjau lengkapnya di halaman Approvals sebelum menyetujui.
+                    Tinjau lengkapnya di halaman Persetujuan sebelum menyetujui.
                   </p>
                   <ul className="space-y-1.5">
                     {preparedAnswers.map((a, i) => {
@@ -369,8 +436,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                               {a.source ? ` · ${SOURCE_LABEL[a.source]}` : ""}
                             </span>
                           </span>
-                          <span className={`shrink-0 font-mono ${attention ? "font-semibold text-[#D9741A]" : "text-muted-foreground"}`}>
-                            {attention && <AlertTriangle className="mr-1 inline h-3 w-3" />}
+                          <span className={`shrink-0 font-mono ${attention ? "font-semibold text-[#B45309]" : "text-muted-foreground"}`}>
+                            {attention && <AlertTriangle className="mr-1 inline h-3 w-3" aria-hidden="true" />}
                             {Math.round(a.confidence * 100)}% {LEVEL_LABEL[confidenceLevel(a.confidence)]}
                           </span>
                         </li>
@@ -381,58 +448,59 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               )}
 
               {/* AI Info */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
-                  <Bot className="h-3 w-3" />
+                  <Bot className="h-3 w-3" aria-hidden="true" />
                   Model: {modelLabel}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Sisa kuota: {quota.remaining} / {quota.quota} lamaran
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  Sisa kuota: {quota.remaining} / {quota.quota} draf
                 </span>
               </div>
 
               {/* AI Scores */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-3 text-center">
-                  <Target className="h-5 w-5 mx-auto text-[#0A5BE0] mb-1" />
+                  <Target className="h-5 w-5 mx-auto text-[#0A5BE0] mb-1" aria-hidden="true" />
                   <div className="text-lg font-bold text-[#0A5BE0]">{aiGenerated.tailoredSkills?.length || 0}</div>
-                  <div className="text-xs text-muted-foreground">Skill Match</div>
+                  <div className="text-xs text-muted-foreground">Skill Cocok</div>
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
-                  <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" />
+                  <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" aria-hidden="true" />
                   <div className="text-lg font-bold">{matchScore !== null ? `${matchScore}%` : "—"}</div>
-                  <div className="text-xs text-muted-foreground">Match Score</div>
+                  <div className="text-xs text-muted-foreground">Skor Kecocokan</div>
                 </div>
                 <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-center">
-                  <Bot className="h-5 w-5 mx-auto text-purple-600 mb-1" />
-                  <div className="text-sm font-bold text-purple-600">{tier === "pro" ? "Pro" : "Flash"}</div>
-                  <div className="text-xs text-muted-foreground">{tier === "pro" ? "Premium" : "Free"}</div>
+                  <Bot className="h-5 w-5 mx-auto text-purple-700 mb-1" aria-hidden="true" />
+                  <div className="text-sm font-bold text-purple-700">{tier === "pro" ? "Pro" : "Flash"}</div>
+                  <div className="text-xs text-muted-foreground">{tier === "pro" ? "Premium" : "Gratis"}</div>
                 </div>
                 <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-center">
-                  <CheckCircle2 className="h-5 w-5 mx-auto text-green-600 mb-1" />
-                  <div className="text-lg font-bold text-green-600">Ready</div>
-                  <div className="text-xs text-muted-foreground">Cover & CV</div>
+                  <CheckCircle2 className="h-5 w-5 mx-auto text-green-700 mb-1" aria-hidden="true" />
+                  <div className="text-lg font-bold text-green-700">Siap</div>
+                  <div className="text-xs text-muted-foreground">Surat &amp; CV</div>
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 border-b border-[#E0E0E0]">
-                {[
-                  { key: "cover", label: "Cover Letter", icon: FileText },
-                  { key: "cv", label: "Optimized CV", icon: Eye },
-                  { key: "strategy", label: "AI Strategy", icon: Zap },
-                ].map((tab) => (
+              <div role="tablist" aria-label="Isi draf" className="flex gap-2 overflow-x-auto border-b border-[#E0E0E0]">
+                {tabs.map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key as any)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
+                    type="button"
+                    role="tab"
+                    id={`apply-tab-${tab.key}`}
+                    aria-selected={activeTab === tab.key}
+                    aria-controls={`apply-panel-${tab.key}`}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition ${
                       activeTab === tab.key
                         ? "border-[#0A5BE0] text-[#0A5BE0]"
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <tab.icon className="h-4 w-4" />
+                    <tab.icon className="h-4 w-4" aria-hidden="true" />
                     {tab.label}
                   </button>
                 ))}
@@ -441,40 +509,45 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
               {/* Tab Content */}
               <div className="min-h-[200px]">
                 {activeTab === "cover" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                  <div role="tabpanel" id="apply-panel-cover" aria-labelledby="apply-tab-cover" className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-medium flex items-center gap-1.5">
-                        <Bot className="h-4 w-4 text-[#0A5BE0]" />
-                        AI-Generated Cover Letter
+                        <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                        Surat lamaran dari AI
                       </span>
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           onClick={() => setIsEditing(!isEditing)}
-                          className="h-8 px-3 rounded-lg border border-[#999999] text-xs font-medium hover:border-[#0A5BE0] transition flex items-center gap-1"
+                          className="min-h-11 px-3 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition flex items-center gap-1"
                         >
-                          <Edit3 className="h-3 w-3" />
-                          {isEditing ? "Batal" : "Edit"}
+                          <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                          {isEditing ? "Batal" : "Sunting"}
                         </button>
                         <button
+                          type="button"
                           onClick={regenerate}
                           disabled={regenerating}
-                          className="h-8 px-3 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] text-xs font-medium hover:bg-[#0A5BE0]/20 transition flex items-center gap-1"
+                          className="min-h-11 px-3 rounded-lg bg-[#0A5BE0]/10 text-[#0A5BE0] text-sm font-medium hover:bg-[#0A5BE0]/20 transition flex items-center gap-1 disabled:opacity-60"
                         >
-                          {regenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                          Regenerate (gratis)
+                          {regenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                          Tulis ulang (gratis)
                         </button>
                       </div>
                     </div>
                     {isEditing ? (
                       <div className="space-y-2">
+                        <label htmlFor="apply-cover-edit" className="sr-only">Isi surat lamaran</label>
                         <textarea
+                          id="apply-cover-edit"
                           value={editedCoverLetter}
                           onChange={(e) => setEditedCoverLetter(e.target.value)}
-                          className="w-full h-64 p-4 rounded-xl border-2 border-[#999999] text-sm resize-none focus:outline-none focus:border-[#0A5BE0]"
+                          className="w-full h-64 p-4 rounded-xl border-2 border-[#999999] text-base md:text-sm resize-none focus:outline-none focus:border-[#0A5BE0]"
                         />
                         <button
+                          type="button"
                           onClick={handleSaveEdit}
-                          className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:opacity-90 transition"
+                          className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition"
                         >
                           Simpan Perubahan
                         </button>
@@ -488,35 +561,35 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 )}
 
                 {activeTab === "cv" && (
-                  <div className="space-y-4">
+                  <div role="tabpanel" id="apply-panel-cv" aria-labelledby="apply-tab-cv" className="space-y-4">
                     <div className="rounded-xl bg-[#F5F5F5] p-5 space-y-4">
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Professional Summary</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Ringkasan Profesional</h4>
                         <p className="text-sm">{aiGenerated.optimizedCV?.summary || "—"}</p>
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Highlighted Skills</h4>
-                        <div className="flex flex-wrap gap-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Skill yang Disorot</h4>
+                        <ul className="flex flex-wrap gap-2">
                           {aiGenerated.tailoredSkills?.map((skill: string, i: number) => (
-                            <span key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
+                            <li key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
                               {skill}
-                            </span>
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {activeTab === "strategy" && (
-                  <div className="space-y-3">
+                  <div role="tabpanel" id="apply-panel-strategy" aria-labelledby="apply-tab-strategy" className="space-y-3">
                     <div className="rounded-xl bg-[#F5F5F5] p-5">
                       <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes || "—"}</pre>
                     </div>
                     {skillGaps !== null && (
                       <div className="rounded-xl border-2 border-[#FDE68A] bg-[#FFFBEB] p-4">
                         <p className="text-xs font-semibold text-[#92400E] flex items-center gap-1.5">
-                          <AlertTriangle className="h-3.5 w-3.5" /> Skill yang diminta lowongan tetapi belum ada di profilmu
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Skill yang diminta lowongan tetapi belum ada di profilmu
                         </p>
                         {skillGaps.length > 0 ? (
                           <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Kesenjangan skill">
@@ -527,7 +600,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                         ) : (
                           <p className="mt-1 text-xs text-[#92400E]">Model tidak melaporkan kesenjangan skill.</p>
                         )}
-                        <p className="mt-2 text-[10px] text-[#92400E]/80">Perkiraan model bahasa, bukan hasil pengukuran. Tambahkan skill yang benar-benar kamu kuasai di halaman Profil.</p>
+                        <p className="mt-2 text-xs text-[#92400E]/90">Perkiraan model bahasa, bukan hasil pengukuran. Tambahkan skill yang benar-benar kamu kuasai di halaman Profil.</p>
                       </div>
                     )}
                   </div>
@@ -539,61 +612,72 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
         {/* Footer Actions */}
         <div className="p-5 border-t border-[#E0E0E0] space-y-3">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
+              type="button"
               onClick={onClose}
-              className="h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition"
+              className="min-h-11 px-5 rounded-xl border-2 border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition"
             >
-              {application ? "Simpan Draft" : "Tutup"}
+              {application ? "Tutup (draf tersimpan)" : "Tutup"}
             </button>
             {application && jobData?.external_url && (
               <button
+                type="button"
                 onClick={handleAutoApply}
                 disabled={enqueuing}
+                aria-describedby="apply-fill-hint"
                 title="Agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim."
-                className="h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                className="min-h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Bot className="h-4 w-4" aria-hidden="true" />}
                 Isi Formulir Saja
               </button>
             )}
             {approvalId ? (
               <Link
                 to="/approvals"
-                className="flex-1 h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition flex items-center justify-center gap-2"
+                onClick={onClose}
+                className="flex-1 min-h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition flex items-center justify-center gap-2"
               >
-                <ShieldCheck className="h-4 w-4 text-[#D2F801]" />
-                Buka Approvals
-                <ArrowRight className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
+                Buka Persetujuan
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             ) : application && (
               <button
+                type="button"
                 onClick={handleRequestApproval}
                 disabled={requesting}
-                className="flex-1 h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+                className="flex-1 min-h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
               >
                 {requesting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <ShieldCheck className="h-4 w-4 text-[#D2F801]" />
+                  <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
                 )}
                 {requesting ? "Mengajukan..." : "Ajukan ke Persetujuan"}
               </button>
             )}
           </div>
+          {application && jobData?.external_url && (
+            <p id="apply-fill-hint" className="text-xs text-muted-foreground">
+              "Isi Formulir Saja": agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim. Pantau di Lamaran Saya, bagian Antrean Agen.
+            </p>
+          )}
           {application && (
             <div className="flex justify-end">
               <button
+                type="button"
                 onClick={handleMarkSentManually}
                 disabled={submitting}
-                className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-[#16150F] hover:underline disabled:opacity-60"
+                className="min-h-11 px-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-[#16150F] hover:underline disabled:opacity-60"
               >
-                {submitting ? "Menyimpan..." : "Sudah kukirim sendiri di luar Applify — tandai terkirim"}
+                {submitting ? "Menyimpan..." : "Sudah kukirim sendiri di luar Applify: tandai terkirim"}
               </button>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

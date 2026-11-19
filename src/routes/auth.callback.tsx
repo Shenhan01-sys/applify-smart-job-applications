@@ -1,6 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { profileService } from "@/services/profileService";
+import { describeAuthError } from "@/lib/authErrors";
 import { Loader2, AlertCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -15,35 +17,38 @@ function AuthCallbackPage() {
   useEffect(() => {
     const url = new URL(window.location.href);
     const error = url.searchParams.get('error');
+    const errorCode = url.searchParams.get('error_code');
     const errorDescription = url.searchParams.get('error_description');
 
-    // Check if Supabase returned an OAuth error
+    // Supabase mengembalikan galat OAuth atau verifikasi email lewat parameter alamat.
     if (error) {
       setStatus('error');
-      setErrorMsg(errorDescription || error);
+      setErrorMsg(describeAuthError({ code: errorCode ?? error, message: errorDescription ?? error }, "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi."));
       return;
     }
 
-    // Wait for Supabase to process the OAuth hash
+    // Beri waktu Supabase memproses token di alamat sebelum membaca sesi.
     const timer = setTimeout(async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           setStatus('error');
-          setErrorMsg(sessionError.message);
+          setErrorMsg(describeAuthError(sessionError, "Sesi belum bisa dibaca. Kembali ke halaman masuk lalu coba lagi."));
           return;
         }
         if (session?.user) {
-          // Clean hash from URL
           window.history.replaceState(null, "", window.location.pathname);
-          navigate({ to: "/dashboard" });
+          // Pengguna baru (profil masih kosong) langsung ke Profil dengan banner sambutan.
+          const target = await profileService.resolvePostLoginTarget(session.user.id);
+          if (target.to === "/profile") navigate({ to: "/profile", search: { welcome: 1 } });
+          else navigate({ to: "/dashboard" });
         } else {
           setStatus('error');
-          setErrorMsg('Session tidak ditemukan setelah login. Silakan coba lagi.');
+          setErrorMsg('Proses masuk belum selesai: sesimu tidak ditemukan. Tautan mungkin sudah dipakai atau kedaluwarsa. Kembali ke halaman masuk lalu coba lagi.');
         }
       } catch (err: any) {
         setStatus('error');
-        setErrorMsg(err?.message || 'Terjadi kesalahan saat memproses login.');
+        setErrorMsg(describeAuthError(err, 'Terjadi kesalahan saat memproses login. Kembali ke halaman masuk lalu coba lagi.'));
       }
     }, 1000);
 
@@ -54,29 +59,25 @@ function AuthCallbackPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
         <div className="h-14 w-14 rounded-full bg-red-100 grid place-items-center">
-          <AlertCircle className="h-7 w-7 text-red-600" />
+          <AlertCircle className="h-7 w-7 text-red-600" aria-hidden="true" />
         </div>
-        <div className="text-center max-w-md">
-          <h1 className="text-lg font-bold text-red-800">Login Gagal</h1>
-          <p className="text-sm text-red-600 mt-2">{errorMsg}</p>
-          <p className="text-xs text-muted-foreground mt-4">
-            Jika pesan error mengandung &quot;Database error saving new user&quot;, 
-            ini berarti trigger database di Supabase backend perlu diperbaiki.
-          </p>
+        <div className="text-center max-w-md" role="alert">
+          <h1 className="text-lg font-bold text-red-800">Belum Berhasil Masuk</h1>
+          <p className="text-sm text-red-700 mt-2">{errorMsg}</p>
         </div>
-        <button
-          onClick={() => navigate({ to: "/login" })}
-          className="h-11 px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition"
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition"
         >
-          Kembali ke Login
-        </button>
+          Kembali ke halaman masuk
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <Loader2 className="h-10 w-10 animate-spin text-[#0A5BE0]" />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4" role="status" aria-live="polite">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0A5BE0]" aria-hidden="true" />
       <div className="text-center">
         <p className="text-sm font-medium">Sedang memproses login...</p>
         <p className="text-xs text-muted-foreground mt-1">Tunggu sebentar</p>

@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { mockFullProfile } from "@/mocks/mockData";
 import type { ExperienceRow, EducationRow, SkillRow } from "@/lib/profileForms";
+import { postLoginTarget, type PostLoginTarget, type ProfileSummary } from "@/lib/onboarding";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -131,6 +132,49 @@ export interface FullProfile {
 // ==================== SERVICE ====================
 
 export const profileService = {
+  /**
+   * Ringkasan isi profil (nama, jabatan, jumlah skill, pengalaman, pendidikan) untuk onboarding dan penjaga
+   * AI Apply. Galat dilempar: ringkasan yang gagal dibaca tidak boleh terlihat seperti profil kosong.
+   */
+  async getSummary(userId: string): Promise<ProfileSummary> {
+    if (isMockMode()) {
+      const m = mockFullProfile;
+      return {
+        full_name: m.profile.full_name ?? "",
+        current_title: m.profile.current_title ?? "",
+        skills: m.skills.length,
+        experiences: m.workExperiences.length,
+        education: m.education.length,
+      };
+    }
+    const count = (table: string) => supabase.from(table).select("id", { count: "exact", head: true }).eq("user_id", userId);
+    const [profile, skills, experiences, education] = await Promise.all([
+      supabase.from("profiles").select("full_name, current_title").eq("id", userId).maybeSingle(),
+      count("user_skills"),
+      count("work_experiences"),
+      count("education"),
+    ]);
+    const failed = [profile, skills, experiences, education].find((r) => r.error);
+    if (failed?.error) throw new Error(failed.error.message);
+    return {
+      full_name: profile.data?.full_name ?? "",
+      current_title: profile.data?.current_title ?? "",
+      skills: skills.count ?? 0,
+      experiences: experiences.count ?? 0,
+      education: education.count ?? 0,
+    };
+  },
+
+  /** Ke mana pengguna dikirim setelah daftar atau masuk. Gagal membaca profil berarti dashboard, bukan terkunci. */
+  async resolvePostLoginTarget(userId: string): Promise<PostLoginTarget> {
+    try {
+      return postLoginTarget(await this.getSummary(userId));
+    } catch (err) {
+      console.warn("[onboarding] ringkasan profil tidak terbaca, lanjut ke dashboard:", err);
+      return postLoginTarget(null);
+    }
+  },
+
   // Fetch full profile
   async getFullProfile(userId: string): Promise<FullProfile> {
     if (isMockMode()) {

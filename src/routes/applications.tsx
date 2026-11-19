@@ -206,8 +206,9 @@ export function AppsPage() {
     loadApplications();
   }, [loadApplications]);
 
-  // "Tandai follow-up sudah kukirim" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
-  // mengirim email follow-up; bagiannya adalah pengingat Telegram (worker) dan tanggal yang tersimpan.
+  // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
+  // mengirim email follow-up. Pengingat Telegram worker memakai satu chat milik pengelola (TELEGRAM_CHAT_ID),
+  // bukan chat pengguna, jadi layar tidak menjanjikan pengingat ke pengguna.
   const handleFollowUp = async (appId: string) => {
     const markDone = (a: AIApplicationData): AIApplicationData =>
       a.id === appId ? { ...a, follow_up_sent: true, status: a.status === "submitted" ? "follow_up" : a.status } : a;
@@ -472,18 +473,16 @@ export function AppsPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="h-4 w-4 text-[#92400E]" aria-hidden="true" />
                       <span className="text-sm font-semibold text-[#92400E]">
-                        {selectedApp.status === "follow_up" ? "Saatnya tindak lanjut" : "Pengingat tindak lanjut"}
+                        {selectedApp.status === "follow_up" ? "Saatnya tindak lanjut" : "Saran tindak lanjut"}
                       </span>
                     </div>
                     <p className="text-xs text-[#92400E]">
-                      {selectedApp.status === "follow_up"
-                        ? "Sudah lewat batas tindak lanjut ("
-                        : "Applify mengingatkanmu lewat Telegram pada "}
+                      Disarankan menghubungi perusahaan sekitar{" "}
                       {new Date(selectedApp.follow_up_scheduled).toLocaleDateString("id-ID", {
                         weekday: "long", day: "numeric", month: "long",
                       })}
-                      {selectedApp.status === "follow_up" ? "). " : ". "}
-                      Pesan tindak lanjut ke perusahaan kamu kirim sendiri; Applify tidak mengirim email tindak lanjut.
+                      . Applify belum mengirim pengingat ke akunmu, jadi catat tanggal ini sendiri. Pesan tindak lanjut
+                      kamu kirim sendiri; Applify tidak mengirim email tindak lanjut.
                     </p>
                     <button
                       type="button"
