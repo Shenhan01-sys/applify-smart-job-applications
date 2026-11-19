@@ -13,3 +13,9 @@ test("Toaster dipasang di rute akar: tanpa itu semua toast.success/toast.error t
   // sanity: komponen memang memanggil toast (kalau ini berubah, tes ini perlu ditinjau)
   assert.match(read("../src/components/ApprovalReviewModal.tsx"), /toast\.(success|error)/);
 });
+
+test("Gerbang Persetujuan dapat digulir sampai jawaban formulir (bukan ScrollArea tanpa tinggi pasti)", () => {
+  const src = readFileSync(new URL("../src/components/ApprovalReviewModal.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /<ScrollArea/);
+  assert.match(src, /flex-1 min-h-0 overflow-y-auto/);
+});

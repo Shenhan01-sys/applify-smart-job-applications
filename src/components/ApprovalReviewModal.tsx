@@ -12,7 +12,6 @@ import {
   normalizeAnswers,
 } from '@/lib/answerReview'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { ShieldCheck, XCircle, Clock, AlertTriangle, Loader2, Edit3, Eye, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -140,7 +139,10 @@ export default function ApprovalReviewModal({
         </DialogHeader>
 
         {/* Radix renders the viewport child as display:table, which lets content overflow sideways */}
-        <ScrollArea className="flex-1 px-6 [&_[data-radix-scroll-area-viewport]>div]:!block">
+        {/* Div biasa, bukan ScrollArea Radix: DialogContent hanya punya max-h, sehingga h-full pada viewport Radix
+            tidak pernah terselesaikan dan isi di bawah surat (jawaban formulir dan keyakinannya) tidak bisa digulir.
+            Ditemukan saat uji klik produksi 19 November 2026. */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6" data-testid="approval-review-scroll">
           <HitlTrack
             stage="gate"
             caption="Setujui untuk memasukkan lamaran ke antrean agen, atau tolak bila tidak sesuai."
@@ -292,7 +294,7 @@ export default function ApprovalReviewModal({
               />
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <div className="flex flex-col gap-3 border-t-2 border-[#16150F]/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-xs text-[#16150F]/60">
