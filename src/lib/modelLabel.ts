@@ -14,6 +14,8 @@ export type AiPlan = "free" | "pro";
 /** Pola nama model yang dikenal rantai draf (supabase/functions/_shared/providers.ts dan planInfo.PLAN_MODELS). */
 const KNOWN_MODELS: Array<[RegExp, string]> = [
   [/gemini-3[.-]5-flash-lite/, "Gemini 3.5 Flash-Lite"],
+  [/gemini-4-hydrogen/, "Gemini 4 Hydrogen"],
+  [/gemini-4-argon/, "Gemini 4 Argon"],
   [/claude-haiku-5[.-]5/, "Claude Haiku 5.5"],
   [/claude-sonnet-5[.-]5/, "Claude Sonnet 5.5"],
   [/deepseek-v4-pro/, "DeepSeek V4 Pro"],

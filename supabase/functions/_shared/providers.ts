@@ -4,7 +4,7 @@
 // Setiap entri rantai model ditulis sebagai "<penyedia>:<model>" atau langsung slug OpenRouter:
 //   gemini:gemini-3.5-flash-lite      -> Google AI Studio, endpoint kompatibel OpenAI, kunci GEMINI_API_KEY
 //   anthropic:claude-haiku-5-5        -> Anthropic, endpoint kompatibel OpenAI, kunci ANTHROPIC_API_KEY
-//   deepseek/deepseek-v4-pro          -> OpenRouter (tanpa awalan), kunci OPENROUTER_API_KEY
+//   google/gemma-4-31b-it:free        -> OpenRouter (tanpa awalan), kunci OPENROUTER_API_KEY
 // Ketiganya menerima format chat completions yang sama, jadi pemanggil cukup mengganti URL, kunci, dan nama model.
 // Entri yang kuncinya tidak ada dilewati, sehingga rantai tetap jalan walau hanya sebagian kunci terpasang.
 
@@ -35,8 +35,11 @@ const ENDPOINTS: Record<ProviderName, string> = {
 /** Rantai bawaan bila secret FREE_MODELS / PRO_MODELS tidak diisi. */
 export const DEFAULT_FREE_MODELS =
   "gemini:gemini-3.5-flash-lite,anthropic:claude-haiku-5-5,google/gemma-4-31b-it:free,openrouter/free";
+// Pro: Gemini 4 menggantikan DeepSeek V4 atas keputusan Hans (19 Nov 2026). Uji coba 19 Nov: gemini-4-argon
+// menolak dengan 429 (kuota free tier 0, butuh billing), gemini-4-hydrogen 503 karena permintaan tinggi.
+// Karena itu Claude Sonnet 5.5 dan Haiku 5.5 (sudah terbukti menjawab) tetap jadi cadangan.
 export const DEFAULT_PRO_MODELS =
-  "deepseek/deepseek-v4-pro,anthropic:claude-sonnet-5-5,deepseek/deepseek-v4-flash,gemini:gemini-3.5-flash-lite";
+  "gemini:gemini-4-hydrogen,gemini:gemini-4-argon,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5";
 
 export function parseModelList(raw: string | undefined, fallback: string): string[] {
   return (raw && raw.trim() ? raw : fallback).split(",").map((m) => m.trim()).filter(Boolean);

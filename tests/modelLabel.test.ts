@@ -14,6 +14,8 @@ test("modelUsed dari Edge Function menjadi nama ramah pengguna", () => {
   assert.equal(formatModelUsed("anthropic:claude-sonnet-5-5"), "Claude Sonnet 5.5");
   assert.equal(formatModelUsed("openrouter:deepseek/deepseek-v4-pro"), "DeepSeek V4 Pro");
   assert.equal(formatModelUsed("deepseek/deepseek-v4-flash"), "DeepSeek V4 Flash");
+  assert.equal(formatModelUsed("gemini:gemini-4-hydrogen"), "Gemini 4 Hydrogen");
+  assert.equal(formatModelUsed("gemini:gemini-4-argon"), "Gemini 4 Argon");
 });
 
 test("model gratis OpenRouter diberi tanda gratis; router tanpa nama model tidak diklaim sebagai model tertentu", () => {

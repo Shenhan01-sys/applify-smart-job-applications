@@ -20,7 +20,7 @@ export const FREE_FEATURES = [
 
 export const PRO_FEATURES = [
   "Hingga 20 lamaran per hari",
-  "AI Premium (DeepSeek V4)",
+  "AI Premium (Gemini 4)",
   "Semua 7 platform",
   GOLDEN_WINDOW_LABEL,
   "CV Optimization AI",
@@ -50,10 +50,10 @@ export const PLAN_MODELS: Record<"free" | "pro", { models: PlanModel[]; note: st
   },
   pro: {
     models: [
-      { name: "DeepSeek V4 Pro", role: "Utama", desc: "Model utama untuk surat lamaran dan pengisian formulir" },
-      { name: "Claude Sonnet 5.5", role: "Cadangan", desc: "Cadangan pertama untuk draf bila DeepSeek V4 Pro tidak tersedia" },
-      { name: "DeepSeek V4 Flash", role: "Cadangan", desc: "Dipakai untuk draf bila model di atas tidak tersedia" },
-      { name: "Model gratis OpenRouter dan Groq", role: "Cadangan", desc: "Cadangan terakhir, sama dengan paket Free" },
+      { name: "Gemini 4 Hydrogen", role: "Utama", desc: "Model utama untuk draf surat lamaran (Google AI Studio)" },
+      { name: "Gemini 4 Argon", role: "Cadangan", desc: "Dipakai untuk draf bila Gemini 4 Hydrogen tidak menjawab" },
+      { name: "Claude Sonnet 5.5", role: "Cadangan", desc: "Cadangan draf dari Anthropic bila kedua model Gemini 4 tidak tersedia" },
+      { name: "Claude Haiku 5.5", role: "Cadangan", desc: "Cadangan terakhir untuk draf" },
     ],
     note: "Model dipilih menurut paketmu; bila satu model sedang tidak tersedia, sistem beralih ke model cadangan. Fitur regenerate surat di layar persetujuan saat ini memakai rangkaian model gratis untuk semua paket.",
   },

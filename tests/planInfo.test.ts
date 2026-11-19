@@ -61,16 +61,18 @@ test("model paket Free ada di kode: Gemini lalu Claude Haiku untuk draf; Gemma, 
   assert.equal(PLAN_MODELS.free.models[0].role, "Utama");
 });
 
-test("model paket Pro ada di kode: DeepSeek V4 Pro (utama), Claude Sonnet dan Flash (cadangan draf)", () => {
-  assert.match(workerAi, /deepseek\/deepseek-v4-pro/);
-  assert.match(providers, /DEFAULT_PRO_MODELS =\s*"deepseek\/deepseek-v4-pro,anthropic:claude-sonnet-5-5,deepseek\/deepseek-v4-flash/);
+test("model draf paket Pro ada di kode: Gemini 4 Hydrogen (utama), Argon, lalu Claude (cadangan)", () => {
+  assert.match(providers, /DEFAULT_PRO_MODELS =\s*"gemini:gemini-4-hydrogen,gemini:gemini-4-argon,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5"/);
+  assert.doesNotMatch(providers, /DEFAULT_PRO_MODELS =\s*"[^"]*deepseek/);
 
-  const [first, second, third] = PLAN_MODELS.pro.models;
-  assert.match(first.name, /DeepSeek V4 Pro/);
+  const [first, second, third, fourth] = PLAN_MODELS.pro.models;
+  assert.match(first.name, /Gemini 4 Hydrogen/);
   assert.equal(first.role, "Utama");
-  assert.match(second.name, /Claude Sonnet/);
-  assert.match(third.name, /DeepSeek V4 Flash/);
-  assert.match(PRO_FEATURES.join(" "), /DeepSeek V4/);
+  assert.match(second.name, /Gemini 4 Argon/);
+  assert.match(third.name, /Claude Sonnet/);
+  assert.match(fourth.name, /Claude Haiku/);
+  assert.match(PRO_FEATURES.join(" "), /Gemini 4/);
+  assert.doesNotMatch(PRO_FEATURES.join(" "), /DeepSeek/);
 });
 
 test("pemilihan paket di kode hanya free/pro, jadi tidak ada panel model untuk paket lain", () => {

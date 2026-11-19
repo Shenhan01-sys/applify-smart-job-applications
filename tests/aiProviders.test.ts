@@ -37,11 +37,11 @@ test("penyedia: entri tanpa kunci dilewati dan urutan rantai dipertahankan", () 
   assert.equal(resolveChain(["anthropic:claude-haiku-5-5"], {}).length, 0);
 });
 
-test("penyedia: rantai bawaan Free diawali Gemini lalu Claude, Pro diawali DeepSeek", () => {
+test("penyedia: rantai bawaan Free diawali Gemini lalu Claude, Pro diawali Gemini 4", () => {
   const free = parseModelList("", DEFAULT_FREE_MODELS);
   assert.equal(free[0].startsWith("gemini:"), true);
   assert.equal(free[1].startsWith("anthropic:"), true);
-  assert.equal(parseModelList(undefined, DEFAULT_PRO_MODELS)[0], "deepseek/deepseek-v4-pro");
+  assert.equal(parseModelList(undefined, DEFAULT_PRO_MODELS)[0], "gemini:gemini-4-hydrogen");
   assert.deepEqual(parseModelList(" a , b ,, ", "x"), ["a", "b"]);
 });
 
