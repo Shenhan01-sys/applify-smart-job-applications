@@ -71,10 +71,10 @@ test("JobCard: tombol ikon punya nama untuk pembaca layar dan target sentuh 44px
   assert.doesNotMatch(src, /h-9 w-9|h-10 w-10/);
 });
 
-test("waitinglist: tanpa janji bonus atau kuota karangan, label terhubung ke kolom, popup lama dihapus", () => {
+test("waitinglist: tanpa janji bonus atau kuota karangan, label terhubung ke kolom, popup landing dipertahankan", () => {
   const src = read("../src/routes/waitinglist.tsx");
   assert.doesNotMatch(src, /bonus 1 bulan|Tidak ada spam|500 pendaftar|Submit & Lanjut/);
   assert.match(src, /htmlFor=\{id\}/);
   assert.match(src, /role="radiogroup"/);
-  assert.throws(() => read("../src/components/WaitinglistPopup.tsx"));
+  // WaitinglistPopup dipulihkan bersama landing page desain asli (keputusan Hans 2026-11-19).
 });

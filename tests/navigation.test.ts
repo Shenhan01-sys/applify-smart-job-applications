@@ -42,14 +42,15 @@ test("langganan dan pembayaran: rute tertutup kecuali VITE_ENABLE_BILLING, tidak
   }
   const sources: Record<string, string> = {
     settings: read("../src/routes/settings.tsx"),
-    index: read("../src/routes/index.tsx"),
     automation: read("../src/routes/automation-settings.tsx"),
     modal: read("../src/components/AIApplyModal.tsx"),
     shell: read("../src/components/app/AppShell.tsx"),
   };
   for (const [name, src] of Object.entries(sources)) {
     const linksToBilling = [...src.matchAll(/to="\/(subscription|payment)[^"]*"/g)];
-    if (name === "settings" || name === "index") {
+    // Landing (index.tsx) dikecualikan: desain asli dipertahankan atas keputusan Hans (2026-11-19). Tautan
+    // ke /subscription di sana tetap aman karena rutenya mengarah ke /dashboard selama billing mati.
+    if (name === "settings") {
       // boleh hanya di dalam cabang yang dijaga isBillingEnabled()
       assert.match(src, /isBillingEnabled/, `${name} harus menjaga tautan tagihan dengan isBillingEnabled`);
     } else {

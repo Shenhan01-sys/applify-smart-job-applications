@@ -5,6 +5,11 @@ import { join } from "node:path";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
+// Landing page dan popup waitinglist sengaja dipertahankan dengan desain asli atas keputusan Hans (2026-11-19).
+// Aturan teks minimal dan modal Radix diberlakukan untuk halaman aplikasi, bukan untuk landing ini.
+const LANDING_DESAIN_ASLI = ["/src/routes/index.tsx", "/src/components/WaitinglistPopup.tsx"];
+const isLanding = (f: string) => LANDING_DESAIN_ASLI.some((x) => f.endsWith(x));
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -26,7 +31,7 @@ test("gaya global: prefers-reduced-motion, fokus keyboard terlihat, kolom 16px d
 test("tidak ada teks di bawah 12px (text-[8..11px]) di kode aplikasi", () => {
   const offenders: string[] = [];
   for (const f of walk(new URL("../src", import.meta.url).pathname)) {
-    if (f.includes("/components/ui/")) continue; // komponen shadcn bawaan pustaka
+    if (f.includes("/components/ui/") || isLanding(f)) continue; // shadcn bawaan pustaka; landing desain asli
     const src = readFileSync(f, "utf8");
     if (/text-\[(8|9|10|11)px\]/.test(src)) offenders.push(f.replace(/.*\/src\//, "src/"));
   }
@@ -39,7 +44,7 @@ test("tidak ada modal buatan sendiri: semua dialog memakai Radix (Dialog atau Sh
   }
   assert.match(read("../src/components/app/AppShell.tsx"), /@\/components\/ui\/sheet/);
   for (const f of walk(new URL("../src", import.meta.url).pathname)) {
-    if (f.includes("/components/ui/") || !f.endsWith(".tsx")) continue;
+    if (f.includes("/components/ui/") || !f.endsWith(".tsx") || isLanding(f)) continue;
     assert.doesNotMatch(readFileSync(f, "utf8"), /fixed inset-0/, `${f} masih memakai overlay buatan sendiri`);
   }
 });
