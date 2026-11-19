@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
-import { visibleJobs, jobSearchFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   NO_PROFILE_SKILLS_TEXT,
@@ -107,8 +107,7 @@ function JobsPage() {
         .eq("status", "active")
         // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
         .not("external_url", "is", null);
-      const filter = jobSearchFilter(search);
-      if (filter) query = query.or(filter);
+      for (const filter of jobSearchFilters(search)) query = query.or(filter);
       // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
       const { data, error } = await query.order("created_at", { ascending: false }).limit(JOBS_PAGE_LIMIT);
 
@@ -199,12 +198,7 @@ function JobsPage() {
   const profileHasSkills = skillsReady ? hasUsableSkills(profileSkills) : null;
 
   const filteredJobs = jobs.filter((job) => {
-    const q = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      job.title.toLowerCase().includes(q) ||
-      job.company.toLowerCase().includes(q) ||
-      job.location.toLowerCase().includes(q);
+    const matchesSearch = matchesJobSearch(job, searchQuery);
 
     const matchesFilter =
       activeFilter === "all" ||
@@ -220,6 +214,8 @@ function JobsPage() {
   const shownJobs = sortByMatch(filteredJobs, scoreOf);
 
   // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
+  // Kosong karena belum ada lowongan sama sekali, bukan karena pencarian tidak menemukan hasil.
+  const noJobsAtAll = jobs.length === 0 && !searchQuery.trim();
   const strongMatches = jobs.filter((j) => (scoreOf(j) ?? -1) >= HIGH_MATCH_THRESHOLD).length;
 
   return (
@@ -346,10 +342,10 @@ function JobsPage() {
         <div className="text-center py-16">
           <Brain className="h-12 w-12 mx-auto text-[#999999] mb-4" aria-hidden="true" />
           <h2 className="text-lg font-semibold mb-2">
-            {jobs.length === 0 ? "Belum ada lowongan" : "Tidak ada lowongan yang cocok"}
+            {noJobsAtAll ? "Belum ada lowongan" : "Tidak ada lowongan yang cocok"}
           </h2>
           <p className="mx-auto max-w-md text-sm text-muted-foreground mb-6">
-            {jobs.length === 0
+            {noJobsAtAll
               ? "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan."
               : activeFilter === "high-match" && profileHasSkills === false
                 ? NO_PROFILE_SKILLS_TEXT + "."
@@ -362,7 +358,7 @@ function JobsPage() {
               Buka Profil
             </Link>
           )}
-          {jobs.length === 0 && !showScanner && (
+          {noJobsAtAll && !showScanner && (
             <button
               type="button"
               onClick={() => setShowScanner(true)}
