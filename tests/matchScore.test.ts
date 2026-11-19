@@ -204,3 +204,12 @@ test("profileService.getSkillSource membaca user_skills dan work_experiences.ski
   assert.match(fn, /from\("work_experiences"\)\.select\("skills_used"\)\.eq\("user_id", userId\)/);
   assert.equal([...fn.matchAll(/throw new Error\(/g)].length, 2);
 });
+
+test("jumlah tailoredSkills dari AI tidak dilabeli skill cocok, supaya tidak bertentangan dengan N dari M", () => {
+  for (const rel of ["../src/components/AIApplyModal.tsx", "../src/routes/applications.tsx"]) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.doesNotMatch(src, />Skill Cocok</);
+    assert.doesNotMatch(src, /tailored_skills\?\.length \|\| 0\} skill cocok/);
+    assert.match(src, /skill disorot AI/i);
+  }
+});

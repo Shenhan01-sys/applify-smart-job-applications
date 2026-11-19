@@ -144,7 +144,7 @@ function AppListRow({ app, onOpen }: { app: AIApplicationData; onOpen: () => voi
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate">{job?.title || "Posisi"}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {job?.company || "Perusahaan"} · {app.tailored_skills?.length || 0} skill cocok
+          {job?.company || "Perusahaan"} · {app.tailored_skills?.length || 0} skill disorot AI
         </p>
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
           {applicationStatusLabel(app.status)}

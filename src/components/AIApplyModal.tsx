@@ -620,7 +620,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-3 text-center">
                   <Target className="h-5 w-5 mx-auto text-[#0A5BE0] mb-1" aria-hidden="true" />
                   <div className="text-lg font-bold text-[#0A5BE0]">{aiGenerated.tailoredSkills?.length || 0}</div>
-                  <div className="text-xs text-muted-foreground">Skill Cocok</div>
+                  <div className="text-xs text-muted-foreground">Skill disorot AI</div>
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
                   <Sparkles className="h-5 w-5 mx-auto text-[#16150F] mb-1" aria-hidden="true" />
