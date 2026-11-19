@@ -103,14 +103,21 @@ test("Dashboard: data contoh hanya di mode demo; tanpa cadangan contoh untuk aku
   assert.match(page, /Mode demo: data contoh/);
   // keadaan kosong dan galat yang jujur
   assert.match(page, /Belum ada lamaran, jadi semua angka masih 0/);
-  assert.match(page, /Data lamaran tidak dapat dimuat/);
+  assert.match(page, /Data lamaran belum bisa dimuat/);
 });
 
-test("Dashboard: kuota dari get_quota_status (bukan kolom monthly_quota/used_quota yang tidak ada) dan paket dari ai_model_tier", () => {
+test("Dashboard: kuota dari get_quota_status (bukan kolom monthly_quota/used_quota yang tidak ada); tanpa lencana paket, tanpa LIVE palsu", () => {
   const page = read("../src/routes/dashboard.tsx");
   assert.match(page, /supabase\.rpc\("get_quota_status", \{ p_user_id: user\.id \}\)/);
   assert.match(page, /parseQuotaStatus\(q\.data\)/);
-  assert.match(page, /subscription\?\.ai_model_tier/);
+  // langganan disembunyikan dari UAT: tidak ada lencana Tier/Free/Pro, dan tidak ada penanda LIVE yang tidak berarti apa-apa
+  assert.doesNotMatch(page, /TIER_LABEL|Tier \{tier\}|LIVE|subscriptions/);
+  assert.match(page, /Tahap uji coba/);
+  // ajakan lengkapi profil memakai aturan onboarding yang sama dengan login
+  assert.match(page, /needsOnboarding\(x\)/);
+  assert.match(page, /to="\/profile"/);
+  assert.match(page, /prefers-reduced-motion/);
+  assert.doesNotMatch(page, /text-\[(8|9|10)px\]/);
   const sql = read("../../database/schema.sql");
   assert.doesNotMatch(sql, /monthly_quota|used_quota/);
 });
