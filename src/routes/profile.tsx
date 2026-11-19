@@ -256,7 +256,11 @@ function ProfilePage() {
     // Profil sudah tersimpan; preferensi disimpan terpisah supaya galatnya bisa dijelaskan sendiri.
     if (!isMockMode()) {
       if (prefsState !== "ready") {
-        toast.warning("Profil tersimpan, tetapi preferensi kerja belum disimpan karena belum bisa dimuat. Buka langkah Preferensi lalu muat ulang.");
+        toast.warning(
+          prefsState === "loading"
+            ? "Profil tersimpan. Preferensi kerja masih dimuat, tunggu sebentar lalu tekan Simpan lagi."
+            : "Profil tersimpan, tetapi preferensi kerja belum disimpan karena belum bisa dimuat. Buka langkah Preferensi lalu muat ulang.",
+        );
         setSaving(false);
         return false;
       }
