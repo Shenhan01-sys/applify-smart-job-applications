@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
 import { mockUser, mockSession } from "@/mocks/mockData";
+import { keepUserIfUnchanged } from "@/lib/stableUser";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -29,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser((prev) => keepUserIfUnchanged(prev, session?.user ?? null));
       setLoading(false);
 
       if (session?.user) {
@@ -41,7 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      // Event berulang (TOKEN_REFRESHED, SIGNED_IN saat tab difokuskan) untuk akun yang sama tidak mengganti
+      // objek user, supaya halaman tidak memuat ulang data dan menghapus isian form yang belum disimpan.
+      setUser((prev) => keepUserIfUnchanged(prev, session?.user ?? null));
       setLoading(false);
 
       if (event === 'SIGNED_IN' && window.location.hash.includes('access_token=')) {

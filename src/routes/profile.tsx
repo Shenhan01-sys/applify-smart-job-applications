@@ -716,7 +716,10 @@ function Step1Basic({ formData, setFormData, errors }: {
               aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : undefined}
               type={field.type}
               value={formData[field.key] || ''}
-              onChange={(e) => setFormData({...formData, [field.key]: field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value})}
+              onChange={(e) => {
+                const value = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
+                setFormData((prev: any) => ({ ...prev, [field.key]: value }));
+              }}
               placeholder={field.placeholder}
               readOnly={field.key === 'email'}
               aria-invalid={!!errors[field.key]}
