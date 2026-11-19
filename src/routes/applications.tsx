@@ -8,6 +8,8 @@ import { QueuePanel } from "@/components/QueuePanel";
 import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { applicationStatusLabel } from "@/lib/statusLabels";
+import { canRequestApproval } from "@/lib/draftApproval";
+import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
@@ -26,6 +28,7 @@ import {
   X,
   GripVertical,
   Search,
+  ShieldCheck,
 } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -51,7 +54,11 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
 };
 
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string } | undefined;
+const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string; platform_source?: string | null } | undefined;
+
+// Persetujuan untuk draf yang dibuka di jendela detail: belum diperiksa, sedang diperiksa, belum ada, sudah menunggu,
+// atau antreannya tidak bisa diperiksa (tombol tetap ada; pengajuan memeriksa lagi dan melaporkan galatnya sendiri).
+type ApprovalUi = { state: "idle" } | { state: "checking" } | { state: "none" } | { state: "pending"; id: string } | { state: "unknown" };
 
 function DraggableKanbanCard({ app, onOpen }: { app: AIApplicationData; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app });
@@ -168,6 +175,60 @@ export function AppsPage() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
+  const [approvalUi, setApprovalUi] = useState<ApprovalUi>({ state: "idle" });
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  // Galat pengajuan tampil di dalam jendela, tepat di atas tombolnya, dan juga lewat toast.
+  const [approvalError, setApprovalError] = useState("");
+
+  // Draf yang belum dikirim: periksa apakah sudah menunggu persetujuan, supaya tidak diajukan dua kali.
+  const selectedId = selectedApp?.id;
+  const selectedStatus = selectedApp?.status;
+  useEffect(() => {
+    setApprovalError("");
+    if (!selectedId || !canRequestApproval(selectedStatus)) {
+      setApprovalUi({ state: "idle" });
+      return;
+    }
+    let alive = true;
+    setApprovalUi({ state: "checking" });
+    getPendingApprovalFor(selectedId)
+      .then((pending) => {
+        if (alive) setApprovalUi(pending ? { state: "pending", id: pending.id } : { state: "none" });
+      })
+      .catch((err) => {
+        console.error("Error checking pending approval:", err);
+        if (alive) setApprovalUi({ state: "unknown" });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedId, selectedStatus]);
+
+  const handleRequestApproval = async (app: AIApplicationData) => {
+    const job = jobOf(app);
+    setApprovalBusy(true);
+    setApprovalError("");
+    try {
+      // Sama dengan tombol "Ajukan ke Persetujuan" di jendela Lamar dengan AI.
+      const { approval, created } = await requestApprovalForDraft({
+        applicationId: app.id,
+        jobId: app.job_id,
+        jobTitle: job?.title,
+        company: job?.company,
+        platform: job?.platform_source,
+        coverLetter: app.cover_letter,
+      });
+      setApprovalUi({ state: "pending", id: approval.id });
+      toast.success(created ? "Draf masuk antrean persetujuan. Setujui di halaman Persetujuan." : "Draf ini sudah ada di antrean persetujuan.");
+    } catch (err) {
+      console.error("Error requesting approval:", err);
+      const message = describeApprovalError(err, "Draf belum bisa diajukan.");
+      setApprovalError(message);
+      toast.error(message);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
 
   const viewOrder: ("kanban" | "list")[] = ["kanban", "list"];
   const handleViewChange = (newView: "kanban" | "list") => {
@@ -427,6 +488,60 @@ export function AppsPage() {
                     </select>
                   </label>
                 </div>
+
+                {/* Draf yang belum dikirim bisa diajukan dari sini, tanpa membuka lagi jendela Lamar dengan AI */}
+                {canRequestApproval(selectedApp.status) && (
+                  <div className="rounded-xl border-2 border-[#16150F]/10 p-4 space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                      Persetujuan
+                    </h3>
+                    {approvalUi.state === "pending" ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Draf ini sudah menunggu persetujuanmu (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim.
+                        </p>
+                        <Link
+                          to="/approvals"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-white hover:-translate-y-0.5 hover:shadow-lg transition"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
+                          Buka Persetujuan
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya.
+                        </p>
+                        {approvalUi.state === "unknown" && (
+                          <p className="text-xs text-[#92400E]">
+                            Antrean persetujuan belum bisa diperiksa. Pengajuan akan memeriksanya lagi dan memberi tahu bila gagal.
+                          </p>
+                        )}
+                        {approvalError && (
+                          <div role="alert" id="detail-approval-error" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                            {approvalError}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRequestApproval(selectedApp)}
+                          disabled={approvalBusy || approvalUi.state === "checking"}
+                          aria-describedby={approvalError ? "detail-approval-error" : undefined}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-white hover:-translate-y-0.5 hover:shadow-lg transition disabled:opacity-60 disabled:hover:translate-y-0"
+                        >
+                          {approvalBusy || approvalUi.state === "checking" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
+                          )}
+                          {approvalUi.state === "checking" ? "Memeriksa antrean..." : approvalBusy ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : "Ajukan ke Persetujuan"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">

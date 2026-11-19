@@ -151,6 +151,25 @@ export const aiApplicationService = {
     return data || [];
   },
 
+  // The newest saved draft of this user for a job, or null. The AI Apply modal shows it instead of making a new one
+  // (a new draft uses one monthly quota). Throws when the lookup fails: "no draft" must never be a guess.
+  async getDraftForJob(jobId: string): Promise<AIApplicationData | null> {
+    if (isMockMode()) {
+      return (mockAppStore.find(a => (a as any).job_id === jobId) as unknown as AIApplicationData) ?? null;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+    const { data, error } = await supabase
+      .from("ai_applications")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return (data?.[0] as AIApplicationData | undefined) ?? null;
+  },
+
   // Get single application
   async getApplication(id: string): Promise<AIApplicationData & { job: any }> {
     if (isMockMode()) {

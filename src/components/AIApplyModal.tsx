@@ -3,14 +3,15 @@ import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
-import { automationApi } from "@/services/automationApi";
+import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { profileService } from "@/services/profileService";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
-import { describeApiError } from "@/lib/apiErrors";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
 import { matchCaption, type JobMatch } from "@/lib/matchScore";
+import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
+import { applicationStatusLabel } from "@/lib/statusLabels";
 import { HitlTrack } from "@/components/HitlTrack";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -57,6 +58,12 @@ interface QuotaState {
   used: number;
 }
 
+type ExistingDraft =
+  | { state: "checking" }
+  | { state: "none" }
+  | { state: "found" }
+  | { state: "error"; message: string };
+
 type ProfileCheck =
   | { state: "checking" }
   | { state: "ok" }
@@ -87,6 +94,10 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   // Profil harus punya nama, jabatan, dan skill sebelum kuota dipakai: draf dari profil kosong sia-sia.
   const [profileCheck, setProfileCheck] = useState<ProfileCheck>({ state: "checking" });
+  // A draft this user already saved for this job is shown, not made again: a new draft uses one monthly quota.
+  // "checking" hides the "Buat draf" button until the lookup answers, so nobody clicks before we know.
+  const [existing, setExisting] = useState<ExistingDraft>({ state: "checking" });
+  const [confirmNewDraft, setConfirmNewDraft] = useState(false);
   // Skill gaps the model reported for the last draft or preview (not stored in the database).
   const [skillGaps, setSkillGaps] = useState<string[] | null>(null);
   const [aiGenerated, setAiGenerated] = useState<{
@@ -107,6 +118,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   // An unknown quota does not block: the Edge Function enforces the limit and answers 429 when it is used up.
   const quotaExhausted = quota !== null && quota.remaining <= 0;
   const canApply = !quotaExhausted && profileOk;
+  // A draft that was already sent (or answered, or closed) is shown but not sent to approval again.
+  const editable = application !== null && canRequestApproval(application.status);
   const quotaText = quota
     ? `${quota.remaining} / ${quota.quota} draf`
     : "belum bisa dimuat";
@@ -127,10 +140,44 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     }
   }, []);
 
+  // Look for a draft this user already made for the job. Found: show it (and whether it already waits for approval).
+  // The lookup failing is an error, not "no draft": drafting stays blocked until it answers.
+  const loadExistingDraft = useCallback(async () => {
+    setExisting({ state: "checking" });
+    try {
+      const app = await aiApplicationService.getDraftForJob(jobId);
+      if (!app) {
+        setExisting({ state: "none" });
+        return;
+      }
+      const view = draftToGenerated(app);
+      setApplication(app);
+      setAiGenerated(view);
+      setEditedCoverLetter(view.coverLetter);
+      setExisting({ state: "found" });
+      if (canRequestApproval(app.status)) {
+        try {
+          const pending = await getPendingApprovalFor(app.id);
+          if (pending) {
+            setApprovalId(pending.id);
+            setPreparedAnswers(normalizeAnswers(pending.answers));
+          }
+        } catch (err) {
+          // Not fatal here: "Ajukan ke Persetujuan" checks the pending list again and reports a failure itself.
+          console.error("Error checking pending approval:", err);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading existing draft:", err);
+      setExisting({ state: "error", message: describeError(err, "Draf yang sudah ada belum bisa diperiksa.") });
+    }
+  }, [jobId]);
+
   useEffect(() => {
     loadQuota();
     checkProfile();
-  }, [jobId, checkProfile]);
+    loadExistingDraft();
+  }, [jobId, checkProfile, loadExistingDraft]);
 
   const loadQuota = async () => {
     try {
@@ -177,6 +224,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
         aiNotes: app.ai_notes,
       });
       setEditedCoverLetter(app.cover_letter);
+      // A new draft replaces whatever was on screen (an earlier draft stays saved in Lamaran Saya).
+      setExisting({ state: "none" });
+      setConfirmNewDraft(false);
+      setApprovalId(null);
+      setPreparedAnswers([]);
+      setApprovalError("");
+      setIsEditing(false);
       // The Edge Function reports the quota after this draft; use it so the screen is right at once.
       // Without it (older response), ask the database again.
       if (analysis.quota) {
@@ -244,26 +298,30 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setError("");
       setApprovalError("");
       await persistPendingEdit();
-      const created: any = await automationApi.createApproval({
-        job_id: jobId,
-        application_id: application.id,
-        job_title: jobTitle,
+      // Same call as the "Ajukan ke Persetujuan" button on Lamaran Saya. A draft that already waits for approval
+      // is not queued twice: that approval comes back with created = false.
+      const { approval, created } = await requestApprovalForDraft({
+        applicationId: application.id,
+        jobId,
+        jobTitle,
         company,
         platform: jobData?.platform_source ?? null,
-        cover_letter: editedCoverLetter || application.cover_letter,
+        coverLetter: editedCoverLetter || application.cover_letter,
       });
-      setApprovalId(created?.id ?? "pending");
-      const answers = normalizeAnswers(created?.answers);
+      setApprovalId(approval?.id ?? "pending");
+      const answers = normalizeAnswers(approval?.answers);
       setPreparedAnswers(answers);
       const check = countNeedingAttention(answers);
       toast.success(
-        check > 0
-          ? `Draf masuk antrean persetujuan. ${check} jawaban formulir perlu kamu cek di halaman Persetujuan.`
-          : "Draf masuk antrean persetujuan. Setujui di halaman Persetujuan."
+        !created
+          ? "Draf ini sudah ada di antrean persetujuan. Setujui di halaman Persetujuan."
+          : check > 0
+            ? `Draf masuk antrean persetujuan. ${check} jawaban formulir perlu kamu cek di halaman Persetujuan.`
+            : "Draf masuk antrean persetujuan. Setujui di halaman Persetujuan."
       );
       onSuccess();
     } catch (err: any) {
-      const message = `${describeApiError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`;
+      const message = `${describeApprovalError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`;
       setApprovalError(message);
       toast.error(message);
     } finally {
@@ -368,6 +426,20 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 Coba lagi
               </button>
             </div>
+          ) : existing.state === "checking" ? (
+            <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
+              <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground">Memeriksa draf yang sudah ada untuk lowongan ini...</p>
+            </div>
+          ) : existing.state === "error" ? (
+            <div className="space-y-3">
+              <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+                {existing.message} Draf baru belum dibuat, supaya kuota tidak terpakai untuk draf kedua.
+              </div>
+              <button type="button" onClick={loadExistingDraft} className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold">
+                Coba lagi
+              </button>
+            </div>
           ) : !application || !aiGenerated ? (
             /* Layar sebelum draf dibuat */
             <div className="flex flex-col items-center justify-center py-10 text-center gap-4">
@@ -441,13 +513,50 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
             </div>
           ) : (
             <div className="space-y-5">
+              {/* A draft saved earlier for this job: shown here, not made again. A new one needs a confirmation (1 quota). */}
+              {existing.state === "found" && (
+                <div role="status" className="rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 p-4 text-sm">
+                  <p className="font-semibold">Kamu sudah punya draf untuk lowongan ini</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Dibuat {new Date(application.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })},
+                    status {applicationStatusLabel(application.status)}. Draf yang ada ditampilkan di sini dan kuota tidak terpakai.
+                  </p>
+                  {canApply && !confirmNewDraft && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmNewDraft(true)}
+                      className="mt-3 min-h-11 rounded-lg border-2 border-[#0A5BE0] px-4 text-sm font-semibold text-[#0A5BE0] hover:bg-[#0A5BE0]/5"
+                    >
+                      Buat draf baru (pakai 1 kuota)
+                    </button>
+                  )}
+                  {canApply && confirmNewDraft && (
+                    <div role="alert" className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-amber-900">
+                      <p>
+                        Draf baru memakai 1 kuota (sisa {quotaText}). Draf yang lama tetap tersimpan di Lamaran Saya. Lanjutkan?
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" onClick={generate} className="min-h-11 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white">
+                          Ya, buat draf baru
+                        </button>
+                        <button type="button" onClick={() => setConfirmNewDraft(false)} className="min-h-11 rounded-lg border-2 border-amber-400 px-4 text-sm font-semibold">
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Where this letter is in the human-in-the-loop flow */}
               <HitlTrack
                 stage="gate"
                 caption={
-                  approvalId
-                    ? "Menunggu persetujuanmu di halaman Persetujuan (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim."
-                    : "Draf siap. Tinjau dan edit bila perlu, lalu ajukan ke persetujuan."
+                  !editable
+                    ? `Lamaran ini sudah berstatus "${applicationStatusLabel(application.status)}", jadi tidak diajukan ke persetujuan lagi.`
+                    : approvalId
+                      ? "Menunggu persetujuanmu di halaman Persetujuan (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim."
+                      : "Draf siap. Tinjau dan edit bila perlu, lalu ajukan ke persetujuan."
                 }
               />
 
@@ -681,7 +790,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
             >
               {application ? "Tutup (draf tersimpan)" : "Tutup"}
             </button>
-            {application && jobData?.external_url && (
+            {editable && jobData?.external_url && (
               <button
                 type="button"
                 onClick={handleAutoApply}
@@ -704,7 +813,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 Buka Persetujuan
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-            ) : application && (
+            ) : editable && (
               <button
                 type="button"
                 onClick={handleRequestApproval}
@@ -721,12 +830,12 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               </button>
             )}
           </div>
-          {application && jobData?.external_url && (
+          {editable && jobData?.external_url && (
             <p id="apply-fill-hint" className="text-xs text-muted-foreground">
               "Isi Formulir Saja": agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim. Pantau di Lamaran Saya, bagian Antrean Agen.
             </p>
           )}
-          {application && (
+          {editable && (
             <div className="flex justify-end">
               <button
                 type="button"

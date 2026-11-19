@@ -12,7 +12,7 @@ test("pengajuan persetujuan yang gagal: galat tampil di footer dekat tombol dan 
   assert.doesNotMatch(fn, /setError\(`/);
   assert.match(fn, /setApprovalError\(message\)/);
   assert.match(fn, /toast\.error\(message\)/);
-  assert.match(fn, /describeApiError\(err, "Draf belum bisa diajukan\."\)/);
+  assert.match(fn, /describeApprovalError\(err, "Draf belum bisa diajukan\."\)/);
   // dibersihkan saat mencoba lagi, supaya galat lama tidak menempel
   assert.match(fn.slice(0, fn.indexOf("await persistPendingEdit")), /setApprovalError\(""\)/);
 
