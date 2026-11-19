@@ -8,7 +8,7 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
-import { DEFAULT_FREE_MODELS, DEFAULT_PRO_MODELS, parseModelList, resolveChain } from "../_shared/providers.ts";
+import { chatBody, DEFAULT_FREE_MODELS, DEFAULT_PRO_MODELS, parseModelList, resolveChain } from "../_shared/providers.ts";
 import {
   GROUNDING_RULES,
   acceptCoverLetter,
@@ -203,15 +203,10 @@ Return JSON exactly in this shape:
           method: "POST",
           headers: candidate.headers,
           signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS),
-          body: JSON.stringify({
-            model: candidate.model,
-            messages: [
-              { role: "system", content: sys },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.6,
-            max_tokens: 1600,
-          }),
+          body: JSON.stringify(chatBody(candidate, [
+            { role: "system", content: sys },
+            { role: "user", content: userPrompt },
+          ], { temperature: 0.6, maxTokens: 1600 })),
         });
       } catch (e) {
         lastDetail = `${model}: ${String((e as Error)?.name ?? e)}`;

@@ -67,3 +67,20 @@ export function resolveModel(entry: string, keys: ProviderKeys): ResolvedModel |
 export function resolveChain(entries: string[], keys: ProviderKeys): ResolvedModel[] {
   return entries.map((e) => resolveModel(e, keys)).filter((r): r is ResolvedModel => r !== null);
 }
+
+/**
+ * Badan permintaan chat per penyedia. Claude menolak `temperature` dengan HTTP 400
+ * ("`temperature` is deprecated for this model"), dan penalaran tersembunyinya memakai jatah
+ * `max_tokens`, sehingga jawaban bisa kosong bila jatahnya pas-pasan. Untuk Claude, `temperature`
+ * dihilangkan dan `max_tokens` dinaikkan minimal 2.400.
+ */
+export function chatBody(
+  target: Pick<ResolvedModel, "provider" | "model">,
+  messages: { role: string; content: string }[],
+  opts: { temperature: number; maxTokens: number },
+): Record<string, unknown> {
+  if (target.provider === "anthropic") {
+    return { model: target.model, messages, max_tokens: Math.max(opts.maxTokens, 2400) };
+  }
+  return { model: target.model, messages, temperature: opts.temperature, max_tokens: opts.maxTokens };
+}

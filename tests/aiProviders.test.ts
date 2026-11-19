@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  chatBody,
   DEFAULT_FREE_MODELS,
   DEFAULT_PRO_MODELS,
   parseModelList,
@@ -59,4 +60,17 @@ test("generate-application mencatat hasil tiap kandidat model tanpa isi surat", 
   }
   assert.match(src, /console\.warn\(`\[generate-application\] \$\{entry\.model\} \$\{entry\.outcome\} \$\{entry\.ms\}ms`\)/);
   assert.match(src, /attempts, models:/);
+});
+
+test("chatBody: Claude tanpa temperature dan max_tokens minimal 2400, penyedia lain tetap", () => {
+  const msgs = [{ role: "user", content: "hai" }];
+  const claude = chatBody({ provider: "anthropic", model: "claude-haiku-5-5" }, msgs, { temperature: 0.6, maxTokens: 1600 });
+  assert.equal("temperature" in claude, false);
+  assert.equal(claude.max_tokens, 2400);
+  const gemini = chatBody({ provider: "gemini", model: "gemini-3.5-flash-lite" }, msgs, { temperature: 0.6, maxTokens: 1600 });
+  assert.equal(gemini.temperature, 0.6);
+  assert.equal(gemini.max_tokens, 1600);
+  const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  assert.match(src, /chatBody\(candidate,/);
+  assert.doesNotMatch(src, /temperature: 0\.6,\s*max_tokens/);
 });
