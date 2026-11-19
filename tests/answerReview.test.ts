@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  SOURCE_LABEL,
   confidenceLevel,
   countNeedingAttention,
   needsAttention,
@@ -60,4 +61,8 @@ test("normalizeAnswers: skor di luar 0..1 dipotong dan source asing dibuang", ()
   const [a] = normalizeAnswers([{ question: "Q", answer: "A", confidence: 5, needs_review: false, source: "magic" }]);
   assert.equal(a.confidence, 1);
   assert.equal(a.source, undefined);
+});
+
+test("SOURCE_LABEL: jawaban yang diambil backend dari Profil berlabel Dari Profil", () => {
+  assert.equal(SOURCE_LABEL.profile, "Dari Profil");
 });

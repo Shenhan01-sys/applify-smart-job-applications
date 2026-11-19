@@ -7,7 +7,7 @@
  */
 
 export type ConfidenceLevel = "high" | "medium" | "low";
-export type AnswerSource = "rule" | "ai" | "default";
+export type AnswerSource = "rule" | "profile" | "ai" | "default";
 
 export interface ApprovalAnswer {
   question: string;
@@ -37,6 +37,7 @@ export const LEVEL_LABEL: Record<ConfidenceLevel, string> = {
 
 export const SOURCE_LABEL: Record<AnswerSource, string> = {
   rule: "Dari Pengaturan Otomasi",
+  profile: "Dari Profil",
   ai: "Ditulis AI",
   default: "Belum ada data",
 };
