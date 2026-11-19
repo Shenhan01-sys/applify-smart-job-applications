@@ -104,7 +104,7 @@ export default function ApprovalReviewModal({
             ? result.warnings.map((w: any) => String(w?.message ?? '')).filter(Boolean)
             : []
         )
-        toast.success('Cover letter ditulis ulang.')
+        toast.success('Surat lamaran ditulis ulang.')
       } else {
         // The backend answered without a new letter: keep the current text, never pretend it was rewritten.
         toast.info('AI tidak mengembalikan surat baru. Edit langsung lalu setujui.')

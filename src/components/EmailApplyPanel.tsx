@@ -50,7 +50,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
     setError("");
     try {
       await enqueueEmailApply(approval, email);
-      toast.success("Email masuk antrean. Worker akan memprosesnya.");
+      toast.success("Email masuk antrean. Agen akan memprosesnya.");
       setConfirming(false);
       onQueued(approval.id);
     } catch (err) {
