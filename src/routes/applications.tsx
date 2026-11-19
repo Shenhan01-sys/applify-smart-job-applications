@@ -1,9 +1,15 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
-import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
+import { aiApplicationService, APPLICATION_STATUSES, type AIApplicationData, type ApplicationStatus } from "@/services/aiApplicationService";
 import { mockAIApplications } from "@/mocks/mockData";
+import { QueuePanel } from "@/components/QueuePanel";
+import { ErrorState } from "@/components/ErrorState";
+import { describeError } from "@/lib/authErrors";
+import { applicationStatusLabel } from "@/lib/statusLabels";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   LayoutGrid,
@@ -19,6 +25,7 @@ import {
   AlertCircle,
   X,
   GripVertical,
+  Search,
 } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -29,73 +36,83 @@ export const Route = createFileRoute("/applications")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  head: () => ({ meta: [{ title: "Applications — Applify" }] }),
+  head: () => ({ meta: [{ title: "Lamaran Saya — Applify" }] }),
   component: AppsPage,
 });
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  draft: { label: "Draft", color: "bg-[#999999] text-white", icon: FileText },
-  ready: { label: "Ready", color: "bg-[#0A5BE0] text-white", icon: CheckCircle2 },
-  submitted: { label: "Submitted", color: "bg-[#D2F801] text-[#16150F]", icon: Send },
-  follow_up: { label: "Follow-up", color: "bg-[#F59E0B] text-white", icon: Mail },
-  responded: { label: "Responded", color: "bg-green-500 text-white", icon: CheckCircle2 },
-  closed: { label: "Closed", color: "bg-[#999999] text-white", icon: X },
+// Kode status tetap bahasa Inggris di database; hanya label tampilannya yang Indonesia (statusLabels.ts).
+const statusConfig: Record<string, { color: string; icon: any }> = {
+  draft: { color: "bg-[#6B6B6B] text-white", icon: FileText },
+  ready: { color: "bg-[#0A5BE0] text-white", icon: CheckCircle2 },
+  submitted: { color: "bg-[#D2F801] text-[#16150F]", icon: Send },
+  follow_up: { color: "bg-[#B45309] text-white", icon: Mail },
+  responded: { color: "bg-green-700 text-white", icon: CheckCircle2 },
+  closed: { color: "bg-[#6B6B6B] text-white", icon: X },
 };
 
-function DraggableKanbanCard({ app, onClick }: { app: AIApplicationData; onClick: () => void }) {
+const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string } | undefined;
+
+function DraggableKanbanCard({ app, onOpen }: { app: AIApplicationData; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app });
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
     opacity: isDragging ? 0.5 : 1,
   } : { opacity: isDragging ? 0.5 : 1 };
+  const job = jobOf(app);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group cursor-grab active:cursor-grabbing">
-      <div
-        onClick={(e) => {
-          // Only trigger click if not dragging
-          if (!isDragging) onClick();
-        }}
-        className="rounded-xl bg-[#F5F5F5] border-2 border-[#E0E0E0] p-3 cursor-pointer hover:border-[#0A5BE0] hover:shadow-md transition relative"
-      >
-        <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
+      <div className="rounded-xl bg-[#F5F5F5] border-2 border-[#E0E0E0] p-3 hover:border-[#0A5BE0] hover:shadow-md transition relative">
+        <div aria-hidden="true" className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
           <GripVertical className="h-3 w-3" />
         </div>
         <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-[#0A5BE0]" />
-          <p className="text-sm font-semibold truncate">{(app as any).jobs?.title || "Job"}</p>
+          <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+          <p className="text-sm font-semibold truncate">{job?.title || "Lowongan"}</p>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 truncate">{(app as any).jobs?.company || "Company"}</p>
-        <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          {app.submitted_at
-            ? `${Math.floor((Date.now() - new Date(app.submitted_at).getTime()) / 86400000)} hari lalu`
-            : "Draft"}
+        <p className="text-xs text-muted-foreground mt-1 truncate">{job?.company || "Perusahaan"}</p>
+        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" aria-hidden="true" />
+          {app.submitted_at ? `${daysAgo(app.submitted_at)} hari lalu` : "Belum dikirim"}
         </div>
         {app.follow_up_scheduled && !app.follow_up_sent && (
-          <div className="mt-2 text-[10px] bg-[#FEF3C7] text-[#92400E] px-2 py-1 rounded-full inline-flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            Follow-up pending
+          <div className="mt-2 text-xs bg-[#FEF3C7] text-[#92400E] px-2 py-1 rounded-full inline-flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" aria-hidden="true" />
+            Perlu tindak lanjut
           </div>
         )}
+        <button
+          type="button"
+          // Tombol ini bukan bagian dari seretan: pointer-down tidak boleh memulai drag.
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={onOpen}
+          className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg border-2 border-[#0A5BE0]/30 text-sm font-medium text-[#0A5BE0] hover:bg-[#0A5BE0]/5"
+        >
+          Lihat detail
+        </button>
       </div>
     </div>
   );
 }
 
-function DroppableColumn({ status, label, color, apps, children }: {
-  status: string; label: string; color: string; apps: AIApplicationData[]; children: React.ReactNode;
+function DroppableColumn({ status, apps, children }: {
+  status: string; apps: AIApplicationData[]; children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status, data: { status } });
+  const config = statusConfig[status];
   return (
     <div
       ref={setNodeRef}
+      role="group"
+      aria-label={`Kolom ${applicationStatusLabel(status)}, ${apps.length} lamaran`}
       className={`rounded-2xl border-2 p-3 min-h-[400px] transition-colors ${
         isOver ? 'border-[#0A5BE0] bg-[#0A5BE0]/5' : 'border-[#999999] bg-white'
       }`}
     >
-      <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${color}`}>
-        <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+      <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${config.color}`}>
+        <span className="text-xs font-semibold uppercase tracking-wider">{applicationStatusLabel(status)}</span>
         <span className="text-xs font-mono">{apps.length}</span>
       </div>
       <div className="mt-3 space-y-2">
@@ -105,14 +122,51 @@ function DroppableColumn({ status, label, color, apps, children }: {
   );
 }
 
+function AppListRow({ app, onOpen }: { app: AIApplicationData; onOpen: () => void }) {
+  const config = statusConfig[app.status] ?? statusConfig.draft;
+  const job = jobOf(app);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full min-h-11 rounded-xl border-2 border-[#999999] bg-white p-4 flex items-center gap-4 text-left hover:border-[#0A5BE0] transition"
+    >
+      <div className="h-10 w-10 rounded-lg bg-[#0A5BE0]/10 grid place-items-center shrink-0" aria-hidden="true">
+        <Bot className="h-5 w-5 text-[#0A5BE0]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate">{job?.title || "Posisi"}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {job?.company || "Perusahaan"} · {app.tailored_skills?.length || 0} skill cocok
+        </p>
+        <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
+          {applicationStatusLabel(app.status)}
+        </span>
+      </div>
+      <div className="hidden md:flex items-center gap-4 text-xs">
+        <span className={`px-2.5 py-1 rounded-full font-medium ${config.color}`}>{applicationStatusLabel(app.status)}</span>
+        {app.submitted_at && (
+          <span className="text-muted-foreground inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            {daysAgo(app.submitted_at)} hari lalu
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export function AppsPage() {
   const [applications, setApplications] = useState<AIApplicationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [loadError, setLoadError] = useState("");
+  // Di ponsel kolom Kanban tidak muat, jadi daftar jadi tampilan awal.
+  const [view, setView] = useState<"kanban" | "list">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "list" : "kanban",
+  );
   const [viewKey, setViewKey] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
 
   const viewOrder: ("kanban" | "list")[] = ["kanban", "list"];
@@ -129,30 +183,31 @@ export function AppsPage() {
     useSensor(KeyboardSensor),
   );
 
-  useEffect(() => {
-    loadApplications();
-  }, []);
-
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
     try {
-      setLoading(true);
       if (isMockMode()) {
         setApplications(mockAIApplications as unknown as AIApplicationData[]);
-        setLoading(false);
         return;
       }
-      const data = await aiApplicationService.getApplications();
-      setApplications(data.length ? data : (mockAIApplications as unknown as AIApplicationData[]));
+      // Tanpa data contoh: akun nyata yang belum punya lamaran melihat state kosong, bukan lamaran palsu.
+      setApplications(await aiApplicationService.getApplications());
     } catch (err) {
       console.error("Error loading applications:", err);
-      setApplications(mockAIApplications as unknown as AIApplicationData[]);
+      setApplications([]);
+      setLoadError(describeError(err, "Daftar lamaran belum bisa dimuat."));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // "Mark follow-up as sent" only records that the user sent a follow-up herself/himself. Applify does not
-  // send follow-up emails; its part is the Telegram reminder (worker) and the saved date.
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
+
+  // "Tandai follow-up sudah kukirim" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
+  // mengirim email follow-up; bagiannya adalah pengingat Telegram (worker) dan tanggal yang tersimpan.
   const handleFollowUp = async (appId: string) => {
     const markDone = (a: AIApplicationData): AIApplicationData =>
       a.id === appId ? { ...a, follow_up_sent: true, status: a.status === "submitted" ? "follow_up" : a.status } : a;
@@ -164,11 +219,32 @@ export function AppsPage() {
       }
       await aiApplicationService.markFollowUpSent(appId);
       setSelectedApp(prev => (prev ? markDone(prev) : prev));
+      toast.success("Tercatat: kamu sudah follow-up.");
       loadApplications();
     } catch (err) {
       console.error("Error marking follow-up:", err);
+      toast.error(describeError(err, "Catatan follow-up belum tersimpan. Coba lagi."));
     }
   };
+
+  // Pindah status (seret kartu atau pilih dari daftar). Kartu dipindah dulu di layar; bila gagal tersimpan,
+  // dikembalikan dan pengguna diberi tahu lewat toast.
+  const moveApplication = useCallback((appId: string, targetStatus: ApplicationStatus) => {
+    const current = applications.find(a => a.id === appId);
+    if (!current || current.status === targetStatus) return;
+    const previousStatus = current.status;
+    setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: targetStatus } : a));
+    setSelectedApp(prev => (prev && prev.id === appId ? { ...prev, status: targetStatus } : prev));
+    if (isMockMode()) return;
+    aiApplicationService.updateStatus(appId, targetStatus).then(() => {
+      toast.success(`Status diubah menjadi "${applicationStatusLabel(targetStatus)}".`);
+    }).catch((err) => {
+      console.error("Gagal menyimpan status:", err);
+      setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: previousStatus } : a));
+      setSelectedApp(prev => (prev && prev.id === appId ? { ...prev, status: previousStatus } : prev));
+      toast.error(describeError(err, "Status belum tersimpan, jadi kartu dikembalikan ke kolom semula. Coba lagi."));
+    });
+  }, [applications]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const app = applications.find(a => a.id === event.active.id);
@@ -179,27 +255,9 @@ export function AppsPage() {
     setActiveDragApp(null);
     const { active, over } = event;
     if (!over) return;
-
-    const draggedApp = applications.find(a => a.id === active.id);
-    if (!draggedApp) return;
-
-    const targetStatus = over.data.current?.status as string;
-    if (targetStatus && draggedApp.status !== targetStatus) {
-      const previousStatus = draggedApp.status;
-      setApplications(prev => prev.map(a => a.id === draggedApp.id ? { ...a, status: targetStatus as any } : a));
-      // Save the move (the backend then announces it on Telegram); put the card back if saving fails.
-      if (!isMockMode()) {
-        aiApplicationService.updateStatus(draggedApp.id, targetStatus as any).catch((err) => {
-          console.error("Gagal menyimpan status:", err);
-          setApplications(prev => prev.map(a => a.id === draggedApp.id ? { ...a, status: previousStatus } : a));
-        });
-      }
-    }
-  }, [applications]);
-
-  const updateAppStatus = (appId: string, newStatus: string) => {
-    setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus as any } : a));
-  };
+    const target = over.data.current?.status as ApplicationStatus | undefined;
+    if (target) moveApplication(String(active.id), target);
+  }, [moveApplication]);
 
   const stats = {
     total: applications.length,
@@ -208,268 +266,241 @@ export function AppsPage() {
     responded: applications.filter((a) => a.status === "responded").length,
   };
 
-  const groupedApps = {
-    draft: applications.filter((a) => a.status === "draft"),
-    ready: applications.filter((a) => a.status === "ready"),
-    submitted: applications.filter((a) => a.status === "submitted"),
-    follow_up: applications.filter((a) => a.status === "follow_up"),
-    responded: applications.filter((a) => a.status === "responded"),
-    closed: applications.filter((a) => a.status === "closed"),
-  };
+  const groupedApps = Object.fromEntries(
+    APPLICATION_STATUSES.map((s) => [s, applications.filter((a) => a.status === s)]),
+  ) as Record<ApplicationStatus, AIApplicationData[]>;
 
   if (loading) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
-          <span className="ml-3 text-muted-foreground">Memuat aplikasi...</span>
+        <div className="flex items-center justify-center py-20" role="status" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
+          <span className="ml-3 text-muted-foreground">Memuat lamaranmu...</span>
         </div>
       </AppShell>
     );
   }
 
+  const selectedJob = selectedApp ? jobOf(selectedApp) : undefined;
+
   return (
     <AppShell>
       <header className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">AI Applications</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Lamaran Saya</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {stats.total > 0
-              ? `${stats.total} aplikasi AI · ${stats.submitted} terkirim · ${stats.responded} mendapat response`
-              : "Belum ada aplikasi AI. Pergi ke Job Feed untuk memulai."}
+              ? `${stats.total} lamaran · ${stats.submitted} terkirim · ${stats.responded} sudah dibalas`
+              : "Belum ada lamaran. Mulai dari halaman Lowongan."}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" role="group" aria-label="Pilih tampilan">
           <button
+            type="button"
             onClick={() => handleViewChange("kanban")}
-            className={`hidden md:inline-flex h-10 px-3 rounded-lg items-center gap-2 text-sm border-2 transition ${
+            aria-pressed={view === "kanban"}
+            className={`hidden md:inline-flex min-h-11 px-3 rounded-lg items-center gap-2 text-sm border-2 transition ${
               view === "kanban"
                 ? "bg-[#0A5BE0] text-white border-[#0A5BE0]"
                 : "border-[#999999] text-muted-foreground hover:text-foreground"
             }`}
           >
-            <LayoutGrid className="h-4 w-4" /> Kanban
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Papan
           </button>
           <button
+            type="button"
             onClick={() => handleViewChange("list")}
-            className={`h-10 px-3 rounded-lg inline-flex items-center gap-2 text-sm border-2 transition ${
+            aria-pressed={view === "list"}
+            className={`min-h-11 px-3 rounded-lg inline-flex items-center gap-2 text-sm border-2 transition ${
               view === "list"
                 ? "bg-[#0A5BE0] text-white border-[#0A5BE0]"
                 : "border-[#999999] text-muted-foreground hover:text-foreground"
             }`}
           >
-            <List className="h-4 w-4" /> List
+            <List className="h-4 w-4" aria-hidden="true" /> Daftar
           </button>
         </div>
       </header>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[
-          { l: "Total Aplikasi", v: stats.total },
-          { l: "Terkirim", v: stats.submitted },
-          { l: "Follow-up", v: stats.followUp },
-          { l: "Response", v: stats.responded },
-        ].map((s) => (
-          <div key={s.l} className="rounded-xl border-2 border-[#999999] bg-white p-4">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.l}</p>
-            <p className="font-mono text-xl md:text-2xl font-bold mt-1">{s.v}</p>
-          </div>
-        ))}
-      </div>
+      {/* Antrean tugas agen: tempat memantau tombol "Isi Formulir Saja" */}
+      <QueuePanel />
 
-      <div key={viewKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
-      {applications.length === 0 ? (
-        <div className="text-center py-16">
-          <Bot className="h-12 w-12 mx-auto text-[#999999] mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Belum ada aplikasi AI</h3>
-          <p className="text-sm text-muted-foreground mb-6">
-            Pergi ke halaman Job Feed dan klik "AI Apply Sekarang" pada lowongan yang menarik.
-          </p>
-        </div>
-      ) : view === "kanban" ? (
-        /* Kanban View with Drag & Drop */
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-3">
-            {Object.entries(groupedApps).map(([status, apps]) => {
-              const config = statusConfig[status];
-              return (
-                <DroppableColumn
-                  key={status}
-                  status={status}
-                  label={config.label}
-                  color={config.color}
-                  apps={apps}
-                >
-                  {apps.map((app) => (
-                    <DraggableKanbanCard
-                      key={app.id}
-                      app={app}
-                      onClick={() => { setSelectedApp(app); setShowDetail(true); }}
-                    />
-                  ))}
-                </DroppableColumn>
-              );
-            })}
-          </div>
-          <DragOverlay>
-            {activeDragApp ? (
-              <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
-                <p className="text-sm font-semibold">{(activeDragApp as any).jobs?.title || "Job"}</p>
-                <p className="text-xs text-muted-foreground">{(activeDragApp as any).jobs?.company || "Company"}</p>
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+      {loadError ? (
+        <ErrorState title="Daftar lamaran belum bisa dimuat" message={loadError} onRetry={loadApplications} />
       ) : (
-        /* List View */
-        <div className="space-y-3">
-          {applications.map((app) => {
-            const config = statusConfig[app.status];
-            const Icon = config.icon;
-            return (
-              <div
-                key={app.id}
-                onClick={() => { setSelectedApp(app); setShowDetail(true); }}
-                className="rounded-xl border-2 border-[#999999] bg-white p-4 flex items-center gap-4 cursor-pointer hover:border-[#0A5BE0] transition"
-              >
-                <div className="h-10 w-10 rounded-lg bg-[#0A5BE0]/10 grid place-items-center shrink-0">
-                  <Bot className="h-5 w-5 text-[#0A5BE0]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">
-                    {(app as any).jobs?.title || "Job Position"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {(app as any).jobs?.company || "Company"} · {app.tailored_skills?.length || 0} skills matched
-                  </p>
-                </div>
-                <div className="hidden md:flex items-center gap-4 text-xs">
-                  <span className={`px-2.5 py-1 rounded-full font-medium ${config.color}`}>
-                    {config.label}
-                  </span>
-                  {app.submitted_at && (
-                    <span className="text-muted-foreground inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {Math.floor((Date.now() - new Date(app.submitted_at).getTime()) / 86400000)}d
-                    </span>
-                  )}
-                </div>
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {[
+              { l: "Total Lamaran", v: stats.total },
+              { l: "Terkirim", v: stats.submitted },
+              { l: "Tindak Lanjut", v: stats.followUp },
+              { l: "Sudah Dibalas", v: stats.responded },
+            ].map((s) => (
+              <div key={s.l} className="rounded-xl border-2 border-[#999999] bg-white p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.l}</p>
+                <p className="font-mono text-xl md:text-2xl font-bold mt-1">{s.v}</p>
               </div>
-            );
-          })}
-        </div>
-      )}
-      </div>
+            ))}
+          </div>
 
-      {/* Detail Modal */}
-      {showDetail && selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl border-2 border-[#999999] overflow-hidden flex flex-col">
-            <div className="p-5 border-b border-[#E0E0E0] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bot className="h-5 w-5 text-[#0A5BE0]" />
-                <div>
-                  <h3 className="font-bold">{(selectedApp as any).jobs?.title || "Application"}</h3>
-                  <p className="text-sm text-muted-foreground">{(selectedApp as any).jobs?.company || "Company"}</p>
-                </div>
+          <div key={viewKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
+            {applications.length === 0 ? (
+              <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[10%]">
+                <Bot className="h-12 w-12 mx-auto text-[#999999] mb-4" aria-hidden="true" />
+                <h2 className="text-lg font-semibold mb-2">Belum ada lamaran</h2>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                  Pilih lowongan di halaman Lowongan, lalu tekan "Lamar dengan AI". Draf surat lamaran yang dibuat AI
+                  akan tersimpan dan muncul di sini.
+                </p>
+                <Link to="/jobs" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:bg-[#0256d3] transition">
+                  <Search className="h-4 w-4" aria-hidden="true" /> Cari lowongan
+                </Link>
               </div>
-              <button
-                onClick={() => setShowDetail(false)}
-                className="h-9 w-9 rounded-lg border-2 border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              <div className="flex items-center gap-2">
-                <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${statusConfig[selectedApp.status].color}`}>
-                  {statusConfig[selectedApp.status].label}
-                </span>
-                {selectedApp.submitted_at && (
-                  <span className="text-xs text-muted-foreground">
-                    Submitted {new Date(selectedApp.submitted_at).toLocaleDateString("id-ID")}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  <FileText className="h-4 w-4 text-[#0A5BE0]" />
-                  AI Cover Letter
-                </h4>
-                <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap leading-relaxed">
-                  {selectedApp.cover_letter}
-                </div>
-              </div>
-
-              {selectedApp.tailored_skills?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-[#0A5BE0]" />
-                    Tailored Skills
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedApp.tailored_skills.map((skill, i) => (
-                      <span key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
-                        {skill}
-                      </span>
+            ) : view === "kanban" ? (
+              <>
+                <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                  <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-3">
+                    {APPLICATION_STATUSES.map((status) => (
+                      <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
+                        {groupedApps[status].map((app) => (
+                          <DraggableKanbanCard key={app.id} app={app} onOpen={() => setSelectedApp(app)} />
+                        ))}
+                      </DroppableColumn>
                     ))}
                   </div>
+                  <DragOverlay>
+                    {activeDragApp ? (
+                      <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
+                        <p className="text-sm font-semibold">{jobOf(activeDragApp)?.title || "Lowongan"}</p>
+                        <p className="text-xs text-muted-foreground">{jobOf(activeDragApp)?.company || "Perusahaan"}</p>
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+                {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
+                <div className="md:hidden space-y-3">
+                  {applications.map((app) => <AppListRow key={app.id} app={app} onOpen={() => setSelectedApp(app)} />)}
                 </div>
-              )}
-
-              {selectedApp.ai_notes && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                    <Bot className="h-4 w-4 text-[#0A5BE0]" />
-                    AI Strategy Notes
-                  </h4>
-                  <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap">
-                    {selectedApp.ai_notes}
-                  </div>
-                </div>
-              )}
-
-              {(selectedApp.status === "submitted" || selectedApp.status === "follow_up") &&
-                selectedApp.follow_up_scheduled &&
-                !selectedApp.follow_up_sent && (
-                <div className="rounded-xl bg-[#FEF3C7] border-2 border-[#FEF3C7] p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-[#92400E]" />
-                    <span className="text-sm font-semibold text-[#92400E]">
-                      {selectedApp.status === "follow_up" ? "Waktunya Follow-up" : "Pengingat Follow-up"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#92400E]">
-                    {selectedApp.status === "follow_up"
-                      ? "Sudah lewat batas follow-up ("
-                      : "Applify mengingatkanmu lewat Telegram pada "}
-                    {new Date(selectedApp.follow_up_scheduled).toLocaleDateString("id-ID", {
-                      weekday: "long", day: "numeric", month: "long",
-                    })}
-                    {selectedApp.status === "follow_up" ? "). " : ". "}
-                    Follow-up ke perusahaan kamu kirim sendiri; Applify tidak mengirim email follow-up.
-                  </p>
-                  <button
-                    onClick={() => handleFollowUp(selectedApp.id)}
-                    title="Hanya mencatat bahwa kamu sudah follow-up. Tidak ada email yang dikirim."
-                    className="mt-3 h-9 px-4 rounded-lg bg-[#92400E] text-white text-xs font-semibold hover:opacity-90 transition inline-flex items-center gap-1.5"
-                  >
-                    <Mail className="h-3.5 w-3.5" />
-                    Tandai Follow-up Sudah Kukirim
-                  </button>
-                </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                {applications.map((app) => <AppListRow key={app.id} app={app} onOpen={() => setSelectedApp(app)} />)}
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
+
+      {/* Detail lamaran: dialog Radix (Esc menutup, fokus terkunci di dalam, dibaca pembaca layar sebagai dialog) */}
+      <Dialog open={!!selectedApp} onOpenChange={(open) => { if (!open) setSelectedApp(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedApp && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 pr-6">
+                  <Bot className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" />
+                  {selectedJob?.title || "Lamaran"}
+                </DialogTitle>
+                <DialogDescription>{selectedJob?.company || "Perusahaan"}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${(statusConfig[selectedApp.status] ?? statusConfig.draft).color}`}>
+                    {applicationStatusLabel(selectedApp.status)}
+                  </span>
+                  {selectedApp.submitted_at && (
+                    <span className="text-xs text-muted-foreground">
+                      Dikirim {new Date(selectedApp.submitted_at).toLocaleDateString("id-ID")}
+                    </span>
+                  )}
+                  <label className="ml-auto flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Ubah status</span>
+                    <select
+                      value={selectedApp.status}
+                      onChange={(e) => moveApplication(selectedApp.id, e.target.value as ApplicationStatus)}
+                      className="min-h-11 rounded-lg border-2 border-[#999999] bg-white px-3 text-base md:text-sm"
+                    >
+                      {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{applicationStatusLabel(s)}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                    Surat Lamaran dari AI
+                  </h3>
+                  <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap leading-relaxed">
+                    {selectedApp.cover_letter}
+                  </div>
+                </div>
+
+                {selectedApp.tailored_skills?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                      <Zap className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                      Skill yang Disorot
+                    </h3>
+                    <ul className="flex flex-wrap gap-2">
+                      {selectedApp.tailored_skills.map((skill, i) => (
+                        <li key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
+                          {skill}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedApp.ai_notes && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                      <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                      Catatan Strategi AI
+                    </h3>
+                    <div className="rounded-xl bg-[#F5F5F5] p-4 text-sm whitespace-pre-wrap">
+                      {selectedApp.ai_notes}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedApp.status === "submitted" || selectedApp.status === "follow_up") &&
+                  selectedApp.follow_up_scheduled &&
+                  !selectedApp.follow_up_sent && (
+                  <div className="rounded-xl bg-[#FEF3C7] border-2 border-[#FEF3C7] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-4 w-4 text-[#92400E]" aria-hidden="true" />
+                      <span className="text-sm font-semibold text-[#92400E]">
+                        {selectedApp.status === "follow_up" ? "Saatnya tindak lanjut" : "Pengingat tindak lanjut"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#92400E]">
+                      {selectedApp.status === "follow_up"
+                        ? "Sudah lewat batas tindak lanjut ("
+                        : "Applify mengingatkanmu lewat Telegram pada "}
+                      {new Date(selectedApp.follow_up_scheduled).toLocaleDateString("id-ID", {
+                        weekday: "long", day: "numeric", month: "long",
+                      })}
+                      {selectedApp.status === "follow_up" ? "). " : ". "}
+                      Pesan tindak lanjut ke perusahaan kamu kirim sendiri; Applify tidak mengirim email tindak lanjut.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleFollowUp(selectedApp.id)}
+                      title="Hanya mencatat bahwa kamu sudah menghubungi perusahaan. Tidak ada email yang dikirim."
+                      className="mt-3 min-h-11 px-4 rounded-lg bg-[#92400E] text-white text-sm font-semibold hover:opacity-90 transition inline-flex items-center gap-1.5"
+                    >
+                      <Mail className="h-4 w-4" aria-hidden="true" />
+                      Tandai: Sudah Kutindaklanjuti
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

@@ -224,7 +224,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       setEnqueuing(true);
       setError("");
       await automationQueue.enqueueAutoApply(jobId);
-      toast.success("Agen akan mengisi formulir tanpa menekan kirim. Pantau di Applications.");
+      toast.success("Tugas masuk antrean. Agen akan mengisi formulir tanpa menekan kirim. Pantau di Lamaran Saya, bagian Antrean Agen.");
       onSuccess();
       onClose();
     } catch (err: any) {
