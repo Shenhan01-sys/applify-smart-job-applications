@@ -25,3 +25,11 @@ test("Lowongan: pemuatan ulang sesudah modal atau pemindai memakai kata kunci pe
   assert.doesNotMatch(src, /fetchJobs\(\)/, "fetchJobs() tanpa kata kunci mengosongkan hasil pencarian");
   assert.match(src, /onSuccess=\{\(\) => \{ fetchJobs\(searchQuery\)/);
 });
+
+test("Pemindai lowongan: Dealls bisa dipilih dan aktif bawaan, id sama dengan registri backend", () => {
+  const src = read("../src/components/AIJobScanner.tsx");
+  assert.match(src, /\{ name: 'Dealls', icon: '[^']+', id: 'dealls' \}/);
+  assert.match(src, /DEFAULT_PLATFORMS = \[[^\]]*'dealls'/);
+  const registry = read("../../backend/services/mcp-registry.ts");
+  assert.match(registry, /this\.register\('dealls'/);
+});

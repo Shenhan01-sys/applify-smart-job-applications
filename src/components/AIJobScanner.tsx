@@ -17,6 +17,7 @@ const PLATFORMS: Platform[] = [
   { name: 'JobStreet', icon: '📋', id: 'jobstreet' },
   { name: 'Glints', icon: '✨', id: 'glints' },
   { name: 'Kalibrr', icon: '🇮🇩', id: 'kalibrr' },
+  { name: 'Dealls', icon: '🤝', id: 'dealls' },
   { name: 'Greenhouse', icon: '🌱', id: 'greenhouse' },
   { name: 'Lever', icon: '🔄', id: 'lever' },
   { name: 'Ashby', icon: '⚡', id: 'ashby' },
@@ -27,7 +28,7 @@ const PLATFORMS: Platform[] = [
 
 // Default: sumber yang bisa diakses tanpa login dan punya papan default di backend.
 // LinkedIn butuh sesi browser; Workable belum punya papan default (config/job-boards.json).
-const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'greenhouse', 'lever', 'ashby', 'smartrecruiters']
+const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'dealls', 'greenhouse', 'lever', 'ashby', 'smartrecruiters']
 
 interface ScanStage {
   message: string
@@ -129,7 +130,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             <h2 className="text-lg font-bold">Pencarian Lowongan</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Cari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan sekaligus. Hasil diurutkan menurut kecocokan dengan skill di Profil Saya, jadi isi skill dulu supaya urutannya tepat.
+            Cari lowongan dari JobStreet, Glints, Kalibrr, Dealls, dan papan karier perusahaan sekaligus. Hasil diurutkan menurut kecocokan dengan skill di Profil Saya, jadi isi skill dulu supaya urutannya tepat.
           </p>
         </div>
         <Button
