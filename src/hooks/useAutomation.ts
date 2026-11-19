@@ -60,7 +60,7 @@ export function useAutomationSettings() {
       const data = await automationApi.getSettings()
       setSettings(data || {})
     } catch (error) {
-      toast.error('Failed to load automation settings')
+      toast.error(describeApiError(error, 'Pengaturan agen belum bisa dimuat.'))
     } finally {
       setLoading(false)
     }
@@ -71,10 +71,10 @@ export function useAutomationSettings() {
       setSaving(true)
       const updated = await automationApi.updateSettings({ ...settings, ...newSettings })
       setSettings(updated || { ...settings, ...newSettings })
-      toast.success('Settings saved successfully')
+      toast.success('Pengaturan tersimpan.')
       return true
     } catch (error) {
-      toast.error('Failed to save settings')
+      toast.error(describeApiError(error, 'Pengaturan belum tersimpan.'))
       return false
     } finally {
       setSaving(false)
@@ -223,11 +223,11 @@ export function useApprovalQueue() {
   const approve = async (id: string) => {
     try {
       await automationApi.approveApplication(id)
-      toast.success('Application approved!')
+      toast.success('Lamaran disetujui.')
       await loadPending()
       return true
     } catch (error) {
-      toast.error('Failed to approve application')
+      toast.error(describeApiError(error, 'Lamaran belum bisa disetujui.'))
       return false
     }
   }
@@ -235,11 +235,11 @@ export function useApprovalQueue() {
   const reject = async (id: string, reason?: string) => {
     try {
       await automationApi.rejectApplication(id, reason)
-      toast.success('Application rejected')
+      toast.success('Lamaran ditolak.')
       await loadPending()
       return true
     } catch (error) {
-      toast.error('Failed to reject application')
+      toast.error(describeApiError(error, 'Lamaran belum bisa ditolak.'))
       return false
     }
   }
@@ -247,7 +247,7 @@ export function useApprovalQueue() {
   const regenerate = async (id: string, instructions: string) => {
     try {
       const result = await automationApi.regenerateCoverLetter(id, instructions)
-      toast.success('Cover letter regenerated!')
+      toast.success('Surat lamaran ditulis ulang.')
       return result.cover_letter || ''
     } catch (error) {
       toast.error(describeApiError(error, 'Gagal menulis ulang surat lamaran.'))

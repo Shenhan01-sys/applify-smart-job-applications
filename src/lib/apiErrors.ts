@@ -82,13 +82,15 @@ function waitText(sec: number | undefined): string {
  * own wording ("Gagal membuat surat") for plain failures.
  */
 export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Coba lagi."): string {
+  // Build produksi tanpa VITE_API_URL: pesannya sudah ditulis untuk pengguna (lihat ApiConfigError).
+  if (err instanceof Error && (err as { code?: unknown }).code === "api_not_configured") return err.message;
   const e = parseApiError(err);
 
   switch (e.code) {
     case "quota_exhausted": {
       const q = e.quota;
       const used = q?.used !== undefined && q?.quota !== undefined ? ` (${q.used} dari ${q.quota} terpakai)` : "";
-      return `Kuota draf AI bulan ini sudah habis${used}. Kuota dihitung per bulan; tunggu bulan berikutnya atau pilih paket Pro.`;
+      return `Kuota draf AI bulan ini sudah habis${used}. Kuota dihitung per bulan dan akan direset bulan depan. Sementara itu kamu masih bisa melihat lowongan dan mengelola lamaran yang sudah ada.`;
     }
     case "rate_limited":
       return `Terlalu banyak permintaan AI dalam waktu singkat. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
@@ -110,6 +112,9 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
   if (e.status === 401) return "Sesi login berakhir atau belum masuk. Masuk lagi, lalu ulangi.";
   if (e.status === 429) return `Terlalu banyak permintaan. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
   if (e.serverMessage) return `${fallback} (${e.serverMessage})`;
-  if (e.rawText && /failed to fetch|networkerror|load failed/i.test(e.rawText)) return "Backend otomasi tidak dapat dihubungi. Coba lagi nanti.";
+  if (e.rawText && /failed to fetch|networkerror|load failed|network request failed/i.test(e.rawText)) {
+    return "Server Applify tidak dapat dihubungi. Periksa koneksi internetmu, lalu coba lagi. Bila koneksimu normal, server sedang bermasalah; coba lagi beberapa menit lagi.";
+  }
+  if (e.status !== undefined && e.status >= 500) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;
   return fallback;
 }

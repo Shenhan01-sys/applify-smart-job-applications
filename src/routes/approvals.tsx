@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
@@ -7,12 +7,14 @@ import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import EmailApplyPanel from "@/components/EmailApplyPanel";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
+import { approvalStatusLabel } from "@/lib/statusLabels";
+import { describeApiError } from "@/lib/apiErrors";
+import { ErrorState } from "@/components/ErrorState";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
 import {
   ShieldCheck, History, ChevronRight, Clock, CheckCircle2,
   XCircle, AlertCircle, Loader2, Sparkles
 } from "lucide-react";
-import { toast } from "sonner";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/approvals")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  head: () => ({ meta: [{ title: "Approvals — Applify" }] }),
+  head: () => ({ meta: [{ title: "Persetujuan Lamaran — Applify" }] }),
   component: ApprovalsPage,
 });
 
@@ -48,6 +50,7 @@ function ApprovalsPage() {
   const [tabKey, setTabKey] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   // Data for the "Kirim lewat Email" action on approved history rows.
@@ -68,6 +71,7 @@ function ApprovalsPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       if (isMockMode()) {
         setPendingApprovals(mockApprovals as unknown as ApprovalRequest[]);
@@ -88,7 +92,10 @@ function ApprovalsPage() {
         setEmailData(emptyEmailApplyData());
       });
     } catch (error) {
-      toast.error('Gagal memuat approvals');
+      // Tanpa data contoh: galat ditampilkan di halaman dengan tombol "Coba lagi".
+      setPendingApprovals([]);
+      setHistory([]);
+      setLoadError(describeApiError(error, 'Daftar persetujuan belum bisa dimuat.'));
     } finally {
       setLoading(false);
     }
@@ -124,9 +131,21 @@ function ApprovalsPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
+        <div className="flex items-center justify-center h-[60vh]" role="status" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
+          <span className="ml-3 text-muted-foreground">Memuat daftar persetujuan...</span>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AppShell>
+        <header className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Persetujuan Lamaran</h1>
+        </header>
+        <ErrorState title="Daftar persetujuan belum bisa dimuat" message={loadError} onRetry={loadData} />
       </AppShell>
     );
   }
@@ -136,17 +155,17 @@ function ApprovalsPage() {
   return (
     <AppShell>
       <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Application Approvals</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Persetujuan Lamaran</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Review dan approve aplikasi AI sebelum dikirim ke perusahaan
+          Periksa draf lamaran yang disiapkan AI. Tidak ada lamaran yang dikirim sebelum kamu menyetujuinya di sini.
         </p>
       </header>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
         {[
-          { key: 'pending' as const, label: 'Pending', icon: ShieldCheck, count: pendingApprovals.length },
-          { key: 'history' as const, label: 'History', icon: History, count: history.length },
+          { key: 'pending' as const, label: 'Menunggu', icon: ShieldCheck, count: pendingApprovals.length },
+          { key: 'history' as const, label: 'Riwayat', icon: History, count: history.length },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -179,19 +198,20 @@ function ApprovalsPage() {
               <div className="h-12 w-12 rounded-full bg-green-100 grid place-items-center mx-auto mb-4">
                 <CheckCircle2 className="h-6 w-6 text-green-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Semua sudah di-review!</h3>
+              <h3 className="text-lg font-semibold mb-2">Tidak ada yang perlu disetujui</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Tidak ada approval yang menunggu. Ajukan draf dari Job Feed (tombol "Ajukan ke Persetujuan"); permintaan baru muncul di halaman ini.
+                Semua permintaan sudah kamu periksa. Buat draf lamaran dari halaman Lowongan (tombol "Ajukan ke Persetujuan"); permintaan baru muncul di sini.
               </p>
+              <Link to="/jobs" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition">Cari lowongan</Link>
             </>
           ) : (
             <>
               <div className="h-12 w-12 rounded-full bg-black/[5%] grid place-items-center mx-auto mb-4">
                 <History className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Belum ada history</h3>
+              <h3 className="text-lg font-semibold mb-2">Belum ada riwayat</h3>
               <p className="text-sm text-muted-foreground">
-                Aplikasi yang di-approve atau di-reject akan muncul di sini.
+                Lamaran yang sudah kamu setujui atau tolak akan muncul di sini.
               </p>
             </>
           )}
@@ -211,24 +231,24 @@ function ApprovalsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-bold truncate">{request.job_title}</h3>
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.text}`}>
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${config.text}`}>
                         <StatusIcon className="h-3 w-3" />
-                        {request.status}
+                        {approvalStatusLabel(request.status)}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
                         <Sparkles className="h-3 w-3" />
                         {platformLabel(request.platform)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{request.company}</p>
-                    <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        Expires: {new Date(request.expires_at).toLocaleDateString('id-ID')}
+                        Berlaku sampai {new Date(request.expires_at).toLocaleDateString('id-ID')}
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <History className="h-3 w-3" />
-                        Created: {new Date(request.created_at).toLocaleDateString('id-ID')}
+                        Dibuat {new Date(request.created_at).toLocaleDateString('id-ID')}
                       </span>
                     </div>
                     {request.rejection_reason && (
@@ -252,9 +272,9 @@ function ApprovalsPage() {
                   {activeTab === 'pending' && (
                     <button
                       onClick={() => handleReview(request)}
-                      className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"
+                      className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"
                     >
-                      Review <ChevronRight className="h-3 w-3" />
+                      Periksa <ChevronRight className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>

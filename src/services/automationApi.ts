@@ -11,9 +11,12 @@ import {
   mockAiAnalysis,
 } from '@/mocks/mockData'
 
-const isMockMode = () => import.meta.env.VITE_MOCK_MODE === 'true'
+import { getApiBaseUrl, isMockMode } from '@/lib/appConfig'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+// Alamat server dibaca saat dipanggil. Di build produksi tanpa VITE_API_URL ini melempar ApiConfigError,
+// yang dijelaskan ke pengguna oleh describeApiError(). Localhost hanya dipakai saat `vite dev`.
+// Mode demo tidak memanggil server (data contoh dipakai), jadi tidak butuh alamat.
+const apiBase = () => (isMockMode() ? 'demo://tanpa-server' : getApiBaseUrl())
 
 async function getAuthHeaders() {
   const { data } = await supabase.auth.getSession()
@@ -24,40 +27,31 @@ async function getAuthHeaders() {
   }
 }
 
+/**
+ * Semua panggilan ke server otomasi lewat sini.
+ *
+ * `mockFn` hanya dipakai bila VITE_MOCK_MODE === 'true' (mode demo). Di luar mode demo, galat jaringan atau
+ * status non-2xx selalu dilempar ke pemanggil, termasuk untuk GET. Data contoh diam-diam akan membuat
+ * pengguna mengira lamaran, persetujuan, atau antrean palsu itu nyata.
+ */
 async function apiFetch<T>(
   url: string,
   options?: RequestInit,
   mockFn?: () => T,
   delay = 0,
-  readOnly = false,
 ): Promise<T> {
   if (isMockMode() && mockFn) {
     if (delay > 0) await new Promise(r => setTimeout(r, delay))
     return mockFn()
   }
-  // Only reads may fall back to placeholder data. A mocked "success" for approve/reject/queue/
-  // settings or for AI output would tell the user an action happened when nothing reached
-  // the backend, so those errors surface to the caller instead.
-  const method = (options?.method ?? 'GET').toUpperCase()
-  const canFallback = method === 'GET' || readOnly
-  try {
-    const res = await fetch(url, options)
-    if (!res.ok) {
-      // Keep the response text as the message (callers parse it) and add the status and Retry-After header,
-      // so describeApiError() can tell 401, 429 quota_exhausted, 429 rate_limited and 503 apart.
-      const retryAfter = Number(res.headers.get('Retry-After'))
-      throw new ApiError(res.status, await res.text(), Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
-    }
-    return res.json()
-  } catch (err) {
-    // Automation backend (Fastify) is optional/not-yet-hosted — degrade gracefully to
-    // placeholder data for reads instead of crashing the page.
-    if (mockFn && canFallback) {
-      console.warn(`[automationApi] backend unavailable for ${url}; using fallback data.`, err)
-      return mockFn()
-    }
-    throw err
+  const res = await fetch(url, options)
+  if (!res.ok) {
+    // Keep the response text as the message (callers parse it) and add the status and Retry-After header,
+    // so describeApiError() can tell 401, 429 quota_exhausted, 429 rate_limited and 503 apart.
+    const retryAfter = Number(res.headers.get('Retry-After'))
+    throw new ApiError(res.status, await res.text(), Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
   }
+  return res.json()
 }
 
 export interface AutomationSettings {
@@ -106,7 +100,7 @@ export const automationApi = {
   // Settings
   async getSettings(): Promise<AutomationSettings> {
     return apiFetch(
-      `${API_BASE_URL}/api/automation/settings`,
+      `${apiBase()}/api/automation/settings`,
       { headers: await getAuthHeaders() },
       () => mockAutomationSettings as AutomationSettings,
     )
@@ -114,7 +108,7 @@ export const automationApi = {
 
   async updateSettings(settings: Partial<AutomationSettings>) {
     return apiFetch(
-      `${API_BASE_URL}/api/automation/settings`,
+      `${apiBase()}/api/automation/settings`,
       {
         method: 'PUT',
         headers: await getAuthHeaders(),
@@ -127,7 +121,7 @@ export const automationApi = {
   // Job Search
   async searchJobs(params: { keywords?: string; location?: string; platforms?: string[] }) {
     return apiFetch(
-      `${API_BASE_URL}/api/automation/search`,
+      `${apiBase()}/api/automation/search`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -135,7 +129,6 @@ export const automationApi = {
       },
       () => ({ jobs: mockJobs, total: mockJobs.length }),
       1500,
-      true, // search is a read even though it is a POST
     )
   },
 
@@ -143,7 +136,7 @@ export const automationApi = {
   async getLogs(params?: { limit?: number; offset?: number; action?: string; status?: string }) {
     const query = new URLSearchParams(params as any).toString()
     return apiFetch(
-      `${API_BASE_URL}/api/automation/logs?${query}`,
+      `${apiBase()}/api/automation/logs?${query}`,
       { headers: await getAuthHeaders() },
       () => [],
     )
@@ -153,7 +146,7 @@ export const automationApi = {
   async getQueue(status?: string) {
     const query = status ? `?status=${status}` : ''
     return apiFetch(
-      `${API_BASE_URL}/api/automation/queue${query}`,
+      `${apiBase()}/api/automation/queue${query}`,
       { headers: await getAuthHeaders() },
       () => [],
     )
@@ -166,7 +159,7 @@ export const automationApi = {
   async getGmailStatus(): Promise<{ gmail: boolean } | null> {
     if (isMockMode()) return { gmail: true }
     try {
-      return await apiFetch<{ gmail: boolean }>(`${API_BASE_URL}/api/oauth/status`, { headers: await getAuthHeaders() })
+      return await apiFetch<{ gmail: boolean }>(`${apiBase()}/api/oauth/status`, { headers: await getAuthHeaders() })
     } catch (err) {
       console.warn('[automationApi] Gmail status unavailable:', err)
       return null
@@ -174,13 +167,17 @@ export const automationApi = {
   },
 
   /** Browser redirect that starts the Gmail OAuth flow (the backend route takes the user id as `uid`). */
-  getGmailConnectUrl(userId: string): string {
-    return `${API_BASE_URL}/api/oauth/google?uid=${encodeURIComponent(userId)}`
+  getGmailConnectUrl(userId: string): string | null {
+    try {
+      return `${apiBase()}/api/oauth/google?uid=${encodeURIComponent(userId)}`
+    } catch {
+      return null // alamat server belum diatur di build ini: tautannya disembunyikan, halaman tidak rusak
+    }
   },
 
   async addToQueue(jobType: string, payload: any, priority?: number) {
     return apiFetch(
-      `${API_BASE_URL}/api/automation/queue`,
+      `${apiBase()}/api/automation/queue`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -193,7 +190,7 @@ export const automationApi = {
   // Approvals
   async getPendingApprovals() {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/pending`,
+      `${apiBase()}/api/approvals/pending`,
       { headers: await getAuthHeaders() },
       () => mockApprovals,
     )
@@ -201,7 +198,7 @@ export const automationApi = {
 
   async getApproval(id: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/${id}`,
+      `${apiBase()}/api/approvals/${id}`,
       { headers: await getAuthHeaders() },
       () => mockApprovals.find(a => a.id === id) || mockApprovals[0],
     )
@@ -209,7 +206,7 @@ export const automationApi = {
 
   async createApproval(data: any) {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals`,
+      `${apiBase()}/api/approvals`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -222,7 +219,7 @@ export const automationApi = {
   /** Approve = consent to submit. `coverLetter` carries the user's edits from the review screen. */
   async approveApplication(id: string, coverLetter?: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/${id}/approve`,
+      `${apiBase()}/api/approvals/${id}/approve`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -234,7 +231,7 @@ export const automationApi = {
 
   async rejectApplication(id: string, reason?: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/${id}/reject`,
+      `${apiBase()}/api/approvals/${id}/reject`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ reason }) },
       () => ({ success: true, id, status: "rejected", reason }),
     )
@@ -242,7 +239,7 @@ export const automationApi = {
 
   async regenerateCoverLetter(id: string, instructions: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/${id}/regenerate`,
+      `${apiBase()}/api/approvals/${id}/regenerate`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ instructions }) },
       () => ({ success: true, id, cover_letter: mockAiAnalysis.coverLetter }),
       2000,
@@ -255,7 +252,7 @@ export const automationApi = {
    */
   async notifyApplicationStatus(applicationId: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/notifications/application-status`,
+      `${apiBase()}/api/notifications/application-status`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -268,7 +265,7 @@ export const automationApi = {
   async getApprovalHistory(params?: { limit?: number; offset?: number }) {
     const query = new URLSearchParams(params as any).toString()
     return apiFetch(
-      `${API_BASE_URL}/api/approvals/history?${query}`,
+      `${apiBase()}/api/approvals/history?${query}`,
       { headers: await getAuthHeaders() },
       () => mockApprovalHistory,
     )
@@ -277,7 +274,7 @@ export const automationApi = {
   // AI Pipeline — always mock with delay
   async generateCoverLetter(params: { jobTitle: string; company: string; jobDescription: string; userProfile: any }) {
     return apiFetch(
-      `${API_BASE_URL}/api/ai/cover-letter`,
+      `${apiBase()}/api/ai/cover-letter`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify(params) },
       () => ({ coverLetter: mockAiAnalysis.coverLetter }),
       2000,
@@ -286,7 +283,7 @@ export const automationApi = {
 
   async analyzeMatch(jobDescription: string, userSkills: string[]) {
     return apiFetch(
-      `${API_BASE_URL}/api/ai/analyze-match`,
+      `${apiBase()}/api/ai/analyze-match`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ jobDescription, userSkills }) },
       () => ({ matchScore: 85, acceptancePotential: 78, skillMatches: userSkills.map(s => ({ skill: s, matched: true, level: 80 })), skillGaps: [] }),
       1500,
@@ -295,7 +292,7 @@ export const automationApi = {
 
   async extractSkills(jobDescription: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/ai/extract-skills`,
+      `${apiBase()}/api/ai/extract-skills`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ jobDescription }) },
       () => ({ skills: ["TypeScript", "React", "Node.js", "PostgreSQL", "Docker"] }),
       1000,
@@ -304,7 +301,7 @@ export const automationApi = {
 
   async generateAnswer(question: string, questionType: string, options?: string[], jobDescription?: string, userProfile?: any) {
     return apiFetch(
-      `${API_BASE_URL}/api/ai/answer`,
+      `${apiBase()}/api/ai/answer`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ question, questionType, options, jobDescription, userProfile }) },
       () => ({ answer: `This is a simulated answer to: "${question}". I have extensive experience in this area and would be happy to discuss in more detail.`, confidence: 0.85 }),
       1000,
@@ -313,7 +310,7 @@ export const automationApi = {
 
   async fillForm(formFields: any[], jobData: any, userSettings: any, userProfile: any) {
     return apiFetch(
-      `${API_BASE_URL}/api/ai/fill-form`,
+      `${apiBase()}/api/ai/fill-form`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ formFields, jobData, userSettings, userProfile }) },
       () => ({ filled: formFields.map(f => ({ field: f.name || f.label, value: "Simulated answer from AI" })) }),
       1500,
@@ -323,7 +320,7 @@ export const automationApi = {
   // Platforms
   async getPlatforms() {
     return apiFetch(
-      `${API_BASE_URL}/api/platforms`,
+      `${apiBase()}/api/platforms`,
       undefined,
       () => mockPlatforms,
     )
@@ -332,7 +329,7 @@ export const automationApi = {
   // Rate Limits
   async getRateLimitStatus() {
     return apiFetch(
-      `${API_BASE_URL}/api/rate-limits/status`,
+      `${apiBase()}/api/rate-limits/status`,
       { headers: await getAuthHeaders() },
       () => mockRateLimits,
     )
@@ -340,7 +337,7 @@ export const automationApi = {
 
   async getPlatformLimit(platform: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/rate-limits/platform/${platform}`,
+      `${apiBase()}/api/rate-limits/platform/${platform}`,
       { headers: await getAuthHeaders() },
       () => mockRateLimits.platforms[platform as keyof typeof mockRateLimits.platforms] || { limit: 30, used: 0, remaining: 30 },
     )
@@ -349,7 +346,7 @@ export const automationApi = {
   // LinkedIn Session
   async getLinkedInSessionStatus() {
     return apiFetch(
-      `${API_BASE_URL}/api/linkedin/status`,
+      `${apiBase()}/api/linkedin/status`,
       { headers: await getAuthHeaders() },
       () => mockLinkedInStatus,
     )
@@ -357,7 +354,7 @@ export const automationApi = {
 
   async getLinkedInInstructions() {
     return apiFetch(
-      `${API_BASE_URL}/api/linkedin/instructions`,
+      `${apiBase()}/api/linkedin/instructions`,
       undefined,
       () => ({ instructions: "1. Go to linkedin.com\n2. Open DevTools (F12)\n3. Go to Application tab\n4. Copy cookies" }),
     )
@@ -365,7 +362,7 @@ export const automationApi = {
 
   async importLinkedInSession(cookies: any, userAgent?: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/linkedin/import`,
+      `${apiBase()}/api/linkedin/import`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ cookies, userAgent }) },
       () => ({ success: true, message: "Session imported (mock)" }),
       1000,
@@ -374,7 +371,7 @@ export const automationApi = {
 
   async verifyLinkedInSession() {
     return apiFetch(
-      `${API_BASE_URL}/api/linkedin/verify`,
+      `${apiBase()}/api/linkedin/verify`,
       { method: 'POST', headers: await getAuthHeaders() },
       () => ({ valid: true, sessionId: "mock-session", expiresAt: new Date(Date.now() + 86400000).toISOString() }),
       800,
@@ -383,7 +380,7 @@ export const automationApi = {
 
   async refreshLinkedInSession() {
     return apiFetch(
-      `${API_BASE_URL}/api/linkedin/refresh`,
+      `${apiBase()}/api/linkedin/refresh`,
       { method: 'POST', headers: await getAuthHeaders() },
       () => ({ success: true, message: "Session refreshed (mock)" }),
       1500,
@@ -393,7 +390,7 @@ export const automationApi = {
   // Sessions
   async getSessions() {
     return apiFetch(
-      `${API_BASE_URL}/api/sessions`,
+      `${apiBase()}/api/sessions`,
       { headers: await getAuthHeaders() },
       () => [{ platform: "linkedin", status: "active", expiresAt: new Date(Date.now() + 86400000).toISOString() }],
     )
@@ -401,7 +398,7 @@ export const automationApi = {
 
   async saveSession(platform: string, sessionData: any, expiresAt?: string) {
     return apiFetch(
-      `${API_BASE_URL}/api/sessions/${platform}`,
+      `${apiBase()}/api/sessions/${platform}`,
       { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ session_data: sessionData, expires_at: expiresAt }) },
       () => ({ success: true, platform }),
     )

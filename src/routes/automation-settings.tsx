@@ -11,6 +11,8 @@ import {
   AlertCircle, Sparkles, ChevronRight, Crown, Zap, Lock, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
+import { describeApiError } from "@/lib/apiErrors";
+import { ErrorState } from "@/components/ErrorState";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -37,6 +39,7 @@ function AutomationSettingsPage() {
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [showSaved, setShowSaved] = useState(false);
   const [tabKey, setTabKey] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
@@ -54,17 +57,18 @@ function AutomationSettingsPage() {
   }, []);
 
   const loadSettings = async () => {
+    setLoading(true);
+    setLoadError("");
     try {
       if (isMockMode()) {
         setSettings(mockAutomationSettings);
-        setLoading(false);
         return;
       }
       const data = await automationApi.getSettings();
       setSettings(data);
     } catch (error) {
-      toast.error('Gagal memuat settings');
-      setSettings(mockAutomationSettings);
+      // Jangan tampilkan pengaturan contoh: pengguna bisa menyimpannya menimpa pengaturan aslinya.
+      setLoadError(describeApiError(error, 'Pengaturan agen belum bisa dimuat.'));
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,7 @@ function AutomationSettingsPage() {
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (error) {
-      toast.error('Gagal menyimpan settings');
+      toast.error(describeApiError(error, 'Pengaturan belum tersimpan.'));
     } finally {
       setSaving(false);
     }
@@ -92,9 +96,21 @@ function AutomationSettingsPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" />
+        <div className="flex items-center justify-center h-[60vh]" role="status" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
+          <span className="ml-3 text-muted-foreground">Memuat pengaturan agen...</span>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AppShell>
+        <header className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Pengaturan Agen</h1>
+        </header>
+        <ErrorState title="Pengaturan agen belum bisa dimuat" message={loadError} onRetry={loadSettings} />
       </AppShell>
     );
   }

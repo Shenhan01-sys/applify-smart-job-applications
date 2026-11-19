@@ -1,0 +1,44 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  APPLICATION_STATUS_LABEL,
+  APPROVAL_STATUS_LABEL,
+  QUEUE_STATUS_LABEL,
+  applicationStatusLabel,
+  approvalStatusLabel,
+  isQueueActive,
+  queueStatusHint,
+  queueStatusLabel,
+  queueTypeLabel,
+} from "../src/lib/statusLabels.ts";
+
+test("setiap status approval, lamaran, dan antrean punya label Indonesia", () => {
+  for (const k of ["pending", "approved", "rejected", "expired"]) assert.ok(APPROVAL_STATUS_LABEL[k]);
+  for (const k of ["draft", "ready", "submitted", "follow_up", "responded", "closed"]) assert.ok(APPLICATION_STATUS_LABEL[k]);
+  for (const k of ["pending", "processing", "completed", "failed"]) assert.ok(QUEUE_STATUS_LABEL[k]);
+  // tidak ada label yang masih bahasa Inggris mentah
+  const all = [APPROVAL_STATUS_LABEL, APPLICATION_STATUS_LABEL, QUEUE_STATUS_LABEL].flatMap((m) => Object.values(m)).join(" | ");
+  assert.doesNotMatch(all, /\b(Pending|Approved|Rejected|Expired|Draft|Ready|Submitted|Follow-up|Responded|Closed|Processing|Completed|Failed)\b/);
+});
+
+test("status tidak dikenal tidak membuang kodenya dan tidak melempar", () => {
+  assert.equal(approvalStatusLabel("approved"), "Disetujui");
+  assert.match(approvalStatusLabel("aneh"), /Status tidak diketahui \(aneh\)/);
+  assert.equal(applicationStatusLabel(null), "Status tidak diketahui");
+  assert.equal(queueStatusLabel("processing"), "Sedang dikerjakan agen");
+  assert.equal(queueTypeLabel("apply"), "Isi formulir lowongan");
+  assert.equal(queueTypeLabel(undefined), "Tugas agen");
+});
+
+test("petunjuk antrean: apply selesai berarti berhenti sebelum kirim, bukan terkirim", () => {
+  assert.match(queueStatusHint("completed", "apply"), /sebelum tombol kirim/);
+  assert.doesNotMatch(queueStatusHint("completed", "apply"), /sudah terkirim/i);
+  assert.match(queueStatusHint("failed"), /mencoba lagi/);
+  assert.equal(queueStatusHint("xyz"), "");
+});
+
+test("isQueueActive: hanya pending dan processing", () => {
+  assert.equal(isQueueActive("pending"), true);
+  assert.equal(isQueueActive("processing"), true);
+  for (const s of ["completed", "failed", undefined, null]) assert.equal(isQueueActive(s as any), false);
+});

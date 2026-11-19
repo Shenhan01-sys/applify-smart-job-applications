@@ -126,7 +126,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
             ) : gmailConnected === false ? (
               <>
                 <span className="inline-flex items-center gap-1 text-amber-800"><AlertCircle className="h-3.5 w-3.5" /> Gmail belum terhubung.</span>
-                {user?.id && <a href={automationApi.getGmailConnectUrl(user.id)} className="font-semibold text-[#0A5BE0] hover:underline">Hubungkan Gmail</a>}
+                {user?.id && automationApi.getGmailConnectUrl(user.id) && <a href={automationApi.getGmailConnectUrl(user.id) ?? undefined} className="font-semibold text-[#0A5BE0] hover:underline">Hubungkan Gmail</a>}
               </>
             ) : (
               <span className="inline-flex items-center gap-1 text-muted-foreground"><AlertCircle className="h-3.5 w-3.5" /> Status Gmail tidak diketahui.</span>

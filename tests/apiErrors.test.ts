@@ -11,7 +11,9 @@ test("429 quota_exhausted: pesan kuota habis dengan hitungan terpakai dari field
   const msg = describeApiError(err, "Gagal membuat surat.");
   assert.match(msg, /Kuota draf AI bulan ini sudah habis/);
   assert.match(msg, /10 dari 10 terpakai/);
-  assert.match(msg, /Pro/);
+  // langganan disembunyikan dari UAT: pesan menjelaskan reset bulan depan, bukan menyuruh membeli paket
+  assert.match(msg, /direset bulan depan/);
+  assert.doesNotMatch(msg, /Pro|paket|upgrade/i);
 });
 
 test("429 quota_exhausted tanpa field quota tetap menghasilkan pesan yang jelas", () => {
@@ -66,8 +68,10 @@ test("approval_required (403) menyebut galat server", () => {
 
 test("galat tanpa kode: memakai teks cadangan layar dan menambahkan pesan server bila ada", () => {
   assert.equal(describeApiError(new ApiError(500, body({ error: "boom" })), "Gagal membuat surat"), "Gagal membuat surat (boom)");
-  assert.equal(describeApiError(new ApiError(500, "<html>bad gateway</html>"), "Gagal membuat surat"), "Gagal membuat surat");
-  assert.match(describeApiError(new TypeError("Failed to fetch"), "Gagal"), /tidak dapat dihubungi/);
+  assert.match(describeApiError(new ApiError(500, "<html>bad gateway</html>"), "Gagal membuat surat."), /^Gagal membuat surat\. Server sedang bermasalah/);
+  const offline = describeApiError(new TypeError("Failed to fetch"), "Gagal");
+  assert.match(offline, /tidak dapat dihubungi/);
+  assert.match(offline, /Periksa koneksi internetmu/);
   assert.equal(describeApiError(undefined, "Gagal"), "Gagal");
   assert.equal(describeApiError(null), "Terjadi kesalahan. Coba lagi.");
 });
