@@ -144,9 +144,12 @@ function RadarChart({ skills }: { skills: { name: string; value: number }[] }) {
 
   const polyPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
+  // Ringkasan teks untuk pembaca layar: nilai tiap skill ada di label, bukan hanya di bentuk grafik.
+  const summary = skills.map((sk) => `${sk.name} ${Math.round(sk.value)} persen`).join(", ");
+
   return (
     <div className="flex items-center justify-center">
-      <svg width={size} height={size}>
+      <svg width={size} height={size} role="img" aria-label={`Grafik radar kecocokan skill: ${summary}`}>
         {/* Background circles */}
         {[25, 50, 75, 100].map((level) => (
           <circle
@@ -201,8 +204,8 @@ function RadarChart({ skills }: { skills: { name: string; value: number }[] }) {
               y={y}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-[8px] fill-[#666666]"
-              style={{ fontSize: 8 }}
+              className="fill-[#666666]"
+              style={{ fontSize: 10 }}
             >
               {skill.name}
             </text>
@@ -351,13 +354,16 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onToggleSave}
-              className="h-9 w-9 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
+              aria-pressed={isSaved}
+              aria-label={isSaved ? `Hapus ${job.title} dari lowongan tersimpan` : `Simpan lowongan ${job.title}`}
+              className="h-11 w-11 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
             >
               {isSaved ? (
-                <BookmarkCheck className="h-4 w-4 text-[#0A5BE0]" />
+                <BookmarkCheck className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
               ) : (
-                <Bookmark className="h-4 w-4 text-[#666666]" />
+                <Bookmark className="h-4 w-4 text-[#666666]" aria-hidden="true" />
               )}
             </button>
           </div>
@@ -503,10 +509,12 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
       )}
 
       {/* Footer Actions */}
-      <div className="border-t border-[#E0E0E0] p-4 flex items-center gap-3">
+      <div className="border-t border-[#E0E0E0] p-4 flex flex-wrap items-center gap-3">
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
-          className="h-10 px-4 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition flex items-center gap-1.5"
+          aria-expanded={expanded}
+          className="min-h-11 px-4 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition flex items-center gap-1.5"
         >
           {expanded ? (
             <>
@@ -521,8 +529,9 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           )}
         </button>
         <button
+          type="button"
           onClick={onApply}
-          className="flex-1 h-10 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+          className="flex-1 min-h-11 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
         >
           <Send className="h-4 w-4" />
           AI Apply Sekarang
@@ -532,9 +541,10 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             href={job.external_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 w-10 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
+            aria-label={`Buka lowongan ${job.title} di situs asal (tab baru)`}
+            className="h-11 w-11 shrink-0 rounded-lg border border-[#999999] grid place-items-center hover:border-[#0A5BE0] transition"
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
         )}
       </div>

@@ -3,9 +3,15 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { AuthProvider } from "./contexts/AuthContext";
+import { DefaultErrorComponent, DefaultNotFoundComponent } from "./components/RouterFallbacks";
 import "./styles.css";
 
-const router = createRouter({ routeTree });
+const router = createRouter({
+  routeTree,
+  // Layar cadangan berbahasa Indonesia untuk error tak terduga dan alamat yang tidak ada.
+  defaultErrorComponent: DefaultErrorComponent,
+  defaultNotFoundComponent: DefaultNotFoundComponent,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

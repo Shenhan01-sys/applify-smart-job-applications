@@ -82,8 +82,10 @@ test("Job Feed: contoh lowongan hanya di mode demo; tombol Generate Demo Jobs da
 
 test("Job Feed: label kuota memakai get_quota_status (draf per bulan), bukan daily_apply_quota sebagai 'apply tersisa'", () => {
   const page = read("../src/routes/jobs.tsx");
-  assert.match(page, /supabase\.rpc\("get_quota_status", \{ p_user_id: user\.id \}\)/);
-  assert.match(page, /draf tersisa bulan ini/);
+  // Kuota dibaca lewat hook useSubscription, yang memanggil RPC get_quota_status.
+  assert.match(page, /useSubscription\(\)/);
+  assert.match(read("../src/hooks/useSubscription.ts"), /supabase\.rpc\("get_quota_status", \{ p_user_id: user\.id \}\)/);
+  assert.match(page, /draf AI tersisa bulan ini/);
   assert.doesNotMatch(page, /apply tersisa/);
   assert.doesNotMatch(page, /select\("ai_model_tier, daily_apply_quota"\)/);
 });

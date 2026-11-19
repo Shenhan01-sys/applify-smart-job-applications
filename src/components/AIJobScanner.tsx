@@ -4,6 +4,7 @@ import { useJobSearch } from '@/hooks/useAutomation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { describeApiError } from '@/lib/apiErrors'
 
 interface Platform {
   name: string
@@ -52,7 +53,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
   const startScan = async () => {
     if (selectedPlatforms.length === 0) {
-      toast.error('Please select at least one platform')
+      toast.error('Pilih minimal satu situs lowongan dulu.')
       return
     }
 
@@ -62,51 +63,58 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
     try {
       // Stage 1: Initialize
-      addStage('🤖 Memulai AI Job Agent v2.1...', 'info')
+      addStage('Memulai pencarian...', 'info')
       setProgress(10)
       await sleep(500)
 
-      addStage(`📡 Menghubungkan ke ${selectedPlatforms.length} platform...`, 'info')
+      addStage(`Menghubungi ${selectedPlatforms.length} situs lowongan...`, 'info')
       setProgress(20)
       await sleep(500)
 
       // Stage 2: Search
-      addStage('🔍 Mencari lowongan...', 'info')
-      const { groups: searchResults, total, stats } = await searchJobs({
+      addStage('Mencari lowongan...', 'info')
+      const { groups: searchResults, total, stats, failed } = await searchJobs({
         platforms: selectedPlatforms,
       })
 
       setProgress(60)
 
       // Ringkasan per sumber dari backend (jumlah lolos filter / error)
-      const failed = stats.filter((s) => s.errors.length > 0 && s.afterFilter === 0).map((s) => s.platform)
-      if (failed.length > 0) {
-        addStage(`⚠️ Sumber tidak merespons: ${failed.join(', ')}`, 'error')
+      const unresponsive = stats.filter((s) => s.errors.length > 0 && s.afterFilter === 0).map((s) => s.platform)
+      if (unresponsive.length > 0) {
+        addStage(`Situs yang tidak merespons: ${unresponsive.join(', ')}`, 'error')
+      }
+
+      if (failed) {
+        // Penyebab sudah ditampilkan sebagai toast oleh useJobSearch; jangan menulis "tidak ada lowongan" untuk permintaan yang gagal.
+        addStage('Pencarian gagal. Periksa koneksi lalu coba lagi.', 'error')
+        setIsScanning(false)
+        return
       }
 
       if (total === 0) {
-        addStage('⚠️ Tidak ada lowongan ditemukan', 'error')
+        addStage('Pencarian selesai, tetapi tidak ada lowongan yang cocok. Coba pilih lebih banyak situs lowongan.', 'error')
         setIsScanning(false)
         return
       }
 
       // Stage 3: tahap yang benar-benar dikerjakan backend (job-aggregation.service.ts)
-      addStage(`🧹 Menyaring lokasi & menghapus duplikat dari ${searchResults.length} sumber...`, 'analysis')
+      addStage(`Menyaring lokasi dan menghapus duplikat dari ${searchResults.length} sumber...`, 'analysis')
       setProgress(80)
       await sleep(600)
 
-      addStage('📊 Mengurutkan berdasarkan skor relevansi terhadap kata kunci & skill profil...', 'analysis')
+      addStage('Mengurutkan berdasarkan kecocokan dengan kata kunci dan skill di profilmu...', 'analysis')
       setProgress(95)
       await sleep(600)
 
       setProgress(100)
-      addStage(`🎉 Selesai! ${total} lowongan ditemukan & diperingkat`, 'success')
+      addStage(`Selesai. ${total} lowongan ditemukan dan diurutkan.`, 'success')
       await sleep(1000)
 
       onComplete()
     } catch (error) {
-      addStage('❌ Terjadi kesalahan saat scanning', 'error')
-      toast.error('Scanning failed. Please try again.')
+      addStage('Terjadi kesalahan saat mencari lowongan.', 'error')
+      toast.error(describeApiError(error, 'Pencarian lowongan gagal. Coba lagi.'))
     } finally {
       setIsScanning(false)
     }
@@ -117,43 +125,45 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Brain className="h-5 w-5 text-[#0A5BE0]" />
-            <h2 className="text-lg font-bold">AI Job Scanner</h2>
+            <Brain className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" />
+            <h2 className="text-lg font-bold">Pencarian Lowongan</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Cari lowongan dari JobStreet, Glints, Kalibrr & papan karier perusahaan (ATS) sekaligus
+            Cari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan sekaligus. Hasil diurutkan menurut kecocokan dengan skill di Profil Saya, jadi isi skill dulu supaya urutannya tepat.
           </p>
         </div>
         <Button
           onClick={startScan}
           disabled={isScanning || selectedPlatforms.length === 0}
-          className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center gap-2 min-h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isScanning || loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           ) : (
-            <Radar className="h-4 w-4" />
+            <Radar className="h-4 w-4" aria-hidden="true" />
           )}
-          {isScanning || loading ? 'Mencari Lowongan...' : 'Scan Job Sekarang'}
+          {isScanning || loading ? 'Mencari lowongan...' : 'Cari Sekarang'}
         </Button>
       </div>
 
       {/* Platform Selection */}
       <div className="mb-6">
-        <p className="text-sm font-medium mb-3">Pilih Platform:</p>
-        <div className="flex flex-wrap gap-2">
+        <p id="label-situs" className="text-sm font-medium mb-3">Pilih situs lowongan:</p>
+        <div role="group" aria-labelledby="label-situs" className="flex flex-wrap gap-2">
           {PLATFORMS.map((platform) => (
             <button
               key={platform.id}
+              type="button"
               onClick={() => togglePlatform(platform.id)}
               disabled={isScanning}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+              aria-pressed={selectedPlatforms.includes(platform.id)}
+              className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
                 selectedPlatforms.includes(platform.id)
                   ? 'bg-[#0A5BE0] text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } disabled:opacity-50`}
             >
-              <span>{platform.icon}</span>
+              <span aria-hidden="true">{platform.icon}</span>
               <span>{platform.name}</span>
             </button>
           ))}
@@ -163,7 +173,14 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       {(isScanning || loading) && (
         <div className="space-y-4">
           {/* Progress bar */}
-          <div className="h-2 bg-[#EFEFEF] rounded-full overflow-hidden">
+          <div
+            role="progressbar"
+            aria-label="Kemajuan pencarian"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+            className="h-2 bg-[#EFEFEF] rounded-full overflow-hidden"
+          >
             <div
               className="h-full bg-[#0A5BE0] rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
@@ -189,7 +206,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                       : 'border-[#E0E0E0]'
                   }`}
                 >
-                  <div className="text-2xl mb-1">{platform.icon}</div>
+                  <div className="text-2xl mb-1" aria-hidden="true">{platform.icon}</div>
                   <div className="text-xs font-medium truncate">{platform.name}</div>
                   {platformResult && (
                     <div className="text-xs text-[#0A5BE0] font-bold mt-1">
@@ -197,7 +214,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
                     </div>
                   )}
                   {isScanning && !platformResult && isSelected && (
-                    <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0A5BE0]" />
+                    <Loader2 className="h-3 w-3 animate-spin mx-auto mt-1 text-[#0A5BE0]" aria-label="Sedang dicari" />
                   )}
                 </div>
               )
@@ -205,7 +222,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
           </div>
 
           {/* Scan stages log */}
-          <div className="rounded-xl bg-[#F5F5F5] p-4 h-40 overflow-hidden">
+          <div role="status" aria-live="polite" className="rounded-xl bg-[#F5F5F5] p-4 h-40 overflow-hidden">
             <div className="space-y-2">
               {stages.map((stage, i) => (
                 <div
@@ -230,8 +247,8 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
       {totalJobs > 0 && !isScanning && !loading && (
         <div className="flex items-center justify-center gap-2 py-4 text-[#0A5BE0] font-semibold">
-          <Sparkles className="h-5 w-5" />
-          <span>{totalJobs} lowongan berhasil ditemukan!</span>
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+          <span>{totalJobs} lowongan ditemukan.</span>
         </div>
       )}
     </div>
