@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
@@ -7,10 +7,11 @@ import {
 } from "@/services/greenCareerService";
 import {
   Leaf, Loader2, ArrowLeft, ArrowRight, AlertCircle, Shield, Building2, Bot,
-  CheckCircle2, Send, GraduationCap, TrendingUp,
+  CheckCircle2, Send, GraduationCap, TrendingUp, ExternalLink, Briefcase,
 } from "lucide-react";
-
-const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
+import { describeError } from "@/lib/authErrors";
+import { isMockMode } from "@/lib/appConfig";
+import { ErrorState } from "@/components/ErrorState";
 
 export const Route = createFileRoute("/green-career")({
   beforeLoad: async () => {
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/green-career")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  head: () => ({ meta: [{ title: "Green Career — Applify" }] }),
+  head: () => ({ meta: [{ title: "Karier Hijau — Applify" }] }),
   component: GreenCareerPage,
 });
 
@@ -35,11 +36,17 @@ function GreenCareerPage() {
   const [result, setResult] = useState<AssessmentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Kegagalan memuat daftar dipisah dari galat asesmen: daftar gagal berarti layar utama menampilkan "Coba lagi".
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => { load(); }, []);
   const load = async () => {
-    try { setLoading(true); setJobs(await greenCareerService.listGreenJobs()); }
-    catch (e: any) { setError(e.message); } finally { setLoading(false); }
+    try {
+      setLoading(true); setLoadError("");
+      setJobs(await greenCareerService.listGreenJobs());
+    } catch (e) {
+      setLoadError(describeError(e, "Daftar lowongan karier hijau belum bisa dimuat."));
+    } finally { setLoading(false); }
   };
 
   const startAssessment = async (j: GreenJob) => {
@@ -47,7 +54,7 @@ function GreenCareerPage() {
       setBusy(true); setError(""); setJob(j);
       const res = await greenCareerService.startAssessment(j.id);
       setAssessmentId(res.assessmentId); setQuestions(res.questions); setAnswers({}); setView("questions");
-    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+    } catch (e) { setError(describeError(e, "Asesmen belum bisa dimulai. Coba lagi sebentar lagi.")); } finally { setBusy(false); }
   };
 
   const submit = async () => {
@@ -56,7 +63,11 @@ function GreenCareerPage() {
       const payload = questions.map((q) => ({ id: q.id, question: q.question, answer: answers[q.id] ?? "" }));
       const r = await greenCareerService.submitAssessment(assessmentId, payload);
       setResult(r); setView("result");
-    } catch (e: any) { setError(e.message); setView("questions"); }
+    } catch (e) {
+      // Jawaban tetap tersimpan di layar, jadi pengguna bisa mengirim ulang tanpa mengetik lagi.
+      setError(describeError(e, "Jawabanmu belum bisa dinilai. Jawabanmu masih ada di sini, coba kirim lagi."));
+      setView("questions");
+    }
   };
 
   const reset = () => { setView("list"); setJob(null); setResult(null); setQuestions([]); setAnswers({}); setError(""); };
@@ -66,8 +77,8 @@ function GreenCareerPage() {
     <AppShell>
       <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
         {error && (
-          <div className="w-full rounded-2xl bg-[#C0341A]/[6%] border-2 border-[#C0341A]/30 p-3 text-sm text-[#C0341A] mb-5 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+          <div role="alert" className="w-full rounded-2xl bg-[#C0341A]/[6%] border-2 border-[#C0341A]/30 p-3 text-sm text-[#C0341A] mb-5 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> {error}
           </div>
         )}
 
@@ -75,11 +86,17 @@ function GreenCareerPage() {
           <>
             <NeuralEcoHeader />
             {loading ? (
-              <div className="flex justify-center py-16 w-full"><Loader2 className="h-7 w-7 animate-spin text-brand-emerald" /></div>
+              <div role="status" className="flex justify-center py-16 w-full"><Loader2 className="h-7 w-7 animate-spin text-brand-emerald" aria-label="Memuat" /></div>
+            ) : loadError ? (
+              <ErrorState className="w-full" title="Lowongan karier hijau belum bisa dimuat" message={loadError} onRetry={load} />
             ) : jobs.length === 0 ? (
-              <div className="glass-solid rounded-3xl w-full text-center py-16 text-muted-foreground text-sm">
-                <Leaf className="h-8 w-8 mx-auto text-brand-emerald mb-3" />
-                Belum ada lowongan Green Career aktif. Agen kami terus meneliti perusahaan berdampak.
+              <div className="glass-solid rounded-3xl w-full text-center py-16 px-4 text-muted-foreground text-sm">
+                <Leaf className="h-8 w-8 mx-auto text-brand-emerald mb-3" aria-hidden="true" />
+                <p>Belum ada lowongan karier hijau yang tersimpan.</p>
+                <p className="mt-1">Sambil menunggu, kamu bisa mencari lowongan biasa di halaman Lowongan.</p>
+                <Link to="/jobs" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-6 text-sm font-semibold text-white hover:bg-neutral-800">
+                  Cari lowongan
+                </Link>
               </div>
             ) : (
               <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-0 animate-fade-up">
@@ -95,7 +112,7 @@ function GreenCareerPage() {
 
         {view === "analyzing" && <AnalyzingDiorama />}
 
-        {view === "result" && result && <ResultView result={result} onBack={reset} />}
+        {view === "result" && result && <ResultView result={result} job={job} onBack={reset} />}
       </div>
     </AppShell>
   );
@@ -109,11 +126,11 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
   return (
     <div className="glass-solid rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-300 group">
       <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 bg-neutral-100 border-2 border-neutral-300 rounded-xl flex items-center justify-center text-neutral-500"><Building2 className="w-5 h-5" /></div>
+        <div className="w-10 h-10 bg-neutral-100 border-2 border-neutral-300 rounded-xl flex items-center justify-center text-neutral-500"><Building2 className="w-5 h-5" aria-hidden="true" /></div>
         {typeof esg === "number" && (
           <div className="flex flex-col items-end">
             <span className="font-mono text-xl font-extrabold text-brand-emerald">{esg}</span>
-            <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">ESG Score</span>
+            <span className="text-xs font-semibold text-neutral-500">Skor hijau (perkiraan AI)</span>
           </div>
         )}
       </div>
@@ -121,23 +138,23 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
       <p className="font-sans text-sm text-neutral-500 mt-1">{job.company}</p>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-4">
-          {tags.slice(0, 3).map((tag) => <span key={tag} className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-[9px] font-bold uppercase border-2 border-emerald-300">{tag}</span>)}
+          {tags.slice(0, 3).map((tag) => <span key={tag} className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-xs font-bold border-2 border-emerald-300">{tag}</span>)}
         </div>
       )}
       <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-3 mt-auto">
         {typeof match === "number" && (
           <>
             <div className="flex justify-between items-center text-xs">
-              <span className="font-sans font-semibold text-neutral-600">AI Match Rate</span>
+              <span className="font-sans font-semibold text-neutral-600">Kecocokan dengan profilmu</span>
               <span className="font-mono font-bold text-neutral-900">{match}%</span>
             </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden"><div className="h-full bg-neutral-800 rounded-full" style={{ width: `${match}%` }} /></div>
+            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden" aria-hidden="true"><div className="h-full bg-neutral-800 rounded-full" style={{ width: `${match}%` }} /></div>
           </>
         )}
-        <button onClick={onStart} disabled={busy} className="w-full mt-2 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Ikuti Asesmen <ArrowRight className="w-3.5 h-3.5" /></>}
+        <button type="button" onClick={onStart} disabled={busy} aria-label={`Ikuti asesmen kesiapan untuk ${job.title} di ${job.company}`} className="w-full mt-2 min-h-11 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <>Ikuti Asesmen <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
         </button>
-        <p className="text-[9px] text-neutral-400 text-center">Rp15.000/sesi · opsional · refund 50% bila tak lolos</p>
+        <p className="text-xs text-neutral-500 text-center">Opsional dan tanpa biaya. Hasilnya hanya untuk kamu.</p>
       </div>
     </div>
   );
@@ -168,27 +185,27 @@ function NeuralEcoHeader() {
   return (
     <div className="w-full bg-[#0A0A0A] rounded-[2rem] p-8 lg:p-12 border-4 border-neutral-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between min-h-[300px] mb-12">
       <div className="relative z-10 md:w-1/2 flex flex-col items-start gap-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/50 border-2 border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase tracking-widest"><Leaf className="w-3.5 h-3.5" /> Eksklusif</div>
-        <h1 className="font-display text-3xl md:text-5xl font-extrabold text-white leading-tight">Ekosistem <span className="text-brand-emerald">Green Career.</span></h1>
-        <p className="font-sans text-neutral-400 text-sm md:text-base leading-relaxed">Applify memprioritaskan perusahaan ber-ESG tinggi. Lakukan asesmen AI otonom untuk memvalidasi kesiapan kompetensimu sebelum melamar.</p>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/50 border-2 border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold uppercase tracking-widest"><Leaf className="w-3.5 h-3.5" aria-hidden="true" /> Karier Hijau</div>
+        <h1 className="font-display text-3xl md:text-5xl font-extrabold text-white leading-tight">Lowongan <span className="text-brand-emerald">karier hijau.</span></h1>
+        <p className="font-sans text-neutral-300 text-sm md:text-base leading-relaxed">Daftar lowongan dari perusahaan yang ditandai AI bergerak di bidang lingkungan atau berdampak sosial positif. Penandaan ini perkiraan AI dari nama perusahaan dan peran, bukan sertifikasi. Kamu bisa mengikuti asesmen singkat untuk melihat kesiapanmu sebelum melamar.</p>
         <div className="mt-4 flex flex-col gap-2">
           <div className="flex items-center gap-2 bg-neutral-900/80 px-3 py-2 rounded-lg border-2 border-neutral-800 w-fit">
-            <Shield className="w-4 h-4 text-brand-emerald" />
-            <span className="text-[10px] text-neutral-300 font-sans">AI menilai substansi murni, bukan wajah/emosi.</span>
+            <Shield className="w-4 h-4 text-brand-emerald" aria-hidden="true" />
+            <span className="text-xs text-neutral-300 font-sans">AI menilai isi jawaban tertulismu, bukan latar belakang pribadi.</span>
           </div>
-          <p className="text-[10px] font-mono text-neutral-500 ml-1">*Commitment fee Rp15.000/sesi asesmen (opsional, menutupi biaya inferensi AI).</p>
+          <p className="text-xs text-neutral-400 ml-1">Asesmen opsional dan tanpa biaya. Jawabanmu disimpan di akunmu.</p>
         </div>
       </div>
 
-      <div className="relative w-[340px] h-[240px] mt-10 md:mt-0 opacity-90 md:opacity-100 flex items-center justify-center">
-        <svg viewBox="0 0 240 170" className="w-full h-full overflow-visible drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+      <div aria-hidden="true" className="relative w-[340px] max-w-full h-[240px] mt-10 md:mt-0 opacity-90 md:opacity-100 flex items-center justify-center">
+        <svg viewBox="0 0 240 170" aria-hidden="true" className="w-full h-full overflow-visible drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">
           <g stroke="#10b981" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.2" filter="blur(3px)">{ECO_PATHS.map((d, i) => <path key={i} d={d} />)}</g>
           <g stroke="#10b981" strokeWidth="4" fill="none" strokeLinecap="round">{ECO_PATHS.map((d, i) => <path key={i} d={d} className={`animate-draw-main ${ECO_DELAYS[i]}`} />)}</g>
         </svg>
         {ECO_NODES.map((n) => (
           <div key={n.t} className={`absolute ${n.pos} animate-popUI ${n.d}`}>
             <div className={`shadow-sm flex items-center gap-1.5 px-2 py-0.5 rounded border ${n.lime ? "bg-brand-emerald border-emerald-400 shadow-[0_0_10px_#10b981]" : "bg-neutral-900 border-brand-emerald"}`}>
-              <span className={`font-display font-bold text-[8px] uppercase ${n.lime ? "text-[#0A0A0A]" : "text-white"}`}>{n.t}</span>
+              <span className={`font-display font-bold text-xs uppercase ${n.lime ? "text-[#0A0A0A]" : "text-white"}`}>{n.t}</span>
             </div>
           </div>
         ))}
@@ -205,35 +222,35 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
   const answered = questions.filter((q) => (answers[q.id] ?? "").trim().length > 0).length;
   return (
     <div className="w-full max-w-2xl opacity-0 animate-fade-up">
-      <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"><ArrowLeft className="h-4 w-4" /> Kembali</button>
+      <button type="button" onClick={onBack} className="min-h-11 text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Kembali</button>
       <div className="glass-solid rounded-3xl p-5 mb-5 flex items-center gap-4">
         <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center shadow-lg border-2 border-neutral-700"><Bot className="w-6 h-6" /></div>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg font-bold text-neutral-900 leading-tight">Asesmen Kesiapan</h3>
           <p className="font-sans text-sm text-neutral-500 truncate">{job?.title} · {job?.company}</p>
         </div>
-        <div className="text-right shrink-0"><p className="font-mono text-sm font-bold text-brand-emerald">{answered}/{questions.length}</p><p className="text-[10px] uppercase tracking-wider text-neutral-400">terjawab</p></div>
+        <div className="text-right shrink-0"><p className="font-mono text-sm font-bold text-brand-emerald">{answered}/{questions.length}</p><p className="text-xs text-neutral-500">terjawab</p></div>
       </div>
       <div className="space-y-4">
         {questions.map((q, i) => (
           <div key={q.id} className="glass-solid rounded-3xl p-5">
-            <p className="font-medium text-sm mb-3"><span className="text-brand-emerald font-bold mr-1">{i + 1}.</span>{q.question}</p>
+            <p id={`pertanyaan-${q.id}`} className="font-medium text-sm mb-3"><span className="text-brand-emerald font-bold mr-1">{i + 1}.</span>{q.question}</p>
             {q.type === "mcq" && q.options ? (
-              <div className="space-y-2">
+              <div role="radiogroup" aria-labelledby={`pertanyaan-${q.id}`} className="space-y-2">
                 {q.options.map((opt, oi) => (
-                  <label key={oi} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer text-sm transition ${answers[q.id] === opt ? "border-brand-emerald bg-emerald-50" : "border-neutral-200 hover:border-emerald-300"}`}>
+                  <label key={oi} className={`flex min-h-11 items-center gap-3 p-3 rounded-xl border cursor-pointer text-sm transition ${answers[q.id] === opt ? "border-brand-emerald bg-emerald-50" : "border-neutral-200 hover:border-emerald-300"}`}>
                     <input type="radio" name={q.id} value={opt} checked={answers[q.id] === opt} onChange={() => setAnswers((p) => ({ ...p, [q.id]: opt }))} className="accent-[#10B981]" />{opt}
                   </label>
                 ))}
               </div>
             ) : (
-              <textarea rows={3} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Jawabanmu..." className="w-full p-3 rounded-xl border-2 border-neutral-300 bg-white text-sm resize-none focus:outline-none focus:border-brand-emerald" />
+              <textarea rows={3} aria-labelledby={`pertanyaan-${q.id}`} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Jawabanmu..." className="w-full p-3 rounded-xl border-2 border-neutral-300 bg-white text-base md:text-sm resize-none focus:outline-none focus:border-brand-emerald" />
             )}
           </div>
         ))}
       </div>
-      <button onClick={onSubmit} disabled={!allAnswered} className="mt-6 w-full h-12 rounded-xl bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
-        <Send className="h-4 w-4" /> {allAnswered ? "Kirim & Nilai Kesiapan" : "Jawab semua dulu"}
+      <button type="button" onClick={onSubmit} disabled={!allAnswered} className="mt-6 w-full min-h-12 rounded-xl bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
+        <Send className="h-4 w-4" aria-hidden="true" /> {allAnswered ? "Kirim dan nilai kesiapanku" : "Jawab semua pertanyaan dulu"}
       </button>
     </div>
   );
@@ -241,19 +258,20 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
 
 /* ── Analyzing (magnifier scan diorama) — shown while edge fn scores ── */
 function AnalyzingDiorama() {
+  // Bilah ini hanya penanda "sedang bekerja": waktu penilaian sebenarnya tidak diketahui, jadi tidak ada angka persen.
   const [progress, setProgress] = useState(8);
   useEffect(() => {
     const t = setInterval(() => setProgress((p) => (p >= 95 ? 95 : p + 7)), 450);
     return () => clearInterval(t);
   }, []);
   return (
-    <div className="w-full flex flex-col items-center opacity-0 animate-fade-up">
+    <div role="status" aria-live="polite" className="w-full flex flex-col items-center opacity-0 animate-fade-up">
       <div className="w-full max-w-2xl glass-solid rounded-[2rem] p-8 overflow-hidden relative">
         <div className="absolute inset-0 bg-cyber-grid opacity-30 z-0" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center animate-gcPulseNode shadow-lg border-2 border-neutral-700"><Bot className="w-6 h-6" /></div>
-            <div><h3 className="font-display text-xl font-bold text-neutral-900 leading-tight">AI Assessment Engine</h3><p className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">Mengekstrak substansi jawaban...</p></div>
+            <div><h3 className="font-display text-xl font-bold text-neutral-900 leading-tight">AI sedang menilai jawabanmu</h3><p className="text-xs text-neutral-600">Mohon tunggu dan jangan tutup halaman ini.</p></div>
           </div>
           <div className="relative w-full max-w-md bg-neutral-50 border-2 border-neutral-300 rounded-xl shadow-inner p-6 text-left overflow-hidden">
             <div className="w-1/3 h-3 bg-neutral-300 rounded mb-4" />
@@ -271,8 +289,8 @@ function AnalyzingDiorama() {
             </div>
           </div>
           <div className="w-full max-w-md mt-8">
-            <div className="flex justify-between text-xs font-mono text-neutral-500 mb-2"><span>ANALYZING SUBSTANCE</span><span>{progress}%</span></div>
-            <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden"><div className="h-full bg-brand-emerald rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }} /></div>
+            <div className="mb-2 text-xs text-neutral-600">Sedang diproses...</div>
+            <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden" aria-hidden="true"><div className="h-full bg-brand-emerald rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }} /></div>
           </div>
         </div>
       </div>
@@ -281,7 +299,7 @@ function AnalyzingDiorama() {
 }
 
 /* ── Result (ring + verdict + real feedback) ── */
-function ResultView({ result, onBack }: { result: AssessmentResult; onBack: () => void }) {
+function ResultView({ result, job, onBack }: { result: AssessmentResult; job: GreenJob | null; onBack: () => void }) {
   const score = result.readinessScore;
   const ready = result.status === "ready";
   const R = 45, C = 2 * Math.PI * R;
@@ -292,25 +310,23 @@ function ResultView({ result, onBack }: { result: AssessmentResult; onBack: () =
     <div className="w-full flex flex-col items-center opacity-0 animate-fade-up">
       <div className="w-full max-w-2xl glass-solid rounded-[2rem] p-8 md:p-10 relative overflow-hidden text-center">
         <h2 className="font-display text-3xl font-extrabold text-neutral-900 mb-2">Asesmen Selesai</h2>
-        <p className="font-sans text-neutral-500 mb-10">Analisis kesiapanmu berdasarkan substansi jawaban.</p>
+        <p className="font-sans text-neutral-600 mb-10">Penilaian kesiapanmu dari isi jawaban tertulis. Ini perkiraan AI sebagai bahan refleksi, bukan keputusan perusahaan.</p>
 
         <div className="relative w-48 h-48 mx-auto flex items-center justify-center animate-float">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120" role="img" aria-label={`Skor kesiapan ${score} dari 100`}>
             <circle cx="60" cy="60" r={R} fill="none" stroke="#f5f5f5" strokeWidth="8" />
             <circle cx="60" cy="60" r={R} fill="none" stroke={ready ? "#10b981" : "#D9741A"} strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.16,1,0.3,1)" }} />
           </svg>
           <div className="absolute flex flex-col items-center">
             <span className="font-display text-4xl font-extrabold text-neutral-900">{score}%</span>
-            <span className="font-mono text-[9px] font-bold uppercase tracking-widest mt-1" style={{ color: ready ? "#10b981" : "#D9741A" }}>Readiness</span>
+            <span className="text-xs font-bold mt-1" style={{ color: ready ? "#047857" : "#9a3412" }}>Kesiapan</span>
           </div>
-          <div className="absolute -top-2 -right-6 bg-white border-2 border-neutral-300 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d1"><CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" /><span className="text-[10px] font-bold text-neutral-800">Kekuatan</span></div>
-          <div className="absolute bottom-4 -left-8 bg-white border-2 border-neutral-300 shadow-lg px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-popUI mf-d3"><AlertCircle className="w-3.5 h-3.5 text-[#D9741A]" /><span className="text-[10px] font-bold text-neutral-800">Area Gap</span></div>
         </div>
 
         <div className="mt-12 rounded-xl p-5 text-left" style={{ background: ready ? "#ecfdf5" : "#fff7ed", border: `1px solid ${ready ? "#a7f3d0" : "#fed7aa"}` }}>
-          <h4 className="font-display font-bold mb-2" style={{ color: ready ? "#065f46" : "#9a3412" }}>{ready ? "Verdict: Siap Melamar 🌱" : "Verdict: Jalur Pengembangan"}</h4>
+          <h4 className="font-display font-bold mb-2" style={{ color: ready ? "#065f46" : "#9a3412" }}>{ready ? "Kamu sudah cukup siap untuk melamar" : "Masih ada yang bisa diperkuat"}</h4>
           <p className="font-sans text-sm leading-relaxed" style={{ color: ready ? "#047857" : "#9a3412" }}>
-            {ready ? "Kamu menunjukkan pemahaman kuat pada metrik keberlanjutan. Agen AI siap menyesuaikan profilmu & mengirim lamaran." : "Hampir! Ikuti jalur pengembangan di bawah lalu coba lagi — ini bukan vonis penolakan."}
+            {ready ? "Jawabanmu menunjukkan pemahaman yang baik tentang keberlanjutan. Langkah berikutnya: lihat lowongan yang cocok, lalu siapkan draf lamaranmu. Lamaran baru dikirim setelah kamu menyetujuinya." : "Hampir. Pelajari saran pengembangan di bawah, lalu coba lagi kapan saja. Ini bukan penolakan."}
           </p>
         </div>
       </div>
@@ -321,7 +337,23 @@ function ResultView({ result, onBack }: { result: AssessmentResult; onBack: () =
         <FeedbackCard title="Pengembangan" icon={<GraduationCap className="h-4 w-4 text-[#0A5BE0]" />} items={result.feedback?.developmentPath} color="#0A5BE0" />
       </div>
 
-      <button onClick={onBack} className="mt-8 bg-neutral-900 text-white font-sans font-bold text-sm px-8 py-3 rounded-xl hover:bg-neutral-800 transition-colors shadow-md">Kembali ke daftar</button>
+      {/* Langkah berikutnya: tanpa ini pengguna selesai asesmen tanpa tahu harus ke mana */}
+      <div className="mt-8 flex w-full max-w-2xl flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+        <Link to="/jobs" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-8 text-sm font-bold text-white shadow-md transition-colors hover:bg-neutral-800">
+          <Briefcase className="h-4 w-4" aria-hidden="true" /> Lihat lowongan yang cocok
+        </Link>
+        {job?.external_url && (
+          <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-brand-emerald px-6 text-sm font-bold text-brand-emerald transition-colors hover:bg-emerald-50">
+            Buka lowongan {job.title} (tab baru) <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          </a>
+        )}
+        {!ready && (
+          <Link to="/profile" className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-neutral-300 px-6 text-sm font-bold text-neutral-800 transition-colors hover:bg-neutral-50">
+            Perkuat profilku
+          </Link>
+        )}
+        <button type="button" onClick={onBack} className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-neutral-300 px-6 text-sm font-bold text-neutral-800 transition-colors hover:bg-neutral-50">Kembali ke daftar</button>
+      </div>
     </div>
   );
 }
@@ -332,7 +364,7 @@ function FeedbackCard({ title, icon, items, color }: { title: string; icon: Reac
       <div className="flex items-center gap-1.5 font-semibold text-sm mb-2">{icon}{title}</div>
       <ul className="space-y-1.5">
         {(items && items.length > 0 ? items : ["—"]).map((it, i) => (
-          <li key={i} className="text-xs text-foreground/80 pl-3 relative"><span className="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-sm" style={{ background: color }} />{it}</li>
+          <li key={i} className="text-sm text-foreground/80 pl-3 relative"><span className="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-sm" style={{ background: color }} />{it}</li>
         ))}
       </ul>
     </div>
