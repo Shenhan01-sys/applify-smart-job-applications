@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import {
   Sparkles, ArrowLeft, ArrowRight, CheckCircle2, Loader2, AlertCircle,
   User, GraduationCap, Hash, BookOpen, Briefcase, MapPin, Rocket, ShieldCheck,
@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/waitinglist")({
-  head: () => ({ meta: [{ title: "Waitinglist Early Access — Applify" }] }),
+  head: () => ({ meta: [{ title: "Daftar Akses Awal — Applify" }] }),
   component: WaitinglistPage,
 });
 
@@ -74,8 +74,8 @@ function WaitinglistPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.work_status) { setError("Pilih status kerja saat ini."); return; }
-    if (!form.job_goal.trim()) { setError("Goals pekerjaan wajib diisi."); return; }
-    if (!form.location_goal.trim()) { setError("Goals lokasi pekerjaan wajib diisi."); return; }
+    if (!form.job_goal.trim()) { setError("Pekerjaan yang kamu incar wajib diisi."); return; }
+    if (!form.location_goal.trim()) { setError("Lokasi kerja yang kamu inginkan wajib diisi."); return; }
     setError(null);
     setSubmitting(true);
 
@@ -97,13 +97,13 @@ function WaitinglistPage() {
     setSubmitting(false);
 
     if (dbErr) {
-      setError("Gagal menyimpan. Coba lagi sebentar ya.");
-      toast.error("Gagal daftar waitinglist");
+      setError("Data belum tersimpan. Periksa koneksi lalu coba lagi.");
+      toast.error("Pendaftaran belum berhasil. Coba lagi sebentar lagi.");
       return;
     }
 
     try { localStorage.setItem("applify:waitinglist-joined", "1"); } catch {}
-    toast.success("Selamat! Kamu resmi di waitinglist Applify.");
+    toast.success("Terima kasih, kamu sudah terdaftar.");
     navigate({ to: "/login" });
   };
 
@@ -127,24 +127,24 @@ function WaitinglistPage() {
       <main className="max-w-3xl mx-auto px-4 md:px-8 py-10 md:py-16">
         {/* Hero */}
         <div className="text-center max-w-xl mx-auto">
-          <div className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-[#D2F801] text-[#16150F] text-[10px] font-bold uppercase tracking-wider">
-            <Sparkles className="h-3 w-3" /> Early Access
+          <div className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-[#D2F801] text-[#16150F] text-xs font-bold tracking-wider">
+            <Sparkles className="h-3 w-3" aria-hidden="true" /> Akses awal
           </div>
           <h1 className="mt-4 font-display text-3xl md:text-4xl font-extrabold tracking-tight">
-            Gabung <span className="text-gradient-primary">waitinglist</span> Applify.
+            Daftar <span className="text-gradient-primary">akses awal</span> Applify.
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Dapet akses lebih awal + bonus 1 bulan Pro gratis saat launch. Isi formulir singkat, sekitar 30 detik.
+            Isi formulir singkat ini bila kamu ingin dihubungi saat Applify dibuka untuk lebih banyak pengguna. Hanya dua langkah.
           </p>
         </div>
 
         {/* Progress bar */}
         <div className="mt-8 mb-6">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-            <span>Step {step + 1} dari 2</span>
+            <span>Langkah {step + 1} dari 2</span>
             <span>{progress}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-black/[8%] overflow-hidden">
+          <div role="progressbar" aria-label="Kemajuan formulir" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="h-1.5 w-full rounded-full bg-black/[8%] overflow-hidden">
             <div
               className="h-full gradient-primary transition-all duration-500"
               style={{ width: `${progress}%` }}
@@ -158,8 +158,8 @@ function WaitinglistPage() {
           className="glass rounded-3xl p-6 md:p-8 space-y-5"
         >
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-[#C0341A]/30 bg-[#C0341A]/[6%] p-3 text-sm text-[#C0341A]">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#C0341A]/30 bg-[#C0341A]/[6%] p-3 text-sm text-[#C0341A]">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
@@ -169,7 +169,7 @@ function WaitinglistPage() {
               <SectionHeader
                 icon={User}
                 title="Biar kenalan dulu"
-                subtitle="Biar kami bisa follow-up yang relevan."
+                subtitle="Supaya kami tahu siapa yang mendaftar."
               />
               <Field
                 label="Nama lengkap"
@@ -224,23 +224,25 @@ function WaitinglistPage() {
             <>
               <SectionHeader
                 icon={Briefcase}
-                title="Goals kariermu"
-                subtitle="Biar kami bisa matching ke lowongan yang tepat."
+                title="Tujuan kariermu"
+                subtitle="Supaya kami tahu jenis lowongan yang kamu cari."
               />
 
               <div>
-                <label className="block text-sm font-semibold mb-1.5">
+                <p id="label-status-kerja" className="block text-sm font-semibold mb-1.5">
                   Status kerja saat ini <span className="text-[#C0341A]">*</span>
-                </label>
-                <div className="grid sm:grid-cols-2 gap-2">
+                </p>
+                <div role="radiogroup" aria-labelledby="label-status-kerja" className="grid sm:grid-cols-2 gap-2">
                   {WORK_STATUS_OPTIONS.map((opt) => {
                     const active = form.work_status === opt;
                     return (
                       <button
                         key={opt}
                         type="button"
+                        role="radio"
+                        aria-checked={active}
                         onClick={() => update("work_status", opt)}
-                        className={`text-left rounded-xl border-2 px-3.5 py-2.5 text-sm transition ${
+                        className={`min-h-11 text-left rounded-xl border-2 px-3.5 py-2.5 text-sm transition ${
                           active
                             ? "border-[#0A5BE0] bg-[#0A5BE0]/[4%] font-semibold"
                             : "border-[color:var(--border)] bg-white hover:bg-black/[3%]"
@@ -261,7 +263,7 @@ function WaitinglistPage() {
               </div>
 
               <Field
-                label="Goals pekerjaan (apa yang kamu incar?)"
+                label="Pekerjaan yang kamu incar"
                 required
                 icon={Briefcase}
                 value={form.job_goal}
@@ -269,7 +271,7 @@ function WaitinglistPage() {
                 placeholder="Product Manager di startup fintech / sustainability"
               />
               <Field
-                label="Goals lokasi pekerjaan"
+                label="Lokasi kerja yang kamu inginkan"
                 required
                 icon={MapPin}
                 value={form.location_goal}
@@ -281,23 +283,23 @@ function WaitinglistPage() {
                 <button
                   type="button"
                   onClick={() => { setError(null); setStep(0); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  className="h-11 px-5 rounded-xl border-2 border-[color:var(--border)] bg-white text-sm font-semibold hover:bg-black/[3%] transition inline-flex items-center gap-2"
+                  className="min-h-11 px-5 rounded-xl border-2 border-[color:var(--border)] bg-white text-sm font-semibold hover:bg-black/[3%] transition inline-flex items-center gap-2"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" /> Kembali
+                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Kembali
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="h-11 px-6 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 inline-flex items-center gap-2"
+                  className="min-h-11 px-6 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 inline-flex items-center gap-2"
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       Menyimpan…
                     </>
                   ) : (
                     <>
-                      <Rocket className="h-4 w-4" /> Submit & Lanjut Login
+                      <Rocket className="h-4 w-4" aria-hidden="true" /> Daftar dan lanjut masuk
                     </>
                   )}
                 </button>
@@ -309,13 +311,13 @@ function WaitinglistPage() {
         {/* Trust strip */}
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-muted-foreground">
           <div className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#1C9656]" />
-            Data tersimpan aman di Supabase
+            <ShieldCheck className="h-3.5 w-3.5 text-[#146B3D]" aria-hidden="true" />
+            Data disimpan di database Supabase milik proyek ini
           </div>
-          <span className="hidden sm:inline">·</span>
+          <span className="hidden sm:inline" aria-hidden="true">·</span>
           <div className="inline-flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#1C9656]" />
-            Tidak ada spam
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#146B3D]" aria-hidden="true" />
+            <Link to="/terms" className="underline underline-offset-2">Baca Ketentuan dan Privasi</Link>
           </div>
         </div>
       </main>
@@ -358,21 +360,24 @@ function Field({
   min?: number;
   max?: number;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-sm font-semibold mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold mb-1.5">
         {label} {required && <span className="text-[#C0341A]">*</span>}
       </label>
       <div className="relative">
-        <Icon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <Icon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden="true" />
         <input
+          id={id}
+          required={required}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           min={min}
           max={max}
-          className="w-full h-11 pl-10 pr-3 rounded-xl border-2 border-[color:var(--border)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/30 focus:border-[#0A5BE0] transition"
+          className="w-full h-12 pl-10 pr-3 rounded-xl border-2 border-[color:var(--border)] bg-white text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/30 focus:border-[#0A5BE0] transition"
         />
       </div>
     </div>

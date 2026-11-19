@@ -190,7 +190,7 @@ function AdminWaitinglistPage() {
               <div className="grid h-9 w-9 place-items-center rounded-lg gradient-primary text-white font-bold">A</div>
               <span className="text-lg font-bold">Applify</span>
             </Link>
-            <span className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#16150F] text-[#D2F801] text-[10px] font-bold uppercase tracking-wider">
+            <span className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#16150F] text-[#D2F801] text-xs font-bold uppercase tracking-wider">
               <ShieldCheck className="h-3 w-3" /> Admin
             </span>
           </div>
@@ -486,7 +486,7 @@ function StatCard({
       </div>
       <p className="mt-3 font-display text-2xl md:text-3xl font-extrabold">{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-[10px] text-muted-foreground truncate mt-0.5" title={sub}>{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground truncate mt-0.5" title={sub}>{sub}</p>}
     </div>
   );
 }
