@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { platformLabel } from "@/lib/platforms";
 import { listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "@/lib/jobCardData";
+import { JOB_LABELS, jobTypeLabel, marketPositionLabel, salaryPeriodLabel, workplaceLabel } from "@/lib/jobLabels";
 import {
   MapPin,
   Briefcase,
@@ -275,7 +276,7 @@ function SalaryBar({ current, marketAvg, marketHigh, marketLow }: { current: num
       </div>
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{formatCurrency(marketLow)}</span>
-        <span className="text-[#0A5BE0] font-semibold">Market Avg</span>
+        <span className="text-[#0A5BE0] font-semibold">{JOB_LABELS.card.marketAverage}</span>
         <span className="text-muted-foreground">{formatCurrency(marketHigh)}</span>
       </div>
     </div>
@@ -300,7 +301,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
 
   const salaryText = job.salary_min && job.salary_max
     ? `${formatCurrency(job.salary_min)} - ${formatCurrency(job.salary_max)}`
-    : "Gaji kompetitif";
+    : JOB_LABELS.card.salaryMissing;
 
   // A row from the job sources has none of the AI analysis (see lib/jobCardData.ts): show only what exists.
   const radarSkills = radarFromMatches(job.skill_matches);
@@ -326,8 +327,8 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
               <h3 className="font-bold text-lg truncate">{job.title}</h3>
               {matchScore !== null && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
-                  <Sparkles className="h-3 w-3" />
-                  AI Matched
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
+                  {JOB_LABELS.card.matchBadge}
                 </span>
               )}
             </div>
@@ -342,12 +343,12 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
               </span>
               <span className="inline-flex items-center gap-1">
                 <Briefcase className="h-3.5 w-3.5" />
-                {job.type}
+                {jobTypeLabel(job.type)}
               </span>
               {job.workplace_type && (
-                <span className="inline-flex items-center gap-1 capitalize">
+                <span className="inline-flex items-center gap-1">
                   <Zap className="h-3.5 w-3.5" />
-                  {job.workplace_type}
+                  {workplaceLabel(job.workplace_type)}
                 </span>
               )}
             </div>
@@ -374,14 +375,14 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
           <CircularProgress
             value={matchScore}
-            label="Match"
+            label={JOB_LABELS.card.matchLabel}
             color={matchColor}
             size={70}
             title="Skor relevansi dari kata kunci pencarian dan skill profil. Tanda — berarti belum ada dasar penilaian."
           />
-          {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Acceptance" color={acceptanceColor} size={70} />}
-          {cultureScore !== null && <CircularProgress value={cultureScore} label="Culture" color="#8B5CF6" size={70} />}
-          {growthScore !== null && <CircularProgress value={growthScore} label="Growth" color="#06B6D4" size={70} />}
+          {acceptanceScore !== null && <CircularProgress value={acceptanceScore} label="Peluang diterima" color={acceptanceColor} size={70} />}
+          {cultureScore !== null && <CircularProgress value={cultureScore} label="Budaya" color="#8B5CF6" size={70} />}
+          {growthScore !== null && <CircularProgress value={growthScore} label="Pertumbuhan" color="#06B6D4" size={70} />}
         </div>
 
         {/* Salary & Platform */}
@@ -389,11 +390,13 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           <div className="inline-flex items-center gap-1.5 text-[#0A5BE0] font-semibold">
             <DollarSign className="h-4 w-4" />
             {salaryText}
-            {job.salary_period && <span className="text-xs text-muted-foreground font-normal">/{job.salary_period}</span>}
+            {job.salary_min && job.salary_max && job.salary_period && (
+              <span className="text-xs text-muted-foreground font-normal">/{salaryPeriodLabel(job.salary_period)}</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
-              Source: {platformLabel(job.platform_source)}
+              {JOB_LABELS.card.sourcePrefix} {platformLabel(job.platform_source)}
             </span>
             {posted && (
               <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
@@ -413,7 +416,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Brain className="h-4 w-4 text-[#0A5BE0]" />
-                <span className="font-semibold text-sm">AI Strategy</span>
+                <span className="font-semibold text-sm">{JOB_LABELS.card.strategy}</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{job.ai_strategy}</p>
             </div>
@@ -424,7 +427,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-[#0A5BE0]" />
-                Skill Match Analysis
+                {JOB_LABELS.card.skillAnalysis}
               </h4>
               {radarSkills ? (
                 <RadarChart skills={radarSkills} />
@@ -435,7 +438,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
                 <div className="mt-3">
                   <p className="text-xs font-medium text-[#F59E0B] mb-1.5 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
-                    Skill Gaps Detected:
+                    {JOB_LABELS.card.skillGaps}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {skillGaps.map((gap, i) => (
@@ -452,7 +455,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4 text-[#0A5BE0]" />
-                Salary Benchmark
+                {JOB_LABELS.card.salaryBenchmark}
               </h4>
               {job.salary_min && job.salary_max && job.salary_benchmark && (
                 <div className="space-y-3">
@@ -464,12 +467,10 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
                   />
                   <div className="flex items-center justify-between text-xs bg-[#F5F5F5] p-3 rounded-lg">
                     <span>
-                      <span className="text-[#0A5BE0] font-bold text-lg">{job.salary_benchmark.percentile}th</span>
-                      <span className="text-muted-foreground ml-1">percentile</span>
+                      <span className="text-muted-foreground mr-1">{JOB_LABELS.card.percentile}</span>
+                      <span className="text-[#0A5BE0] font-bold text-lg">{job.salary_benchmark.percentile}</span>
                     </span>
-                    <span className="text-muted-foreground">
-                      {job.salary_benchmark.percentile >= 75 ? "Above Market" : job.salary_benchmark.percentile >= 50 ? "Market Rate" : "Below Market"}
-                    </span>
+                    <span className="text-muted-foreground">{marketPositionLabel(job.salary_benchmark.percentile)}</span>
                   </div>
                 </div>
               )}
@@ -481,7 +482,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
                 <Bot className="h-4 w-4 text-[#0A5BE0]" />
-                AI Application Plan
+                {JOB_LABELS.card.plan}
               </h4>
               <div className="space-y-0">
                 {aiActions.map((action, i) => (
@@ -494,7 +495,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           {/* Requirements Preview */}
           {requirements.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold mb-2">Key Requirements</h4>
+              <h4 className="text-sm font-semibold mb-2">{JOB_LABELS.card.requirements}</h4>
               <ul className="space-y-1.5">
                 {requirements.slice(0, 4).map((req, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
@@ -519,12 +520,12 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           {expanded ? (
             <>
               <ChevronUp className="h-4 w-4" />
-              Ringkas
+              {JOB_LABELS.card.collapse}
             </>
           ) : (
             <>
               <ChevronDown className="h-4 w-4" />
-              Lihat Detail & Analisis AI
+              {JOB_LABELS.card.seeDetail}
             </>
           )}
         </button>
@@ -534,7 +535,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: {
           className="flex-1 min-h-11 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
         >
           <Send className="h-4 w-4" />
-          AI Apply Sekarang
+          {JOB_LABELS.card.apply}
         </button>
         {job.external_url && (
           <a

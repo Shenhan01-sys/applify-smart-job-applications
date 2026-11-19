@@ -109,7 +109,7 @@ test("skor kecocokan dari backend (jobs.match_score 0-100 atau null): null tampi
   assert.equal(scoreOrNull(null), null);
   const card = read("../src/components/JobCard.tsx");
   assert.match(card, /value === null \? "—" : `\$\{value\}%`/);
-  assert.match(card, /<CircularProgress\s+value=\{matchScore\}\s+label="Match"/);
+  assert.match(card, /<CircularProgress\s+value=\{matchScore\}\s+label=\{JOB_LABELS\.card\.matchLabel\}/);
   const modal = read("../src/components/AIApplyModal.tsx");
   assert.match(modal, /const matchScore: number \| null = scoreOrNull\(jobData\?\.match_score\)/);
   assert.match(modal, /matchScore !== null \? `\$\{matchScore\}%` : "—"/);
