@@ -191,8 +191,10 @@ test("kontrak: rute antrean umum dan penjaga persetujuan backend memang memakai 
   const route = read("../../backend/api/routes/automation.ts");
   assert.match(route, /app\.post\('\/queue'/);
   assert.match(route, /const \{ job_type, payload, priority = 0 \} = request\.body/);
-  assert.match(route, /ApprovalRequiredError/);
+  assert.match(route, /clientErrorReply\(error\)/);
   const guard = read("../../backend/services/queue-guard.ts");
+  assert.match(guard, /class ApprovalRequiredError/);
+  assert.match(guard, /error instanceof ApprovalRequiredError/);
   assert.match(guard, /const needsApproval = jobType === 'email_apply'/);
   assert.match(guard, /delete payload\.approved/);
   const handler = read("../../worker/src/handlers/emailApply.ts");
