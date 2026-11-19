@@ -311,6 +311,8 @@ Return JSON exactly in this shape:
         tailored_skills: result.tailoredSkills,
         ai_notes: result.aiNotes,
         status: "draft",
+        // Disimpan supaya label model tetap benar saat draf dibuka lagi (migrasi 2026-11-19_ai_applications_model_used).
+        model_used: modelUsed,
       })
       .select("*, jobs(*)")
       .single();

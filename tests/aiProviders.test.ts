@@ -74,3 +74,12 @@ test("chatBody: Claude tanpa temperature dan max_tokens minimal 2400, penyedia l
   assert.match(src, /chatBody\(candidate,/);
   assert.doesNotMatch(src, /temperature: 0\.6,\s*max_tokens/);
 });
+
+test("model draf disimpan di ai_applications.model_used dan dibaca lagi saat modal dibuka", () => {
+  const fn = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  assert.match(fn, /status: "draft",[\s\S]{0,200}model_used: modelUsed/);
+  const modal = readFileSync(new URL("../src/components/AIApplyModal.tsx", import.meta.url), "utf8");
+  assert.match(modal, /if \(app\.model_used\) setModelUsed\(app\.model_used\)/);
+  const mig = readFileSync(new URL("../../database/migrations/2026-11-19_ai_applications_model_used.sql", import.meta.url), "utf8");
+  assert.match(mig, /add column if not exists model_used text/);
+});

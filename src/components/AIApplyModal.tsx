@@ -152,6 +152,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       }
       const view = draftToGenerated(app);
       setApplication(app);
+      // Draf baru menyimpan modelnya; draf lama (null) tetap memakai label paket.
+      if (app.model_used) setModelUsed(app.model_used);
       setAiGenerated(view);
       setEditedCoverLetter(view.coverLetter);
       setExisting({ state: "found" });

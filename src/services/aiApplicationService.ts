@@ -25,6 +25,8 @@ export interface AIApplicationData {
   follow_up_sent: boolean;
   company_response?: string;
   response_received_at?: string;
+  /** Model yang menulis draf (penyedia:model). Null untuk draf sebelum kolom ini ada. */
+  model_used?: string | null;
   created_at: string;
   updated_at: string;
 }
