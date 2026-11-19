@@ -111,7 +111,7 @@ test("apiFetch melempar ApiError dengan status dan Retry-After; hook dan modal m
 test("halaman sesi LinkedIn menampilkan galat konfigurasi di layar dan tidak mengosongkan cookie yang gagal diimpor", () => {
   const page = read("../src/routes/linkedin-session.tsx");
   assert.match(page, /sessionError &&/);
-  assert.match(page, /const imported = await importSession\(cookies\);\s*\n\s*if \(imported\) setCookiesJson\(''\);/);
+  assert.match(page, /const imported = await importSession\(parsed\.cookies\);\s*\n\s*if \(imported\) setCookiesText\(""\);/);
 });
 
 test("kontrak backend yang dipakai pesan ini memang ada di kode backend (dibaca, tidak diubah)", () => {
