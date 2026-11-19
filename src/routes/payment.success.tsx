@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { isBillingEnabled } from "@/lib/appConfig";
 import { useEffect, useState } from "react";
 import {
   CheckCircle2, ArrowRight, Sparkles, Copy, Loader2, Crown,
   Calendar, CreditCard, Wallet, Smartphone, QrCode,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSubscription, PLAN_PRICE, type PaymentMethod, type PlanTier } from "@/lib/subscriptionStore";
+import { useSimulatedCheckout, PLAN_PRICE, type PaymentMethod, type PlanTier } from "@/lib/subscriptionStore";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -16,6 +17,8 @@ export const Route = createFileRoute("/payment/success")({
     txn: (input.txn as string) || undefined,
   }),
   beforeLoad: async () => {
+    // Langganan dan pembayaran disembunyikan dari uji coba kecuali VITE_ENABLE_BILLING=true.
+    if (!isBillingEnabled()) throw redirect({ to: "/dashboard" });
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
@@ -36,7 +39,7 @@ const METHOD_LABEL: Record<PaymentMethod, { name: string; icon: typeof Wallet }>
 
 function PaymentSuccessPage() {
   const { txn } = Route.useSearch();
-  const sub = useSubscription();
+  const sub = useSimulatedCheckout();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);

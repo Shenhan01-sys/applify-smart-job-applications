@@ -1,18 +1,18 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
+import { isBillingEnabled } from "@/lib/appConfig";
 import { Check, Sparkles, ArrowRight, ArrowLeft, Building2, GraduationCap, Zap, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
-import {
-  PLAN_PRICE,
-  useSubscription,
-  type PlanTier,
-} from "@/lib/subscriptionStore";
+import { PLAN_PRICE, type PlanTier } from "@/lib/subscriptionStore";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/subscription")({
   beforeLoad: async () => {
+    // Langganan dan pembayaran disembunyikan dari uji coba kecuali VITE_ENABLE_BILLING=true.
+    if (!isBillingEnabled()) throw redirect({ to: "/dashboard" });
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
@@ -122,10 +122,10 @@ function SubscriptionPage() {
             <Sparkles className="h-3.5 w-3.5 text-[#1C9656]" />
             <span>
               Paket aktif: <span className="font-bold capitalize">{current.tier}</span>
-              {current.expiresAt && (
+              {current.periodEnd && (
                 <span className="text-muted-foreground">
                   {" · aktif sampai "}
-                  {new Date(current.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                  {new Date(current.periodEnd).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
               )}
             </span>

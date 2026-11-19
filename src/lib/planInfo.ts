@@ -44,7 +44,7 @@ export const PLAN_MODELS: Record<"free" | "pro", { models: PlanModel[]; note: st
       { name: "Qwen 3.8", role: "Cadangan", desc: "Model gratis OpenRouter untuk agen pengisi formulir dan backend" },
       { name: "Groq (gpt-oss, Qwen)", role: "Cadangan", desc: "Penyedia terpisah, dipakai bila model gratis OpenRouter tidak menjawab" },
     ],
-    note: "Daftar model gratis sering berganti; model yang sudah dicabut dilewati otomatis. Upgrade ke Pro untuk memakai DeepSeek V4.",
+    note: "Daftar model gratis sering berganti; model yang sudah dicabut dilewati otomatis.",
   },
   pro: {
     models: [

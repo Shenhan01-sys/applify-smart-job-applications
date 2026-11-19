@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 
+// Paket dan kuota pengguna dibaca dari database (tabel `subscriptions` dan RPC `get_quota_status`), lewat
+// src/hooks/useSubscription.ts. File ini hanya memuat tipe, daftar harga, dan simulasi alur pembayaran.
+//
+// Simulasi pembayaran (activateSimulatedCheckout dan seterusnya) hanya dipakai halaman /payment dan
+// /payment/success, yang tertutup kecuali VITE_ENABLE_BILLING=true. Ia menulis ke localStorage untuk
+// menampilkan struk demo dan TIDAK mengubah paket pengguna di database.
+
 export type PlanTier = "free" | "pro" | "kampus";
 export type PaymentMethod = "gopay" | "ovo" | "dana" | "qris";
 
@@ -19,6 +26,16 @@ export const PLAN_PRICE: Record<PlanTier, { amount: number; label: string; perio
   pro: { amount: 69000, label: "Rp 69.000", period: "/bulan" },
   kampus: { amount: 50_000_000, label: "Rp 50jt", period: "/semester" },
 };
+
+/**
+ * Paket dari satu baris `subscriptions`. Edge Function dan worker memilih model AI dari `ai_model_tier`,
+ * jadi kolom itu yang menentukan; `plan_name` hanya membedakan paket Kampus. Baris kosong berarti Free.
+ */
+export function planFromRow(row: { ai_model_tier?: unknown; plan_name?: unknown } | null | undefined): PlanTier {
+  if (!row) return "free";
+  if (String(row.plan_name ?? "").toLowerCase() === "kampus") return "kampus";
+  return String(row.ai_model_tier ?? "").toLowerCase() === "pro" ? "pro" : "free";
+}
 
 const DEFAULT_STATE: SubscriptionState = {
   tier: "free",
@@ -46,7 +63,8 @@ function writeToStorage(state: SubscriptionState) {
   window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: state }));
 }
 
-export function activateSubscription(tier: PlanTier, method: PaymentMethod) {
+/** SIMULASI demo: menyimpan struk di localStorage. Tidak mengubah paket di database. */
+export function activateSimulatedCheckout(tier: PlanTier, method: PaymentMethod) {
   const now = new Date();
   const expires = new Date(now);
   if (tier === "pro") expires.setMonth(expires.getMonth() + 1);
@@ -62,15 +80,8 @@ export function activateSubscription(tier: PlanTier, method: PaymentMethod) {
   return next;
 }
 
-export function cancelSubscription() {
-  writeToStorage(DEFAULT_STATE);
-}
-
-export function getSubscriptionSnapshot(): SubscriptionState {
-  return readFromStorage();
-}
-
-export function useSubscription(): SubscriptionState {
+/** Struk simulasi terakhir (hanya untuk halaman /payment/success). */
+export function useSimulatedCheckout(): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>(() => readFromStorage());
   useEffect(() => {
     const handler = (e: Event) => {

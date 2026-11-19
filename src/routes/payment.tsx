@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
+import { isBillingEnabled } from "@/lib/appConfig";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, Wallet, Smartphone, QrCode, ShieldCheck, Lock,
@@ -7,7 +8,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import {
   PLAN_PRICE,
-  activateSubscription,
+  activateSimulatedCheckout,
   type PlanTier,
   type PaymentMethod,
 } from "@/lib/subscriptionStore";
@@ -23,6 +24,8 @@ export const Route = createFileRoute("/payment")({
     plan: (input.plan as PlanTier) || undefined,
   }),
   beforeLoad: async () => {
+    // Langganan dan pembayaran disembunyikan dari uji coba kecuali VITE_ENABLE_BILLING=true.
+    if (!isBillingEnabled()) throw redirect({ to: "/dashboard" });
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
@@ -101,7 +104,7 @@ function PaymentPage() {
     if (!selected) return;
     setProcessing(true);
     await new Promise((r) => setTimeout(r, 1400));
-    const result = activateSubscription(tier, selected);
+    const result = activateSimulatedCheckout(tier, selected);
     setProcessing(false);
     navigate({
       to: "/payment/success",

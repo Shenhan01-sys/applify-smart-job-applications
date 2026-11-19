@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { automationApi, AutomationSettings } from "@/services/automationApi";
@@ -22,16 +22,16 @@ export const Route = createFileRoute("/automation-settings")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  head: () => ({ meta: [{ title: "Automation Settings — Applify" }] }),
+  head: () => ({ meta: [{ title: "Pengaturan Agen — Applify" }] }),
   component: AutomationSettingsPage,
 });
 
 const tabs = [
-  { id: 'personal', label: 'Personal Info', icon: User },
-  { id: 'answers', label: 'Application Answers', icon: FileText },
-  { id: 'search', label: 'Search Preferences', icon: Search },
-  { id: 'behavior', label: 'Behavior', icon: Settings },
-  { id: 'ai', label: 'AI Settings', icon: Brain },
+  { id: 'personal', label: 'Data Pribadi', icon: User },
+  { id: 'answers', label: 'Jawaban Lamaran', icon: FileText },
+  { id: 'search', label: 'Pencarian', icon: Search },
+  { id: 'behavior', label: 'Perilaku Agen', icon: Settings },
+  { id: 'ai', label: 'Model AI', icon: Brain },
 ];
 
 function AutomationSettingsPage() {
@@ -121,33 +121,36 @@ function AutomationSettingsPage() {
       {showSaved && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-[fadeInUp_0.3s_ease-out]">
           <CheckCircle2 className="h-4 w-4" />
-          <span className="text-sm font-semibold">Settings disimpan!</span>
+          <span className="text-sm font-semibold" role="status">Pengaturan disimpan!</span>
         </div>
       )}
 
       <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Automation Settings</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Pengaturan Agen</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Konfigurasi preferensi otomatisasi lamaran kerja AI kamu
+          Atur data dan preferensi yang dipakai agen saat mencari lowongan dan mengisi formulir lamaran
         </p>
       </header>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+      <div role="tablist" aria-label="Bagian pengaturan" className="flex gap-2 mb-6 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              className={`flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 isActive
                   ? 'bg-[#0A5BE0] text-white shadow-lg shadow-[#0A5BE0]/20'
                   : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:bg-black/[7%]'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4" aria-hidden="true" />
               {tab.label}
             </button>
           );
@@ -163,18 +166,18 @@ function AutomationSettingsPage() {
           {activeTab === 'personal' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <User className="h-5 w-5 text-[#0A5BE0]" /> Personal Information
+                <User className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Data Pribadi
               </h2>
-              <p className="text-sm text-muted-foreground">Data ini digunakan untuk mengisi form lamaran otomatis</p>
+              <p className="text-sm text-muted-foreground">Data ini dipakai agen untuk mengisi formulir lamaran. Isi seperlunya.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="First Name" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
-                <InputField label="Last Name" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
-                <InputField label="Phone Number" value={settings.phone_number || ''} onChange={(v: string) => updateField('phone_number', v)} icon={Sparkles} />
-                <InputField label="Current City" value={settings.current_city || ''} onChange={(v: string) => updateField('current_city', v)} icon={MapPin} />
-                <InputField label="Street" value={settings.street || ''} onChange={(v: string) => updateField('street', v)} />
-                <InputField label="State" value={settings.state || ''} onChange={(v: string) => updateField('state', v)} />
-                <InputField label="Zip Code" value={settings.zipcode || ''} onChange={(v: string) => updateField('zipcode', v)} />
-                <InputField label="Country" value={settings.country || ''} onChange={(v: string) => updateField('country', v)} />
+                <InputField label="Nama depan" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
+                <InputField label="Nama belakang" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
+                <InputField label="Nomor telepon" value={settings.phone_number || ''} onChange={(v: string) => updateField('phone_number', v)} icon={Sparkles} />
+                <InputField label="Kota tempat tinggal" value={settings.current_city || ''} onChange={(v: string) => updateField('current_city', v)} icon={MapPin} />
+                <InputField label="Alamat jalan" value={settings.street || ''} onChange={(v: string) => updateField('street', v)} />
+                <InputField label="Provinsi" value={settings.state || ''} onChange={(v: string) => updateField('state', v)} />
+                <InputField label="Kode pos" value={settings.zipcode || ''} onChange={(v: string) => updateField('zipcode', v)} />
+                <InputField label="Negara" value={settings.country || ''} onChange={(v: string) => updateField('country', v)} />
               </div>
             </div>
           )}
@@ -182,32 +185,33 @@ function AutomationSettingsPage() {
           {activeTab === 'answers' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-[#0A5BE0]" /> Application Answers
+                <FileText className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Jawaban Lamaran
               </h2>
-              <p className="text-sm text-muted-foreground">Jawaban yang sudah dikonfigurasi untuk pertanyaan umum lamaran</p>
+              <p className="text-sm text-muted-foreground">Jawaban tetap untuk pertanyaan yang sering muncul di formulir lamaran</p>
               <div className="space-y-4">
-                <InputField label="Years of Experience" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
+                <InputField label="Lama pengalaman kerja (tahun)" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
                 <SelectField 
-                  label="Require Visa Sponsorship" 
+                  label="Butuh sponsor visa kerja?" 
                   value={settings.require_visa || 'no'} 
-                  options={[{value: 'no', label: 'No'}, {value: 'yes', label: 'Yes'}]}
+                  options={[{value: 'no', label: 'Tidak'}, {value: 'yes', label: 'Ya'}]}
                   onChange={(v: string) => updateField('require_visa', v)} 
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField label="Desired Salary (Annual)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
-                  <InputField label="Current CTC (Annual)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
+                  <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
+                  <InputField label="Gaji saat ini (Rp)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
                 </div>
-                <InputField label="Notice Period (days)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
-                <InputField label="LinkedIn URL" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
-                <InputField label="Website / Portfolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
+                <InputField label="Masa pemberitahuan (hari)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
+                <InputField label="Alamat profil LinkedIn" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
+                <InputField label="Situs web atau portofolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Default Cover Letter</label>
+                  <label htmlFor="setting-cover-letter" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Surat lamaran bawaan</label>
                   <textarea
+                    id="setting-cover-letter"
                     rows={6}
                     value={settings.cover_letter || ''}
                     onChange={(e) => updateField('cover_letter', e.target.value)}
-                    placeholder="Template cover letter default kamu..."
-                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all resize-y"
+                    placeholder="Templat surat lamaran bawaanmu..."
+                    className="mt-1.5 w-full rounded-xl bg-black/[4%] border-2 border-black/[8%] p-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all resize-y"
                   />
                 </div>
               </div>
@@ -217,35 +221,35 @@ function AutomationSettingsPage() {
           {activeTab === 'search' && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Search className="h-5 w-5 text-[#0A5BE0]" /> Search Preferences
+                <Search className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Preferensi Pencarian
               </h2>
               <div className="space-y-4">
                 <InputField 
-                  label="Search Keywords (pisahkan koma)" 
+                  label="Kata kunci pencarian (pisahkan dengan koma)" 
                   value={settings.search_keywords?.join(', ') || ''} 
                   onChange={(v: string) => updateField('search_keywords', v.split(',').map(k => k.trim()).filter(Boolean))} 
                   placeholder="Software Engineer, React Developer, Full Stack"
                 />
                 <InputField 
-                  label="Search Location" 
+                  label="Lokasi pencarian" 
                   value={settings.search_location || ''} 
                   onChange={(v: string) => updateField('search_location', v)} 
                   placeholder="Jakarta, Indonesia atau Remote"
                   icon={MapPin}
                 />
                 <ToggleField 
-                  label="Easy Apply Only" 
-                  description="Hanya cari lowongan dengan easy apply"
+                  label="Hanya lamaran cepat (Easy Apply)" 
+                  description="Hanya cari lowongan yang bisa dilamar dengan cepat tanpa formulir panjang"
                   checked={settings.easy_apply_only ?? false}
                   onChange={(v: boolean) => updateField('easy_apply_only', v)}
                 />
                 <InputField 
-                  label="Blacklist Companies (pisahkan koma)" 
+                  label="Perusahaan yang dihindari (pisahkan dengan koma)" 
                   value={settings.blacklist_companies?.join(', ') || ''} 
                   onChange={(v: string) => updateField('blacklist_companies', v.split(',').map(k => k.trim()).filter(Boolean))} 
                 />
                 <InputField 
-                  label="Blacklist Words (pisahkan koma)" 
+                  label="Kata yang dihindari di lowongan (pisahkan dengan koma)" 
                   value={settings.blacklist_words?.join(', ') || ''} 
                   onChange={(v: string) => updateField('blacklist_words', v.split(',').map(k => k.trim()).filter(Boolean))} 
                 />
@@ -256,23 +260,23 @@ function AutomationSettingsPage() {
           {activeTab === 'behavior' && (
             <div className="space-y-6">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Settings className="h-5 w-5 text-[#0A5BE0]" /> Automation Behavior
+                <Settings className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Perilaku Agen
               </h2>
               <ToggleField 
-                label="Pause Before Submit" 
-                description="Berhenti sebelum submit setiap lamaran untuk review kamu"
+                label="Berhenti sebelum mengirim" 
+                description="Agen berhenti sebelum menekan tombol kirim, supaya kamu bisa memeriksa dulu"
                 checked={settings.pause_before_submit ?? true}
                 onChange={(v: boolean) => updateField('pause_before_submit', v)}
               />
               <ToggleField 
-                label="Pause at Unknown Questions" 
-                description="Berhenti saat AI menemukan pertanyaan yang tidak bisa dijawab"
+                label="Berhenti saat ada pertanyaan yang tak bisa dijawab" 
+                description="Agen berhenti bila menemukan pertanyaan formulir yang tidak bisa dijawab dari datamu"
                 checked={settings.pause_at_failed_question ?? true}
                 onChange={(v: boolean) => updateField('pause_at_failed_question', v)}
               />
               <ToggleField 
-                label="Overwrite Previous Answers" 
-                description="Selalu gunakan settings terbaru daripada jawaban yang sudah tersimpan"
+                label="Selalu pakai jawaban terbaru" 
+                description="Pakai pengaturan terbaru, bukan jawaban lama yang sudah tersimpan"
                 checked={settings.overwrite_previous_answers ?? false}
                 onChange={(v: boolean) => updateField('overwrite_previous_answers', v)}
               />
@@ -287,11 +291,12 @@ function AutomationSettingsPage() {
           <div className="mt-6 pt-6 border-t border-black/[6%] flex justify-end">
             <button
               onClick={handleSave}
+              type="button"
               disabled={saving}
-              className="h-11 px-8 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
+              className="min-h-11 px-8 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Menyimpan...' : 'Simpan Settings'}
+              {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
             </button>
           </div>
         </div>
@@ -300,33 +305,38 @@ function AutomationSettingsPage() {
   );
 }
 
-// Helper components
+// Komponen bantu. Setiap label terhubung ke kolomnya lewat htmlFor/id (useId), dan sakelar memakai role="switch".
 function InputField({ label, value, onChange, type = 'text', placeholder = '', icon: Icon }: any) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-        {Icon && <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" />}
+      <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+        {Icon && <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" />}
         {label}
       </label>
       <input
+        id={id}
         type={type}
+        inputMode={type === 'number' ? 'numeric' : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all hover:border-black/[12%]"
+        className="mt-1.5 w-full h-12 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all hover:border-black/[12%]"
       />
     </div>
   );
 }
 
 function SelectField({ label, value, options, onChange }: any) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</label>
+      <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</label>
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 w-full h-11 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all appearance-none cursor-pointer"
+        className="mt-1.5 w-full h-12 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all appearance-none cursor-pointer"
       >
         {options.map((opt: any) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -337,18 +347,26 @@ function SelectField({ label, value, options, onChange }: any) {
 }
 
 function ToggleField({ label, description, checked, onChange }: any) {
+  const labelId = useId();
+  const descId = useId();
   return (
-    <div className="flex items-center justify-between py-2 border-b border-black/[4%] last:border-0">
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-black/[4%] last:border-0">
       <div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p id={labelId} className="text-sm font-medium">{label}</p>
+        <p id={descId} className="text-xs text-muted-foreground">{description}</p>
       </div>
       <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={labelId}
+        aria-describedby={descId}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0A5BE0]' : 'bg-black/[12%]'}`}
+        className={`relative h-11 w-14 shrink-0 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0A5BE0]' : 'bg-black/[12%]'}`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'left-[22px]' : 'left-0.5'}`}
+          aria-hidden="true"
+          className={`absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-white shadow-sm transition-all duration-200 ${checked ? 'left-[calc(100%-1.75rem)]' : 'left-1'}`}
         />
       </button>
     </div>
@@ -370,7 +388,7 @@ function AITierDisplay() {
   
   const tierConfig: Record<string, { label: string; color: string; bg: string; border: string; badge: string; icon: any }> = {
     free: { 
-      label: 'Free', 
+      label: 'Gratis', 
       color: 'text-muted-foreground', 
       bg: 'bg-black/[3%]', 
       border: 'border-black/[8%]',
@@ -395,7 +413,7 @@ function AITierDisplay() {
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-bold flex items-center gap-2">
-        <Brain className="h-5 w-5 text-[#0A5BE0]" /> AI Settings
+        <Brain className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Model AI
       </h2>
       
       {/* Tier Badge */}
@@ -404,7 +422,7 @@ function AITierDisplay() {
           <TierIcon className={`h-5 w-5 text-white`} />
         </div>
         <div>
-          <p className="text-sm font-bold">Plan {config.label}</p>
+          <p className="text-sm font-bold">Model {config.label}</p>
           <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${config.badge}`}>
             Aktif
           </span>
@@ -449,12 +467,6 @@ function AITierDisplay() {
         </div>
       </div>
       
-      {/* Upgrade CTA for Free */}
-      {tier === 'free' && (
-        <button className="w-full h-11 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center justify-center gap-2 shadow-lg shadow-[#0A5BE0]/20 hover:-translate-y-0.5">
-          <Zap className="h-4 w-4" /> Upgrade ke Pro
-        </button>
-      )}
     </div>
   );
 }
