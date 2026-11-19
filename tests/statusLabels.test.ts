@@ -9,6 +9,8 @@ import {
   approvalStatusLabel,
   isQueueActive,
   queueStatusHint,
+  queueDisplayLabel,
+  isQueueSkipped,
   queueStatusLabel,
   queueTypeLabel, effectiveApprovalStatus } from "../src/lib/statusLabels.ts";
 
@@ -59,4 +61,13 @@ test("teks antarmuka tidak lagi menyebut Job Feed", () => {
     const src = readFileSync(new URL(rel, import.meta.url), "utf8");
     assert.doesNotMatch(src.replace(/^\s*(\*|\/\/).*$/gm, ""), /Job Feed/);
   }
+});
+
+test("antrean: job apply tanpa tautan tampil Dilewati, bukan Gagal", () => {
+  const msg = "Lowongan tidak punya tautan untuk dilamar";
+  assert.equal(isQueueSkipped("failed", msg), true);
+  assert.equal(queueDisplayLabel("failed", msg), "Dilewati");
+  assert.match(queueStatusHint("failed", "apply", msg), /tidak punya tautan/);
+  assert.equal(queueDisplayLabel("failed", "timeout"), "Gagal");
+  assert.match(queueStatusHint("completed", "apply"), /peramban server/);
 });

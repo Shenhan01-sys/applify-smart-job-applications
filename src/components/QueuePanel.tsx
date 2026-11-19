@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bot, CheckCircle2, Clock, Loader2, XCircle, RefreshCw } from "lucide-react";
 import { automationQueue, type QueueItem } from "@/services/automationQueue";
 import { describeError } from "@/lib/authErrors";
-import { isQueueActive, queueStatusHint, queueStatusLabel, queueTypeLabel } from "@/lib/statusLabels";
+import { isQueueActive, queueDisplayLabel, queueStatusHint, queueTypeLabel } from "@/lib/statusLabels";
 import { relativeTime } from "@/lib/dashboardStats";
 
 const POLL_MS = 15_000;
@@ -91,11 +91,11 @@ export function QueuePanel() {
                 {q.job && <p className="truncate text-sm text-muted-foreground">{q.job.title} · {q.job.company}</p>}
               </div>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[q.status] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}>
-                <StatusIcon status={q.status} /> {queueStatusLabel(q.status)}
+                <StatusIcon status={q.status} /> {queueDisplayLabel(q.status, q.error_message)}
               </span>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type)}
+              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message)}
             </p>
             {q.status === "failed" && q.error_message && (
               <details className="mt-1.5 text-xs text-muted-foreground">

@@ -37,7 +37,7 @@ test("Lamaran: antrean agen terlihat dan jendela detail memakai Radix Dialog", (
   assert.doesNotMatch(src, /fixed inset-0 z-50/);
   const panel = read("../src/components/QueuePanel.tsx");
   assert.match(panel, /automationQueue\.getQueue/);
-  assert.match(panel, /queueStatusLabel/);
+  assert.match(panel, /queue(StatusLabel|DisplayLabel)/);
   assert.match(panel, /Coba lagi/);
   const queue = read("../src/services/automationQueue.ts");
   assert.match(queue, /async getQueue\(/);

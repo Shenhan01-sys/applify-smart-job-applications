@@ -61,8 +61,23 @@ export const applicationStatusLabel = (s?: string | null) => pick(APPLICATION_ST
 export const queueStatusLabel = (s?: string | null) => pick(QUEUE_STATUS_LABEL, s, "Status tidak diketahui");
 export const queueTypeLabel = (s?: string | null) => pick(QUEUE_TYPE_LABEL, s, "Tugas agen");
 
+/**
+ * Worker menandai job apply tanpa tautan lowongan sebagai failed dengan pesan ini (NonRetryableError).
+ * Bagi pengguna itu bukan kegagalan agen, jadi tampil sebagai Dilewati.
+ */
+export function isQueueSkipped(status?: string | null, errorMessage?: string | null): boolean {
+  return status === "failed" && /tidak punya tautan/i.test(errorMessage ?? "");
+}
+
+export function queueDisplayLabel(status?: string | null, errorMessage?: string | null): string {
+  return isQueueSkipped(status, errorMessage) ? "Dilewati" : queueStatusLabel(status);
+}
+
 /** Penjelasan satu kalimat untuk pengguna awam: apa artinya status antrean ini dan apa yang perlu dilakukan. */
-export function queueStatusHint(status: string | null | undefined, jobType?: string | null): string {
+export function queueStatusHint(status: string | null | undefined, jobType?: string | null, errorMessage?: string | null): string {
+  if (isQueueSkipped(status, errorMessage)) {
+    return "Dilewati: lowongan ini tidak punya tautan untuk dilamar. Pilih lowongan lain di halaman Lowongan.";
+  }
   switch (status) {
     case "pending":
       return "Tugas sudah masuk antrean. Agen akan mengerjakannya begitu gilirannya tiba; kamu tidak perlu melakukan apa-apa.";
@@ -70,7 +85,7 @@ export function queueStatusHint(status: string | null | undefined, jobType?: str
       return "Agen sedang mengerjakan tugas ini. Halaman ini bisa ditinggalkan; hasilnya muncul di sini.";
     case "completed":
       return jobType === "apply"
-        ? "Agen sudah mengisi formulir lowongan dan berhenti sebelum tombol kirim. Buka lowongannya dan kirim sendiri bila sudah yakin."
+        ? "Agen sudah mencoba mengisi formulir di peramban server dan berhenti sebelum tombol kirim. Isian itu tidak tersimpan di perangkatmu, jadi kirim sendiri lewat situs lowongan bila sudah yakin."
         : "Tugas selesai.";
     case "failed":
       return "Tugas tidak berhasil. Kamu bisa mencoba lagi dari halaman Lowongan.";
