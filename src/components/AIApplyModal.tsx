@@ -75,6 +75,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
   const [isEditing, setIsEditing] = useState(false);
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
   const [error, setError] = useState("");
+  // Galat pengajuan persetujuan tampil di footer, tepat di atas tombolnya: area isi bisa tergulir dan galatnya tidak terlihat.
+  const [approvalError, setApprovalError] = useState("");
   const [tier, setTier] = useState<"free" | "pro">("free");
   // null = belum diketahui (belum dimuat atau gagal dimuat): tidak pernah diisi angka bawaan 10 / 10.
   const [quota, setQuota] = useState<QuotaState | null>(null);
@@ -237,6 +239,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
     try {
       setRequesting(true);
       setError("");
+      setApprovalError("");
       await persistPendingEdit();
       const created: any = await automationApi.createApproval({
         job_id: jobId,
@@ -257,7 +260,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
       );
       onSuccess();
     } catch (err: any) {
-      setError(`${describeApiError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`);
+      const message = `${describeApiError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`;
+      setApprovalError(message);
+      toast.error(message);
     } finally {
       setRequesting(false);
     }
@@ -656,6 +661,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
 
         {/* Footer Actions */}
         <div className="p-5 border-t border-[#E0E0E0] space-y-3">
+          {approvalError && (
+            <div role="alert" id="apply-approval-error" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{approvalError}</span>
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -692,6 +705,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 type="button"
                 onClick={handleRequestApproval}
                 disabled={requesting}
+                aria-describedby={approvalError ? "apply-approval-error" : undefined}
                 className="flex-1 min-h-11 rounded-xl bg-[#16150F] text-white text-sm font-semibold hover:-translate-y-0.5 hover:shadow-lg transition disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
               >
                 {requesting ? (
@@ -699,7 +713,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, onClose, onSuc
                 ) : (
                   <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
                 )}
-                {requesting ? "Mengajukan..." : "Ajukan ke Persetujuan"}
+                {requesting ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : "Ajukan ke Persetujuan"}
               </button>
             )}
           </div>
