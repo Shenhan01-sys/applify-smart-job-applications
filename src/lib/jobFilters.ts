@@ -56,3 +56,18 @@ export function isVisibleJob(job: JobFilterFields): boolean {
 export function visibleJobs<T extends JobFilterFields>(jobs: readonly T[]): T[] {
   return jobs.filter(isVisibleJob);
 }
+
+/** Batas baris per muatan halaman Lowongan. */
+export const JOBS_PAGE_LIMIT = 200;
+
+/**
+ * Saringan PostgREST `or` untuk pencarian Lowongan di server: judul, perusahaan, atau lokasi mengandung kata kunci.
+ * Karakter yang punya arti dalam sintaks `or` (koma, kurung, titik dua, tanda kutip, garis miring terbalik) dan
+ * wildcard (`%`, `*`) dibuang, supaya ketikan pengguna tidak bisa mengubah bentuk kueri.
+ * Mengembalikan null bila kata kunci kosong setelah dibersihkan.
+ */
+export function jobSearchFilter(raw: string): string | null {
+  const q = raw.replace(/[,():"'\\%*]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!q) return null;
+  return ["title", "company", "location"].map((col) => `${col}.ilike.*${q}*`).join(",");
+}

@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
-import { visibleJobs } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   NO_PROFILE_SKILLS_TEXT,
@@ -68,9 +68,16 @@ function JobsPage() {
       setLoading(false);
       return;
     }
-    fetchJobs();
     fetchSavedJobs();
   }, []);
+
+  // Pencarian dijalankan di server (judul, perusahaan, lokasi), bukan hanya pada lowongan yang sudah termuat.
+  // Tanpa ini, mencari "frontend" kosong bila 100 lowongan terbaru kebetulan bidang lain (uji klik 2026-11-19).
+  useEffect(() => {
+    if (isMockMode()) return;
+    const t = setTimeout(() => fetchJobs(searchQuery), searchQuery ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // Skill dari user_skills dan skills_used di pengalaman. Gagal memuat bukan berarti "tanpa skill": galatnya
   // ditampilkan dan skor tidak dihitung.
@@ -91,18 +98,19 @@ function JobsPage() {
     }
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (search = "") => {
     try {
       setLoadError("");
-      const { data, error } = await supabase
+      let query = supabase
         .from("jobs")
         .select("*")
         .eq("status", "active")
         // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
-        .not("external_url", "is", null)
-        // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
-        .order("created_at", { ascending: false })
-        .limit(100);
+        .not("external_url", "is", null);
+      const filter = jobSearchFilter(search);
+      if (filter) query = query.or(filter);
+      // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
+      const { data, error } = await query.order("created_at", { ascending: false }).limit(JOBS_PAGE_LIMIT);
 
       if (error) throw error;
       // Akun asli tidak pernah diisi data contoh: tabel kosong berarti daftar kosong. Baris uji (localhost,
@@ -307,7 +315,7 @@ function JobsPage() {
         <ErrorState
           title="Lowongan belum bisa dimuat"
           message={loadError}
-          onRetry={() => { setLoading(true); fetchJobs(); }}
+          onRetry={() => { setLoading(true); fetchJobs(searchQuery); }}
         />
       ) : shownJobs.length > 0 ? (
         <>

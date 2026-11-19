@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilter, JOBS_PAGE_LIMIT } from "../src/lib/jobFilters.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -76,4 +76,22 @@ test("halaman Lowongan menyaring hasil database dan hitungannya mengikuti hasil 
   assert.doesNotMatch(page, /from\("jobs"\)\s*\.(delete|update|insert|upsert)/);
   // hitungan header memakai daftar yang sudah disaring
   assert.match(page, /\$\{jobs\.length\} lowongan tersimpan/);
+});
+
+test("pencarian lowongan: saringan server mencakup judul, perusahaan, lokasi dan membuang karakter sintaks", () => {
+  assert.equal(jobSearchFilter("  "), null);
+  assert.equal(jobSearchFilter("%*,()"), null);
+  assert.equal(
+    jobSearchFilter(" Frontend  Dev "),
+    "title.ilike.*Frontend Dev*,company.ilike.*Frontend Dev*,location.ilike.*Frontend Dev*",
+  );
+  assert.equal(jobSearchFilter("a,b(c):d"), "title.ilike.*a b c d*,company.ilike.*a b c d*,location.ilike.*a b c d*");
+  assert.ok(JOBS_PAGE_LIMIT >= 100);
+});
+
+test("halaman Lowongan mencari di server, bukan hanya di 100 baris terbaru", () => {
+  const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  assert.match(src, /jobSearchFilter\(search\)/);
+  assert.match(src, /query\.or\(filter\)/);
+  assert.doesNotMatch(src, /\.limit\(100\)/);
 });
