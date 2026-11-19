@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -9,8 +10,7 @@ import {
   isQueueActive,
   queueStatusHint,
   queueStatusLabel,
-  queueTypeLabel,
-} from "../src/lib/statusLabels.ts";
+  queueTypeLabel, effectiveApprovalStatus } from "../src/lib/statusLabels.ts";
 
 test("setiap status approval, lamaran, dan antrean punya label Indonesia", () => {
   for (const k of ["pending", "approved", "rejected", "expired"]) assert.ok(APPROVAL_STATUS_LABEL[k]);
@@ -41,4 +41,22 @@ test("isQueueActive: hanya pending dan processing", () => {
   assert.equal(isQueueActive("pending"), true);
   assert.equal(isQueueActive("processing"), true);
   for (const s of ["completed", "failed", undefined, null]) assert.equal(isQueueActive(s as any), false);
+});
+
+test("status persetujuan yang masa berlakunya lewat ditampilkan kedaluwarsa, bukan Disetujui", () => {
+  const now = Date.parse("2026-11-19T16:00:00Z");
+  assert.equal(effectiveApprovalStatus("approved", "2026-11-19T15:05:00Z", now), "expired");
+  assert.equal(effectiveApprovalStatus("pending", "2026-11-19T15:05:00Z", now), "expired");
+  assert.equal(effectiveApprovalStatus("approved", "2026-11-19T17:00:00Z", now), "approved");
+  assert.equal(effectiveApprovalStatus("rejected", "2026-11-19T15:05:00Z", now), "rejected");
+  assert.equal(effectiveApprovalStatus("approved", null, now), "approved");
+  const src = readFileSync(new URL("../src/routes/approvals.tsx", import.meta.url), "utf8");
+  assert.match(src, /approvalStatusLabel\(shownStatus\)/);
+});
+
+test("teks antarmuka tidak lagi menyebut Job Feed", () => {
+  for (const rel of ["../src/lib/emailApply.ts", "../src/routes/payment.success.tsx"]) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.doesNotMatch(src.replace(/^\s*(\*|\/\/).*$/gm, ""), /Job Feed/);
+  }
 });

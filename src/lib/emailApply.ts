@@ -145,7 +145,7 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
   });
 
   if (!Number.isFinite(expires) || expires <= now) {
-    return off("expired", "Persetujuan ini sudah kedaluwarsa. Ajukan draf lagi dari Job Feed untuk mendapat persetujuan baru.");
+    return off("expired", "Persetujuan ini sudah kedaluwarsa. Ajukan draf lagi dari halaman Lowongan untuk mendapat persetujuan baru.");
   }
   if (!approval.job_id) return off("no_job", "Persetujuan ini tidak terhubung ke lowongan, jadi email tidak bisa dikirim.");
   if (typeof approval.cover_letter !== "string" || approval.cover_letter.trim() === "") {

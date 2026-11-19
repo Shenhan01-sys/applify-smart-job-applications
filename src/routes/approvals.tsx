@@ -7,7 +7,7 @@ import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import EmailApplyPanel from "@/components/EmailApplyPanel";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
-import { approvalStatusLabel } from "@/lib/statusLabels";
+import { approvalStatusLabel, effectiveApprovalStatus } from "@/lib/statusLabels";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
@@ -219,7 +219,8 @@ function ApprovalsPage() {
       ) : (
         <div className="space-y-3">
           {displayApprovals.map((request, i) => {
-            const config = getStatusConfig(request.status);
+            const shownStatus = effectiveApprovalStatus(request.status, request.expires_at);
+            const config = getStatusConfig(shownStatus);
             const StatusIcon = config.icon;
             return (
               <div
@@ -233,7 +234,7 @@ function ApprovalsPage() {
                       <h3 className="text-sm font-bold truncate">{request.job_title}</h3>
                       <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${config.text}`}>
                         <StatusIcon className="h-3 w-3" />
-                        {approvalStatusLabel(request.status)}
+                        {approvalStatusLabel(shownStatus)}
                       </span>
                       <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
                         <Sparkles className="h-3 w-3" />

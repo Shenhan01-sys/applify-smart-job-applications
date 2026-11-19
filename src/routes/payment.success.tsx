@@ -180,7 +180,7 @@ function PaymentSuccessPage() {
             </li>
             <li className="flex items-start gap-2.5">
               <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">2</span>
-              <span>Ajukan draf lamaran dari <span className="font-semibold text-foreground">Job Feed</span>. Agen mengisi formulir, dan baru mengirim setelah kamu menyetujuinya.</span>
+              <span>Ajukan draf lamaran dari <span className="font-semibold text-foreground">Lowongan</span>. Agen mengisi formulir, dan baru mengirim setelah kamu menyetujuinya.</span>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">3</span>

@@ -11,6 +11,20 @@ export const APPROVAL_STATUS_LABEL: Record<string, string> = {
   expired: "Kedaluwarsa",
 };
 
+/**
+ * Status yang ditampilkan untuk satu permintaan persetujuan. Kolom status di database tidak berubah sendiri
+ * saat masa berlaku habis, jadi permintaan `pending` atau `approved` yang `expires_at`-nya sudah lewat
+ * ditampilkan sebagai `expired`. Tanpa ini, badge menulis "Disetujui" sementara panel email di bawahnya
+ * menulis "sudah kedaluwarsa" (uji klik produksi 19 November 2026).
+ */
+export function effectiveApprovalStatus(status: string, expiresAt: string | null | undefined, now: number = Date.now()): string {
+  if ((status === "pending" || status === "approved") && expiresAt) {
+    const t = new Date(expiresAt).getTime();
+    if (Number.isFinite(t) && t <= now) return "expired";
+  }
+  return status;
+}
+
 /** ai_applications.status */
 export const APPLICATION_STATUS_LABEL: Record<string, string> = {
   draft: "Draf",
