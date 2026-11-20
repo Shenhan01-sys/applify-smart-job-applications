@@ -100,3 +100,16 @@ export function matchesJobSearch(job: { title?: string | null; company?: string 
   const hay = `${job.title ?? ""} ${job.company ?? ""} ${job.location ?? ""}`.toLowerCase();
   return searchTerms(raw).every((t) => hay.includes(t.toLowerCase()));
 }
+
+export const SAVED_EMPTY_TITLE = "Belum ada lowongan tersimpan";
+export const SAVED_EMPTY_TEXT = "Tekan ikon simpan pada kartu lowongan untuk menyimpannya.";
+
+/**
+ * Teks keadaan kosong untuk saringan "Tersimpan". null bila teks umum ("Tidak ada lowongan yang cocok") yang
+ * benar: ada lowongan tersimpan (jadi kosongnya karena pencarian), atau daftar tersimpan gagal dimuat
+ * (kosongnya belum tentu berarti pengguna belum menyimpan apa pun).
+ */
+export function savedFilterEmpty(input: { filter: string; savedCount: number; loadFailed: boolean }): { title: string; text: string } | null {
+  if (input.filter !== "saved" || input.loadFailed || input.savedCount > 0) return null;
+  return { title: SAVED_EMPTY_TITLE, text: SAVED_EMPTY_TEXT };
+}

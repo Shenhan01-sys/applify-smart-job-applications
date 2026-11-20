@@ -11,7 +11,7 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, freshJobsFilter, savedFilterEmpty, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   NO_PROFILE_SKILLS_TEXT,
@@ -48,6 +48,8 @@ const FILTERS = [
 function JobsPage() {
   const [jobs, setJobs] = useState<JobData[]>([]);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
+  // Gagal memuat daftar tersimpan: filter "Tersimpan" yang kosong belum tentu berarti belum ada yang disimpan.
+  const [savedLoadFailed, setSavedLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
@@ -143,9 +145,11 @@ function JobsPage() {
 
       if (error) throw error;
       setSavedJobs(new Set(data?.map((j) => j.job_id) || []));
+      setSavedLoadFailed(false);
     } catch (err) {
       console.error("Error fetching saved jobs:", err);
       setSavedJobs(new Set());
+      setSavedLoadFailed(true);
       toast.error(describeError(err, "Daftar lowongan tersimpan belum bisa dimuat."));
     }
   };
@@ -237,6 +241,8 @@ function JobsPage() {
   // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
   // Kosong karena belum ada lowongan sama sekali, bukan karena pencarian tidak menemukan hasil.
   const noJobsAtAll = jobs.length === 0 && !searchQuery.trim();
+  // Saringan "Tersimpan" tanpa satu pun lowongan tersimpan: beri petunjuk cara menyimpan, bukan teks umum.
+  const savedEmpty = savedFilterEmpty({ filter: activeFilter, savedCount: savedJobs.size, loadFailed: savedLoadFailed });
   const strongMatches = jobs.filter((j) => (scoreOf(j) ?? -1) >= HIGH_MATCH_THRESHOLD).length;
 
   return (
@@ -369,16 +375,18 @@ function JobsPage() {
         <div className="text-center py-16">
           <Brain className="h-12 w-12 mx-auto text-[#999999] mb-4" aria-hidden="true" />
           <h2 className="text-lg font-semibold mb-2">
-            {noJobsAtAll ? "Belum ada lowongan" : "Tidak ada lowongan yang cocok"}
+            {noJobsAtAll ? "Belum ada lowongan" : savedEmpty ? savedEmpty.title : "Tidak ada lowongan yang cocok"}
           </h2>
           <p className="mx-auto max-w-md text-sm text-muted-foreground mb-6">
             {noJobsAtAll
               ? "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan."
-              : activeFilter === "high-match" && profileHasSkills === false
-                ? NO_PROFILE_SKILLS_TEXT + "."
-                : activeFilter === "high-match" && skillsError
-                  ? skillsError
-                  : "Coba ubah penyaring atau kata kunci pencarian."}
+              : savedEmpty
+                ? savedEmpty.text
+                : activeFilter === "high-match" && profileHasSkills === false
+                  ? NO_PROFILE_SKILLS_TEXT + "."
+                  : activeFilter === "high-match" && skillsError
+                    ? skillsError
+                    : "Coba ubah penyaring atau kata kunci pencarian."}
           </p>
           {jobs.length > 0 && activeFilter === "high-match" && profileHasSkills === false && (
             <Link to="/profile" className="inline-flex min-h-11 items-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90 transition">

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT } from "../src/lib/jobFilters.ts";
 
 test("freshSinceDate/freshJobsFilter: 30 hari ke belakang (UTC), baris tanpa posted_at tetap dimuat", () => {
   assert.equal(JOB_MAX_AGE_DAYS, 30);
@@ -115,4 +115,32 @@ test("halaman Lowongan mencari di server, bukan hanya di 100 baris terbaru", () 
   assert.match(src, /query = query\.or\(filter\)/);
   assert.match(src, /noJobsAtAll \? "Belum ada lowongan"/);
   assert.doesNotMatch(src, /\.limit\(100\)/);
+});
+
+// Uji E2E klik 20 November 2026 (temuan 17): saringan "Tersimpan" yang kosong memakai teks umum.
+test("temuan 17: saringan Tersimpan tanpa lowongan tersimpan punya teks sendiri dengan petunjuk menyimpan", () => {
+  const copy = savedFilterEmpty({ filter: "saved", savedCount: 0, loadFailed: false });
+  assert.deepEqual(copy, { title: SAVED_EMPTY_TITLE, text: SAVED_EMPTY_TEXT });
+  assert.equal(`${copy?.title}. ${copy?.text}`, "Belum ada lowongan tersimpan. Tekan ikon simpan pada kartu lowongan untuk menyimpannya.");
+});
+
+test("saringan Tersimpan: teks umum tetap dipakai bila ada lowongan tersimpan, daftar gagal dimuat, atau saringan lain", () => {
+  // ada yang tersimpan, kosongnya karena pencarian
+  assert.equal(savedFilterEmpty({ filter: "saved", savedCount: 3, loadFailed: false }), null);
+  // gagal memuat: kosong belum tentu berarti belum menyimpan
+  assert.equal(savedFilterEmpty({ filter: "saved", savedCount: 0, loadFailed: true }), null);
+  for (const filter of ["all", "remote", "hybrid", "onsite", "high-match"]) {
+    assert.equal(savedFilterEmpty({ filter, savedCount: 0, loadFailed: false }), null, filter);
+  }
+});
+
+test("halaman Lowongan memakai teks kosong Tersimpan, tanpa membuang teks umum dan keadaan belum ada lowongan", () => {
+  const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  assert.match(src, /savedFilterEmpty\(\{ filter: activeFilter, savedCount: savedJobs\.size, loadFailed: savedLoadFailed \}\)/);
+  assert.match(src, /savedEmpty \? savedEmpty\.title : "Tidak ada lowongan yang cocok"/);
+  assert.match(src, /savedEmpty\s*\? savedEmpty\.text/);
+  assert.match(src, /noJobsAtAll \? "Belum ada lowongan"/);
+  // kegagalan memuat daftar tersimpan dicatat, dan dibersihkan lagi saat berhasil
+  assert.match(src, /setSavedLoadFailed\(true\)/);
+  assert.match(src, /setSavedLoadFailed\(false\)/);
 });
