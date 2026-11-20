@@ -8,8 +8,9 @@
  *   skor = skill yang disebut lowongan DAN ada di profil / semua skill yang disebut lowongan
  *
  * "Skill yang disebut lowongan" diambil dari tiga tempat, tanpa AI dan tanpa angka karangan:
- *   1. kamus skill umum (teknologi dan beberapa kemampuan umum) yang muncul di judul, deskripsi, requirements,
- *      dan skill_matches lowongan;
+ *   1. kamus skill umum (teknologi, IT support dan jaringan, administrasi dan keuangan, desain, pemasaran,
+ *      data, serta beberapa kemampuan umum) yang muncul di judul, deskripsi, requirements, dan skill_matches
+ *      lowongan;
  *   2. daftar skill yang ditulis eksplisit: item `requirements` yang pendek, dan baris "Requirements: A, B, C"
  *      (atau Persyaratan, Kualifikasi, Skills, Keahlian) di deskripsi;
  *   3. skill profil di luar kamus yang disebut langsung di teks lowongan.
@@ -125,6 +126,66 @@ const SKILL_DICTIONARY: string[][] = [
   ["Kepemimpinan", "leadership"],
   ["Kerja Tim", "teamwork", "kerja sama tim", "kerjasama tim"],
   ["Bahasa Inggris", "english"],
+
+  // IT support dan operasional. "jaringan" polos dihitung sebagai jaringan komputer (di lowongan IT hampir
+  // selalu begitu); "network" polos tidak, karena sering berarti relasi bisnis.
+  ["IT Support", "helpdesk", "help desk", "service desk", "technical support", "dukungan teknis"],
+  ["Hardware", "perangkat keras"],
+  ["Jaringan Komputer", "jaringan", "networking", "computer network", "computer networking"],
+  ["Troubleshooting", "troubleshoot"],
+  ["Windows", "microsoft windows"],
+  ["Windows Server"],
+  ["Active Directory"],
+  ["TCP/IP", "tcpip"],
+  ["LAN/WAN", "lan", "wan", "local area network", "wide area network"],
+  ["MikroTik", "routeros"],
+  ["Cisco", "ccna", "ccnp"],
+  ["CCTV"],
+  ["Printer"],
+  ["VMware"],
+  ["Microsoft 365", "office 365", "m365", "o365"],
+  ["Google Workspace", "g suite", "gsuite", "google docs", "google sheets", "google spreadsheet"],
+  ["PowerPoint", "microsoft powerpoint", "ms powerpoint", "power point"],
+  ["Microsoft Word", "ms word"],
+
+  // Administrasi, keuangan, dan layanan
+  ["Administrasi", "administration", "administrative", "administratif"],
+  ["Akuntansi", "accounting", "pembukuan", "bookkeeping"],
+  ["Perpajakan", "pajak", "taxation", "tax"],
+  ["Data Entry", "input data", "pengisian data"],
+  ["Customer Service", "layanan pelanggan", "pelayanan pelanggan", "customer support", "customer care"],
+  ["Negosiasi", "negotiation"],
+  ["Problem Solving", "pemecahan masalah", "pemecah masalah"],
+  ["Manajemen Waktu", "time management"],
+  ["Public Speaking"],
+
+  // Desain
+  ["Desain Grafis", "graphic design", "graphic designer"],
+  ["Adobe Photoshop", "photoshop"],
+  ["Adobe Illustrator", "illustrator"],
+  ["Adobe Premiere", "premiere pro"],
+  ["After Effects", "adobe after effects"],
+  ["Canva"],
+  ["CorelDRAW", "corel draw"],
+  ["UI/UX Design", "ui ux", "uiux", "ux design", "ui design", "ux research"],
+  ["Video Editing", "edit video", "pengeditan video"],
+
+  // Pemasaran dan konten
+  ["Copywriting", "copywriter", "copy writing"],
+  ["Social Media", "media sosial", "sosial media", "social media marketing", "social media management"],
+  ["Digital Marketing", "pemasaran digital", "online marketing"],
+  ["Content Creation", "content creator", "pembuatan konten", "pembuat konten", "content production", "produksi konten"],
+  ["Content Writing", "content writer", "penulisan konten"],
+  ["Email Marketing"],
+  ["Google Analytics", "ga4"],
+  ["Google Ads", "google adwords"],
+  ["Meta Ads", "facebook ads", "instagram ads"],
+
+  // Data
+  ["Data Visualization", "visualisasi data"],
+  ["Looker Studio", "google data studio"],
+  ["Statistika", "statistik", "statistics"],
+  ["ETL"],
 ];
 
 /**

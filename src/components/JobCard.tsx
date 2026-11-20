@@ -1,9 +1,29 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { platformLabel } from "@/lib/platforms";
 import { listOrEmpty, postedDate, radarFromMatches } from "@/lib/jobCardData";
 import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
-import { JOB_LABELS, jobTypeLabel, marketPositionLabel, salaryPeriodLabel, workplaceLabel } from "@/lib/jobLabels";
+import { JOB_LABELS, jobTypeLabel, marketPositionLabel, workplaceLabel } from "@/lib/jobLabels";
+import {
+  GLINTS_DETAIL_NOTE,
+  benchmarkScale,
+  benchmarkText,
+  benchmarkView,
+  enrichFailureNote,
+  formatMoney,
+  formatMoneyRange,
+  isThinDetail,
+  matchBreakdown,
+  mergeJobUpdate,
+  needsDetail,
+  needsGlintsNote,
+  salaryText,
+  skillAnalysisNote,
+  type BenchmarkView,
+  type MatchBreakdown,
+  type SalaryBenchmarkResult,
+} from "@/lib/jobDetail";
+import { automationApi } from "@/services/automationApi";
 import {
   MapPin,
   Briefcase,
@@ -26,6 +46,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 export interface JobData {
@@ -285,6 +306,87 @@ function SalaryBar({ current, marketAvg, marketHigh, marketLow }: { current: num
   );
 }
 
+/** Donat kecocokan: skill yang cocok (hijau) melawan yang belum ada di profil (kuning). Angkanya dari computeMatch. */
+function MatchDonut({ breakdown }: { breakdown: MatchBreakdown }) {
+  const size = 96;
+  const stroke = 12;
+  const center = size / 2;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const matchedLength = breakdown.share * circumference;
+
+  return (
+    <div className="flex items-center gap-4">
+      <svg
+        width={size}
+        height={size}
+        className="shrink-0"
+        role="img"
+        aria-label={`Grafik donat kecocokan skill: ${breakdown.matched} cocok dan ${breakdown.missing} belum dimiliki dari ${breakdown.total} skill yang diminta`}
+      >
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="#F59E0B" strokeWidth={stroke} />
+        {breakdown.matched > 0 && (
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="#22C55E"
+            strokeWidth={stroke}
+            strokeDasharray={`${matchedLength} ${circumference - matchedLength}`}
+            transform={`rotate(-90 ${center} ${center})`}
+          />
+        )}
+        <text x={center} y={center} textAnchor="middle" dominantBaseline="central" className="fill-[#16150F] font-bold" style={{ fontSize: 16 }}>
+          {breakdown.matched}/{breakdown.total}
+        </text>
+      </svg>
+      <ul className="space-y-1 text-xs">
+        <li className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-[#22C55E]" aria-hidden="true" />
+          {breakdown.matched} cocok
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-[#F59E0B]" aria-hidden="true" />
+          {breakdown.missing} belum dimiliki
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Batang pembanding gaji: pita rentang tengah (p25 sampai p75) lowongan serupa, garis median, dan rentang gaji
+ * lowongan ini. Angkanya ada di legenda dan kalimat di bawahnya, jadi batangnya sendiri disembunyikan dari pembaca layar.
+ */
+function BenchmarkBar({ view }: { view: Extract<BenchmarkView, { kind: "compare" }> }) {
+  const s = benchmarkScale(view);
+  const jobRange = formatMoneyRange(view.jobMin, view.jobMax, view.currency);
+  return (
+    <div className="space-y-2">
+      <div className="relative h-4 rounded-full bg-[#EFEFEF]" aria-hidden="true">
+        <div className="absolute inset-y-0 rounded-full bg-[#0A5BE0]/20" style={{ left: `${s.bandLeft}%`, width: `${s.bandWidth}%` }} />
+        <div className="absolute -inset-y-1 w-0.5 bg-[#16150F]" style={{ left: `${s.medianAt}%` }} />
+        <div className="absolute inset-y-0.5 rounded-full bg-[#0A5BE0]" style={{ left: `${s.jobLeft}%`, width: `${s.jobWidth}%` }} />
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <span className="h-2.5 w-4 rounded-full bg-[#0A5BE0]/20" aria-hidden="true" />
+          Rentang tengah {formatMoneyRange(view.p25, view.p75, view.currency)}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="h-3 w-0.5 bg-[#16150F]" aria-hidden="true" />
+          Median {formatMoney(view.median, view.currency)}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="h-2.5 w-4 rounded-full bg-[#0A5BE0]" aria-hidden="true" />
+          Lowongan ini {jobRange}
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -293,7 +395,13 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, onApply }: {
+/** Ids whose full detail was already requested in this page load; a card used on its own gets this fallback. */
+const DETAIL_ATTEMPTS_FALLBACK = new Set<string>();
+
+type DetailState = { phase: "idle" } | { phase: "loading" } | { phase: "failed"; note: string };
+type BenchmarkState = { phase: "idle" } | { phase: "loading" } | { phase: "ready"; data: SalaryBenchmarkResult } | { phase: "unavailable" };
+
+export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, onApply, onJobUpdated, detailAttempts = DETAIL_ATTEMPTS_FALLBACK }: {
   job: JobData;
   /** Per-user match (lib/matchScore.ts); null while it is being worked out or when the profile could not be read. */
   match: JobMatch | null;
@@ -302,15 +410,67 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   isSaved: boolean;
   onToggleSave: () => void;
   onApply: () => void;
+  /** Called with the job row after the server filled in its full detail, so the page can replace it and recompute the match. */
+  onJobUpdated?: (job: JobData) => void;
+  /** Page-level set of job ids whose detail was already requested, so a collapsed and re-opened card never asks twice. */
+  detailAttempts?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<DetailState>({ phase: "idle" });
+  const [bench, setBench] = useState<BenchmarkState>({ phase: "idle" });
+  const benchRequested = useRef(false);
 
-  const salaryText = job.salary_min && job.salary_max
-    ? `${formatCurrency(job.salary_min)} - ${formatCurrency(job.salary_max)}`
-    : JOB_LABELS.card.salaryMissing;
+  // First time the card is opened: JobStreet and Dealls rows only hold a teaser, so the server fetches the full
+  // posting (description, requirements, salary). Once per job id; Glints cannot be fetched (see GLINTS_DETAIL_NOTE).
+  useEffect(() => {
+    if (!expanded || !needsDetail(job) || detailAttempts.has(job.id)) return;
+    detailAttempts.add(job.id);
+    setDetail({ phase: "loading" });
+    (async () => {
+      try {
+        const res = await automationApi.enrichJob(job.id);
+        if (!res) {
+          setDetail({ phase: "idle" });
+        } else if (res.enriched && res.job) {
+          onJobUpdated?.(mergeJobUpdate(job, res.job));
+          setDetail({ phase: "idle" });
+        } else {
+          setDetail({ phase: "failed", note: enrichFailureNote(res.reason) });
+        }
+      } catch (err) {
+        console.error("Error enriching job:", err);
+        setDetail({ phase: "failed", note: enrichFailureNote() });
+      }
+    })();
+  }, [expanded, job.id]);
+
+  // Salary comparison with similar postings: fetched when the card is first opened, once per card.
+  useEffect(() => {
+    if (!expanded || benchRequested.current) return;
+    benchRequested.current = true;
+    setBench({ phase: "loading" });
+    (async () => {
+      try {
+        const res = await automationApi.getSalaryBenchmark(job.id);
+        setBench(res ? { phase: "ready", data: res } : { phase: "unavailable" });
+      } catch (err) {
+        console.error("Error loading salary benchmark:", err);
+        setBench({ phase: "unavailable" });
+      }
+    })();
+  }, [expanded, job.id]);
+
+  const salary = salaryText(job);
+  const benchView = bench.phase === "ready" ? benchmarkView(job, bench.data) : null;
+  // "idle" counts as loading: the card is only open after the effect above has had its turn.
+  const benchLoading = bench.phase === "idle" || bench.phase === "loading";
+  const detailLoading = detail.phase === "loading";
+  const thinDetail = isThinDetail(job);
 
   // A row from the job sources has none of the AI analysis (see lib/jobCardData.ts): show only what exists.
+  // The skill chart below comes from `match` (computeMatch); skill_matches is only an extra source when present.
   const radarSkills = radarFromMatches(job.skill_matches);
+  const breakdown = matchBreakdown(match);
   const skillGaps = listOrEmpty<SkillGap>(job.skill_gaps);
   const aiActions = listOrEmpty<AIAction>(job.ai_actions);
   const requirements = listOrEmpty<string>(job.requirements);
@@ -412,10 +572,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
         <div className="flex items-center justify-between mt-4 text-sm">
           <div className="inline-flex items-center gap-1.5 text-[#0A5BE0] font-semibold">
             <DollarSign className="h-4 w-4" />
-            {salaryText}
-            {job.salary_min && job.salary_max && job.salary_period && (
-              <span className="text-xs text-muted-foreground font-normal">/{salaryPeriodLabel(job.salary_period)}</span>
-            )}
+            {salary ?? JOB_LABELS.card.salaryMissing}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
@@ -434,6 +591,40 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
       {/* Expandable Content */}
       {expanded && (
         <div className="border-t border-[#E0E0E0] p-5 space-y-6">
+          {/* Detail lengkap dari situs asal: status pengambilan, atau alasan bila tidak bisa */}
+          {detailLoading && (
+            <p role="status" className="flex items-center gap-2 rounded-xl bg-[#F5F5F5] p-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-[#0A5BE0]" aria-hidden="true" />
+              Mengambil detail lengkap dari {platformLabel(job.platform_source)}...
+            </p>
+          )}
+          {detail.phase === "failed" && (
+            <p role="status" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
+              {detail.note}
+              {job.external_url && (
+                <>
+                  {" "}
+                  <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+                    Buka di situs asal
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+          {needsGlintsNote(job) && (
+            <p className="rounded-xl bg-[#F5F5F5] p-3 text-sm text-muted-foreground">
+              {GLINTS_DETAIL_NOTE}
+              {job.external_url && (
+                <>
+                  {" "}
+                  <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium text-[#0A5BE0] underline underline-offset-4">
+                    Buka di situs asal
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+
           {/* AI Strategy */}
           {job.ai_strategy && (
             <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
@@ -476,11 +667,18 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
                   )}
                 </div>
               )}
-              {radarSkills ? (
-                <RadarChart skills={radarSkills} />
-              ) : match?.status !== "ok" ? (
-                <p className="text-xs text-muted-foreground">Analisis kecocokan skill belum tersedia untuk lowongan ini.</p>
-              ) : null}
+              {breakdown && <MatchDonut breakdown={breakdown} />}
+              {radarSkills && <RadarChart skills={radarSkills} />}
+              {!breakdown && !radarSkills && (
+                <p className="text-xs text-muted-foreground" role={match === null && matchUnavailable ? "alert" : "status"}>
+                  {skillAnalysisNote({
+                    status: match?.status ?? null,
+                    unavailable: matchUnavailable,
+                    loadingDetail: detailLoading,
+                    thinDetail,
+                  })}
+                </p>
+              )}
               {skillGaps.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs font-medium text-[#F59E0B] mb-1.5 flex items-center gap-1">
@@ -504,22 +702,39 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
                 <TrendingUp className="h-4 w-4 text-[#0A5BE0]" />
                 {JOB_LABELS.card.salaryBenchmark}
               </h4>
-              {job.salary_min && job.salary_max && job.salary_benchmark && (
+              {benchLoading && (
+                <p role="status" className="text-xs text-muted-foreground">Memuat pembanding gaji...</p>
+              )}
+              {benchView?.kind === "compare" && (
                 <div className="space-y-3">
-                  <SalaryBar
-                    current={(job.salary_min + job.salary_max) / 2}
-                    marketAvg={job.salary_benchmark.market_average}
-                    marketHigh={job.salary_benchmark.market_high}
-                    marketLow={job.salary_benchmark.market_low}
-                  />
-                  <div className="flex items-center justify-between text-xs bg-[#F5F5F5] p-3 rounded-lg">
-                    <span>
-                      <span className="text-muted-foreground mr-1">{JOB_LABELS.card.percentile}</span>
-                      <span className="text-[#0A5BE0] font-bold text-lg">{job.salary_benchmark.percentile}</span>
-                    </span>
-                    <span className="text-muted-foreground">{marketPositionLabel(job.salary_benchmark.percentile)}</span>
-                  </div>
+                  <BenchmarkBar view={benchView} />
+                  <p className="text-sm leading-relaxed">{benchmarkText(benchView)}</p>
                 </div>
+              )}
+              {benchView && benchView.kind !== "compare" && (
+                <p className="text-sm leading-relaxed">{benchmarkText(benchView)}</p>
+              )}
+              {!benchView && !benchLoading && (
+                job.salary_min && job.salary_max && job.salary_benchmark ? (
+                  // Fallback: the salary_benchmark column, only demo rows carry it (see lib/jobCardData.ts).
+                  <div className="space-y-3">
+                    <SalaryBar
+                      current={(job.salary_min + job.salary_max) / 2}
+                      marketAvg={job.salary_benchmark.market_average}
+                      marketHigh={job.salary_benchmark.market_high}
+                      marketLow={job.salary_benchmark.market_low}
+                    />
+                    <div className="flex items-center justify-between text-xs bg-[#F5F5F5] p-3 rounded-lg">
+                      <span>
+                        <span className="text-muted-foreground mr-1">{JOB_LABELS.card.percentile}</span>
+                        <span className="text-[#0A5BE0] font-bold text-lg">{job.salary_benchmark.percentile}</span>
+                      </span>
+                      <span className="text-muted-foreground">{marketPositionLabel(job.salary_benchmark.percentile)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Pembanding gaji belum tersedia untuk lowongan ini.</p>
+                )
               )}
             </div>
           </div>

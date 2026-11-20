@@ -12,6 +12,7 @@ import {
 } from '@/mocks/mockData'
 
 import { getApiBaseUrl, isMockMode } from '@/lib/appConfig'
+import type { EnrichJobResult, SalaryBenchmarkResult } from '@/lib/jobDetail'
 
 // Alamat server dibaca saat dipanggil. Di build produksi tanpa VITE_API_URL ini melempar ApiConfigError,
 // yang dijelaskan ke pengguna oleh describeApiError(). Localhost hanya dipakai saat `vite dev`.
@@ -385,6 +386,26 @@ export const automationApi = {
       { method: 'POST', headers: await getAuthHeaders() },
       () => ({ success: true, message: "Session refreshed (mock)" }),
       1500,
+    )
+  },
+
+  // Detail lowongan (lib/jobDetail.ts). Mode demo tidak punya server, jadi hasilnya null (tidak ada).
+  /** Mengambil deskripsi lengkap, requirements, dan gaji dari situs asal lalu menyimpannya. Glints tidak didukung. */
+  async enrichJob(jobId: string): Promise<EnrichJobResult | null> {
+    return apiFetch<EnrichJobResult | null>(
+      `${apiBase()}/api/jobs/${encodeURIComponent(jobId)}/enrich`,
+      // Fastify menolak POST ber-Content-Type JSON tanpa isi, jadi body kosong tetap dikirim sebagai objek.
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
+      () => null,
+    )
+  },
+
+  /** Median gaji lowongan serupa yang mencantumkan gaji (per bulan). */
+  async getSalaryBenchmark(jobId: string): Promise<SalaryBenchmarkResult | null> {
+    return apiFetch<SalaryBenchmarkResult | null>(
+      `${apiBase()}/api/jobs/${encodeURIComponent(jobId)}/salary-benchmark`,
+      { headers: await getAuthHeaders() },
+      () => null,
     )
   },
 

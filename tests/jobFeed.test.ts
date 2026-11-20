@@ -118,7 +118,8 @@ test("skor kecocokan per pengguna (lib/matchScore.ts): null tampil —, 0 tampil
   // urutan akhir dari skor per pengguna di klien; kolom match_score global tidak dipakai mengurutkan
   const page = read("../src/routes/jobs.tsx");
   assert.doesNotMatch(page, /\.order\("match_score"/);
-  assert.match(page, /sortByMatch\(filteredJobs, scoreOf\)/);
+  assert.match(page, /sortByMatch\(filteredJobs, orderScoreOf\)/);
+  assert.match(page, /heldScores\.has\(job\.id\) \? \(heldScores\.get\(job\.id\) as number \| null\) : scoreOf\(job\)/);
   assert.match(page, /match=\{matchOf\(selectedJob\)\}/);
   // backend: kolom jobs.match_score diisi skor deterministik atau null (dibaca, tidak diubah)
   assert.match(read("../../backend/services/job-ingest.service.ts"), /match_score/);

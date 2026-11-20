@@ -59,7 +59,9 @@ test("JobCard memakai peta label, tidak ada label bahasa Inggris tertinggal di t
   assert.match(src, /from "@\/lib\/jobLabels"/);
   assert.match(src, /jobTypeLabel\(job\.type\)/);
   assert.match(src, /workplaceLabel\(job\.workplace_type\)/);
-  assert.match(src, /salaryPeriodLabel\(job\.salary_period\)/);
+  // satuan gaji ("/ bulan") ditulis oleh salaryText di lib/jobDetail.ts, bukan lagi di kartu
+  assert.match(src, /salaryText\(job\)/);
+  assert.match(read("../src/lib/jobDetail.ts"), /monthly: "bulan"/);
   assert.doesNotMatch(src, /AI Matched|"Match"|Source:|Acceptance|"Culture"|"Growth"|>\s*Culture|\/monthly|full-time|On-Site|Lihat Detail|AI Apply Sekarang|Skill Gaps Detected|Salary Benchmark|Market Avg|percentile<|Above Market|Key Requirements|AI Application Plan|AI Strategy|Gaji kompetitif/);
   assert.doesNotMatch(src, /\bcapitalize\b/);
 });

@@ -81,7 +81,7 @@ test("profil tanpa skill: tidak ada persen, ada ajakan melengkapi skill di Profi
 });
 
 test("lowongan yang tidak menyebut skill apa pun tidak diberi skor (bukan 0% dan bukan angka karangan)", () => {
-  const m = computeMatch({ title: "Staf Administrasi", description: "Mengurus surat menyurat kantor." }, FRONTEND_PROFILE);
+  const m = computeMatch({ title: "Staf Umum", description: "Mengurus surat menyurat kantor." }, FRONTEND_PROFILE);
   assert.equal(m.status, "no-job-skills");
   assert.equal(m.score, null);
   assert.equal(m.total, 0);

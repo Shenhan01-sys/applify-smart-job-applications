@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
@@ -57,6 +57,9 @@ function JobsPage() {
   // Skill profil untuk skor kecocokan per pengguna. null = belum dimuat atau gagal (lihat skillsError).
   const [profileSkills, setProfileSkills] = useState<string[] | null>(null);
   const [skillsError, setSkillsError] = useState("");
+  // Id lowongan yang detail lengkapnya sudah diminta ke server (satu kali per lowongan), dan skor lama yang menahan urutan.
+  const detailAttempts = useRef(new Set<string>());
+  const [heldScores, setHeldScores] = useState<Map<string, number | null>>(new Map());
   // Kuota draf AI bulan ini dibaca dari database (get_quota_status). null = belum diketahui, jadi tidak ditampilkan.
   const { quota: draftQuota, reload: reloadQuota } = useSubscription();
 
@@ -115,6 +118,7 @@ function JobsPage() {
       // Akun asli tidak pernah diisi data contoh: tabel kosong berarti daftar kosong. Baris uji (localhost,
       // 127.0.0.1, httpbin, sumber e2e-mock) disaring di sini; datanya di database tidak diubah.
       setJobs(visibleJobs((data ?? []) as JobData[]));
+      setHeldScores(new Map());
     } catch (err) {
       console.error("Error fetching jobs:", err);
       setJobs([]);
@@ -187,6 +191,16 @@ function JobsPage() {
     setShowApplyModal(true);
   };
 
+  // Detail lengkap dari server (deskripsi, requirements, gaji) menggantikan baris lowongan di daftar, jadi skor
+  // kecocokan dihitung ulang dari teks yang lengkap. Urutan kartu ditahan: kartu yang sedang dibuka tidak
+  // berpindah tempat saat skornya berubah; urutan baru berlaku saat daftar dimuat ulang.
+  const handleJobUpdated = (updated: JobData) => {
+    const before = matches?.get(updated.id)?.score ?? null;
+    setHeldScores((prev) => (prev.has(updated.id) ? prev : new Map(prev).set(updated.id, before)));
+    setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
+    setSelectedJob((prev) => (prev && prev.id === updated.id ? updated : prev));
+  };
+
   // Skor kecocokan per pengguna: irisan skill profil dengan skill yang disebut lowongan (lib/matchScore.ts).
   const matches = useMemo(
     () => (profileSkills === null ? null : new Map(jobs.map((job) => [job.id, computeMatch(job, profileSkills)] as const))),
@@ -211,7 +225,9 @@ function JobsPage() {
     return matchesSearch && matchesFilter;
   });
   // Skor tertinggi lebih dulu; yang tanpa skor di akhir, urutan sisanya tetap (terbaru lebih dulu).
-  const shownJobs = sortByMatch(filteredJobs, scoreOf);
+  const orderScoreOf = (job: JobData): number | null =>
+    heldScores.has(job.id) ? (heldScores.get(job.id) as number | null) : scoreOf(job);
+  const shownJobs = sortByMatch(filteredJobs, orderScoreOf);
 
   // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
   // Kosong karena belum ada lowongan sama sekali, bukan karena pencarian tidak menemukan hasil.
@@ -337,6 +353,8 @@ function JobsPage() {
                 isSaved={savedJobs.has(job.id)}
                 onToggleSave={() => toggleSaveJob(job.id)}
                 onApply={() => handleApply(job)}
+                onJobUpdated={handleJobUpdated}
+                detailAttempts={detailAttempts.current}
               />
             </li>
           ))}

@@ -1,12 +1,17 @@
 /**
  * What a Job Feed card may show for a row of the `jobs` table.
  *
- * Rows ingested from the job sources (backend/services/job-ingest.service.ts) carry no AI analysis: the
- * table has no skill_matches, skill_gaps or salary_benchmark column, and match_score, acceptance_potential,
- * company_culture_score, growth_potential and ai_strategy are never written by any flow. The card used to
- * assume all of them were present, which crashed the page for a real row and, for the missing numbers,
+ * Rows ingested from the job sources (backend/services/job-ingest.service.ts) carry no AI analysis. The live
+ * `jobs` table has skill_matches, skill_gaps, ai_actions and salary_benchmark columns (they are not in
+ * schema.sql), but no flow ever fills them for a real row: only the demo data in mocks/mockData.ts does. The
+ * same holds for acceptance_potential, company_culture_score, growth_potential and ai_strategy. The card used
+ * to assume all of them were present, which crashed the page for a real row and, for the missing numbers,
  * printed invented defaults. These helpers return `null` or an empty list for what is not there, and the
  * card hides that part.
+ *
+ * What a real row does get is built elsewhere: the skill analysis comes from lib/matchScore.ts (computeMatch),
+ * and the full description, requirements, salary and salary comparison come from the server through
+ * lib/jobDetail.ts. skill_matches is only an extra source when a row happens to carry it.
  *
  * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
  */
