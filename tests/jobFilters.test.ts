@@ -89,7 +89,7 @@ test("halaman Lowongan menyaring hasil database dan hitungannya mengikuti hasil 
   // data uji di database tidak diubah: tidak ada tulis/hapus ke tabel jobs dari halaman
   assert.doesNotMatch(page, /from\("jobs"\)\s*\.(delete|update|insert|upsert)/);
   // hitungan header memakai daftar yang sudah disaring
-  assert.match(page, /\$\{jobs\.length\} lowongan tersimpan/);
+  assert.match(page, /\$\{jobs\.length\} lowongan ditemukan/);
 });
 
 test("pencarian lowongan: per kata, setiap kata wajib ada, karakter sintaks dibuang", () => {
