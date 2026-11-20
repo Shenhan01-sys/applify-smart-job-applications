@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { automationApi } from '@/services/automationApi'
 import { describeApiError } from '@/lib/apiErrors'
@@ -12,6 +12,7 @@ import {
   countNeedingAttention,
   needsAttention,
   normalizeAnswers,
+  rejectReasonHint,
 } from '@/lib/answerReview'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ShieldCheck, XCircle, Clock, AlertTriangle, Loader2, Edit3, Eye, Sparkles } from 'lucide-react'
@@ -49,6 +50,7 @@ export default function ApprovalReviewModal({
   const [loading, setLoading] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const rejectReasonRef = useRef<HTMLTextAreaElement>(null)
   const [editedCoverLetter, setEditedCoverLetter] = useState(request.cover_letter || '')
   const [isEditing, setIsEditing] = useState(false)
   // Peringatan dari penjaga mutu backend setelah "Tulis ulang": angka yang tidak ada di surat asli.
@@ -65,6 +67,16 @@ export default function ApprovalReviewModal({
   const needAttention = countNeedingAttention(answers)
   // Jawaban kosong untuk isian Data Pribadi (telepon, negara, kota, ...): tab itu di Pengaturan Agen belum diisi.
   const personalHint = personalDataHint(answers.filter((a) => a.answer.trim() === '').map((a) => a.question))
+  const rejectHint = rejectReasonHint(showRejectForm, rejectReason)
+
+  // Kolom alasan ada di dasar isi yang panjang: setelah "Tolak", gulir ke sana dan beri fokus supaya terlihat dan bisa langsung diketik.
+  useEffect(() => {
+    if (!showRejectForm) return
+    const field = rejectReasonRef.current
+    if (!field) return
+    field.scrollIntoView({ block: 'center' })
+    field.focus({ preventScroll: true })
+  }, [showRejectForm])
 
   const handleApprove = async () => {
     setLoading(true)
@@ -300,25 +312,38 @@ export default function ApprovalReviewModal({
 
           {showRejectForm && (
             <div className="mb-4 rounded-xl border-2 border-red-200 bg-red-50 p-4">
-              <h4 className="mb-1 text-sm font-semibold text-red-800">Kenapa ditolak?</h4>
+              <h4 id="reject-reason-label" className="mb-1 text-sm font-semibold text-red-800">
+                Kenapa ditolak? <span className="text-xs font-normal">(wajib diisi)</span>
+              </h4>
               <p className="mb-2 text-xs text-red-700">
                 Alasanmu disimpan di riwayat persetujuan. Belum dipakai untuk mengubah hasil AI secara otomatis.
               </p>
               <textarea
+                ref={rejectReasonRef}
+                aria-labelledby="reject-reason-label"
+                aria-required="true"
+                aria-describedby={rejectHint ? 'reject-reason-hint' : undefined}
                 placeholder="mis. tidak cocok, gaji terlalu rendah, butuh skill yang belum kupunya..."
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={3}
-                className="w-full resize-none rounded-lg border-2 border-red-200 bg-white p-3 text-sm focus:outline-none"
+                className="w-full resize-none rounded-lg border-2 border-red-200 bg-white p-3 text-sm focus:outline-none focus:border-red-400"
               />
             </div>
           )}
         </div>
 
         <div className="flex flex-col gap-3 border-t-2 border-[#16150F]/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#16150F]/60">
-            Berlaku sampai {new Date(request.expires_at).toLocaleString('id-ID')}
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-[#16150F]/60">
+              Berlaku sampai {new Date(request.expires_at).toLocaleString('id-ID')}
+            </span>
+            {rejectHint && (
+              <span id="reject-reason-hint" role="status" className="text-xs font-semibold text-red-700">
+                {rejectHint}
+              </span>
+            )}
+          </div>
           <div className="flex gap-3 [&>button]:flex-1 sm:[&>button]:flex-none">
             {!showRejectForm ? (
               <>

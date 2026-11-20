@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
+  REJECT_REASON_HINT,
+  rejectReasonHint,
   SOURCE_LABEL,
   confidenceLevel,
   countNeedingAttention,
@@ -69,4 +72,36 @@ test("SOURCE_LABEL: jawaban yang diambil backend dari Profil berlabel Dari Profi
 
 test("SOURCE_LABEL: jawaban aturan memakai nama menu Pengaturan Agen", () => {
   assert.equal(SOURCE_LABEL.rule, "Dari Pengaturan Agen");
+});
+
+// Uji E2E klik 20 November 2026 (temuan 9): kolom alasan tolak ada di dasar jendela panjang tanpa petunjuk.
+test("temuan 9: petunjuk alasan wajib tampil selama formulir tolak terbuka dan alasan masih kosong", () => {
+  assert.equal(rejectReasonHint(true, ""), REJECT_REASON_HINT);
+  assert.equal(rejectReasonHint(true, "   \n "), REJECT_REASON_HINT);
+  assert.equal(rejectReasonHint(true, "gaji terlalu rendah"), null);
+  // formulir tolak tertutup: tidak ada petunjuk
+  assert.equal(rejectReasonHint(false, ""), null);
+  assert.match(REJECT_REASON_HINT, /wajib diisi/);
+  assert.match(REJECT_REASON_HINT, /Kenapa ditolak\?/);
+  assert.match(REJECT_REASON_HINT, /Konfirmasi Tolak/);
+});
+
+test("temuan 9: tombol Tolak menggulir kolom alasan ke tampilan, memberi fokus, dan petunjuk dipasang di footer dekat tombol", () => {
+  const src = readFileSync(new URL("../src/components/ApprovalReviewModal.tsx", import.meta.url), "utf8");
+  assert.match(src, /const rejectReasonRef = useRef<HTMLTextAreaElement>\(null\)/);
+  const effect = src.slice(src.indexOf("useEffect(() => {"), src.indexOf("const handleApprove"));
+  assert.match(effect, /if \(!showRejectForm\) return/);
+  assert.match(effect, /field\.scrollIntoView\(\{ block: .center. \}\)/);
+  assert.match(effect, /field\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(effect, /\[showRejectForm\]/);
+  assert.match(src, /<textarea\s+ref=\{rejectReasonRef\}/);
+  assert.match(src, /aria-required="true"/);
+  assert.match(src, /aria-describedby=\{rejectHint \? .reject-reason-hint. : undefined\}/);
+  // petunjuk ada di footer, sebelum deretan tombol, dan hilang begitu alasan terisi
+  assert.match(src, /const rejectHint = rejectReasonHint\(showRejectForm, rejectReason\)/);
+  const footer = src.slice(src.indexOf("border-t-2 border-[#16150F]/10 px-6 py-4"));
+  assert.ok(footer.indexOf("{rejectHint &&") > -1 && footer.indexOf("{rejectHint &&") < footer.indexOf("Konfirmasi Tolak"));
+  assert.match(footer, /id="reject-reason-hint" role="status"/);
+  // tombol konfirmasi tetap nonaktif tanpa alasan
+  assert.match(src, /disabled=\{loading \|\| !rejectReason\.trim\(\)\}/);
 });

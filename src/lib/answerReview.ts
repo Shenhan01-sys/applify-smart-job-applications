@@ -6,6 +6,13 @@
  * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
  */
 
+export const REJECT_REASON_HINT = 'Alasan wajib diisi dulu. Tulis di kolom "Kenapa ditolak?" di atas, lalu tombol Konfirmasi Tolak aktif.';
+
+/** Petunjuk di dekat tombol "Konfirmasi Tolak": tampil selama formulir tolak terbuka dan alasannya masih kosong. */
+export function rejectReasonHint(showRejectForm: boolean, reason: string): string | null {
+  return showRejectForm && !reason.trim() ? REJECT_REASON_HINT : null;
+}
+
 export type ConfidenceLevel = "high" | "medium" | "low";
 export type AnswerSource = "rule" | "profile" | "ai" | "default";
 
