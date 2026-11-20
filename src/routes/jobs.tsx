@@ -10,6 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
+import { buildSavedJobRow } from "@/lib/savedJob";
 import { visibleJobs, jobSearchFilters, matchesJobSearch, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
@@ -149,7 +150,8 @@ function JobsPage() {
     }
   };
 
-  const toggleSaveJob = async (jobId: string) => {
+  const toggleSaveJob = async (job: JobData) => {
+    const jobId = job.id;
     if (isMockMode()) {
       setSavedJobs((prev) => {
         const next = new Set(prev);
@@ -176,7 +178,8 @@ function JobsPage() {
         });
         toast.success("Lowongan dihapus dari daftar tersimpan.");
       } else {
-        const { error } = await supabase.from("saved_jobs").insert({ user_id: user.id, job_id: jobId });
+        // Kolom company_name, role_title, dan platform wajib diisi di database; buildSavedJobRow mengisinya dari kartu.
+        const { error } = await supabase.from("saved_jobs").insert(buildSavedJobRow(user.id, job));
         if (error) throw error;
         setSavedJobs((prev) => new Set(prev).add(jobId));
         toast.success("Lowongan disimpan.");
@@ -353,7 +356,7 @@ function JobsPage() {
                 match={matchOf(job)}
                 matchUnavailable={skillsError ? "Kecocokan belum bisa dihitung. Skill profilmu belum termuat." : undefined}
                 isSaved={savedJobs.has(job.id)}
-                onToggleSave={() => toggleSaveJob(job.id)}
+                onToggleSave={() => toggleSaveJob(job)}
                 onApply={() => handleApply(job)}
                 onJobUpdated={handleJobUpdated}
                 detailAttempts={detailAttempts.current}
