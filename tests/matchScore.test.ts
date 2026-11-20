@@ -34,11 +34,11 @@ test("lowongan JobStreet Metro Tara (20 November 2026): kalimat kualifikasi dan 
     title: "Internship IT",
     description:
       "Kualifikasi:\n• Pendidikan minimal SMK/D3 atau fresh graduate jurusan Teknik Informatika, Sistem Informasi, TKJ, atau bidang terkait.\n• Memahami dasar hardware komputer, laptop, printer, dan jaringan.\nSkills: SQL, Troubleshooting dan bidang terkait",
-    requirements: ["IT SYSTEM DEVELOPMENT", "Memiliki pemahaman mengenai database dan SQL.", "SQL", "Responsible, proactive, and reliable"],
+    requirements: ["IT SYSTEM DEVELOPMENT", "Memiliki pemahaman mengenai database dan SQL.", "SQL", "Responsible, proactive, and reliable", "CV Terbaru"],
   };
   const m = computeMatch(job, ["React"]);
   const labels = [...m.matched, ...m.missing].map((s) => String(s).toLowerCase());
-  for (const junk of ["atau bidang terkait", "bidang terkait", "it system development", "tkj", "responsible, proactive, and reliable"]) {
+  for (const junk of ["atau bidang terkait", "bidang terkait", "it system development", "tkj", "responsible, proactive, and reliable", "cv terbaru"]) {
     assert.ok(!labels.includes(junk), `${junk} bukan skill`);
   }
   assert.ok(labels.includes("sql"), labels.join(", "));

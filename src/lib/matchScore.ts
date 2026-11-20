@@ -318,7 +318,8 @@ export function hasUsableSkills(skills: readonly string[]): boolean {
 
 // ---- skill yang disebut lowongan ----------------------------------------------------------------------
 
-const NOT_A_SKILL = /\b(tahun|years?|pengalaman|experience|minimal|maksimal|usia|umur|domisili|fresh graduate|lulusan|gaji|salary)\b/i;
+// Dokumen lamaran (CV, portofolio, KTP, ijazah) juga bukan skill: tag Dealls "CV Terbaru" (uji klik 20 November 2026).
+const NOT_A_SKILL = /\b(tahun|years?|pengalaman|experience|minimal|maksimal|usia|umur|domisili|fresh graduate|lulusan|gaji|salary|cv|resume|portofolio|portfolio|ktp|ijazah|transkrip|sim)\b/i;
 
 function stripHtml(text: string): string {
   return text.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;|&#\d+;/gi, " ");
