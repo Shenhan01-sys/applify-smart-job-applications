@@ -722,10 +722,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 {activeTab === "cv" && (
                   <div role="tabpanel" id="apply-panel-cv" aria-labelledby="apply-tab-cv" className="space-y-4">
                     <div className="rounded-xl bg-[#F5F5F5] p-5 space-y-4">
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Ringkasan Profesional</h4>
-                        <p className="text-sm">{aiGenerated.optimizedCV?.summary || "—"}</p>
-                      </div>
+                      {/* optimizedCV.summary diisi Edge Function dengan aiNotes (catatan strategi orang ketiga), jadi tidak
+                          ditampilkan di sini sebagai ringkasan profil; teks itu sudah ada di tab Strategi AI. */}
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Skill yang Disorot</h4>
                         <ul className="flex flex-wrap gap-2">

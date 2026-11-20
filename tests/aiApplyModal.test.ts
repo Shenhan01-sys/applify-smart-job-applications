@@ -5,6 +5,17 @@ import { readFileSync } from "node:fs";
 // Pemeriksaan kabel statis pada komponen React (suite ini tidak punya DOM): membaca teks sumbernya.
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
+test("tab CV tidak menampilkan optimizedCV.summary sebagai Ringkasan Profesional (isinya aiNotes, duplikat tab Strategi)", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  const edge = read("../supabase/functions/generate-application/index.ts");
+  // Edge Function memang mengisi summary dengan aiNotes, jadi menampilkannya sebagai ringkasan profil menyesatkan.
+  assert.match(edge, /optimizedCV: \{ summary: parsed\.aiNotes/);
+  const cv = src.slice(src.indexOf('activeTab === "cv"'), src.indexOf('activeTab === "strategy"'));
+  assert.doesNotMatch(cv, /Ringkasan Profesional/);
+  assert.doesNotMatch(cv, /optimizedCV\?\.summary/);
+  assert.match(cv, /Skill yang Disorot/);
+});
+
 test("pengajuan persetujuan yang gagal: galat tampil di footer dekat tombol dan lewat toast.error", () => {
   const src = read("../src/components/AIApplyModal.tsx");
   const fn = src.slice(src.indexOf("const handleRequestApproval"), src.indexOf("// The user sent this application outside Applify"));
