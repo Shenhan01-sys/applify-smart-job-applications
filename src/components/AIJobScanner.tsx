@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Brain, Search, Check, Loader2, Sparkles, Radar, Globe } from 'lucide-react'
 import { useJobSearch } from '@/hooks/useAutomation'
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,18 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(DEFAULT_PLATFORMS)
   const [stages, setStages] = useState<ScanStage[]>([])
   const { results, loading, totalJobs, searchJobs } = useJobSearch()
+  // Uji E2E klik 20 November 2026: selama sekitar 60 detik layar hanya menampilkan "Mencari lowongan...".
+  // Backend mengembalikan hasil semua situs sekaligus, jadi kemajuan per situs tidak bisa diketahui di tengah jalan.
+  // Yang ditampilkan adalah waktu yang sudah berjalan, bukan persentase tebakan.
+  const [waitingSince, setWaitingSince] = useState<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    if (waitingSince === null) return
+    setElapsed(0)
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - waitingSince) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [waitingSince])
 
   const addStage = useCallback((message: string, type: ScanStage['type'] = 'info') => {
     setStages((prev) => [...prev.slice(-4), { message, type }])
@@ -74,9 +86,14 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
       // Stage 2: Search
       addStage('Mencari lowongan...', 'info')
-      const { groups: searchResults, total, stats, failed } = await searchJobs({
-        platforms: selectedPlatforms,
-      })
+      setWaitingSince(Date.now())
+      let searched: Awaited<ReturnType<typeof searchJobs>>
+      try {
+        searched = await searchJobs({ platforms: selectedPlatforms })
+      } finally {
+        setWaitingSince(null)
+      }
+      const { groups: searchResults, total, stats, failed } = searched
 
       setProgress(60)
 
@@ -187,6 +204,13 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
               style={{ width: `${progress}%` }}
             />
           </div>
+
+          {waitingSince !== null && (
+            <p className="text-sm text-muted-foreground" data-testid="scan-elapsed">
+              Sudah berjalan {elapsed} detik. {selectedPlatforms.length} situs dicari bersamaan, dan jumlah lowongan per
+              situs tampil sesudah semua situs menjawab. Situs yang lambat bisa membuat pencarian lebih dari satu menit.
+            </p>
+          )}
 
           {/* Platform scanning status */}
           <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
