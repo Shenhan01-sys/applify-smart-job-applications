@@ -7,7 +7,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
-import { buildRadarData, describeRadar, findGaps, DEMO_SKILLS, type SkillAxis, type UserSkillRow } from "@/lib/skillRadar";
+import {
+  buildRadarData,
+  describeRadar,
+  findGaps,
+  unmatchedSkillLabels,
+  DEMO_SKILLS,
+  UNMATCHED_SECTION_TEXT,
+  UNMATCHED_SECTION_TITLE,
+  type SkillAxis,
+  type UserSkillRow,
+} from "@/lib/skillRadar";
 
 export const Route = createFileRoute("/skill-radar")({
   beforeLoad: async () => {
@@ -89,6 +99,8 @@ function SkillPage() {
           <Link to="/profile" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90">
             Buka Profil Saya
           </Link>
+          {/* Skill yang ada di profil tetap terlihat, jadi halaman tidak kosong walau tidak ada yang cocok dengan enam bidang. */}
+          {built.status === "unmatched" && <UnmatchedSkills skills={built.unmatched} className="mt-6 text-left" />}
         </div>
       ) : (
         <>
@@ -115,9 +127,27 @@ function SkillPage() {
               <ActionableInsights data={data} />
             </div>
           </div>
+          {!demo && <UnmatchedSkills skills={built.unmatched} className="mt-10" />}
         </>
       )}
     </AppShell>
+  );
+}
+
+/** Skill profil yang tidak masuk ke satu pun dari enam bidang: tidak ikut grafik, tetapi tetap ditampilkan. */
+function UnmatchedSkills({ skills, className = "" }: { skills: UserSkillRow[]; className?: string }) {
+  const labels = unmatchedSkillLabels(skills);
+  if (labels.length === 0) return null;
+  return (
+    <section aria-labelledby="skill-luar-bidang" className={`rounded-2xl border-2 border-neutral-200 bg-white p-5 ${className}`}>
+      <h2 id="skill-luar-bidang" className="text-lg font-bold">{UNMATCHED_SECTION_TITLE}</h2>
+      <p className="mt-1 text-sm text-neutral-700">{UNMATCHED_SECTION_TEXT}</p>
+      <ul className="mt-3 flex flex-wrap gap-2" aria-label={UNMATCHED_SECTION_TITLE}>
+        {labels.map((label) => (
+          <li key={label} className="rounded-full border-2 border-neutral-200 bg-neutral-50 px-3 py-1 text-sm font-medium text-neutral-800">{label}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

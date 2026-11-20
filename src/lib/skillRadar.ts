@@ -43,8 +43,35 @@ export type RadarStatus =
   | "unmatched"
   | "ok";
 
-export function buildRadarData(skills: UserSkillRow[]): { data: SkillAxis[]; status: RadarStatus; matchedCount: number } {
-  if (!skills.length) return { data: [], status: "empty", matchedCount: 0 };
+export interface RadarBuild {
+  data: SkillAxis[];
+  status: RadarStatus;
+  matchedCount: number;
+  /** Skill yang tidak cocok dengan bidang mana pun: tidak ikut grafik, tetapi tetap ditampilkan. */
+  unmatched: UserSkillRow[];
+}
+
+export const UNMATCHED_SECTION_TITLE = "Skill di luar enam bidang";
+export const UNMATCHED_SECTION_TEXT =
+  "Peta ini hanya membaca enam bidang: Frontend, Backend, UI/UX, Cloud/DevOps, Data/AI, dan Agile/Soft. Skill di bawah ini tidak masuk ke bidang mana pun, jadi tidak ikut di grafik. Skill ini tetap tersimpan di profilmu dan dipakai untuk menghitung kecocokan lowongan.";
+
+/** Nama skill untuk daftar "di luar enam bidang": tanpa nama kosong dan tanpa duplikat (huruf besar-kecil diabaikan), dengan tingkat 1-5 bila ada. */
+export function unmatchedSkillLabels(skills: UserSkillRow[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of skills) {
+    const name = (s.name ?? "").trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    const level = Number(s.proficiency_level);
+    out.push(Number.isInteger(level) && level >= 1 && level <= 5 ? `${name} (${level}/5)` : name);
+  }
+  return out;
+}
+
+export function buildRadarData(skills: UserSkillRow[]): RadarBuild {
+  if (!skills.length) return { data: [], status: "empty", matchedCount: 0, unmatched: [] };
   const maxP = Math.max(...skills.map((s) => Number(s.proficiency_level) || 0), 0);
   // Skala 1-5 diubah ke persen; nilai di atas 5 dianggap sudah persen.
   const norm = (v: number) => (maxP <= 5 ? v * 20 : v);
@@ -60,8 +87,8 @@ export function buildRadarData(skills: UserSkillRow[]): { data: SkillAxis[]; sta
       : 0;
     return { id: i + 1, name: ax.name, userLevel, marketDemand: ax.market };
   });
-  if (!data.some((d) => d.userLevel > 0)) return { data: [], status: "unmatched", matchedCount: 0 };
-  return { data, status: "ok", matchedCount: used.size };
+  if (!data.some((d) => d.userLevel > 0)) return { data: [], status: "unmatched", matchedCount: 0, unmatched: [...skills] };
+  return { data, status: "ok", matchedCount: used.size, unmatched: skills.filter((s) => !used.has(s)) };
 }
 
 /** Bidang yang tingkat skill-mu lebih dari 10 poin di bawah patokan, diurutkan dari selisih terbesar. */
