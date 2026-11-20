@@ -10,6 +10,7 @@ import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
 import { groupByStatus } from "@/lib/dashboardStats";
+import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
@@ -96,7 +97,13 @@ function FillYourselfBadge() {
   );
 }
 
-function DraggableKanbanCard({ app, gaps, fillYourself, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; onOpen: () => void }) {
+// Baris kecil untuk kartu yang lowongannya muncul lebih dari sekali: urutan dan waktu dibuat (lib/applicationCards.ts).
+function DuplicateNote({ info, className = "" }: { info?: DuplicateInfo; className?: string }) {
+  if (!info) return null;
+  return <p className={`text-xs text-muted-foreground/80 ${className}`}>{duplicateLabel(info)}</p>;
+}
+
+function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app, attributes: { roleDescription: BOARD_ROLE_DESCRIPTION } });
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -115,6 +122,7 @@ function DraggableKanbanCard({ app, gaps, fillYourself, onOpen }: { app: AIAppli
           <p className="text-sm font-semibold truncate">{job?.title || "Lowongan"}</p>
         </div>
         <p className="text-xs text-muted-foreground mt-1 truncate">{job?.company || "Perusahaan"}</p>
+        <DuplicateNote info={duplicate} className="mt-1 leading-snug" />
         <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" aria-hidden="true" />
           {app.submitted_at ? `${daysAgo(app.submitted_at)} hari lalu` : "Belum dikirim"}
@@ -176,7 +184,7 @@ function DroppableColumn({ status, apps, children }: {
   );
 }
 
-function AppListRow({ app, gaps, fillYourself, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; onOpen: () => void }) {
+function AppListRow({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
   const config = statusConfig[app.status] ?? statusConfig.draft;
   const job = jobOf(app);
   return (
@@ -193,6 +201,7 @@ function AppListRow({ app, gaps, fillYourself, onOpen }: { app: AIApplicationDat
         <p className="text-xs text-muted-foreground truncate">
           {job?.company || "Perusahaan"} · {app.tailored_skills?.length || 0} skill disorot AI
         </p>
+        <DuplicateNote info={duplicate} className="truncate" />
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
           {applicationStatusLabel(app.status)}
         </span>
@@ -451,6 +460,11 @@ export function AppsPage() {
 
   // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
   const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
+  // Lowongan yang sama dengan lebih dari satu lamaran: kartunya diberi urutan dan waktu dibuat agar bisa dibedakan.
+  const duplicates = useMemo(
+    () => duplicateApplications(applications.map((a) => ({ id: a.id, created_at: a.created_at, job_id: a.job_id, title: jobOf(a)?.title, company: jobOf(a)?.company }))),
+    [applications],
+  );
 
   if (loading) {
     return (
@@ -561,7 +575,7 @@ export function AppsPage() {
                     {APPLICATION_STATUSES.map((status) => (
                       <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
                         {groupedApps[status].map((app) => (
-                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />
+                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
                     ))}
@@ -577,12 +591,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />)}
+                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />)}
+                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
