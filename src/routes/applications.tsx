@@ -10,6 +10,7 @@ import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
 import { groupByStatus } from "@/lib/dashboardStats";
+import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
@@ -646,6 +647,12 @@ export function AppsPage() {
                             {selectedGaps.cvAttached === false && (
                               <p>
                                 CV belum terlampir. Unggah CV di <Link to="/profile" className="font-semibold underline underline-offset-4">Profil Saya</Link>.
+                              </p>
+                            )}
+                            {personalDataHint(selectedGaps.remaining) && (
+                              <p data-testid="personal-data-hint">
+                                {personalDataHint(selectedGaps.remaining)}{" "}
+                                <Link to="/automation-settings" className="font-semibold underline underline-offset-4">{PERSONAL_DATA_LINK_LABEL}</Link>
                               </p>
                             )}
                             <p>

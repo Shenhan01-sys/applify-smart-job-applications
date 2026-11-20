@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { gapsByJob, latestFormGaps, MAX_GAP_ITEMS, MAX_GAP_LABEL_LENGTH } from "../src/lib/formGaps.ts";
+import { gapsByJob, latestFormGaps, MAX_GAP_ITEMS, MAX_GAP_LABEL_LENGTH, shortenGapLabel } from "../src/lib/formGaps.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -62,7 +62,7 @@ test("label dirapikan: dipangkas, yang kosong atau bukan teks dibuang, kembar di
   assert.deepEqual(r?.remaining, ["Phone", "City", "Email"]);
 });
 
-test("label dipotong 200 karakter dan daftar dibatasi 20 butir", () => {
+test("label dibatasi MAX_GAP_LABEL_LENGTH karakter dan daftar dibatasi 20 butir", () => {
   const long = "A".repeat(MAX_GAP_LABEL_LENGTH + 50);
   const r = latestFormGaps([row({ details: { remaining_required: [long] } })], "job-1");
   assert.equal(r?.remaining[0].length, MAX_GAP_LABEL_LENGTH);
@@ -207,4 +207,29 @@ test("modal AI Apply: draf yang sudah ready memakai label 'Ajukan lagi ke Perset
   assert.ok(hintAt > 0, "baris penjelasan ada di footer");
   assert.match(footer.slice(Math.max(0, hintAt - 300), hintAt), /editable && !approvalId && application\?\.status === "ready"/);
   assert.ok(hintAt < footer.indexOf("onClick={handleRequestApproval}"), "baris penjelasan di atas tombol ajukan");
+});
+
+// Uji E2E klik 20 November 2026 (temuan 14): label pernyataan persetujuan terpotong di tengah kata ("...to the bes").
+const CONSENT =
+  "I certify that the information I have provided in this application is true and correct to the best of my knowledge and I understand that any false statement may result in the withdrawal of an offer or in dismissal from employment";
+
+test("temuan 14: label 200 karakter lebih tidak lagi dipotong di tengah kata pada batas lama", () => {
+  assert.ok(CONSENT.length > 200 && CONSENT.length <= MAX_GAP_LABEL_LENGTH);
+  const r = latestFormGaps([row({ details: { remaining_required: [CONSENT] } })], "job-1");
+  assert.equal(r?.remaining[0], CONSENT);
+  assert.match(r?.remaining[0] ?? "", /correct to the best of my knowledge/);
+});
+
+test("shortenGapLabel: yang lebih panjang dipotong di batas kata dengan elipsis, tidak melebihi batas", () => {
+  assert.equal(shortenGapLabel("  Phone  "), "Phone");
+  assert.equal(shortenGapLabel(CONSENT, 400), CONSENT);
+  const cut = shortenGapLabel(CONSENT, 120);
+  assert.ok(cut.length <= 120);
+  assert.ok(cut.endsWith("…"));
+  // sesudah membuang elipsis, yang tersisa adalah awal label asli yang berakhir pada kata utuh
+  const head = cut.slice(0, -1);
+  assert.ok(CONSENT.startsWith(head));
+  assert.equal(CONSENT[head.length], " ");
+  // tanpa spasi (atau spasi terlalu awal) dipotong keras, tetap tidak melebihi batas
+  assert.equal(shortenGapLabel("A".repeat(50), 20), `${"A".repeat(19)}…`);
 });

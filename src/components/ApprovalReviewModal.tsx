@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { automationApi } from '@/services/automationApi'
 import { describeApiError } from '@/lib/apiErrors'
 import { HitlTrack } from '@/components/HitlTrack'
 import { platformLabel } from '@/lib/platforms'
+import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from '@/lib/personalData'
 import {
   LEVEL_LABEL,
   SOURCE_LABEL,
@@ -61,6 +63,8 @@ export default function ApprovalReviewModal({
   const edited = editedCoverLetter !== (request.cover_letter || '')
   const answers = normalizeAnswers(request.answers)
   const needAttention = countNeedingAttention(answers)
+  // Jawaban kosong untuk isian Data Pribadi (telepon, negara, kota, ...): tab itu di Pengaturan Agen belum diisi.
+  const personalHint = personalDataHint(answers.filter((a) => a.answer.trim() === '').map((a) => a.question))
 
   const handleApprove = async () => {
     setLoading(true)
@@ -231,6 +235,21 @@ export default function ApprovalReviewModal({
                 )}{' '}
                 Isian pada formulir lowongan yang sebenarnya dibaca agen setelah persetujuan.
               </p>
+              {personalHint && (
+                <div
+                  data-testid="approval-personal-data-hint"
+                  className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border-2 border-[#D9741A]/40 bg-[#D9741A]/10 p-3 text-xs text-[#16150F]"
+                >
+                  <span className="min-w-0 flex-1 basis-56">{personalHint}</span>
+                  <Link
+                    to="/automation-settings"
+                    onClick={onClose}
+                    className="inline-flex min-h-11 shrink-0 items-center rounded-lg border-2 border-[#16150F]/15 bg-white px-3 font-semibold text-[#0A5BE0] hover:border-[#0A5BE0]"
+                  >
+                    {PERSONAL_DATA_LINK_LABEL}
+                  </Link>
+                </div>
+              )}
               <div className="space-y-2">
                 {answers.map((answer, index) => {
                   const level = confidenceLevel(answer.confidence)
@@ -244,7 +263,7 @@ export default function ApprovalReviewModal({
                       }`}
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{answer.question}</span>
+                        <span className="min-w-0 break-words text-sm font-medium">{answer.question}</span>
                         {attention && (
                           <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#D9741A]">
                             <AlertTriangle className="h-3 w-3" />

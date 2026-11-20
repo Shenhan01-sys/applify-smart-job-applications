@@ -46,7 +46,19 @@ export type ApplyAttempt = {
 export const REASON_NO_FIELDS_FILLED = "no_fields_filled";
 
 export const MAX_GAP_ITEMS = 20;
-export const MAX_GAP_LABEL_LENGTH = 200;
+// Pernyataan persetujuan di formulir lowongan bisa lebih dari 200 karakter; batas lama memotongnya di tengah kata
+// ("...true and correct to the bes", uji E2E klik 20 November 2026, temuan 14).
+export const MAX_GAP_LABEL_LENGTH = 400;
+
+/** Label sepanjang-panjangnya `max` karakter. Yang lebih panjang dipotong di batas kata dan diakhiri "…", tidak di tengah kata. */
+export function shortenGapLabel(label: string, max: number = MAX_GAP_LABEL_LENGTH): string {
+  const text = label.trim();
+  if (text.length <= max) return text;
+  const room = text.slice(0, max - 1);
+  const lastSpace = room.lastIndexOf(" ");
+  const cut = lastSpace > max * 0.6 ? room.slice(0, lastSpace) : room;
+  return `${cut.trimEnd().replace(/[,;:.\-]+$/, "")}…`;
+}
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -56,7 +68,7 @@ function cleanRemaining(value: unknown): string[] {
   const out: string[] = [];
   for (const item of value) {
     if (typeof item !== "string") continue;
-    const label = item.trim().slice(0, MAX_GAP_LABEL_LENGTH).trimEnd();
+    const label = shortenGapLabel(item);
     if (!label || seen.has(label)) continue;
     seen.add(label);
     out.push(label);
