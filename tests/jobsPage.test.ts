@@ -71,6 +71,12 @@ test("JobCard: tombol ikon punya nama untuk pembaca layar dan target sentuh 44px
   assert.doesNotMatch(src, /h-9 w-9|h-10 w-10/);
 });
 
+test("jobs: subjudul daftar tidak memakai kata tersimpan, yang dipakai saringan Tersimpan (temuan 19)", () => {
+  const src = read("../src/routes/jobs.tsx");
+  assert.match(src, /lowongan ditemukan dari sumber yang didukung/);
+  assert.doesNotMatch(src, /lowongan tersimpan dari sumber/);
+});
+
 test("waitinglist: tanpa janji bonus atau kuota karangan, label terhubung ke kolom, popup landing dipertahankan", () => {
   const src = read("../src/routes/waitinglist.tsx");
   assert.doesNotMatch(src, /bonus 1 bulan|Tidak ada spam|500 pendaftar|Submit & Lanjut/);
