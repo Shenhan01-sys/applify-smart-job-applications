@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import {
@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
+import { profileSkillList, sortByMatch } from "@/lib/matchScore";
+import { greenMatchView, type GreenMatchView } from "@/lib/greenMatch";
+import { profileService } from "@/services/profileService";
 import { ErrorState } from "@/components/ErrorState";
 
 export const Route = createFileRoute("/green-career")({
@@ -38,12 +41,37 @@ function GreenCareerPage() {
   const [error, setError] = useState("");
   // Kegagalan memuat daftar dipisah dari galat asesmen: daftar gagal berarti layar utama menampilkan "Coba lagi".
   const [loadError, setLoadError] = useState("");
+  // Skill profil untuk label "Kecocokan dengan profilmu" (per pengguna, bukan jobs.match_score yang global).
+  // null = belum dimuat atau gagal (lihat skillsFailed).
+  const [profileSkills, setProfileSkills] = useState<string[] | null>(null);
+  const [skillsFailed, setSkillsFailed] = useState(false);
 
   useEffect(() => { load(); }, []);
+
+  // Gagal memuat skill bukan berarti "tanpa skill": kartu menulis bahwa kecocokan belum bisa dihitung.
+  const loadProfileSkills = async () => {
+    try {
+      setSkillsFailed(false);
+      let userId = "mock-user";
+      if (!isMockMode()) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
+        userId = user.id;
+      }
+      setProfileSkills(profileSkillList(await profileService.getSkillSource(userId)));
+    } catch (err) {
+      console.error("Error loading profile skills:", err);
+      setProfileSkills(null);
+      setSkillsFailed(true);
+    }
+  };
+
   const load = async () => {
     try {
       setLoading(true); setLoadError("");
-      setJobs(await greenCareerService.listGreenJobs());
+      // Skill dimuat bersama daftar supaya urutan kartu tidak berpindah setelah tampil.
+      const [list] = await Promise.all([greenCareerService.listGreenJobs(), loadProfileSkills()]);
+      setJobs(list);
     } catch (e) {
       setLoadError(describeError(e, "Daftar lowongan karier hijau belum bisa dimuat."));
     } finally { setLoading(false); }
@@ -71,6 +99,15 @@ function GreenCareerPage() {
   };
 
   const reset = () => { setView("list"); setJob(null); setResult(null); setQuestions([]); setAnswers({}); setError(""); };
+  // Skor kecocokan per pengguna (lib/greenMatch.ts, logika yang sama dengan halaman Lowongan); kartu tanpa skor di akhir.
+  const matchViews = useMemo(
+    () => new Map(jobs.map((j) => [j.id, greenMatchView(j, profileSkills, skillsFailed)] as const)),
+    [jobs, profileSkills, skillsFailed],
+  );
+  const shownJobs = sortByMatch(jobs, (j) => {
+    const v = matchViews.get(j.id);
+    return v?.kind === "score" ? v.score : null;
+  });
   const allAnswered = questions.length > 0 && questions.every((q) => (answers[q.id] ?? "").trim().length > 0);
 
   return (
@@ -100,7 +137,7 @@ function GreenCareerPage() {
               </div>
             ) : (
               <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-0 animate-fade-up">
-                {jobs.map((j) => <JobCard key={j.id} job={j} onStart={() => startAssessment(j)} busy={busy} />)}
+                {shownJobs.map((j) => <JobCard key={j.id} job={j} view={matchViews.get(j.id)!} onStart={() => startAssessment(j)} busy={busy} />)}
               </div>
             )}
           </>
@@ -119,9 +156,8 @@ function GreenCareerPage() {
 }
 
 /* ── List: job card ── */
-function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; busy: boolean }) {
+function JobCard({ job, view, onStart, busy }: { job: GreenJob; view: GreenMatchView; onStart: () => void; busy: boolean }) {
   const esg = job.company_insight?.green_score;
-  const match = job.match_score;
   const tags = job.company_insight?.esg_flags ?? [];
   return (
     <div className="glass-solid rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-300 group">
@@ -142,21 +178,40 @@ function JobCard({ job, onStart, busy }: { job: GreenJob; onStart: () => void; b
         </div>
       )}
       <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-3 mt-auto">
-        {typeof match === "number" && (
-          <>
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-sans font-semibold text-neutral-600">Kecocokan dengan profilmu</span>
-              <span className="font-mono font-bold text-neutral-900">{match}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden" aria-hidden="true"><div className="h-full bg-neutral-800 rounded-full" style={{ width: `${match}%` }} /></div>
-          </>
-        )}
+        <MatchBlock view={view} />
         <button type="button" onClick={onStart} disabled={busy} aria-label={`Ikuti asesmen kesiapan untuk ${job.title} di ${job.company}`} className="w-full mt-2 min-h-11 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <>Ikuti Asesmen <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
         </button>
         <p className="text-xs text-neutral-500 text-center">Opsional dan tanpa biaya. Hasilnya hanya untuk kamu.</p>
       </div>
     </div>
+  );
+}
+
+/* ── Kecocokan per pengguna: persentase dengan dasarnya, atau tanda strip dengan alasan angka belum ada ── */
+function MatchBlock({ view }: { view: GreenMatchView }) {
+  const score = view.kind === "score" ? view.score : null;
+  return (
+    <>
+      <div className="flex justify-between items-center text-xs">
+        <span className="font-sans font-semibold text-neutral-600">Kecocokan dengan profilmu</span>
+        <span className="font-mono font-bold text-neutral-900">{score === null ? <><span aria-hidden="true">-</span><span className="sr-only">Belum ada skor</span></> : `${score}%`}</span>
+      </div>
+      <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden" aria-hidden="true">
+        <div className="h-full bg-neutral-800 rounded-full" style={{ width: `${score ?? 0}%` }} />
+      </div>
+      {view.kind === "score" ? (
+        <p className="text-xs text-neutral-500" title={view.matched.length > 0 ? `Cocok: ${view.matched.join(", ")}` : undefined}>
+          {view.caption}. Dihitung dari skill di profilmu dan skill yang disebut lowongan.
+        </p>
+      ) : view.kind === "no-profile-skills" ? (
+        <Link to="/profile" className="inline-flex min-h-11 items-center text-xs font-medium text-[#0A5BE0] underline underline-offset-4">
+          {view.text}
+        </Link>
+      ) : (
+        <p className="text-xs text-neutral-500" role={view.kind === "unavailable" ? "alert" : "status"}>{view.text}</p>
+      )}
+    </>
   );
 }
 

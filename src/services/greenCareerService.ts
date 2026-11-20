@@ -11,6 +11,7 @@ export interface GreenJob {
   requirements?: any;
   company_insight?: { green_score?: number; summary?: string; esg_flags?: string[] } | null;
   external_url?: string | null;
+  /** Kolom global untuk semua pengguna; tidak ditampilkan sebagai kecocokan (lihat lib/greenMatch.ts). */
   match_score?: number | null;
 }
 export interface AssessmentQuestion {
