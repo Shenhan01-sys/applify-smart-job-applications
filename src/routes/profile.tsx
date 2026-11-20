@@ -38,6 +38,8 @@ import {
   type PreferencesForm,
 } from "@/lib/profilePreferences";
 import { ExperienceEditor, EducationEditor, SkillsEditor } from "@/components/profile/ProfileEditors";
+import LinkedInImportCard from "@/components/profile/LinkedInImportCard";
+import { applyProfilePatch, type CommitResult } from "@/lib/linkedinImport";
 import {
   buildProfileRow,
   formatMonthYear,
@@ -283,6 +285,24 @@ function ProfilePage() {
     if (await handleSave()) setFinished(true);
   };
 
+  // Sesudah impor PDF LinkedIn: ambil ulang daftar dari database (mode demo: tambahkan baris yang dibuat di memori)
+  // dan isi hanya kolom profil dasar yang masih kosong, supaya ketikan yang belum disimpan tidak tertimpa.
+  const handleImported = useCallback(async (result: CommitResult) => {
+    setFormData((prev) => applyProfilePatch(prev, result.profilePatch));
+    if (isMockMode()) {
+      setWorkExps((prev) => [...(result.created.experiences as any[]), ...prev]);
+      setEducations((prev) => [...(result.created.education as any[]), ...prev]);
+      setCerts((prev) => [...(result.created.certifications as any[]), ...prev]);
+      setUserSkills((prev) => [...(result.created.skills as any[]), ...prev]);
+      return;
+    }
+    const full = await profileService.getFullProfile(user!.id);
+    setWorkExps(full.workExperiences);
+    setEducations(full.education);
+    setCerts(full.certifications);
+    setUserSkills(full.skills);
+  }, [user]);
+
   // ---- Experience / education / skills: each change is saved right away (no "Simpan" needed) ----
   const newMockId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -404,6 +424,15 @@ function ProfilePage() {
           title="Profil belum bisa dimuat"
           message={`${loadError} Data yang tampil di bawah belum tentu lengkap.`}
           onRetry={() => { setLoading(true); setReloadKey((k) => k + 1); }}
+        />
+      )}
+
+      {user && (
+        <LinkedInImportCard
+          userId={user.id}
+          existing={{ basic: formData, experiences: workExps, education: educations, certifications: certs, skills: userSkills }}
+          disabledReason={loadError ? "Profilmu belum termuat penuh, jadi data yang sudah ada belum bisa dicek. Muat ulang profil dulu." : undefined}
+          onImported={handleImported}
         />
       )}
 
