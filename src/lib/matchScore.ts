@@ -340,6 +340,8 @@ function explicitTerms(requirements: string[], description: string): string[] {
     if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return;
     // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
     if (t.includes(" ") && t === t.toUpperCase()) return;
+    // butir berkoma seperti "Responsible, proactive, and reliable" adalah kalimat sifat, bukan satu skill
+    if (t.includes(",")) return;
     out.push(t);
   };
   for (const r of requirements) add(r);
