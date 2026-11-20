@@ -97,6 +97,14 @@ test("service pengajuan: memeriksa antrean pending lebih dulu, memakai createApp
   assert.match(svc, /automationApi\.getPendingApprovals\(\)/);
 });
 
+test("Lamaran Saya: status ready tidak lagi ditulis 'belum diajukan' (uji E2E klik 20 November 2026)", () => {
+  const src = read("../src/routes/applications.tsx");
+  const box = src.slice(src.indexOf("Draf ini sudah menunggu persetujuanmu"), src.indexOf("approvalUi.state === \"unknown\""));
+  // teks 'belum diajukan' hanya untuk status selain ready
+  assert.match(box, /selectedApp\.status === "ready"\s*\?[\s\S]*berhenti sebelum tombol kirim[\s\S]*: "Draf ini belum diajukan\./);
+  assert.match(src, /selectedApp\.status === "ready" \? "Ajukan lagi ke Persetujuan" : "Ajukan ke Persetujuan"/);
+});
+
 test("Lamaran Saya: detail draf punya tombol Ajukan ke Persetujuan, tautan Buka Persetujuan, galat dekat tombol, dan toast", () => {
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /canRequestApproval\(selectedApp\.status\) && \(/);

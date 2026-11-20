@@ -512,7 +512,10 @@ export function AppsPage() {
                     ) : (
                       <>
                         <p className="text-sm text-muted-foreground">
-                          Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya.
+                          {selectedApp.status === "ready"
+                            ? // Status ready ditulis worker sesudah mengisi formulir (atau dipilih lewat Ubah status), jadi draf ini sudah pernah disetujui.
+                              "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang."
+                            : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}
                         </p>
                         {approvalUi.state === "unknown" && (
                           <p className="text-xs text-[#92400E]">
@@ -536,7 +539,7 @@ export function AppsPage() {
                           ) : (
                             <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
                           )}
-                          {approvalUi.state === "checking" ? "Memeriksa antrean..." : approvalBusy ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : "Ajukan ke Persetujuan"}
+                          {approvalUi.state === "checking" ? "Memeriksa antrean..." : approvalBusy ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : selectedApp.status === "ready" ? "Ajukan lagi ke Persetujuan" : "Ajukan ke Persetujuan"}
                         </button>
                       </>
                     )}
