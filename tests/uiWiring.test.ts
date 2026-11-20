@@ -48,3 +48,12 @@ test("Lowongan: judul halaman tidak menulis Mulai dengan menekan saat masih memu
   assert.match(jobs, /\{loading\s*\?\s*"Memuat lowongan\.\.\."/);
   assert.match(jobs, /Menampilkan \$\{JOBS_PAGE_LIMIT\} lowongan terbaru/);
 });
+
+test("Halaman masuk: tombol LinkedIn memakai provider linkedin_oidc dan kembali ke /auth/callback", () => {
+  const src = read("../src/routes/login.tsx");
+  assert.match(src, /provider: "linkedin_oidc"/);
+  assert.match(src, /onClick=\{handleLinkedInAuth\}/);
+  assert.match(src, /Masuk dengan LinkedIn/);
+  const linkedIn = src.slice(src.indexOf("const handleLinkedInAuth"));
+  assert.match(linkedIn, /redirectTo: window\.location\.origin \+ '\/auth\/callback'/);
+});
