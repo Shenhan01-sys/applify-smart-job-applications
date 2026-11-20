@@ -367,8 +367,8 @@ test("Edge Function generate-application membaca kolom yang kini bisa diisi dari
 
 test("halaman profil: contoh data hanya di mode demo, simpan lewat kolom bersaring, editor terpasang", () => {
   const page = read("../src/routes/profile.tsx");
-  // 4 daftar (pengalaman, pendidikan, sertifikasi, skill) hanya terisi contoh bila isMockMode()
-  assert.equal((page.match(/useState<any\[\]>\(\(\) => \(isMockMode\(\) \? \[\.\.\.mock/g) ?? []).length, 4);
+  // 5 daftar (pengalaman, pendidikan, sertifikasi, penghargaan, skill) hanya terisi contoh bila isMockMode()
+  assert.equal((page.match(/useState<any\[\]>\(\(\) => \(isMockMode\(\) \? \[\.\.\.mock/g) ?? []).length, 5);
   assert.doesNotMatch(page, /const d = data \|\| mockProfileData/);
   assert.match(page, /buildProfileRow\(formData\)/);
   assert.match(page, /if \(error\) throw error/);

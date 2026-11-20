@@ -802,13 +802,19 @@ export const mockLinkedInImportPreview = {
     { institution: "Sekolah Menengah Atas Contoh 1", degree: "SMA", field_of_study: "IPA", start_year: 2013, end_year: 2016, is_current: false, notes: [] },
   ],
   certifications: [{ name: "Google Data Analytics Professional Certificate", issuer: "" }],
+  // Judul di PDF LinkedIn terpotong beberapa baris; di pratinjau sudah digabung. Item pertama sudah ada di mockAchievements ("Sudah ada").
+  achievements: [
+    { title: "Best Innovation Award", category: "award", issuer: "Tech Company Inc.", achievement_date: "2024-01-01", description: null, notes: ["Hanya tahun yang tercantum di PDF, tanggal diisi 1 Januari."] },
+    { title: "Juara 2 Lomba Karya Tulis Ilmiah (Nasional)", category: "award", issuer: null, achievement_date: "2023-01-01", description: null, notes: ["Hanya tahun yang tercantum di PDF, tanggal diisi 1 Januari."] },
+    { title: "Analisis Sentimen Ulasan Aplikasi Transportasi Daring Menggunakan Metode Naive Bayes", category: "publication", issuer: null, achievement_date: null, description: null, notes: [] },
+  ],
   skills: [
     { name: "TypeScript", category: "technical", proficiency_level: 3 },
     { name: "Next.js", category: "technical", proficiency_level: 3 },
     { name: "Indonesian", category: "language", proficiency_level: 5 },
     { name: "English", category: "language", proficiency_level: 4 },
   ],
-  meta: { method: "ai", model: "demo", pages: 2, truncated: false, dropped: { experiences: 0, education: 0, certifications: 0, skills: 0 } },
+  meta: { method: "ai", model: "demo", pages: 2, truncated: false, dropped: { experiences: 0, education: 0, certifications: 0, achievements: 0, skills: 0 } },
   warnings: [],
 };
 

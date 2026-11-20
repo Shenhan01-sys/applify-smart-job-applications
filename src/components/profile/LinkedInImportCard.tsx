@@ -46,6 +46,7 @@ const SECTIONS: Array<{ key: SectionKey; title: string }> = [
   { key: "experiences", title: "Pengalaman kerja" },
   { key: "education", title: "Pendidikan" },
   { key: "certifications", title: "Sertifikasi" },
+  { key: "achievements", title: "Penghargaan dan publikasi" },
   { key: "skills", title: "Skill dan bahasa" },
 ];
 
@@ -224,7 +225,13 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
                   items={plan[key] as Array<ImportItem<unknown>>}
                   selected={selected}
                   disabled={saving}
-                  note={key === "skills" ? "Tingkat skill diisi otomatis karena PDF LinkedIn tidak memuatnya. Ubah nanti di langkah Pendidikan dan skills." : undefined}
+                  note={
+                    key === "skills"
+                      ? "Tingkat skill diisi otomatis karena PDF LinkedIn tidak memuatnya. Ubah nanti di langkah Pendidikan dan skills."
+                      : key === "achievements"
+                        ? "Datanya tersimpan di akunmu, tetapi halaman Profil belum punya daftar untuk melihat atau mengubahnya."
+                        : undefined
+                  }
                   onToggle={(itemKey) => setSelected((prev) => toggleItem(plan, itemKey, prev))}
                   onAll={(on) => setSelected((prev) => setSectionSelection(plan, key, prev, on))}
                 />

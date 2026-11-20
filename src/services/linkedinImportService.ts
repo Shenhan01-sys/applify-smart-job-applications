@@ -6,7 +6,8 @@ import { profileService } from "@/services/profileService";
 
 /**
  * Menulis pilihan impor PDF LinkedIn ke profil. Semua penulisan lewat fungsi yang sudah dipakai halaman Profil:
- * `profileService.create*` untuk pengalaman, pendidikan, sertifikasi, dan skill, serta upsert `profiles` yang
+ * `profileService.create*` untuk pengalaman, pendidikan, sertifikasi, penghargaan dan publikasi (tabel
+ * `achievements`), dan skill, serta upsert `profiles` yang
  * sama dengan tombol Simpan (jadi pengguna tanpa baris `profiles` mendapat satu). Logika memilih dan melaporkan
  * ada di lib/linkedinImport.ts (applyImport) supaya bisa dites tanpa Supabase.
  */
@@ -28,6 +29,7 @@ function supabaseWriter(userId: string): ImportWriter {
     createExperience: (row) => unwrap(profileService.createWorkExperience(row)),
     createEducation: (row) => unwrap(profileService.createEducation(row)),
     createCertification: (row) => unwrap(profileService.createCertification(row)),
+    createAchievement: (row) => unwrap(profileService.createAchievement(row)),
     createSkill: (row) => unwrap(profileService.createSkill(row)),
   };
 }
@@ -40,6 +42,7 @@ function demoWriter(userId: string): ImportWriter {
     createExperience: async (row) => made("exp", row),
     createEducation: async (row) => made("edu", row),
     createCertification: async (row) => made("cert", row),
+    createAchievement: async (row) => made("ach", row),
     createSkill: async (row) => made("sk", row),
   };
 }

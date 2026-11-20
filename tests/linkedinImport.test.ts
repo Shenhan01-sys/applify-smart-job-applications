@@ -23,6 +23,7 @@ import {
   skillKey,
   summarizeCommit,
   toggleItem,
+  validateAchievement,
   validateCertification,
   validateLinkedInPdfFile,
   type ExistingProfile,
@@ -42,6 +43,7 @@ const basePreview = (over: Partial<ImportPreview> = {}): ImportPreview => ({
   ],
   education: [{ institution: "Universitas Fiktif Nusantara", degree: "Bachelor of Engineering - BE", field_of_study: "Information Systems", start_year: 2014, end_year: 2018, is_current: false, notes: [] }],
   certifications: [{ name: "AWS Certified Cloud Practitioner", issuer: "" }],
+  achievements: [],
   skills: [
     { name: "Python", category: "technical", proficiency_level: 3 },
     { name: "English", category: "language", proficiency_level: 4 },
@@ -342,6 +344,7 @@ function fakeWriter(failOn: (kind: string, row: any) => boolean = () => false) {
     createExperience: make("experience"),
     createEducation: make("education"),
     createCertification: make("certification"),
+    createAchievement: make("achievement"),
     createSkill: make("skill"),
   };
   return { writer, calls, maxRunning: () => maxRunning };
@@ -354,7 +357,7 @@ test("applyImport: menulis hanya yang dipilih, urut profil lalu pengalaman, pend
   const result = await applyImport(sel, f.writer);
   assert.deepEqual(f.calls.map((c) => c.kind), ["profile", "experience", "education", "certification", "skill"], "satu skill duplikat dan satu pengalaman dicabut");
   assert.deepEqual(f.calls[0].row, sel.profilePatch);
-  assert.deepEqual(result.added, { basic: 4, experiences: 1, education: 1, certifications: 1, skills: 1 });
+  assert.deepEqual(result.added, { basic: 4, experiences: 1, education: 1, certifications: 1, achievements: 0, skills: 1 });
   assert.equal(result.failed.length, 0);
   assert.equal(result.created.experiences.length, 1);
   assert.deepEqual(result.profilePatch, sel.profilePatch);
@@ -375,7 +378,7 @@ test("applyImport: satu item gagal tidak menghentikan yang lain; kegagalan dilap
   const sel = selectionFromPlan(plan, defaultSelection(plan));
   const f = fakeWriter((kind, row) => (kind === "experience" && row.role_title === "Data Intern") || kind === "certification");
   const result = await applyImport(sel, f.writer);
-  assert.deepEqual(result.added, { basic: 4, experiences: 1, education: 1, certifications: 0, skills: 2 });
+  assert.deepEqual(result.added, { basic: 4, experiences: 1, education: 1, certifications: 0, achievements: 0, skills: 2 });
   assert.deepEqual(result.failed.map((x) => [x.section, x.label]), [["pengalaman", "Data Intern di Studio Kopi Hitam"], ["sertifikasi", "AWS Certified Cloud Practitioner"]]);
   const s = summarizeCommit(result);
   assert.equal(s.kind, "partial");

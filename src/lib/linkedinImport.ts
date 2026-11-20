@@ -11,10 +11,13 @@
  * sudah terisi tidak pernah ditimpa. Tanpa impor selain berkas lib lain, supaya bisa dites dengan `node --test`.
  */
 import {
+  LIMITS,
+  MIN_YEAR,
   PROFICIENCY_LEVELS,
   SKILL_CATEGORIES,
   buildProfileRow,
   formatMonthYear,
+  toDbDate,
   toMonthInput,
   validateEducation,
   validateExperience,
@@ -149,6 +152,19 @@ export interface PreviewCertification {
   issuer: string;
 }
 
+/** Nilai kolom `achievements.category`: seksi "Honors-Awards" PDF = award, seksi "Publications" = publication. */
+export type AchievementCategory = "award" | "publication";
+
+export interface PreviewAchievement {
+  title: string;
+  category: AchievementCategory;
+  issuer: string | null;
+  /** `YYYY-MM-DD` (selalu tanggal 1), null bila PDF tidak mencantumkan tanggal */
+  achievement_date: string | null;
+  description: string | null;
+  notes: string[];
+}
+
 export interface PreviewSkill {
   name: string;
   category: string;
@@ -160,6 +176,7 @@ export interface ImportPreview {
   experiences: PreviewExperience[];
   education: PreviewEducation[];
   certifications: PreviewCertification[];
+  achievements: PreviewAchievement[];
   skills: PreviewSkill[];
   meta: { method: "ai" | "rules"; model: string | null; pages: number; truncated: boolean; dropped: number };
   warnings: string[];
@@ -183,7 +200,7 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
   const profile = obj(p.profile) ?? {};
   const meta = obj(p.meta) ?? {};
   const dropped = obj(meta.dropped) ?? {};
-  const droppedTotal = ["experiences", "education", "certifications", "skills"].reduce((n, k) => n + (Number(dropped[k]) || 0), 0);
+  const droppedTotal = ["experiences", "education", "certifications", "achievements", "skills"].reduce((n, k) => n + (Number(dropped[k]) || 0), 0);
 
   const experiences: PreviewExperience[] = [];
   for (const item of list(p.experiences)) {
@@ -224,6 +241,20 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
     certifications.push({ name: text(c.name), issuer: text(c.issuer) });
   }
 
+  const achievements: PreviewAchievement[] = [];
+  for (const item of list(p.achievements)) {
+    const a = obj(item);
+    if (!a || !text(a.title) || (a.category !== "award" && a.category !== "publication")) continue;
+    achievements.push({
+      title: text(a.title),
+      category: a.category,
+      issuer: textOrNull(a.issuer),
+      achievement_date: textOrNull(a.achievement_date),
+      description: textOrNull(a.description),
+      notes: strings(a.notes),
+    });
+  }
+
   const skills: PreviewSkill[] = [];
   for (const item of list(p.skills)) {
     const s = obj(item);
@@ -241,6 +272,7 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
     experiences,
     education,
     certifications,
+    achievements,
     skills,
     meta: {
       method: meta.method === "rules" ? "rules" : "ai",
@@ -266,6 +298,25 @@ export interface CertificationRow {
 
 export const CERT_NAME_MAX = 200;
 export const CERT_ISSUER_MAX = 120;
+
+/**
+ * Baris `achievements` yang ditulis (kolom `url` dibiarkan kosong, user_id ditambahkan layanan). `category` berupa
+ * teks bebas di database; impor memakai "award" (Honors-Awards) dan "publication" (Publications).
+ */
+export interface AchievementRow {
+  title: string;
+  category: AchievementCategory;
+  issuer: string | null;
+  /** `YYYY-MM-01` */
+  achievement_date: string | null;
+  description: string | null;
+  is_featured: boolean;
+}
+
+export const ACHIEVEMENT_TITLE_MAX = 200;
+export const ACHIEVEMENT_ISSUER_MAX = 120;
+export const ACHIEVEMENT_DESCRIPTION_MAX = LIMITS.longText;
+const ACHIEVEMENT_LABELS: Record<AchievementCategory, string> = { award: "Penghargaan", publication: "Publikasi" };
 
 export type ItemStatus = "new" | "duplicate" | "invalid";
 
@@ -293,6 +344,7 @@ export interface ImportPlan {
   experiences: Array<ImportItem<ExperienceRow>>;
   education: Array<ImportItem<EducationRow>>;
   certifications: Array<ImportItem<CertificationRow>>;
+  achievements: Array<ImportItem<AchievementRow>>;
   skills: Array<ImportItem<SkillRow>>;
 }
 
@@ -302,10 +354,11 @@ export interface ExistingProfile {
   experiences: Array<{ company_name?: unknown; role_title?: unknown }>;
   education: Array<{ institution?: unknown; degree?: unknown }>;
   certifications: Array<{ name?: unknown }>;
+  achievements: Array<{ title?: unknown }>;
   skills: Array<{ name?: unknown }>;
 }
 
-export const EMPTY_EXISTING: ExistingProfile = { basic: {}, experiences: [], education: [], certifications: [], skills: [] };
+export const EMPTY_EXISTING: ExistingProfile = { basic: {}, experiences: [], education: [], certifications: [], achievements: [], skills: [] };
 
 /**
  * Kunci perbandingan nama: huruf kecil, tanpa aksen, tanda baca jadi spasi, tetapi `+` dan `#` dipertahankan
@@ -347,6 +400,38 @@ export function validateCertification(c: { name: unknown; issuer: unknown }): { 
   return { ok: true, row: { name, issuer, is_verified: false } };
 }
 
+const currentMonth = (now: Date) => `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
+/**
+ * Validator penghargaan dan publikasi (editor Profil belum punya formulir untuk tabel `achievements`, jadi aturannya
+ * ada di sini, setara validateCertification): judul wajib dan paling banyak 200 karakter, jenis award atau
+ * publication, penyelenggara paling banyak 120, deskripsi paling banyak 2000, tanggal (bila ada) sah, tidak
+ * sebelum tahun 1950, dan tidak di masa depan. Tanggal dinormalkan ke `YYYY-MM-01`.
+ */
+export function validateAchievement(
+  a: { title: unknown; category: unknown; issuer: unknown; achievement_date: unknown; description: unknown },
+  now: Date = new Date(),
+): { ok: true; row: AchievementRow } | { ok: false; reason: string } {
+  const title = text(a.title);
+  const issuer = text(a.issuer);
+  const description = text(a.description);
+  const dateRaw = text(a.achievement_date);
+  if (!title) return { ok: false, reason: "Judul kosong." };
+  if (title.length > ACHIEVEMENT_TITLE_MAX) return { ok: false, reason: `Judul maksimal ${ACHIEVEMENT_TITLE_MAX} karakter.` };
+  if (a.category !== "award" && a.category !== "publication") return { ok: false, reason: "Jenis harus penghargaan atau publikasi." };
+  if (issuer.length > ACHIEVEMENT_ISSUER_MAX) return { ok: false, reason: `Penyelenggara maksimal ${ACHIEVEMENT_ISSUER_MAX} karakter.` };
+  if (description.length > ACHIEVEMENT_DESCRIPTION_MAX) return { ok: false, reason: `Deskripsi maksimal ${ACHIEVEMENT_DESCRIPTION_MAX} karakter.` };
+  let date: string | null = null;
+  if (dateRaw) {
+    const d = toDbDate(dateRaw);
+    if (!d) return { ok: false, reason: "Tanggal tidak valid." };
+    if (Number(d.slice(0, 4)) < MIN_YEAR) return { ok: false, reason: `Tahun tidak boleh sebelum ${MIN_YEAR}.` };
+    if (d.slice(0, 7) > currentMonth(now)) return { ok: false, reason: "Tanggal tidak boleh di masa depan." };
+    date = d;
+  }
+  return { ok: true, row: { title, category: a.category, issuer: issuer || null, achievement_date: date, description: description || null, is_featured: false } };
+}
+
 /**
  * Susun rencana impor dari pratinjau server dan isi profil yang sudah ada. Setiap item mendapat status:
  *   new       lolos validator editor Profil dan belum ada
@@ -354,7 +439,7 @@ export function validateCertification(c: { name: unknown; issuer: unknown }): { 
  *   invalid   tidak lolos validator (mis. tanggal di masa depan) atau melewati batas jumlah skill; dilewati
  */
 export function buildImportPlan(preview: ImportPreview, existing: ExistingProfile = EMPTY_EXISTING, now: Date = new Date()): ImportPlan {
-  const plan: ImportPlan = { basic: [], experiences: [], education: [], certifications: [], skills: [] };
+  const plan: ImportPlan = { basic: [], experiences: [], education: [], certifications: [], achievements: [], skills: [] };
 
   // --- profil dasar: hanya mengisi kolom yang masih kosong, tidak pernah menimpa
   for (const field of BASIC_ORDER) {
@@ -468,6 +553,27 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
     plan.certifications.push({ ...base, status: "new", reason: "", row: v.row });
   }
 
+  // --- penghargaan dan publikasi (achievements): duplikat bila judulnya sama, tanpa peduli huruf besar dan tanda baca.
+  // Daftar "ada" bertambah tiap item baru, jadi judul ganda di dalam PDF yang sama juga tertangkap.
+  const seenAch = new Set(existing.achievements.map((a) => normKey(a.title)));
+  for (const [i, a] of preview.achievements.entries()) {
+    const key = `ach:${i}`;
+    const date = formatMonthYear(a.achievement_date);
+    const base = { key, title: a.title, detail: [ACHIEVEMENT_LABELS[a.category], a.issuer, date].filter(Boolean).join(" · "), notes: a.notes };
+    const k = normKey(a.title);
+    if (seenAch.has(k)) {
+      plan.achievements.push({ ...base, status: "duplicate", reason: "Penghargaan atau publikasi dengan judul ini sudah ada.", row: null });
+      continue;
+    }
+    const v = validateAchievement(a, now);
+    if (!v.ok) {
+      plan.achievements.push({ ...base, status: "invalid", reason: v.reason, row: null });
+      continue;
+    }
+    seenAch.add(k);
+    plan.achievements.push({ ...base, status: "new", reason: "", row: v.row });
+  }
+
   // --- skill dan bahasa (user_skills). Daftar "ada" bertambah tiap item baru, jadi duplikat di PDF dan batas 50 ikut tertangkap.
   const knownSkills: Array<{ id?: string; name?: string }> = existing.skills.map((s) => ({ name: typeof s.name === "string" ? s.name : "" }));
   for (const [i, s] of preview.skills.entries()) {
@@ -491,7 +597,7 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
   return plan;
 }
 
-export const SECTION_KEYS = ["basic", "experiences", "education", "certifications", "skills"] as const;
+export const SECTION_KEYS = ["basic", "experiences", "education", "certifications", "achievements", "skills"] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export const allItems = (plan: ImportPlan): Array<ImportItem<unknown>> => SECTION_KEYS.flatMap((k) => plan[k] as Array<ImportItem<unknown>>);
@@ -534,6 +640,7 @@ export interface ImportSelection {
   experiences: ExperienceRow[];
   education: EducationRow[];
   certifications: CertificationRow[];
+  achievements: AchievementRow[];
   skills: SkillRow[];
 }
 
@@ -548,12 +655,13 @@ export function selectionFromPlan(plan: ImportPlan, selected: ReadonlySet<string
     experiences: pick(plan.experiences),
     education: pick(plan.education),
     certifications: pick(plan.certifications),
+    achievements: pick(plan.achievements),
     skills: pick(plan.skills),
   };
 }
 
 export const selectionSize = (s: ImportSelection): number =>
-  Object.keys(s.profilePatch).length + s.experiences.length + s.education.length + s.certifications.length + s.skills.length;
+  Object.keys(s.profilePatch).length + s.experiences.length + s.education.length + s.certifications.length + s.achievements.length + s.skills.length;
 
 /** Isi hanya kolom formulir profil yang masih kosong; yang sudah terisi (atau sedang diketik) dibiarkan. */
 export function applyProfilePatch<T extends Record<string, any>>(prev: T, patch: Partial<Record<BasicField, string>>): T {
@@ -574,11 +682,12 @@ export interface ImportWriter {
   createExperience(row: ExperienceRow): Promise<unknown>;
   createEducation(row: EducationRow): Promise<unknown>;
   createCertification(row: CertificationRow): Promise<unknown>;
+  createAchievement(row: AchievementRow): Promise<unknown>;
   createSkill(row: SkillRow): Promise<unknown>;
 }
 
 export interface CommitFailure {
-  section: "profil" | "pengalaman" | "pendidikan" | "sertifikasi" | "skill";
+  section: "profil" | "pengalaman" | "pendidikan" | "sertifikasi" | "penghargaan" | "skill";
   label: string;
   message: string;
 }
@@ -586,16 +695,16 @@ export interface CommitFailure {
 export interface CommitResult {
   /** kolom profil yang benar-benar tersimpan */
   profilePatch: Partial<Record<BasicField, string>>;
-  added: { basic: number; experiences: number; education: number; certifications: number; skills: number };
+  added: { basic: number; experiences: number; education: number; certifications: number; achievements: number; skills: number };
   /** baris yang dikembalikan database, untuk mode demo atau pembaruan lokal */
-  created: { experiences: unknown[]; education: unknown[]; certifications: unknown[]; skills: unknown[] };
+  created: { experiences: unknown[]; education: unknown[]; certifications: unknown[]; achievements: unknown[]; skills: unknown[] };
   failed: CommitFailure[];
 }
 
 export const emptyCommit = (): CommitResult => ({
   profilePatch: {},
-  added: { basic: 0, experiences: 0, education: 0, certifications: 0, skills: 0 },
-  created: { experiences: [], education: [], certifications: [], skills: [] },
+  added: { basic: 0, experiences: 0, education: 0, certifications: 0, achievements: 0, skills: 0 },
+  created: { experiences: [], education: [], certifications: [], achievements: [], skills: [] },
   failed: [],
 });
 
@@ -621,7 +730,7 @@ export async function runLimited<T, R>(items: T[], limit: number, fn: (item: T) 
 
 /**
  * Tulis pilihan pengguna. Profil dasar dulu (upsert, jadi pengguna tanpa baris `profiles` mendapat satu), lalu
- * pengalaman, pendidikan, sertifikasi, skill. Satu item yang gagal tidak menghentikan yang lain; yang gagal
+ * pengalaman, pendidikan, sertifikasi, penghargaan dan publikasi, skill. Satu item yang gagal tidak menghentikan yang lain; yang gagal
  * dilaporkan. Impor ulang PDF yang sama aman: item yang sudah masuk terdeteksi sebagai "Sudah ada".
  */
 export async function applyImport(sel: ImportSelection, writer: ImportWriter, concurrency = 4): Promise<CommitResult> {
@@ -659,6 +768,7 @@ export async function applyImport(sel: ImportSelection, writer: ImportWriter, co
   result.added.experiences = await run(sel.experiences, "pengalaman", (r) => `${r.role_title} di ${r.company_name}`, (r) => writer.createExperience(r), result.created.experiences);
   result.added.education = await run(sel.education, "pendidikan", (r) => `${r.degree} di ${r.institution}`, (r) => writer.createEducation(r), result.created.education);
   result.added.certifications = await run(sel.certifications, "sertifikasi", (r) => r.name, (r) => writer.createCertification(r), result.created.certifications);
+  result.added.achievements = await run(sel.achievements, "penghargaan", (r) => r.title, (r) => writer.createAchievement(r), result.created.achievements);
   result.added.skills = await run(sel.skills, "skill", (r) => r.name, (r) => writer.createSkill(r), result.created.skills);
   return result;
 }
@@ -672,6 +782,7 @@ export function summarizeCommit(r: CommitResult): { kind: "success" | "partial" 
   if (r.added.experiences) parts.push(`${r.added.experiences} pengalaman`);
   if (r.added.education) parts.push(`${r.added.education} pendidikan`);
   if (r.added.certifications) parts.push(`${r.added.certifications} sertifikasi`);
+  if (r.added.achievements) parts.push(`${r.added.achievements} penghargaan dan publikasi`);
   if (r.added.skills) parts.push(`${r.added.skills} skill`);
   const added = parts.join(", ");
   if (r.failed.length === 0) return { kind: "success", message: added ? `Ditambahkan ke profil: ${added}.` : "Tidak ada yang ditambahkan." };

@@ -79,11 +79,12 @@ export interface Achievement {
   id: string;
   user_id: string;
   title: string;
-  description?: string;
-  category?: string;
-  issuer?: string;
-  achievement_date?: string;
-  url?: string;
+  // Kolom di bawah ini boleh NULL di database (schema.sql: achievements), jadi null sah, bukan hanya undefined.
+  description?: string | null;
+  category?: string | null;
+  issuer?: string | null;
+  achievement_date?: string | null;
+  url?: string | null;
   is_featured: boolean;
   created_at: string;
   updated_at: string;

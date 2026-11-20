@@ -16,6 +16,7 @@ import {
   mockWorkExperiences,
   mockEducation,
   mockCertifications,
+  mockAchievements,
   mockUserSkills,
 } from "@/mocks/mockData";
 import { profileService } from "@/services/profileService";
@@ -134,6 +135,8 @@ function ProfilePage() {
   const [workExps, setWorkExps] = useState<any[]>(() => (isMockMode() ? [...mockWorkExperiences] : []));
   const [educations, setEducations] = useState<any[]>(() => (isMockMode() ? [...mockEducation] : []));
   const [certs, setCerts] = useState<any[]>(() => (isMockMode() ? [...mockCertifications] : []));
+  // Tabel achievements belum punya editor di halaman ini; daftarnya hanya dipakai untuk mendeteksi duplikat saat impor PDF LinkedIn.
+  const [achievements, setAchievements] = useState<any[]>(() => (isMockMode() ? [...mockAchievements] : []));
   const [userSkills, setUserSkills] = useState<any[]>(() => (isMockMode() ? [...mockUserSkills] : []));
   // Preferensi langkah 4 disimpan ke user_automation_settings (lewat server otomasi). 'failed' = belum bisa
   // dimuat, dan dalam keadaan itu preferensi tidak ikut disimpan supaya tidak menimpa nilai lama dengan kosong.
@@ -195,6 +198,7 @@ function ProfilePage() {
         setWorkExps(full.workExperiences);
         setEducations(full.education);
         setCerts(full.certifications);
+        setAchievements(full.achievements);
         setUserSkills(full.skills);
       } catch (err: any) {
         console.error("Error loading profile:", err);
@@ -293,6 +297,7 @@ function ProfilePage() {
       setWorkExps((prev) => [...(result.created.experiences as any[]), ...prev]);
       setEducations((prev) => [...(result.created.education as any[]), ...prev]);
       setCerts((prev) => [...(result.created.certifications as any[]), ...prev]);
+      setAchievements((prev) => [...(result.created.achievements as any[]), ...prev]);
       setUserSkills((prev) => [...(result.created.skills as any[]), ...prev]);
       return;
     }
@@ -300,6 +305,7 @@ function ProfilePage() {
     setWorkExps(full.workExperiences);
     setEducations(full.education);
     setCerts(full.certifications);
+    setAchievements(full.achievements);
     setUserSkills(full.skills);
   }, [user]);
 
@@ -430,7 +436,7 @@ function ProfilePage() {
       {user && (
         <LinkedInImportCard
           userId={user.id}
-          existing={{ basic: formData, experiences: workExps, education: educations, certifications: certs, skills: userSkills }}
+          existing={{ basic: formData, experiences: workExps, education: educations, certifications: certs, achievements, skills: userSkills }}
           disabledReason={loadError ? "Profilmu belum termuat penuh, jadi data yang sudah ada belum bisa dicek. Muat ulang profil dulu." : undefined}
           onImported={handleImported}
         />
