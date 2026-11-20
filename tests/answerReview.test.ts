@@ -66,3 +66,7 @@ test("normalizeAnswers: skor di luar 0..1 dipotong dan source asing dibuang", ()
 test("SOURCE_LABEL: jawaban yang diambil backend dari Profil berlabel Dari Profil", () => {
   assert.equal(SOURCE_LABEL.profile, "Dari Profil");
 });
+
+test("SOURCE_LABEL: jawaban aturan memakai nama menu Pengaturan Agen", () => {
+  assert.equal(SOURCE_LABEL.rule, "Dari Pengaturan Agen");
+});

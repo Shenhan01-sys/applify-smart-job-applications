@@ -221,7 +221,7 @@ export default function ApprovalReviewModal({
             <div className="mb-4">
               <h4 className="mb-1 text-sm font-semibold text-[#16150F]">Jawaban formulir</h4>
               <p className="mb-2 text-xs text-[#16150F]/60">
-                Jawaban standar yang disiapkan agen dari Pengaturan Otomasi-mu.{' '}
+                Jawaban standar yang disiapkan agen dari Profil dan Pengaturan Agen-mu.{' '}
                 {needAttention > 0 ? (
                   <span className="font-semibold text-[#D9741A]">
                     {needAttention} dari {answers.length} perlu dicek sebelum kamu menyetujui.
@@ -253,7 +253,7 @@ export default function ApprovalReviewModal({
                         )}
                       </div>
                       <p className="text-sm text-[#16150F]/80">
-                        {answer.answer.trim() ? answer.answer : <em className="text-[#16150F]/50">(kosong: isi dulu di Pengaturan Otomasi)</em>}
+                        {answer.answer.trim() ? answer.answer : <em className="text-[#16150F]/50">(kosong: isi dulu di Profil atau Pengaturan Agen)</em>}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-[#16150F]/50">
                         <span>

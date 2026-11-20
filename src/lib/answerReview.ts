@@ -36,7 +36,7 @@ export const LEVEL_LABEL: Record<ConfidenceLevel, string> = {
 };
 
 export const SOURCE_LABEL: Record<AnswerSource, string> = {
-  rule: "Dari Pengaturan Otomasi",
+  rule: "Dari Pengaturan Agen",
   profile: "Dari Profil",
   ai: "Ditulis AI",
   default: "Belum ada data",
