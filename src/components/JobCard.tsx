@@ -398,7 +398,11 @@ function formatCurrency(amount: number) {
 /** Ids whose full detail was already requested in this page load; a card used on its own gets this fallback. */
 const DETAIL_ATTEMPTS_FALLBACK = new Set<string>();
 
-type DetailState = { phase: "idle" } | { phase: "loading" } | { phase: "failed"; note: string };
+// Jawaban server yang berarti detail sudah diambil sebelumnya, bukan gagal. Sebagian lowongan memang tidak punya judul
+// kualifikasi di halamannya (sapuan 24 lowongan, 20 November 2026), sehingga requirements tetap kosong walau deskripsi lengkap.
+const DETAIL_SETTLED_REASONS = new Set(["sudah lengkap", "tidak ada data baru"]);
+
+type DetailState ={ phase: "idle" } | { phase: "loading" } | { phase: "failed"; note: string };
 type BenchmarkState = { phase: "idle" } | { phase: "loading" } | { phase: "ready"; data: SalaryBenchmarkResult } | { phase: "unavailable" };
 
 export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, onApply, onJobUpdated, detailAttempts = DETAIL_ATTEMPTS_FALLBACK }: {
@@ -433,7 +437,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
         const merged = res?.job ? mergeJobUpdate(job, res.job) : null;
         if (!res) {
           setDetail({ phase: "idle" });
-        } else if (merged && (res.enriched || !isThinDetail(merged))) {
+        } else if (merged && (res.enriched || !isThinDetail(merged) || DETAIL_SETTLED_REASONS.has(String(res.reason ?? "")))) {
           // Uji klik 20 November 2026: server menjawab enriched:false "sudah lengkap" karena percobaan sebelumnya
           // sudah menyimpan detailnya. Baris lengkap yang dikirim balik tetap dipakai, bukan dianggap gagal.
           onJobUpdated?.(merged);

@@ -330,7 +330,8 @@ test("kartu: detail lengkap diambil sekali saat dibuka, hanya bila needsDetail, 
   // berhasil: baris baru naik ke halaman; gagal atau tidak didukung: catatan, tanpa memutus kartu
   assert.match(effect, /const merged = res\?\.job \? mergeJobUpdate\(job, res\.job\) : null;/);
   // "sudah lengkap" (enriched:false) dengan baris yang sudah lengkap tetap dipakai, bukan dianggap gagal (uji klik 20 Nov)
-  assert.match(effect, /merged && \(res\.enriched \|\| !isThinDetail\(merged\)\)/);
+  assert.match(effect, /merged && \(res\.enriched \|\| !isThinDetail\(merged\) \|\| DETAIL_SETTLED_REASONS\.has\(/);
+  assert.match(card, /const DETAIL_SETTLED_REASONS = new Set\(\["sudah lengkap", "tidak ada data baru"\]\)/);
   assert.match(effect, /onJobUpdated\?\.\(merged\)/);
   // gagal bisa dicoba lagi: id dihapus dari catatan percobaan lalu efek dijalankan ulang
   assert.match(card, /const retryDetail = \(\) => \{\s*detailAttempts\.delete\(job\.id\);\s*setDetailRetry\(\(n\) => n \+ 1\);/);
