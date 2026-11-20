@@ -17,14 +17,45 @@ export interface UserSkillRow {
   proficiency_level?: number | string | null;
 }
 
+/**
+ * Kata kunci tiap bidang. Dicocokkan sebagai kata utuh atau frasa (lihat hasKeyword), bukan potongan kata, jadi
+ * bentuk lain yang dulu tertangkap sebagai awalan ("front", "prototyp", "tensor") ditulis eksplisit di sini.
+ */
 export const AXES = [
-  { name: "Frontend", market: 90, kw: ["front", "react", "vue", "css", "html", "javascript", "typescript", "tailwind"] },
-  { name: "Backend", market: 80, kw: ["back", "node", "api", "server", "golang", "java", "python", "php", "rest", "graphql"] },
-  { name: "UI/UX", market: 70, kw: ["ux", "ui/ux", "design", "figma", "wireframe", "prototyp"] },
-  { name: "Cloud/DevOps", market: 65, kw: ["cloud", "devops", "aws", "gcp", "azure", "docker", "kubernetes", "ci/cd", "terraform"] },
-  { name: "Data/AI", market: 85, kw: ["data", "ai", "ml", "machine", "analytic", "sql", "pandas", "tensor", "llm"] },
+  { name: "Frontend", market: 90, kw: ["frontend", "front end", "react", "reactjs", "vue", "vuejs", "css", "css3", "html", "html5", "javascript", "typescript", "tailwind", "tailwindcss"] },
+  { name: "Backend", market: 80, kw: ["backend", "back end", "node", "nodejs", "api", "server", "golang", "java", "python", "php", "rest", "restful", "graphql"] },
+  { name: "UI/UX", market: 70, kw: ["ux", "ui/ux", "ux/ui", "design", "designer", "figma", "wireframe", "prototype", "prototyping"] },
+  { name: "Cloud/DevOps", market: 65, kw: ["cloud", "devops", "aws", "gcp", "azure", "docker", "kubernetes", "k8s", "ci/cd", "cicd", "terraform"] },
+  { name: "Data/AI", market: 85, kw: ["data", "database", "dataset", "ai", "ml", "machine", "analytic", "analytical", "sql", "mysql", "postgresql", "nosql", "sqlite", "pandas", "tensor", "tensorflow", "llm"] },
   { name: "Agile/Soft", market: 75, kw: ["agile", "scrum", "communication", "leadership", "soft", "management", "kolaborasi"] },
 ] as const;
+
+/** Huruf kecil; tanda hubung, garis bawah, dan spasi ganda menjadi satu spasi ("Front-End" sama dengan "front end"). */
+const normalizeText = (text: string): string => text.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+const isAlnum = (c: string | undefined): boolean => c !== undefined && /[a-z0-9]/.test(c);
+
+/**
+ * Apakah `keyword` ada di `text` sebagai kata utuh atau frasa. "ai" tidak ada di "Blockchain" dan "java" tidak
+ * ada di "JavaScript", tetapi "AI/ML" dan "Java Spring" cocok. Batas kata hanya diperiksa di sisi yang berupa
+ * huruf atau angka, jadi kata kunci bersimbol seperti "c++", "node.js", atau "ci/cd" tetap bekerja. Kata kunci
+ * sepanjang 3 karakter ke atas boleh diikuti "s" untuk jamak ("APIs", "servers").
+ */
+export function hasKeyword(text: string, keyword: string): boolean {
+  const hay = normalizeText(text);
+  const term = normalizeText(keyword);
+  if (!term) return false;
+  let from = 0;
+  for (;;) {
+    const i = hay.indexOf(term, from);
+    if (i < 0) return false;
+    const end = i + term.length;
+    const startOk = !(isAlnum(term[0]) && isAlnum(hay[i - 1]));
+    let endOk = !(isAlnum(term[term.length - 1]) && isAlnum(hay[end]));
+    if (!endOk && term.length >= 3 && hay[end] === "s" && !isAlnum(hay[end + 1])) endOk = true;
+    if (startOk && endOk) return true;
+    from = i + 1;
+  }
+}
 
 /** Data contoh, hanya dipakai di mode demo eksplisit (VITE_MOCK_MODE=true). */
 export const DEMO_SKILLS: SkillAxis[] = [
@@ -78,8 +109,8 @@ export function buildRadarData(skills: UserSkillRow[]): RadarBuild {
   const used = new Set<UserSkillRow>();
   const data: SkillAxis[] = AXES.map((ax, i) => {
     const matched = skills.filter((s) => {
-      const hay = `${s.name || ""} ${s.category || ""}`.toLowerCase();
-      return ax.kw.some((k) => hay.includes(k));
+      const hay = `${s.name || ""} ${s.category || ""}`;
+      return ax.kw.some((k) => hasKeyword(hay, k));
     });
     matched.forEach((m) => used.add(m));
     const userLevel = matched.length

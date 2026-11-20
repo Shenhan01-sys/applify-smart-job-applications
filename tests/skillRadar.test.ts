@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildRadarData, findGaps, describeRadar, unmatchedSkillLabels, DEMO_SKILLS, UNMATCHED_SECTION_TEXT, UNMATCHED_SECTION_TITLE } from "../src/lib/skillRadar.ts";
+import { AXES, buildRadarData, findGaps, describeRadar, hasKeyword, unmatchedSkillLabels, DEMO_SKILLS, UNMATCHED_SECTION_TEXT, UNMATCHED_SECTION_TITLE } from "../src/lib/skillRadar.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -129,4 +129,92 @@ test("temuan 11: halaman Peta Skill menampilkan bagian Skill di luar enam bidang
   assert.match(src, /<section aria-labelledby="skill-luar-bidang"/);
   // profil tanpa skill tetap memakai keadaan kosong lama
   assert.match(src, /Skill-mu belum ada di profil/);
+});
+
+// Tindak lanjut temuan 11: kata kunci dicocokkan sebagai kata utuh, bukan potongan kata.
+const axisOf = (skill: { name: string; category?: string | null; proficiency_level?: number }) =>
+  buildRadarData([{ proficiency_level: 4, ...skill }]).data.filter((d) => d.userLevel > 0).map((d) => d.name);
+
+test("kata kunci: Blockchain tidak masuk Data/AI karena memuat ai, dan profil Web3 tetap di luar enam bidang", () => {
+  assert.equal(hasKeyword("Blockchain", "ai"), false);
+  assert.deepEqual(axisOf({ name: "Solidity", category: "Blockchain" }), []);
+  const r = buildRadarData([{ name: "Solidity", category: "Blockchain", proficiency_level: 5 }, { name: "Smart Contract", category: "Web3", proficiency_level: 4 }]);
+  assert.equal(r.status, "unmatched");
+  assert.equal(r.unmatched.length, 2);
+});
+
+test("kata kunci: potongan kata lain yang dulu salah tangkap tidak lagi cocok", () => {
+  const misses: Array<[string, string]> = [
+    ["Software Engineering", "soft"], // bukan soft skill
+    ["JavaScript", "java"], // bukan Java
+    ["HTML", "ml"], // bukan machine learning
+    ["Maintenance", "ai"],
+    ["Retail", "ai"],
+    ["Email Marketing", "ai"],
+    ["Metadata", "data"],
+    ["Frontier Markets", "front"],
+    ["Restaurant Management", "rest"],
+    ["Serverless", "server"],
+  ];
+  for (const [text, kw] of misses) assert.equal(hasKeyword(text, kw), false, `${text} / ${kw}`);
+  assert.deepEqual(axisOf({ name: "Software Engineering", category: "technical" }), []);
+  assert.deepEqual(axisOf({ name: "Email Marketing", category: "tool" }), []);
+  assert.deepEqual(axisOf({ name: "Pelayanan Pelanggan", category: "language" }), []);
+});
+
+test("kata kunci: kata utuh, frasa, tanda hubung, garis miring, dan jamak tetap cocok", () => {
+  const hits: Array<[string, string]> = [
+    ["AI", "ai"],
+    ["AI/ML Engineer", "ai"],
+    ["AI/ML Engineer", "ml"],
+    ["Machine Learning", "machine"],
+    ["Front-End Developer", "front end"],
+    ["Frontend", "frontend"],
+    ["Back_End", "back end"],
+    ["REST API", "api"],
+    ["REST APIs", "api"],
+    ["Cloud Computing", "cloud"],
+    ["Data Analytics", "analytic"],
+    ["Rapid Prototyping", "prototyping"],
+    ["Project Management", "management"],
+    ["Soft skill", "soft"],
+  ];
+  for (const [text, kw] of hits) assert.equal(hasKeyword(text, kw), true, `${text} / ${kw}`);
+  // frasa harus utuh dan berurutan
+  assert.equal(hasKeyword("Back Office", "back end"), false);
+  assert.equal(hasKeyword("end to back", "back end"), false);
+});
+
+test("kata kunci bersimbol tetap bekerja: c++, c#, node.js, .net, ci/cd, ui/ux", () => {
+  assert.equal(hasKeyword("C++ Developer", "c++"), true);
+  assert.equal(hasKeyword("Embedded C++", "c++"), true);
+  assert.equal(hasKeyword("abc++", "c++"), false);
+  assert.equal(hasKeyword("C#", "c#"), true);
+  assert.equal(hasKeyword("Node.js", "node.js"), true);
+  assert.equal(hasKeyword("Node.js", "node"), true, "node di dalam node.js");
+  assert.equal(hasKeyword("Backend (Node.js, Express)", "node.js"), true);
+  assert.equal(hasKeyword("ASP.NET", ".net"), true);
+  assert.equal(hasKeyword("CI/CD Pipeline", "ci/cd"), true);
+  assert.equal(hasKeyword("UI/UX Designer", "ui/ux"), true);
+  assert.equal(hasKeyword("UI/UX Designer", "ux"), true);
+  assert.equal(hasKeyword("anything", ""), false);
+});
+
+test("kata kunci: kasus nyata tetap masuk bidangnya, dan bentuk yang dulu awalan ditulis eksplisit", () => {
+  assert.deepEqual(axisOf({ name: "React", category: "technical" }), ["Frontend"]);
+  assert.deepEqual(axisOf({ name: "Next.js", category: "Frontend" }), ["Frontend"]);
+  assert.deepEqual(axisOf({ name: "Node.js", category: "technical" }), ["Backend"]);
+  assert.deepEqual(axisOf({ name: "Figma", category: "tool" }), ["UI/UX"]);
+  assert.deepEqual(axisOf({ name: "Docker", category: "tool" }), ["Cloud/DevOps"]);
+  assert.deepEqual(axisOf({ name: "Kubernetes", category: "tool" }), ["Cloud/DevOps"]);
+  assert.deepEqual(axisOf({ name: "PostgreSQL", category: "tool" }), ["Data/AI"]);
+  assert.deepEqual(axisOf({ name: "Pandas", category: "technical" }), ["Data/AI"]);
+  assert.deepEqual(axisOf({ name: "Scrum", category: "tool" }), ["Agile/Soft"]);
+  assert.deepEqual(axisOf({ name: "Komunikasi", category: "soft" }), ["Agile/Soft"], "kategori soft memetakan ke Agile/Soft");
+  assert.deepEqual(axisOf({ name: "Wireframes", category: "tool" }), ["UI/UX"], "jamak");
+  assert.deepEqual(axisOf({ name: "UX Prototyping", category: "technical" }), ["UI/UX"]);
+  assert.deepEqual(axisOf({ name: "TensorFlow", category: "technical" }), ["Data/AI"]);
+  assert.deepEqual(axisOf({ name: "Data Analytics", category: "technical" }), ["Data/AI"]);
+  // semua kata kunci kata utuh cocok dengan dirinya sendiri
+  for (const ax of AXES) for (const k of ax.kw) assert.equal(hasKeyword(k, k), true, `${ax.name}: ${k}`);
 });
