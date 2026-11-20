@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceCounts, jobsEmptyState, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
 
 test("freshSinceDate/freshJobsFilter: 30 hari ke belakang (UTC), baris tanpa posted_at tetap dimuat", () => {
   assert.equal(JOB_MAX_AGE_DAYS, 30);
@@ -159,7 +159,6 @@ const emptyBase: JobsEmptyInput = {
   skillsError: "",
   scoredCount: 120,
   topScore: 67,
-  counts: { remote: 0, hybrid: 3, "on-site": 190, unknown: 7 },
 };
 
 test("temuan 7: workplaceKind membaca workplace_type seperti label kartu, dan hanya kata jelas bila kolom kosong", () => {
@@ -190,30 +189,78 @@ test("temuan 7: matchesWorkplaceFilter memetakan kunci penyaring halaman, kunci 
   for (const key of ["all", "high-match", "saved", ""]) assert.equal(matchesWorkplaceFilter({ workplace_type: "remote" }, key), false, key);
 });
 
-test("temuan 7: workplaceCounts menghitung per jenis dan yang tanpa keterangan", () => {
-  const jobs = [{ workplace_type: "on-site" }, { workplace_type: "on-site" }, { workplace_type: "hybrid" }, { workplace_type: null, location: "Remote" }, { workplace_type: null }];
-  assert.deepEqual(workplaceCounts(jobs), { remote: 1, hybrid: 1, "on-site": 2, unknown: 1 });
-  assert.deepEqual(workplaceCounts([]), { remote: 0, hybrid: 0, "on-site": 0, unknown: 0 });
+// Tindak lanjut temuan 7: penyaring tempat kerja dijalankan di server, seperti kotak cari.
+test("temuan 7: workplaceQueryFilter membuat saringan or PostgREST per penyaring, null untuk yang bukan tempat kerja", () => {
+  assert.equal(workplaceQueryFilter("onsite"), "workplace_type.eq.on-site");
+  assert.equal(
+    workplaceQueryFilter("remote"),
+    "workplace_type.eq.remote,and(workplace_type.is.null,or(location.ilike.*remote*,title.ilike.*remote*,location.ilike.*wfh*,title.ilike.*wfh*,location.ilike.*work from home*,title.ilike.*work from home*))",
+  );
+  assert.equal(
+    workplaceQueryFilter("hybrid"),
+    "workplace_type.eq.hybrid,and(workplace_type.is.null,or(location.ilike.*hybrid*,title.ilike.*hybrid*))",
+  );
+  for (const key of ["all", "high-match", "saved", "", "Remote", "on-site"]) assert.equal(workplaceQueryFilter(key), null, key);
 });
 
-test("temuan 7: keadaan kosong Remote menyebut berapa lowongan dicari, apa yang ada, dan apa yang dicoba", () => {
-  const s = jobsEmptyState({ ...emptyBase, filter: "remote" });
-  assert.equal(s.title, "Belum ada lowongan remote");
-  assert.match(s.text, /Tidak ada yang berlabel Remote di antara 200 lowongan yang dimuat\./);
-  assert.match(s.text, /Yang ada: Di kantor 190, Hybrid 3, tanpa keterangan 7\./);
-  assert.match(s.text, /pilih "Semua" lalu cari kata "remote"/);
-  assert.notEqual(s.title, GENERIC_EMPTY_TITLE);
-  assert.equal(s.action, null);
+test("temuan 7: saringan server mencakup yang dipilih penyaring klien (nilai kolom persis, atau kolom kosong dengan kata di lokasi atau judul)", () => {
+  // Evaluasi sederhana atas string saringan: setiap suku `kolom.operator.nilai` pada baris contoh.
+  const rows = [
+    { workplace_type: "remote", location: "Jakarta", title: "Accountant" },
+    { workplace_type: null, location: "Remote - Indonesia", title: "Engineer" },
+    { workplace_type: null, location: "Jakarta", title: "Support (WFH)" },
+    { workplace_type: null, location: "Bandung", title: "Hybrid Designer" },
+    { workplace_type: "hybrid", location: "Jakarta", title: "PM" },
+    { workplace_type: "on-site", location: "Remote", title: "Teller" },
+    { workplace_type: "on-site", location: "Jakarta", title: "Teller" },
+    { workplace_type: null, location: "Jakarta", title: "Admin" },
+  ];
+  const term = (row: Record<string, unknown>, t: string): boolean => {
+    const m = t.match(/^(\w+)\.(eq|is|ilike)\.(.*)$/)!;
+    const v = row[m[1]];
+    if (m[2] === "is") return v === null;
+    if (m[2] === "eq") return v === m[3];
+    const needle = m[3].replace(/\*/g, "").toLowerCase();
+    return typeof v === "string" && v.toLowerCase().includes(needle);
+  };
+  const evalOr = (row: Record<string, unknown>, expr: string): boolean => splitTop(expr).some((p) => evalPart(row, p));
+  const evalPart = (row: Record<string, unknown>, p: string): boolean =>
+    p.startsWith("and(") ? splitTop(p.slice(4, -1)).every((q) => evalPart(row, q)) : p.startsWith("or(") ? evalOr(row, p.slice(3, -1)) : term(row, p);
+  function splitTop(expr: string): string[] {
+    const out: string[] = [];
+    let depth = 0, start = 0;
+    for (let i = 0; i < expr.length; i++) {
+      if (expr[i] === "(") depth++;
+      else if (expr[i] === ")") depth--;
+      else if (expr[i] === "," && depth === 0) { out.push(expr.slice(start, i)); start = i + 1; }
+    }
+    out.push(expr.slice(start));
+    return out;
+  }
+  for (const key of ["remote", "hybrid", "onsite"]) {
+    const server = rows.filter((r) => evalOr(r, workplaceQueryFilter(key)!));
+    const client = rows.filter((r) => matchesWorkplaceFilter(r, key));
+    for (const r of client) assert.ok(server.includes(r), `${key}: baris klien hilang di server: ${JSON.stringify(r)}`);
+  }
+  assert.equal(rows.filter((r) => evalOr(r, workplaceQueryFilter("remote")!)).length, 3);
+  assert.equal(rows.filter((r) => evalOr(r, workplaceQueryFilter("hybrid")!)).length, 2);
+  assert.equal(rows.filter((r) => evalOr(r, workplaceQueryFilter("onsite")!)).length, 2);
 });
 
-test("temuan 7: keadaan kosong Hybrid dan Di kantor memakai labelnya sendiri dan menyebut pencarian aktif", () => {
-  const hy = jobsEmptyState({ ...emptyBase, filter: "hybrid", searchQuery: " web3 ", loadedCount: 4, counts: { remote: 0, hybrid: 0, "on-site": 4, unknown: 0 } });
+test("temuan 7: keadaan kosong Remote, Hybrid, dan Di kantor (hasil server kosong) menyebut apa yang dicari dan apa yang dicoba", () => {
+  const re = jobsEmptyState({ ...emptyBase, filter: "remote", loadedCount: 0 });
+  assert.equal(re.title, "Belum ada lowongan remote");
+  assert.equal(re.text, 'Penyaring ini mencari di semua lowongan aktif, dan tidak ada yang berlabel Remote. Coba pilih "Semua".');
+  assert.notEqual(re.title, GENERIC_EMPTY_TITLE);
+  assert.equal(re.action, null, "bukan keadaan belum ada lowongan sama sekali, jadi tanpa tombol pemindai");
+  const hy = jobsEmptyState({ ...emptyBase, filter: "hybrid", searchQuery: " web3 ", loadedCount: 0 });
   assert.equal(hy.title, "Belum ada lowongan hybrid");
-  assert.match(hy.text, /Tidak ada yang berlabel Hybrid di antara 4 lowongan yang dimuat untuk pencarian "web3"\. Yang ada: Di kantor 4\. Pilih salah satunya\.$/);
-  const on = jobsEmptyState({ ...emptyBase, filter: "onsite", loadedCount: 2, counts: { remote: 2, hybrid: 0, "on-site": 0, unknown: 0 } });
+  assert.equal(hy.text, 'Penyaring ini mencari di semua lowongan aktif, dan tidak ada yang berlabel Hybrid untuk pencarian "web3". Coba pilih "Semua" atau ganti kata kunci.');
+  const on = jobsEmptyState({ ...emptyBase, filter: "onsite", loadedCount: 0 });
   assert.equal(on.title, "Belum ada lowongan di kantor");
-  assert.match(on.text, /berlabel Di kantor di antara 2 lowongan yang dimuat\. Yang ada: Remote 2\./);
-  assert.doesNotMatch(on.text, /kata "remote"/);
+  assert.match(on.text, /berlabel Di kantor\./);
+  // ada lowongan termuat tetapi semuanya tersaring klien: teks umum, bukan klaim "tidak ada"
+  assert.deepEqual(jobsEmptyState({ ...emptyBase, filter: "remote", loadedCount: 5 }), { title: GENERIC_EMPTY_TITLE, text: GENERIC_EMPTY_TEXT, action: null });
 });
 
 test("temuan 7: keadaan kosong 80% ke atas menyebut jumlah yang dihitung, skor tertinggi, dan batas muatan", () => {
@@ -244,7 +291,7 @@ test("temuan 7: keadaan kosong tanpa lowongan, pencarian tanpa hasil, Tersimpan,
   const none = jobsEmptyState({ ...emptyBase, loadedCount: 0, scoredCount: 0, topScore: null });
   assert.equal(none.title, "Belum ada lowongan");
   assert.equal(none.action, "scanner");
-  const noHit = jobsEmptyState({ ...emptyBase, loadedCount: 0, searchQuery: "zzzz", filter: "remote" });
+  const noHit = jobsEmptyState({ ...emptyBase, loadedCount: 0, searchQuery: "zzzz", filter: "all" });
   assert.equal(noHit.title, GENERIC_EMPTY_TITLE);
   assert.match(noHit.text, /Tidak ada lowongan untuk pencarian "zzzz"\./);
   assert.equal(noHit.action, null);
@@ -255,9 +302,28 @@ test("temuan 7: keadaan kosong tanpa lowongan, pencarian tanpa hasil, Tersimpan,
   assert.deepEqual(jobsEmptyState({ ...emptyBase, filter: "all" }), { title: GENERIC_EMPTY_TITLE, text: GENERIC_EMPTY_TEXT, action: null });
 });
 
-test("temuan 7: halaman memakai penyaring tempat kerja bersama, bukan perbandingan string mentah", () => {
+test("temuan 7: halaman memasang penyaring tempat kerja di kueri server, memuat ulang saat penyaring berubah, dan menjaga 80% di klien", () => {
   const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  // di kueri, setelah saringan pencarian, sebagai saringan or tambahan (DAN dengan yang lain)
+  const fn = src.slice(src.indexOf("const fetchJobs = async"), src.indexOf("const fetchSavedJobs"));
+  assert.match(fn, /for \(const filter of jobSearchFilters\(search\)\) query = query\.or\(filter\);\s*\n[^\n]*\n\s*const workplaceFilter = workplaceQueryFilter\(activeFilter\);\s*\n\s*if \(workplaceFilter\) query = query\.or\(workplaceFilter\);/);
+  assert.match(fn, /\.limit\(JOBS_PAGE_LIMIT\)/);
+  // muat ulang saat kata kunci atau penyaring berubah
+  assert.match(src, /\}, \[searchQuery, activeFilter\]\);/);
+  // jawaban kueri lama tidak menimpa yang baru
+  assert.match(fn, /const seq = \+\+fetchSeq\.current;/);
+  assert.match(fn, /if \(seq !== fetchSeq\.current\) return;\s*\n\s*if \(error\) throw error;/);
+  // penyaring klien tetap dipakai sebagai pemeriksa akhir, tanpa perbandingan string mentah
   assert.match(src, /matchesWorkplaceFilter\(job, activeFilter\)/);
   assert.doesNotMatch(src, /job\.workplace_type === /);
-  assert.match(src, /counts: workplaceCounts\(jobs\)/);
+  // 80% tetap di klien, dihitung dari skor per pengguna
+  assert.match(src, /\(activeFilter === "high-match" && \(scoreOf\(job\) \?\? -1\) >= HIGH_MATCH_THRESHOLD\)/);
+  assert.doesNotMatch(fn, /high-match|scoreOf\(|\.eq\("match_score"|\.gte\("match_score"/);
+  // sementara kueri berjalan dan belum ada kartu, spinner dipakai, bukan keadaan kosong
+  assert.match(src, /\{loading \|\| \(fetching && shownJobs\.length === 0\) \? \(/);
+});
+
+test("temuan 7: keadaan kosong 80% tetap menyebut hanya lowongan yang dimuat", () => {
+  const s = jobsEmptyState({ ...emptyBase, filter: "high-match" });
+  assert.match(s.text, /Penyaring ini hanya menghitung lowongan yang dimuat di layar/);
 });

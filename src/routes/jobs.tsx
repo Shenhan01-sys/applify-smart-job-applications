@@ -11,7 +11,7 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceCounts, jobsEmptyState, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   computeMatch,
@@ -50,6 +50,9 @@ function JobsPage() {
   // Gagal memuat daftar tersimpan: filter "Tersimpan" yang kosong belum tentu berarti belum ada yang disimpan.
   const [savedLoadFailed, setSavedLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Ada kueri yang sedang berjalan (pencarian atau penyaring berubah). Hasil lama tidak boleh menimpa yang lebih baru.
+  const [fetching, setFetching] = useState(false);
+  const fetchSeq = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [showScanner, setShowScanner] = useState(false);
@@ -76,13 +79,15 @@ function JobsPage() {
     fetchSavedJobs();
   }, []);
 
-  // Pencarian dijalankan di server (judul, perusahaan, lokasi), bukan hanya pada lowongan yang sudah termuat.
-  // Tanpa ini, mencari "frontend" kosong bila 100 lowongan terbaru kebetulan bidang lain (uji klik 2026-11-19).
+  // Pencarian dan penyaring tempat kerja (Remote, Hybrid, Di kantor) dijalankan di server, bukan hanya pada lowongan
+  // yang sudah termuat. Tanpa ini, mencari "frontend" kosong bila 100 lowongan terbaru kebetulan bidang lain
+  // (uji klik 2026-11-19), dan Remote kosong karena hampir semua lowongan remote ada di luar 200 terbaru.
+  // Penyaring 80% tetap di klien: skornya per pengguna.
   useEffect(() => {
     if (isMockMode()) return;
     const t = setTimeout(() => fetchJobs(searchQuery), searchQuery ? 350 : 0);
     return () => clearTimeout(t);
-  }, [searchQuery]);
+  }, [searchQuery, activeFilter]);
 
   // Skill dari user_skills dan skills_used di pengalaman. Gagal memuat bukan berarti "tanpa skill": galatnya
   // ditampilkan dan skor tidak dihitung.
@@ -104,6 +109,8 @@ function JobsPage() {
   };
 
   const fetchJobs = async (search = "") => {
+    const seq = ++fetchSeq.current;
+    setFetching(true);
     try {
       setLoadError("");
       let query = supabase
@@ -115,20 +122,29 @@ function JobsPage() {
         // Lowongan yang tayang lebih dari JOB_MAX_AGE_DAYS hari lalu kemungkinan besar sudah ditutup di situs asal.
         .or(freshJobsFilter());
       for (const filter of jobSearchFilters(search)) query = query.or(filter);
+      // Penyaring tempat kerja: saringan `or` tambahan, DAN dengan saringan lain (lib/jobFilters.ts).
+      const workplaceFilter = workplaceQueryFilter(activeFilter);
+      if (workplaceFilter) query = query.or(workplaceFilter);
       // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
       const { data, error } = await query.order("created_at", { ascending: false }).limit(JOBS_PAGE_LIMIT);
 
+      // Kueri yang lebih baru sudah berjalan (pencarian atau penyaring berubah): jawaban ini sudah usang.
+      if (seq !== fetchSeq.current) return;
       if (error) throw error;
       // Akun asli tidak pernah diisi data contoh: tabel kosong berarti daftar kosong. Baris uji (localhost,
       // 127.0.0.1, httpbin, sumber e2e-mock) disaring di sini; datanya di database tidak diubah.
       setJobs(visibleJobs((data ?? []) as JobData[]));
       setHeldScores(new Map());
     } catch (err) {
+      if (seq !== fetchSeq.current) return;
       console.error("Error fetching jobs:", err);
       setJobs([]);
       setLoadError(describeError(err, "Lowongan belum bisa dimuat."));
     } finally {
-      setLoading(false);
+      if (seq === fetchSeq.current) {
+        setLoading(false);
+        setFetching(false);
+      }
     }
   };
 
@@ -248,7 +264,6 @@ function JobsPage() {
     skillsError,
     scoredCount: loadedScores.length,
     topScore: loadedScores.length > 0 ? Math.max(...loadedScores) : null,
-    counts: workplaceCounts(jobs),
   });
   // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
   const strongMatches = jobs.filter((j) => (scoreOf(j) ?? -1) >= HIGH_MATCH_THRESHOLD).length;
@@ -341,7 +356,7 @@ function JobsPage() {
       </header>
 
       {/* Daftar lowongan */}
-      {loading ? (
+      {loading || (fetching && shownJobs.length === 0) ? (
         <div role="status" className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
           <span className="ml-3 text-muted-foreground">Memuat lowongan...</span>
