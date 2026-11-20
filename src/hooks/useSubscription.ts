@@ -8,7 +8,7 @@ import { describeError } from "@/lib/authErrors";
 
 export interface AccountPlan {
   tier: PlanTier;
-  /** akhir periode langganan dari `subscriptions.current_period_end`, bila ada */
+  /** akhir periode langganan dari `subscriptions.expires_at`, bila ada */
   periodEnd: string | null;
   loading: boolean;
   error: string;
@@ -44,13 +44,15 @@ export function useSubscription(): AccountPlan {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Not authenticated");
         const [sub, q] = await Promise.all([
-          supabase.from("subscriptions").select("plan_name, ai_model_tier, current_period_end").eq("user_id", user.id).maybeSingle(),
+          // Kolom produksi bernama expires_at. current_period_end hanya ada di database/schema.sql (drift tercatat di
+          // database/snapshots/schema-diff-2026-10-03.txt); memintanya membuat PostgREST menjawab 400 dan kartu kuota gagal.
+          supabase.from("subscriptions").select("plan_name, ai_model_tier, expires_at").eq("user_id", user.id).maybeSingle(),
           supabase.rpc("get_quota_status", { p_user_id: user.id }),
         ]);
         if (sub.error) throw new Error(sub.error.message);
         if (!alive) return;
         setTier(planFromRow(sub.data));
-        setPeriodEnd((sub.data as { current_period_end?: string | null } | null)?.current_period_end ?? null);
+        setPeriodEnd((sub.data as { expires_at?: string | null } | null)?.expires_at ?? null);
         setQuota(q.error ? null : parseQuotaStatus(q.data));
       } catch (err) {
         if (alive) setError(describeError(err, "Paket dan kuotamu belum bisa dimuat."));
