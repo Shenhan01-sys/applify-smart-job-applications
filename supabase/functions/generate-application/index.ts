@@ -20,6 +20,7 @@ import {
   stripReasoning,
   validateCoverLetter,
 } from "../_shared/output-guard.ts";
+import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementLines } from "../_shared/profile-context.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -112,13 +113,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4) Context
-    const [{ data: job }, { data: profile }, { data: skills }, { data: work }] = await Promise.all([
+    const [{ data: job }, { data: profile }, { data: skills }, { data: work }, { data: achievementRows }] = await Promise.all([
       admin.from("jobs").select("*").eq("id", jobId).maybeSingle(),
       admin.from("profiles").select("*").eq("id", userId).maybeSingle(),
       admin.from("user_skills").select("name, proficiency_level").eq("user_id", userId),
       admin.from("work_experiences")
         .select("role_title, company_name, description, start_date, end_date")
         .eq("user_id", userId).order("start_date", { ascending: false }).limit(3),
+      // Penghargaan dan publikasi: dibatasi 8 baris pendek oleh buildAchievementLines (unggulan dulu, lalu terbaru).
+      // Bila bacanya gagal, datanya null dan draf dibuat tanpa daftar ini.
+      admin.from("achievements")
+        .select("title, category, issuer, achievement_date, is_featured, created_at")
+        .eq("user_id", userId).order("achievement_date", { ascending: false, nullsFirst: false }).limit(50),
     ]);
     if (!job) return json({ error: "Job not found" }, 404);
 
@@ -126,6 +132,10 @@ Deno.serve(async (req: Request) => {
       || (Array.isArray(profile?.skills) ? profile!.skills.join(", ") : "");
     const workList = (work ?? [])
       .map((w: any) => `- ${w.role_title} @ ${w.company_name}: ${w.description ?? ""}`).join("\n");
+    const achievementLines = buildAchievementLines(achievementRows);
+    // Kosong bila tidak ada penghargaan: prompt sama persis dengan sebelumnya.
+    const achievementSection = achievementLines.length ? `\n${achievementPromptSection(achievementLines)}` : "";
+    const achievementRule = achievementLines.length ? `\n- ${ACHIEVEMENT_GROUNDING_RULE}` : "";
 
     // Language: Bahasa Indonesia by default; English only when the posting is clearly English (or asked for).
     const language = selectLanguage({ requested: requestedLanguage, jobText: `${job.title ?? ""}\n${job.description ?? ""}` });
@@ -140,8 +150,9 @@ Deno.serve(async (req: Request) => {
       workExperiences: (work ?? []).map((w: any) => ({
         role_title: w.role_title, company_name: w.company_name, start_date: w.start_date, end_date: w.end_date, description: w.description,
       })),
+      achievements: achievementLines,
     };
-    const allowedContext = `${profile?.full_name ?? ""} ${job.company ?? ""} ${job.title ?? ""} ${job.description ?? ""} ${workList}`;
+    const allowedContext = `${profile?.full_name ?? ""} ${job.company ?? ""} ${job.title ?? ""} ${job.description ?? ""} ${workList}${achievementLines.length ? ` ${achievementLines.join(" ")}` : ""}`;
 
     // 5) Prompt
     const sys = `You are an expert Indonesian career assistant for "Applify". Analyze the candidate-job match and write a tailored, ATS-friendly cover letter. Respond with ONLY a valid JSON object (no markdown, no code fences).`;
@@ -158,13 +169,13 @@ Current title: ${profile?.current_title ?? "-"}
 Experience years: ${profile?.experience_years ?? 0}
 Skills: ${skillList || "-"}
 Recent experience:
-${workList || "-"}
+${workList || "-"}${achievementSection}
 
 TONE: ${tone}
 LANGUAGE: ${languageInstruction(language)}
 
 GROUNDING RULES (strict):
-${GROUNDING_RULES.map((r) => `- ${r}`).join("\n")}
+${GROUNDING_RULES.map((r) => `- ${r}`).join("\n")}${achievementRule}
 
 Return JSON exactly in this shape:
 {
