@@ -9,6 +9,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
+import { groupByStatus } from "@/lib/dashboardStats";
 import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
@@ -438,9 +439,8 @@ export function AppsPage() {
     responded: applications.filter((a) => a.status === "responded").length,
   };
 
-  const groupedApps = Object.fromEntries(
-    APPLICATION_STATUSES.map((s) => [s, applications.filter((a) => a.status === s)]),
-  ) as Record<ApplicationStatus, AIApplicationData[]>;
+  // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
+  const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
 
   if (loading) {
     return (

@@ -21,8 +21,10 @@ export interface DashApplication {
 
 export interface DashStats {
   total: number;
-  /** draft + ready: not sent yet */
+  /** status draft only, the same rows as the "Draf" column of the Lamaran Saya board */
   drafts: number;
+  /** status ready only, the same rows as the "Siap dikirim" column of the board */
+  ready: number;
   /** submitted, follow_up, responded, or closed after it was submitted */
   sent: number;
   /** submitted and past its follow-up date (status follow_up) */
@@ -30,9 +32,10 @@ export interface DashStats {
   responded: number;
 }
 
+// Same wording as the board columns (lib/statusLabels.ts APPLICATION_STATUS_LABEL); a test keeps them equal.
 export const STATUS_LABEL: Record<DashStatus, string> = {
   draft: "Draf",
-  ready: "Siap",
+  ready: "Siap dikirim",
   submitted: "Terkirim",
   follow_up: "Perlu follow-up",
   responded: "Dibalas",
@@ -41,33 +44,30 @@ export const STATUS_LABEL: Record<DashStatus, string> = {
 
 const isStatus = (s: unknown): s is DashStatus => (APPLICATION_STATUS_VALUES as readonly string[]).includes(s as string);
 
-export function summarizeApplications(rows: ReadonlyArray<DashApplication> | null | undefined): DashStats {
-  const stats: DashStats = { total: 0, drafts: 0, sent: 0, followUp: 0, responded: 0 };
+/**
+ * One column per status, in APPLICATION_STATUS_VALUES order. The Lamaran Saya board builds its columns with this
+ * function and the Dashboard counters are derived from the same grouping, so both screens always agree.
+ * Rows with a missing or unknown status are left out.
+ */
+export function groupByStatus<T extends { status?: string | null }>(rows: ReadonlyArray<T> | null | undefined): Record<DashStatus, T[]> {
+  const groups = Object.fromEntries(APPLICATION_STATUS_VALUES.map((s) => [s, [] as T[]])) as Record<DashStatus, T[]>;
   for (const r of rows ?? []) {
-    if (!r || !isStatus(r.status)) continue;
-    stats.total += 1;
-    switch (r.status) {
-      case "draft":
-      case "ready":
-        stats.drafts += 1;
-        break;
-      case "submitted":
-        stats.sent += 1;
-        break;
-      case "follow_up":
-        stats.sent += 1;
-        stats.followUp += 1;
-        break;
-      case "responded":
-        stats.sent += 1;
-        stats.responded += 1;
-        break;
-      case "closed":
-        if (r.submitted_at) stats.sent += 1;
-        break;
-    }
+    if (r && isStatus(r.status)) groups[r.status].push(r);
   }
-  return stats;
+  return groups;
+}
+
+export function summarizeApplications(rows: ReadonlyArray<DashApplication> | null | undefined): DashStats {
+  const g = groupByStatus(rows);
+  return {
+    total: APPLICATION_STATUS_VALUES.reduce((n, s) => n + g[s].length, 0),
+    drafts: g.draft.length,
+    ready: g.ready.length,
+    // closed counts as sent only when it was submitted first
+    sent: g.submitted.length + g.follow_up.length + g.responded.length + g.closed.filter((r) => r.submitted_at).length,
+    followUp: g.follow_up.length,
+    responded: g.responded.length,
+  };
 }
 
 export interface ActivityRow {

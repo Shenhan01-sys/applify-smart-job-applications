@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { recentActivity, relativeTime, summarizeApplications, STATUS_LABEL, type DashApplication } from "../src/lib/dashboardStats.ts";
+import { groupByStatus, recentActivity, relativeTime, summarizeApplications, STATUS_LABEL, APPLICATION_STATUS_VALUES, type DashApplication } from "../src/lib/dashboardStats.ts";
+import { APPLICATION_STATUS_LABEL } from "../src/lib/statusLabels.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -15,21 +16,21 @@ const row = (status: string, over: Partial<DashApplication> = {}): DashApplicati
 });
 
 test("tanpa data: semua angka 0 dan tidak ada aktivitas (tidak ada angka contoh)", () => {
-  assert.deepEqual(summarizeApplications([]), { total: 0, drafts: 0, sent: 0, followUp: 0, responded: 0 });
-  assert.deepEqual(summarizeApplications(null), { total: 0, drafts: 0, sent: 0, followUp: 0, responded: 0 });
-  assert.deepEqual(summarizeApplications(undefined), { total: 0, drafts: 0, sent: 0, followUp: 0, responded: 0 });
+  assert.deepEqual(summarizeApplications([]), { total: 0, drafts: 0, ready: 0, sent: 0, followUp: 0, responded: 0 });
+  assert.deepEqual(summarizeApplications(null), { total: 0, drafts: 0, ready: 0, sent: 0, followUp: 0, responded: 0 });
+  assert.deepEqual(summarizeApplications(undefined), { total: 0, drafts: 0, ready: 0, sent: 0, followUp: 0, responded: 0 });
   assert.deepEqual(recentActivity([]), []);
   assert.deepEqual(recentActivity(null), []);
 });
 
-test("hitungan per status: draf dan siap = draf; submitted, follow_up, responded = terkirim", () => {
+test("hitungan per status: draf dan siap dihitung terpisah; submitted, follow_up, responded = terkirim", () => {
   const s = summarizeApplications([
     row("draft"), row("draft"), row("ready"),
     row("submitted"), row("submitted"),
     row("follow_up"),
     row("responded"),
   ]);
-  assert.deepEqual(s, { total: 7, drafts: 3, sent: 4, followUp: 1, responded: 1 });
+  assert.deepEqual(s, { total: 7, drafts: 2, ready: 1, sent: 4, followUp: 1, responded: 1 });
 });
 
 test("closed dihitung terkirim hanya bila pernah dikirim (submitted_at ada)", () => {
@@ -40,12 +41,12 @@ test("closed dihitung terkirim hanya bila pernah dikirim (submitted_at ada)", ()
 
 test("baris dengan status tidak dikenal atau rusak diabaikan, bukan dihitung", () => {
   const s = summarizeApplications([row("ATS Lolos"), row("Callback"), row(""), { id: "x" }, null as any, row("draft")]);
-  assert.deepEqual(s, { total: 1, drafts: 1, sent: 0, followUp: 0, responded: 0 });
+  assert.deepEqual(s, { total: 1, drafts: 1, ready: 0, sent: 0, followUp: 0, responded: 0 });
 });
 
 test("tidak ada penghitung Lolos ATS atau Callback: sistem tidak bisa mengetahuinya", () => {
   const s = summarizeApplications([row("submitted")]);
-  assert.deepEqual(Object.keys(s).sort(), ["drafts", "followUp", "responded", "sent", "total"]);
+  assert.deepEqual(Object.keys(s).sort(), ["drafts", "followUp", "ready", "responded", "sent", "total"]);
   assert.equal(Object.values(STATUS_LABEL).some((l) => /ATS|callback/i.test(l)), false);
 });
 
@@ -130,4 +131,58 @@ test("alur normal menulis ai_applications (Edge Function) dan tidak ada kode yan
   for (const f of ["../src/services/aiApplicationService.ts", "../src/routes/applications.tsx", "../src/routes/dashboard.tsx"]) {
     assert.doesNotMatch(read(f), /from\("applications"\)/, f);
   }
+});
+
+// Uji E2E klik 20 November 2026 (temuan 16): Beranda menulis "Draf 2" padahal papan Lamaran Saya punya 1 Draf dan 1 Siap dikirim.
+test("temuan 16: satu draf dan satu siap dikirim = Draf 1 dan Siap 1, sama seperti kolom papan", () => {
+  const rows = [row("draft"), row("ready")];
+  const s = summarizeApplications(rows);
+  assert.equal(s.drafts, 1);
+  assert.equal(s.ready, 1);
+  assert.equal(s.total, 2);
+  const board = groupByStatus(rows);
+  assert.equal(s.drafts, board.draft.length);
+  assert.equal(s.ready, board.ready.length);
+});
+
+test("groupByStatus: satu kolom per status dengan urutan tetap, baris tidak dikenal dibuang, masukan kosong aman", () => {
+  const a = row("draft", { id: "a" });
+  const b = row("ready", { id: "b" });
+  const c = row("draft", { id: "c" });
+  const g = groupByStatus([a, b, c, row("ATS Lolos"), { id: "x" }, null as any]);
+  assert.deepEqual(Object.keys(g), [...APPLICATION_STATUS_VALUES]);
+  assert.deepEqual(g.draft.map((r) => r.id), ["a", "c"]);
+  assert.deepEqual(g.ready.map((r) => r.id), ["b"]);
+  assert.equal(g.submitted.length + g.follow_up.length + g.responded.length + g.closed.length, 0);
+  assert.deepEqual(Object.values(groupByStatus(null)).map((x) => x.length), [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(Object.values(groupByStatus(undefined)).map((x) => x.length), [0, 0, 0, 0, 0, 0]);
+});
+
+test("setiap status punya hitungan yang sama dengan kolom papan, juga untuk campuran status", () => {
+  const rows = ["draft", "draft", "draft", "ready", "ready", "submitted", "follow_up", "responded", "closed"].map((s) => row(s));
+  const board = groupByStatus(rows);
+  const s = summarizeApplications(rows);
+  assert.equal(s.total, rows.length);
+  assert.equal(s.drafts, board.draft.length);
+  assert.equal(s.ready, board.ready.length);
+  assert.equal(s.followUp, board.follow_up.length);
+  assert.equal(s.responded, board.responded.length);
+});
+
+test("label status di Beranda sama dengan label kolom papan Lamaran Saya", () => {
+  for (const status of APPLICATION_STATUS_VALUES) {
+    if (status === "follow_up" || status === "responded") continue; // Beranda memakai kata lebih pendek untuk dua status ini
+    assert.equal(STATUS_LABEL[status], APPLICATION_STATUS_LABEL[status], status);
+  }
+  assert.equal(STATUS_LABEL.ready, "Siap dikirim");
+});
+
+test("papan Lamaran Saya dan Beranda memakai fungsi pengelompokan yang sama", () => {
+  const board = read("../src/routes/applications.tsx");
+  assert.match(board, /import \{ groupByStatus \} from "@\/lib\/dashboardStats"/);
+  assert.match(board, /groupedApps[^=]*= groupByStatus\(applications\)/);
+  const page = read("../src/routes/dashboard.tsx");
+  assert.match(page, /summarizeApplications\(applications\)/);
+  assert.match(page, /ready=\{stats\.ready\}/);
+  assert.match(page, /lamaran siap dikirim/);
 });

@@ -176,7 +176,7 @@ export function DashboardPage() {
         )}
 
         {/* Mission Control diorama */}
-        <MissionControlStage drafts={stats.drafts} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={stats.total === 0 && !loadError} />
+        <MissionControlStage drafts={stats.drafts} ready={stats.ready} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={stats.total === 0 && !loadError} />
 
         {/* Bottom: activity log + quick actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 opacity-0 animate-dbFadeUp" style={{ animationDelay: "300ms" }}>
@@ -255,7 +255,7 @@ export function DashboardPage() {
   );
 }
 
-function MissionControlStage({ drafts, sent, responded, followUp, empty }: { drafts: number; sent: number; responded: number; followUp: number; empty: boolean }) {
+function MissionControlStage({ drafts, ready, sent, responded, followUp, empty }: { drafts: number; ready: number; sent: number; responded: number; followUp: number; empty: boolean }) {
   return (
     <section aria-label="Ringkasan lamaran" className="relative w-full flex flex-col items-center pt-8 pb-12 opacity-0 animate-dbFadeUp" style={{ animationDelay: "100ms" }}>
       <div aria-hidden="true" className="absolute inset-0 bg-tech-grid z-0 pointer-events-none" />
@@ -292,11 +292,21 @@ function MissionControlStage({ drafts, sent, responded, followUp, empty }: { dra
         <p className="relative z-30 mt-6 text-sm text-neutral-600 text-center max-w-md px-4">
           Belum ada lamaran, jadi semua angka masih 0. Angka dihitung dari draf dan lamaran nyata di akunmu.
         </p>
-      ) : followUp > 0 ? (
-        <Link to="/applications" className="relative z-30 mt-6 text-xs font-bold text-[#B45309] bg-amber-50 border border-amber-200 rounded-full px-3 py-1 hover:underline">
-          {followUp} lamaran perlu ditindaklanjuti
-        </Link>
-      ) : null}
+      ) : (
+        <div className="relative z-30 mt-6 flex flex-wrap items-center justify-center gap-2 px-4">
+          {/* Draf dan Siap dikirim dihitung terpisah, sama seperti dua kolom di papan Lamaran Saya */}
+          {ready > 0 && (
+            <Link to="/applications" className="text-xs font-bold text-neutral-700 bg-neutral-100 border border-neutral-300 rounded-full px-3 py-1 hover:underline">
+              {ready} lamaran siap dikirim
+            </Link>
+          )}
+          {followUp > 0 && (
+            <Link to="/applications" className="text-xs font-bold text-[#B45309] bg-amber-50 border border-amber-200 rounded-full px-3 py-1 hover:underline">
+              {followUp} lamaran perlu ditindaklanjuti
+            </Link>
+          )}
+        </div>
+      )}
     </section>
   );
 }
