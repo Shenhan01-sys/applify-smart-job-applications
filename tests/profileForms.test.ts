@@ -380,3 +380,24 @@ test("halaman profil: contoh data hanya di mode demo, simpan lewat kolom bersari
   const svc = read("../src/services/profileService.ts");
   for (const t of ["work_experiences", "education", "user_skills"]) assert.match(svc, new RegExp(`from\\("${t}"\\)\\.insert\\(\\{ \\.\\.\\.data, user_id: user\\.id \\}\\)`));
 });
+
+// Uji E2E klik 20 November 2026 (temuan 10): hapus skill langsung berlaku, hapus pendidikan memakai konfirmasi di tempat.
+test("temuan 10: hapus skill memakai konfirmasi Hapus/Batal yang sama dengan pendidikan, bukan langsung berlaku", () => {
+  const src = read("../src/components/profile/ProfileEditors.tsx");
+  const skills = src.slice(src.indexOf("export function SkillsEditor"), src.indexOf("export function AchievementEditor"));
+  // satu komponen konfirmasi untuk semua editor
+  assert.equal([...src.matchAll(/function DeleteButton\(/g)].length, 1);
+  assert.match(skills, /<DeleteButton variant="chip" onConfirm=\{\(\) => remove\(skill\.id\)\} busy=\{busyId === skill\.id\} label=\{`Hapus skill \$\{skill\.name\}`\} \/>/);
+  // tidak ada lagi tombol yang memanggil remove() langsung
+  assert.doesNotMatch(skills, /onClick=\{\(\) => remove\(/);
+  const education = src.slice(src.indexOf("export function EducationEditor"), src.indexOf("export function SkillsEditor"));
+  assert.match(education, /<DeleteButton onConfirm=\{\(\) => remove\(edu\.id\)\}/);
+  // konfirmasi: ikon membuka pertanyaan, "Hapus" menjalankan, "Batal" membatalkan tanpa menghapus
+  const del = src.slice(src.indexOf("export function DeleteButton"), src.indexOf("const labelOf"));
+  assert.match(del, /onClick=\{\(\) => setAsking\(true\)\}/);
+  assert.match(del, /onClick=\{\(\) => \{ setAsking\(false\); onConfirm\(\); \}\}[^>]*>Hapus<\/button>/);
+  assert.match(del, /onClick=\{\(\) => setAsking\(false\)\}[^>]*>Batal<\/button>/);
+  // varian kapsul biru: tombol terbaca di atas biru dan spinner saat menghapus
+  assert.match(del, /variant\?: "row" \| "chip"/);
+  assert.match(del, /busy \? <Loader2/);
+});

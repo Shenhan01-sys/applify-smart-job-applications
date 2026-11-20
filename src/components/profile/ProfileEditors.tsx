@@ -101,14 +101,26 @@ function FormShell({ title, saving, onCancel, onSubmit, error, children }: { tit
   );
 }
 
-function DeleteButton({ onConfirm, busy, label }: { onConfirm: () => void; busy: boolean; label: string }) {
+/**
+ * Hapus dengan konfirmasi di tempat: ikon hapus, lalu "Hapus" dan "Batal". Dipakai pengalaman, pendidikan, skill,
+ * dan penghargaan. Varian "chip" untuk kapsul biru (skill): ikon X putih dan tombol yang terbaca di atas biru.
+ */
+export function DeleteButton({ onConfirm, busy, label, variant = "row" }: { onConfirm: () => void; busy: boolean; label: string; variant?: "row" | "chip" }) {
   const [asking, setAsking] = useState(false);
+  const chip = variant === "chip";
   if (asking) {
     return (
       <span className="inline-flex items-center gap-1">
-        <button type="button" onClick={() => { setAsking(false); onConfirm(); }} disabled={busy} className="h-7 px-2 rounded-md bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-60">Hapus</button>
-        <button type="button" onClick={() => setAsking(false)} className="h-7 px-2 rounded-md border-2 border-black/[8%] text-xs hover:bg-black/[5%]">Batal</button>
+        <button type="button" onClick={() => { setAsking(false); onConfirm(); }} disabled={busy} aria-label={`Konfirmasi: ${label}`} className={`h-7 px-2 rounded-md bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-60${chip ? " border border-white/70" : ""}`}>Hapus</button>
+        <button type="button" onClick={() => setAsking(false)} aria-label={`Batal: ${label}`} className={chip ? "h-7 px-2 rounded-md border border-white/70 text-xs text-white hover:bg-white/20" : "h-7 px-2 rounded-md border-2 border-black/[8%] text-xs hover:bg-black/[5%]"}>Batal</button>
       </span>
+    );
+  }
+  if (chip) {
+    return (
+      <button type="button" onClick={() => setAsking(true)} disabled={busy} aria-label={label} title={label} className="h-6 w-6 rounded-full grid place-items-center hover:bg-white/20 disabled:opacity-50">
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+      </button>
     );
   }
   return (
@@ -425,9 +437,8 @@ export function SkillsEditor({ items, onSave, onDelete }: {
               <span>{skill.name}</span>
               <span className="text-xs opacity-70" title={labelOf(PROFICIENCY_LEVELS, skill.proficiency_level)}>{skill.proficiency_level}/5</span>
               <button type="button" onClick={() => open(skill.id, skillToForm(skill))} aria-label={`Ubah skill ${skill.name}`} title="Ubah" className="h-6 w-6 rounded-full grid place-items-center hover:bg-white/20"><Pencil className="h-3 w-3" /></button>
-              <button type="button" onClick={() => remove(skill.id)} disabled={busyId === skill.id} aria-label={`Hapus skill ${skill.name}`} title="Hapus" className="h-6 w-6 rounded-full grid place-items-center hover:bg-white/20 disabled:opacity-50">
-                {busyId === skill.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-              </button>
+              {/* Konfirmasi di tempat ("Hapus" / "Batal"), sama seperti pendidikan dan pengalaman. */}
+              <DeleteButton variant="chip" onConfirm={() => remove(skill.id)} busy={busyId === skill.id} label={`Hapus skill ${skill.name}`} />
             </li>
           ))}
         </ul>
