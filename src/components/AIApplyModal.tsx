@@ -782,6 +782,12 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               </p>
             </div>
           )}
+          {editable && !approvalId && application?.status === "ready" && (
+            // Status ready ditulis worker sesudah mengisi formulir tanpa menekan tombol kirim.
+            <p className="text-sm text-muted-foreground">
+              Agen sudah pernah mengisi formulir ini tanpa mengirim. Mengajukan lagi membuat agen mengisi ulang.
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -826,7 +832,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 ) : (
                   <ShieldCheck className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
                 )}
-                {requesting ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : "Ajukan ke Persetujuan"}
+                {requesting ? "Mengajukan..." : approvalError ? "Coba ajukan lagi" : application?.status === "ready" ? "Ajukan lagi ke Persetujuan" : "Ajukan ke Persetujuan"}
               </button>
             )}
           </div>

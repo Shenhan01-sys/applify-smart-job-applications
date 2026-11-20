@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { aiApplicationService, APPLICATION_STATUSES, type AIApplicationData, type ApplicationStatus } from "@/services/aiApplicationService";
@@ -9,6 +9,8 @@ import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
+import type { FormGaps } from "@/lib/formGaps";
+import { getFormGaps } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -60,7 +62,19 @@ const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string;
 // atau antreannya tidak bisa diperiksa (tombol tetap ada; pengajuan memeriksa lagi dan melaporkan galatnya sendiri).
 type ApprovalUi = { state: "idle" } | { state: "checking" } | { state: "none" } | { state: "pending"; id: string } | { state: "unknown" };
 
-function DraggableKanbanCard({ app, onOpen }: { app: AIApplicationData; onOpen: () => void }) {
+// Lencana untuk lamaran "Siap dikirim" yang formulirnya masih punya isian wajib kosong (dari log percobaan agen).
+function FormGapBadge({ gaps }: { gaps: FormGaps }) {
+  const detail = `${gaps.remaining.length} isian wajib masih kosong`;
+  return (
+    <span title={detail} className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-1 text-xs font-medium text-[#92400E]">
+      <AlertCircle className="h-3 w-3" aria-hidden="true" />
+      Perlu dilengkapi
+      <span className="sr-only">: {detail}</span>
+    </span>
+  );
+}
+
+function DraggableKanbanCard({ app, gaps, onOpen }: { app: AIApplicationData; gaps?: FormGaps; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app });
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -83,6 +97,11 @@ function DraggableKanbanCard({ app, onOpen }: { app: AIApplicationData; onOpen: 
           <Clock className="h-3 w-3" aria-hidden="true" />
           {app.submitted_at ? `${daysAgo(app.submitted_at)} hari lalu` : "Belum dikirim"}
         </div>
+        {app.status === "ready" && gaps && (
+          <div className="mt-2">
+            <FormGapBadge gaps={gaps} />
+          </div>
+        )}
         {app.follow_up_scheduled && !app.follow_up_sent && (
           <div className="mt-2 text-xs bg-[#FEF3C7] text-[#92400E] px-2 py-1 rounded-full inline-flex items-center gap-1">
             <AlertCircle className="h-3 w-3" aria-hidden="true" />
@@ -129,7 +148,7 @@ function DroppableColumn({ status, apps, children }: {
   );
 }
 
-function AppListRow({ app, onOpen }: { app: AIApplicationData; onOpen: () => void }) {
+function AppListRow({ app, gaps, onOpen }: { app: AIApplicationData; gaps?: FormGaps; onOpen: () => void }) {
   const config = statusConfig[app.status] ?? statusConfig.draft;
   const job = jobOf(app);
   return (
@@ -149,6 +168,11 @@ function AppListRow({ app, onOpen }: { app: AIApplicationData; onOpen: () => voi
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
           {applicationStatusLabel(app.status)}
         </span>
+        {app.status === "ready" && gaps && (
+          <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
+            <FormGapBadge gaps={gaps} />
+          </span>
+        )}
       </div>
       <div className="hidden md:flex items-center gap-4 text-xs">
         <span className={`px-2.5 py-1 rounded-full font-medium ${config.color}`}>{applicationStatusLabel(app.status)}</span>
@@ -179,6 +203,8 @@ export function AppsPage() {
   const [approvalBusy, setApprovalBusy] = useState(false);
   // Galat pengajuan tampil di dalam jendela, tepat di atas tombolnya, dan juga lewat toast.
   const [approvalError, setApprovalError] = useState("");
+  // Isian wajib yang masih kosong saat agen berhenti, per job_id. Hanya untuk lamaran berstatus ready.
+  const [formGaps, setFormGaps] = useState<Record<string, FormGaps>>({});
 
   // Draf yang belum dikirim: periksa apakah sudah menunggu persetujuan, supaya tidak diajukan dua kali.
   const selectedId = selectedApp?.id;
@@ -267,6 +293,32 @@ export function AppsPage() {
     loadApplications();
   }, [loadApplications]);
 
+  // Lamaran ready: ambil kekurangan isian dari log percobaan agen. Tidak memblokir halaman; bila gagal,
+  // lencana dan daftar kekurangan tidak tampil dan halaman tetap berfungsi. Kuncinya berubah juga saat
+  // kartu dipindah ke atau dari kolom ready, jadi data ikut diperbarui.
+  const readyJobKey = useMemo(
+    () => [...new Set(applications.filter((a) => a.status === "ready" && a.job_id).map((a) => a.job_id))].sort().join(","),
+    [applications],
+  );
+  useEffect(() => {
+    if (!readyJobKey) {
+      setFormGaps({});
+      return;
+    }
+    let alive = true;
+    getFormGaps(readyJobKey.split(","))
+      .then((gaps) => {
+        if (alive) setFormGaps(gaps);
+      })
+      .catch((err) => {
+        console.warn("Isian wajib yang kosong belum bisa dimuat:", err);
+        if (alive) setFormGaps({});
+      });
+    return () => {
+      alive = false;
+    };
+  }, [readyJobKey]);
+
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
   // mengirim email follow-up. Pengingat Telegram worker memakai satu chat milik pengelola (TELEGRAM_CHAT_ID),
   // bukan chat pengguna, jadi layar tidak menjanjikan pengingat ke pengguna.
@@ -344,6 +396,7 @@ export function AppsPage() {
   }
 
   const selectedJob = selectedApp ? jobOf(selectedApp) : undefined;
+  const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
 
   return (
     <AppShell>
@@ -426,7 +479,7 @@ export function AppsPage() {
                     {APPLICATION_STATUSES.map((status) => (
                       <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
                         {groupedApps[status].map((app) => (
-                          <DraggableKanbanCard key={app.id} app={app} onOpen={() => setSelectedApp(app)} />
+                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
                     ))}
@@ -442,12 +495,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {applications.map((app) => <AppListRow key={app.id} app={app} onOpen={() => setSelectedApp(app)} />)}
+                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => <AppListRow key={app.id} app={app} onOpen={() => setSelectedApp(app)} />)}
+                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
@@ -517,6 +570,23 @@ export function AppsPage() {
                               "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang."
                             : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}
                         </p>
+                        {selectedGaps && (
+                          <div className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E] space-y-2">
+                            <p id="detail-form-gaps-heading" className="font-semibold">Isian wajib yang masih kosong saat agen berhenti:</p>
+                            <ol aria-labelledby="detail-form-gaps-heading" className="list-decimal space-y-0.5 break-words pl-5">
+                              {selectedGaps.remaining.map((label, i) => <li key={i}>{label}</li>)}
+                            </ol>
+                            {selectedGaps.cvAttached === false && (
+                              <p>
+                                CV belum terlampir. Unggah CV di <Link to="/profile" className="font-semibold underline underline-offset-4">Profil Saya</Link>.
+                              </p>
+                            )}
+                            <p>
+                              Lengkapi datanya di <Link to="/profile" className="font-semibold underline underline-offset-4">Profil Saya</Link> atau{" "}
+                              <Link to="/automation-settings" className="font-semibold underline underline-offset-4">Pengaturan Agen</Link>, lalu ajukan lagi.
+                            </p>
+                          </div>
+                        )}
                         {approvalUi.state === "unknown" && (
                           <p className="text-xs text-[#92400E]">
                             Antrean persetujuan belum bisa diperiksa. Pengajuan akan memeriksanya lagi dan memberi tahu bila gagal.
