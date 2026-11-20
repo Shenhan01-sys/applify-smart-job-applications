@@ -11,10 +11,9 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, freshJobsFilter, savedFilterEmpty, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceCounts, jobsEmptyState, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
-  NO_PROFILE_SKILLS_TEXT,
   computeMatch,
   hasUsableSkills,
   profileSkillList,
@@ -225,9 +224,8 @@ function JobsPage() {
 
     const matchesFilter =
       activeFilter === "all" ||
-      (activeFilter === "remote" && job.workplace_type === "remote") ||
-      (activeFilter === "hybrid" && job.workplace_type === "hybrid") ||
-      (activeFilter === "onsite" && job.workplace_type === "on-site") ||
+      // Remote, Hybrid, Di kantor: dibaca dari workplace_type dengan normalisasi yang sama seperti label kartu.
+      matchesWorkplaceFilter(job, activeFilter) ||
       (activeFilter === "high-match" && (scoreOf(job) ?? -1) >= HIGH_MATCH_THRESHOLD) ||
       (activeFilter === "saved" && savedJobs.has(job.id));
 
@@ -238,11 +236,21 @@ function JobsPage() {
     heldScores.has(job.id) ? (heldScores.get(job.id) as number | null) : scoreOf(job);
   const shownJobs = sortByMatch(filteredJobs, orderScoreOf);
 
+  // Keadaan kosong khusus tiap penyaring: menyebut berapa lowongan yang dimuat dan dicari, lalu apa yang bisa dicoba.
+  const loadedScores = jobs.map(scoreOf).filter((s): s is number => s !== null);
+  const emptyState = jobsEmptyState({
+    filter: activeFilter,
+    searchQuery,
+    loadedCount: jobs.length,
+    savedCount: savedJobs.size,
+    savedLoadFailed,
+    profileHasSkills,
+    skillsError,
+    scoredCount: loadedScores.length,
+    topScore: loadedScores.length > 0 ? Math.max(...loadedScores) : null,
+    counts: workplaceCounts(jobs),
+  });
   // Lowongan dengan kecocokan tinggi untuk profilmu. Ini hanya hitungan, bukan fitur Golden Window.
-  // Kosong karena belum ada lowongan sama sekali, bukan karena pencarian tidak menemukan hasil.
-  const noJobsAtAll = jobs.length === 0 && !searchQuery.trim();
-  // Saringan "Tersimpan" tanpa satu pun lowongan tersimpan: beri petunjuk cara menyimpan, bukan teks umum.
-  const savedEmpty = savedFilterEmpty({ filter: activeFilter, savedCount: savedJobs.size, loadFailed: savedLoadFailed });
   const strongMatches = jobs.filter((j) => (scoreOf(j) ?? -1) >= HIGH_MATCH_THRESHOLD).length;
 
   return (
@@ -374,26 +382,14 @@ function JobsPage() {
       ) : (
         <div className="text-center py-16">
           <Brain className="h-12 w-12 mx-auto text-[#999999] mb-4" aria-hidden="true" />
-          <h2 className="text-lg font-semibold mb-2">
-            {noJobsAtAll ? "Belum ada lowongan" : savedEmpty ? savedEmpty.title : "Tidak ada lowongan yang cocok"}
-          </h2>
-          <p className="mx-auto max-w-md text-sm text-muted-foreground mb-6">
-            {noJobsAtAll
-              ? "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan."
-              : savedEmpty
-                ? savedEmpty.text
-                : activeFilter === "high-match" && profileHasSkills === false
-                  ? NO_PROFILE_SKILLS_TEXT + "."
-                  : activeFilter === "high-match" && skillsError
-                    ? skillsError
-                    : "Coba ubah penyaring atau kata kunci pencarian."}
-          </p>
-          {jobs.length > 0 && activeFilter === "high-match" && profileHasSkills === false && (
+          <h2 className="text-lg font-semibold mb-2">{emptyState.title}</h2>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground mb-6">{emptyState.text}</p>
+          {emptyState.action === "profile" && (
             <Link to="/profile" className="inline-flex min-h-11 items-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90 transition">
               Buka Profil
             </Link>
           )}
-          {noJobsAtAll && !showScanner && (
+          {emptyState.action === "scanner" && !showScanner && (
             <button
               type="button"
               onClick={() => setShowScanner(true)}

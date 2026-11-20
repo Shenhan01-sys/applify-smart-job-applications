@@ -5,8 +5,10 @@
  * such as `e2e-mock`. Applying to one of those opens a test server, not a company. The page drops them
  * on the client; the rows themselves stay in the database.
  *
- * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
+ * Plain TypeScript with only relative imports, so it runs under `node --test` without a bundler.
  */
+
+import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT } from "./matchScore.ts";
 
 /** Hostnames that point at a test or local machine rather than a company. */
 function isTestHost(hostname: string): boolean {
@@ -112,4 +114,138 @@ export const SAVED_EMPTY_TEXT = "Tekan ikon simpan pada kartu lowongan untuk men
 export function savedFilterEmpty(input: { filter: string; savedCount: number; loadFailed: boolean }): { title: string; text: string } | null {
   if (input.filter !== "saved" || input.loadFailed || input.savedCount > 0) return null;
   return { title: SAVED_EMPTY_TITLE, text: SAVED_EMPTY_TEXT };
+}
+
+// ---- Penyaring tempat kerja dan keadaan kosong halaman Lowongan (uji klik 20 November 2026, temuan 7) --------------
+
+export type WorkplaceKind = "remote" | "hybrid" | "on-site";
+
+interface WorkplaceFields {
+  workplace_type?: unknown;
+  location?: unknown;
+  title?: unknown;
+}
+
+const WORKPLACE_FILTER_KIND: Record<string, WorkplaceKind> = { remote: "remote", hybrid: "hybrid", onsite: "on-site" };
+
+/**
+ * Jenis tempat kerja sebuah lowongan. `jobs.workplace_type` dibaca dengan normalisasi yang sama seperti label kartu
+ * ("On-Site", "onsite", "on_site" sama dengan "on-site"), supaya kartu berlabel "Di kantor" juga lolos penyaring
+ * "Di kantor". Bila kolomnya kosong, hanya kata yang jelas di lokasi atau judul yang dipakai ("Remote", "WFH", "Hybrid").
+ * Nilai yang tidak dikenal tidak ditebak.
+ */
+export function workplaceKind(job: WorkplaceFields): WorkplaceKind | null {
+  const raw = typeof job.workplace_type === "string" ? job.workplace_type.trim().toLowerCase().replace(/[\s_]+/g, "-") : "";
+  if (raw === "remote" || raw === "hybrid") return raw;
+  if (raw === "on-site" || raw === "onsite") return "on-site";
+  if (raw) return null;
+  const text = `${typeof job.location === "string" ? job.location : ""} ${typeof job.title === "string" ? job.title : ""}`.toLowerCase();
+  if (/\bhybrid\b/.test(text)) return "hybrid";
+  if (/\b(remote|wfh|work from home)\b/.test(text)) return "remote";
+  return null;
+}
+
+/** Kunci penyaring halaman ("remote", "hybrid", "onsite") terhadap lowongan; kunci lain selalu false. */
+export function matchesWorkplaceFilter(job: WorkplaceFields, filter: string): boolean {
+  const wanted = WORKPLACE_FILTER_KIND[filter];
+  return wanted !== undefined && workplaceKind(job) === wanted;
+}
+
+export type WorkplaceCounts = Record<WorkplaceKind | "unknown", number>;
+
+/** Jumlah lowongan per jenis tempat kerja; `unknown` untuk yang tanpa keterangan. */
+export function workplaceCounts(jobs: readonly WorkplaceFields[]): WorkplaceCounts {
+  const out: WorkplaceCounts = { remote: 0, hybrid: 0, "on-site": 0, unknown: 0 };
+  for (const job of jobs) out[workplaceKind(job) ?? "unknown"] += 1;
+  return out;
+}
+
+export interface JobsEmptyInput {
+  /** Kunci penyaring aktif: all, remote, hybrid, onsite, high-match, saved. */
+  filter: string;
+  searchQuery: string;
+  /** Jumlah lowongan yang termuat untuk pencarian ini (sebelum penyaring klien). */
+  loadedCount: number;
+  savedCount: number;
+  savedLoadFailed: boolean;
+  /** null = skill profil belum dimuat atau gagal. */
+  profileHasSkills: boolean | null;
+  skillsError: string;
+  /** Lowongan yang punya skor kecocokan, dan skor tertinggi di antaranya. */
+  scoredCount: number;
+  topScore: number | null;
+  counts: WorkplaceCounts;
+}
+
+export interface JobsEmptyState {
+  title: string;
+  text: string;
+  /** Tombol di bawah teks: ke Profil, atau membuka pemindai lowongan. */
+  action: "profile" | "scanner" | null;
+}
+
+const WORKPLACE_COPY: Record<string, { kind: WorkplaceKind; title: string; label: string }> = {
+  remote: { kind: "remote", title: "Belum ada lowongan remote", label: "Remote" },
+  hybrid: { kind: "hybrid", title: "Belum ada lowongan hybrid", label: "Hybrid" },
+  onsite: { kind: "on-site", title: "Belum ada lowongan di kantor", label: "Di kantor" },
+};
+const KIND_LABEL: Record<WorkplaceKind, string> = { remote: "Remote", hybrid: "Hybrid", "on-site": "Di kantor" };
+
+export const GENERIC_EMPTY_TITLE = "Tidak ada lowongan yang cocok";
+export const GENERIC_EMPTY_TEXT = "Coba ubah penyaring atau kata kunci pencarian.";
+
+/**
+ * Teks keadaan kosong halaman Lowongan. Tiap penyaring menyebut apa yang dicari (di antara berapa lowongan yang
+ * dimuat, untuk pencarian apa), bukan teks umum, dan memberi langkah berikutnya. Penyaring klien hanya melihat
+ * lowongan yang termuat (paling banyak JOBS_PAGE_LIMIT yang terbaru); lowongan lain baru muncul lewat kotak cari.
+ */
+export function jobsEmptyState(input: JobsEmptyInput): JobsEmptyState {
+  const query = input.searchQuery.trim();
+  const among = `${input.loadedCount} lowongan yang dimuat${query ? ` untuk pencarian "${query}"` : ""}`;
+
+  if (input.loadedCount === 0 && !query) {
+    return {
+      title: "Belum ada lowongan",
+      text: "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan.",
+      action: "scanner",
+    };
+  }
+  const saved = savedFilterEmpty({ filter: input.filter, savedCount: input.savedCount, loadFailed: input.savedLoadFailed });
+  if (saved) return { ...saved, action: null };
+
+  if (input.loadedCount === 0) {
+    return {
+      title: GENERIC_EMPTY_TITLE,
+      text: `Tidak ada lowongan untuk pencarian "${query}". Coba kata kunci yang lebih umum, misalnya nama posisi atau kota, atau hapus pencarian.`,
+      action: null,
+    };
+  }
+
+  if (input.filter === "high-match") {
+    if (input.profileHasSkills === false) return { title: "Skill di profilmu belum terisi", text: `${NO_PROFILE_SKILLS_TEXT}.`, action: "profile" };
+    if (input.skillsError) return { title: GENERIC_EMPTY_TITLE, text: input.skillsError, action: null };
+    const limitNote = input.loadedCount >= JOBS_PAGE_LIMIT ? ` (paling banyak ${JOBS_PAGE_LIMIT} yang terbaru)` : "";
+    const basis =
+      input.scoredCount === 0 || input.topScore === null
+        ? `Dari ${among}, belum ada yang skor kecocokannya bisa dihitung karena lowongannya tidak menyebut skill yang terbaca.`
+        : `Dari ${among}, ${input.scoredCount} punya skor kecocokan dan yang tertinggi ${input.topScore}%.`;
+    return {
+      title: `Belum ada kecocokan ${HIGH_MATCH_THRESHOLD}% ke atas`,
+      text: `${basis} Penyaring ini hanya menghitung lowongan yang dimuat di layar${limitNote}. Coba cari nama skill atau posisi di kotak cari, atau lengkapi skill di Profil.`,
+      action: null,
+    };
+  }
+
+  const wp = WORKPLACE_COPY[input.filter];
+  if (wp) {
+    const others = (["on-site", "hybrid", "remote"] as const)
+      .filter((k) => k !== wp.kind && input.counts[k] > 0)
+      .map((k) => `${KIND_LABEL[k]} ${input.counts[k]}`);
+    if (input.counts.unknown > 0) others.push(`tanpa keterangan ${input.counts.unknown}`);
+    const available = others.length > 0 ? ` Yang ada: ${others.join(", ")}. Pilih salah satunya.` : "";
+    const tip = wp.kind === "remote" ? ' Sumber lowongan tidak selalu mencantumkan remote, jadi coba juga pilih "Semua" lalu cari kata "remote".' : "";
+    return { title: wp.title, text: `Tidak ada yang berlabel ${wp.label} di antara ${among}.${available}${tip}`, action: null };
+  }
+
+  return { title: GENERIC_EMPTY_TITLE, text: GENERIC_EMPTY_TEXT, action: null };
 }

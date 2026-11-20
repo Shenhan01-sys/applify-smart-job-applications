@@ -54,6 +54,18 @@ export function isThinDetail(job: JobDetailInput): boolean {
   return descriptionLength(job.description) < DETAIL_MIN_DESCRIPTION_LENGTH || !hasRequirements(job.requirements);
 }
 
+/**
+ * Skor kecocokan di kartu dihitung dari teks yang ada di baris saat itu. Baris dari daftar baru memuat ringkasan
+ * (deskripsi pendek), jadi skornya perkiraan: setelah detail lengkap diambil, lebih banyak skill terbaca dan
+ * persennya bisa berubah (uji klik 20 November 2026: 100% di daftar, 13% setelah detail dibuka). Rumus dan
+ * kamus skill-nya sama; yang berbeda hanya teks yang dibaca.
+ */
+export function isProvisionalMatch(job: Pick<JobDetailInput, "description">): boolean {
+  return descriptionLength(job.description) < DETAIL_MIN_DESCRIPTION_LENGTH;
+}
+
+export const PROVISIONAL_MATCH_NOTE = "Perkiraan: teks lowongan masih pendek, jadi persennya bisa berubah setelah detail lengkap dibuka.";
+
 /** True bila detail layak diambil dari server: sumbernya didukung dan isinya masih ringkasan. */
 export function needsDetail(job: JobDetailInput): boolean {
   return (DETAIL_PLATFORMS as readonly string[]).includes(platformOf(job)) && isThinDetail(job);

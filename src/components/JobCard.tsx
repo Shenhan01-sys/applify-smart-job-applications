@@ -15,11 +15,13 @@ import {
   enrichFailureNote,
   formatMoney,
   formatMoneyRange,
+  isProvisionalMatch,
   isThinDetail,
   matchBreakdown,
   mergeJobUpdate,
   needsDetail,
   needsGlintsNote,
+  PROVISIONAL_MATCH_NOTE,
   salaryText,
   skillAnalysisNote,
   type BenchmarkView,
@@ -589,6 +591,9 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
                 </p>
                 {match.status === "ok" && (
                   <p className="text-xs text-muted-foreground">{JOB_LABELS.card.matchBasis}</p>
+                )}
+                {match.status === "ok" && isProvisionalMatch(job) && (
+                  <p className="text-xs text-[#92400E]">{PROVISIONAL_MATCH_NOTE}</p>
                 )}
               </>
             )}

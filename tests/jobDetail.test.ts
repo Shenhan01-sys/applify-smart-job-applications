@@ -13,7 +13,10 @@ import {
   enrichFailureNote,
   formatMoney,
   formatMoneyRange,
+  isProvisionalMatch,
   isThinDetail,
+  DETAIL_MIN_DESCRIPTION_LENGTH,
+  PROVISIONAL_MATCH_NOTE,
   matchBreakdown,
   mergeJobUpdate,
   needsDetail,
@@ -442,6 +445,41 @@ test("komentar jobCardData tidak lagi bilang kolom skill_matches dan salary_benc
   assert.doesNotMatch(src, /the[\s*]+table has no skill_matches/);
   assert.match(src, /live[\s*]+`jobs` table has skill_matches, skill_gaps, ai_actions and salary_benchmark columns/);
   assert.match(src, /no flow ever fills them for a real row/);
+});
+
+// ---- skor kartu vs skor detail (uji klik 20 November 2026, temuan 7) ----
+
+test("temuan 7: skor dari ringkasan ditandai perkiraan; skor dari teks lengkap tidak", () => {
+  const profile = ["Solidity"];
+  // ringkasan menyebut satu skill yang ada di profil: 100%
+  const teaser = { title: "Web3 Developer", description: "Cari developer Solidity.", requirements: [] as string[] };
+  const card = computeMatch(teaser, profile);
+  assert.equal(card.score, 100);
+  assert.equal(isProvisionalMatch(teaser), true);
+  // teks lengkap menyebut banyak skill lain: rumus dan kamus sama, persen turun
+  const full = {
+    title: "Web3 Developer",
+    description: `Cari developer Solidity. ${"Kami memakai React, TypeScript, Node.js, Docker, AWS, PostgreSQL, GraphQL. ".repeat(10)}`,
+    requirements: ["React", "TypeScript", "Node.js", "Docker", "AWS", "PostgreSQL", "GraphQL"],
+  };
+  const detail = computeMatch(full, profile);
+  assert.ok(detail.score !== null && detail.score < 20, `skor detail ${detail.score}`);
+  assert.equal(isProvisionalMatch(full), false);
+  assert.match(PROVISIONAL_MATCH_NOTE, /Perkiraan/);
+});
+
+test("temuan 7: isProvisionalMatch mengabaikan tag HTML dan menolak deskripsi kosong atau bukan teks", () => {
+  assert.equal(isProvisionalMatch({ description: `<p>${"x".repeat(100)}</p>` }), true);
+  assert.equal(isProvisionalMatch({ description: "y".repeat(DETAIL_MIN_DESCRIPTION_LENGTH) }), false);
+  assert.equal(isProvisionalMatch({ description: "y".repeat(DETAIL_MIN_DESCRIPTION_LENGTH - 1) }), true);
+  assert.equal(isProvisionalMatch({ description: null }), true);
+  assert.equal(isProvisionalMatch({}), true);
+});
+
+test("temuan 7: kartu menampilkan catatan perkiraan hanya untuk skor ok dari teks pendek", () => {
+  const card = read("../src/components/JobCard.tsx");
+  assert.match(card, /match\.status === "ok" && isProvisionalMatch\(job\) && \(/);
+  assert.match(card, /\{PROVISIONAL_MATCH_NOTE\}/);
 });
 
 test("pustaka jobDetail murni tanpa impor, supaya jalan di bawah node --test", () => {
