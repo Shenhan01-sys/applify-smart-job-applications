@@ -326,10 +326,15 @@ test("kartu: detail lengkap diambil sekali saat dibuka, hanya bila needsDetail, 
   const effect = card.slice(card.indexOf("if (!expanded || !needsDetail(job)"), card.indexOf("// Salary comparison with similar postings"));
   assert.ok(effect.indexOf("detailAttempts.add(job.id)") < effect.indexOf("automationApi.enrichJob(job.id)"));
   assert.equal([...card.matchAll(/automationApi\.enrichJob\(/g)].length, 1);
-  assert.match(effect, /\}, \[expanded, job\.id\]\);/);
+  assert.match(effect, /\}, \[expanded, job\.id, detailRetry\]\);/);
   // berhasil: baris baru naik ke halaman; gagal atau tidak didukung: catatan, tanpa memutus kartu
-  assert.match(effect, /res\.enriched && res\.job/);
-  assert.match(effect, /onJobUpdated\?\.\(mergeJobUpdate\(job, res\.job\)\)/);
+  assert.match(effect, /const merged = res\?\.job \? mergeJobUpdate\(job, res\.job\) : null;/);
+  // "sudah lengkap" (enriched:false) dengan baris yang sudah lengkap tetap dipakai, bukan dianggap gagal (uji klik 20 Nov)
+  assert.match(effect, /merged && \(res\.enriched \|\| !isThinDetail\(merged\)\)/);
+  assert.match(effect, /onJobUpdated\?\.\(merged\)/);
+  // gagal bisa dicoba lagi: id dihapus dari catatan percobaan lalu efek dijalankan ulang
+  assert.match(card, /const retryDetail = \(\) => \{\s*detailAttempts\.delete\(job\.id\);\s*setDetailRetry\(\(n\) => n \+ 1\);/);
+  assert.match(card, /onClick=\{retryDetail\}[\s\S]{0,160}Coba lagi/);
   assert.match(effect, /enrichFailureNote\(res\.reason\)/);
   assert.match(effect, /catch \(err\)[\s\S]*enrichFailureNote\(\)/);
   // id yang sudah pernah diminta disimpan di tingkat halaman

@@ -417,6 +417,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<DetailState>({ phase: "idle" });
+  const [detailRetry, setDetailRetry] = useState(0);
   const [bench, setBench] = useState<BenchmarkState>({ phase: "idle" });
   const benchRequested = useRef(false);
 
@@ -429,10 +430,13 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
     (async () => {
       try {
         const res = await automationApi.enrichJob(job.id);
+        const merged = res?.job ? mergeJobUpdate(job, res.job) : null;
         if (!res) {
           setDetail({ phase: "idle" });
-        } else if (res.enriched && res.job) {
-          onJobUpdated?.(mergeJobUpdate(job, res.job));
+        } else if (merged && (res.enriched || !isThinDetail(merged))) {
+          // Uji klik 20 November 2026: server menjawab enriched:false "sudah lengkap" karena percobaan sebelumnya
+          // sudah menyimpan detailnya. Baris lengkap yang dikirim balik tetap dipakai, bukan dianggap gagal.
+          onJobUpdated?.(merged);
           setDetail({ phase: "idle" });
         } else {
           setDetail({ phase: "failed", note: enrichFailureNote(res.reason) });
@@ -442,7 +446,13 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
         setDetail({ phase: "failed", note: enrichFailureNote() });
       }
     })();
-  }, [expanded, job.id]);
+  }, [expanded, job.id, detailRetry]);
+
+  // Gagal karena jaringan atau server (misalnya 503 saat layanan login tidak terjangkau) bisa dicoba lagi.
+  const retryDetail = () => {
+    detailAttempts.delete(job.id);
+    setDetailRetry((n) => n + 1);
+  };
 
   // Salary comparison with similar postings: fetched when the card is first opened, once per card.
   useEffect(() => {
@@ -600,7 +610,10 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
           )}
           {detail.phase === "failed" && (
             <p role="status" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
-              {detail.note}
+              {detail.note}{" "}
+              <button type="button" onClick={retryDetail} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+                Coba lagi
+              </button>
               {job.external_url && (
                 <>
                   {" "}
