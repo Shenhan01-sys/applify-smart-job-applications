@@ -29,6 +29,22 @@ const FRONTEND_JOB = {
   match_score: 50,
 };
 
+test("lowongan JobStreet Metro Tara (20 November 2026): kalimat kualifikasi dan judul bagian tidak menjadi skill", () => {
+  const job = {
+    title: "Internship IT",
+    description:
+      "Kualifikasi:\n• Pendidikan minimal SMK/D3 atau fresh graduate jurusan Teknik Informatika, Sistem Informasi, TKJ, atau bidang terkait.\n• Memahami dasar hardware komputer, laptop, printer, dan jaringan.\nSkills: SQL, Troubleshooting dan bidang terkait",
+    requirements: ["IT SYSTEM DEVELOPMENT", "Memiliki pemahaman mengenai database dan SQL.", "SQL"],
+  };
+  const m = computeMatch(job, ["React"]);
+  const labels = [...m.matched, ...m.missing].map((s) => String(s).toLowerCase());
+  for (const junk of ["atau bidang terkait", "bidang terkait", "it system development", "tkj"]) {
+    assert.ok(!labels.includes(junk), `${junk} bukan skill`);
+  }
+  assert.ok(labels.includes("sql"), labels.join(", "));
+  assert.ok(labels.some((l) => l.includes("troubleshooting")), labels.join(", "));
+});
+
 test("Apoteker untuk profil React/TypeScript: rendah, walau jobs.match_score global bernilai 90", () => {
   const m = computeMatch(APOTEKER, FRONTEND_PROFILE);
   assert.equal(m.status, "ok");

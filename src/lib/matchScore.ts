@@ -328,13 +328,24 @@ function stripHtml(text: string): string {
 function explicitTerms(requirements: string[], description: string): string[] {
   const out: string[] = [];
   const add = (raw: string) => {
-    const t = raw.trim().replace(/^[-•*\s]+/, "").replace(/[.;:\s]+$/, "").trim();
+    const t = raw
+      .trim()
+      .replace(/^[-•*\s]+/, "")
+      .replace(/^(?:atau|dan|serta|or|and)\s+/i, "")
+      .replace(/[.;:\s]+$/, "")
+      .trim();
     if (!t || t.length > 40 || t.split(/\s+/).length > 4) return;
     if (!/[a-z]/i.test(t) || /\d/.test(t) || NOT_A_SKILL.test(t)) return;
+    // sisa kalimat seperti "atau bidang terkait" bukan skill
+    if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return;
+    // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
+    if (t.includes(" ") && t === t.toUpperCase()) return;
     out.push(t);
   };
   for (const r of requirements) add(r);
-  const lists = /\b(?:requirements?|persyaratan|kualifikasi|kompetensi|keahlian|skills?)\s*[:：]\s*([^\n]+)/gi;
+  // Daftar harus di baris yang sama dengan labelnya. "Kualifikasi:" yang diikuti baris baru berisi kalimat
+  // (uji klik 20 November 2026, lowongan JobStreet) tidak boleh dipecah menjadi skill.
+  const lists = /\b(?:requirements?|persyaratan|kualifikasi|kompetensi|keahlian|skills?)[ \t]*[:：][ \t]*([^\n]+)/gi;
   for (const m of description.matchAll(lists)) {
     // daftar berhenti di akhir kalimat (titik lalu spasi); "Node.js" tidak terpotong
     const list = m[1].split(/\.\s/)[0];
