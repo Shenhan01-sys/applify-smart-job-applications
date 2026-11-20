@@ -5,7 +5,7 @@ import { followUpDueAt } from "@/lib/followUp";
 import { cleanStringList } from "@/lib/jobCardData";
 import { rawModelUsed } from "@/lib/modelLabel";
 import { quotaFromEdgeResponse, type QuotaSummary } from "@/lib/quotaStatus";
-import { DRAFT_CLIENT_TIMEOUT_MS, DRAFT_TIMEOUT_MESSAGE, isClientTimeout } from "@/lib/draftProgress";
+import { invokeWithDraftTimeout } from "@/lib/draftProgress";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -75,22 +75,11 @@ async function invokeGenerate(
 ) {
   // The Edge Function stops its model chain after its own time budget; the browser gives up a little later
   // (lib/draftProgress.ts), so a stuck request ends with the retry message instead of waiting on every model.
-  const { data, error } = await supabase.functions.invoke("generate-application", {
-    body: { jobId, mode, tone },
-    timeout: DRAFT_CLIENT_TIMEOUT_MS,
-  });
-  if (error) {
-    if (isClientTimeout(error)) throw new Error(DRAFT_TIMEOUT_MESSAGE);
-    // supabase-js wraps non-2xx responses; try to surface the real server message
-    let msg = error.message;
-    try {
-      const ctx = await (error as any).context?.json?.();
-      if (ctx?.error) msg = ctx.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(msg);
-  }
+  // A timeout, a server error and a network error all end as an Error with a message the modal can show
+  // (invokeWithDraftTimeout in lib/draftProgress.ts, covered by tests/draftProgress.test.ts).
+  const data = await invokeWithDraftTimeout((timeout) =>
+    supabase.functions.invoke("generate-application", { body: { jobId, mode, tone }, timeout }),
+  );
   return data as any;
 }
 

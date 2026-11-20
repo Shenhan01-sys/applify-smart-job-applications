@@ -1,13 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createClient } from "@supabase/supabase-js";
 import {
   DRAFT_CLIENT_TIMEOUT_MS,
   DRAFT_TIMEOUT_MESSAGE,
   SLOW_HINT_AFTER_SECONDS,
+  draftErrorMessage,
   draftProgressText,
   draftStage,
   draftWaitHint,
+  invokeWithDraftTimeout,
   isClientTimeout,
 } from "../src/lib/draftProgress.ts";
 import { DEFAULT_AI_TOTAL_BUDGET_MS } from "../supabase/functions/_shared/providers.ts";
@@ -68,9 +71,102 @@ test("pesan batas waktu klien lolos describeError apa adanya dan sama dengan pes
 
 test("layanan draf memasang batas waktu klien dan memetakan batas waktu ke pesan coba lagi", () => {
   const src = read("../src/services/aiApplicationService.ts");
-  assert.match(src, /import \{ DRAFT_CLIENT_TIMEOUT_MS, DRAFT_TIMEOUT_MESSAGE, isClientTimeout \} from "@\/lib\/draftProgress"/);
-  assert.match(src, /functions\.invoke\("generate-application", \{\s*body: \{ jobId, mode, tone \},\s*timeout: DRAFT_CLIENT_TIMEOUT_MS,\s*\}\)/);
-  assert.match(src, /if \(isClientTimeout\(error\)\) throw new Error\(DRAFT_TIMEOUT_MESSAGE\)/);
+  assert.match(src, /import \{ invokeWithDraftTimeout \} from "@\/lib\/draftProgress"/);
+  assert.match(src, /invokeWithDraftTimeout\(\(timeout\) =>\s*supabase\.functions\.invoke\("generate-application", \{ body: \{ jobId, mode, tone \}, timeout \}\),?\s*\)/);
+  // pemetaan galat ada di satu tempat yang diuji, bukan disalin di layanan
+  assert.doesNotMatch(src, /isClientTimeout|DRAFT_TIMEOUT_MESSAGE/);
+});
+
+// ---- batas waktu klien diuji dengan supabase.functions asli dan fetch yang tidak pernah menjawab ----------------
+// (uji klik 20 November 2026, temuan 13: jalur galat 40 detik tidak sempat terpicu di produksi)
+
+/** `supabase.functions` dari supabase-js asli, dengan fetch buatan; tanpa sesi, tanpa jaringan. */
+const functionsWith = (fetchImpl: typeof fetch) =>
+  createClient("http://localhost:54321", "anon-test-key", { global: { fetch: fetchImpl }, auth: { persistSession: false, autoRefreshToken: false } }).functions;
+const abortError = () => new DOMException("This operation was aborted", "AbortError");
+/** fetch yang menggantung sampai dibatalkan, seperti Edge Function yang tidak menjawab. */
+const hangingFetch = ((_url: unknown, init?: { signal?: AbortSignal }) =>
+  new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(abortError())))) as unknown as typeof fetch;
+const jsonResponse = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+test("temuan 13: supabase.functions asli yang menyerah karena timeout menghasilkan galat yang dikenali isClientTimeout", async () => {
+  const client = functionsWith(hangingFetch);
+  const started = Date.now();
+  const { data, error } = await client.invoke("generate-application", { body: { jobId: "j1" }, timeout: 40 });
+  assert.equal(data, null);
+  assert.ok(Date.now() - started < 1_000, "menyerah sesudah timeout, tidak menggantung");
+  assert.equal((error as { name?: string }).name, "FunctionsFetchError");
+  assert.equal(isClientTimeout(error), true);
+});
+
+test("temuan 13: invokeWithDraftTimeout melempar pesan coba lagi saat batas waktu habis, dan memberi batas waktunya ke invoke", async () => {
+  const client = functionsWith(hangingFetch);
+  let received = -1;
+  await assert.rejects(
+    invokeWithDraftTimeout((timeout) => {
+      received = timeout;
+      return client.invoke("generate-application", { body: { jobId: "j1" }, timeout: 40 });
+    }),
+    (err: Error) => {
+      assert.equal(err.message, DRAFT_TIMEOUT_MESSAGE);
+      // yang sampai ke layar (describeError) sama dengan pesan galat 502 server
+      assert.equal(describeError(err, "Draf belum bisa dibuat. Coba lagi."), DRAFT_TIMEOUT_MESSAGE);
+      return true;
+    },
+  );
+  assert.equal(received, DRAFT_CLIENT_TIMEOUT_MS);
+  // batas waktu bawaan bisa diganti (dipakai uji ini), dan tanpa argumen sama dengan DRAFT_CLIENT_TIMEOUT_MS
+  let custom = -1;
+  await invokeWithDraftTimeout((t) => { custom = t; return Promise.resolve({ data: 1, error: null }); }, 123);
+  assert.equal(custom, 123);
+});
+
+test("temuan 13: Coba lagi: panggilan kedua berhasil sesudah panggilan pertama kehabisan waktu, tanpa sisa keadaan", async () => {
+  let calls = 0;
+  const flaky = ((url: unknown, init?: { signal?: AbortSignal }) => {
+    calls += 1;
+    if (calls === 1) return hangingFetch(url, init);
+    return Promise.resolve(jsonResponse(200, { application: { id: "app-1" }, analysis: { skillGaps: [] } }));
+  }) as unknown as typeof fetch;
+  const client = functionsWith(flaky);
+  const attempt = () => invokeWithDraftTimeout<{ application: { id: string } }>((timeout) => client.invoke("generate-application", { body: { jobId: "j1" }, timeout }), 40);
+  await assert.rejects(attempt(), { message: DRAFT_TIMEOUT_MESSAGE });
+  const second = await attempt();
+  assert.equal(second?.application.id, "app-1");
+  assert.equal(calls, 2);
+});
+
+test("temuan 13: galat selain batas waktu tidak memakai pesan batas waktu", async () => {
+  // jaringan putus: FunctionsFetchError dengan TypeError, pesan asli dipertahankan
+  const offline = functionsWith((() => Promise.reject(new TypeError("Failed to fetch"))) as unknown as typeof fetch);
+  await assert.rejects(
+    invokeWithDraftTimeout((timeout) => offline.invoke("generate-application", { body: {}, timeout })),
+    (err: Error) => err.message !== DRAFT_TIMEOUT_MESSAGE && /Failed to send a request to the Edge Function/.test(err.message),
+  );
+  // server menjawab 4xx dengan { error }: pesan server yang ditampilkan
+  const quota = functionsWith((() => Promise.resolve(jsonResponse(402, { error: "Kuota draf bulan ini habis." }))) as unknown as typeof fetch);
+  await assert.rejects(
+    invokeWithDraftTimeout((timeout) => quota.invoke("generate-application", { body: {}, timeout })),
+    { message: "Kuota draf bulan ini habis." },
+  );
+  // badan jawaban bukan JSON: pesan galat bawaan supabase-js
+  const html = functionsWith((() => Promise.resolve(new Response("<html>Bad gateway</html>", { status: 502 }))) as unknown as typeof fetch);
+  await assert.rejects(
+    invokeWithDraftTimeout((timeout) => html.invoke("generate-application", { body: {}, timeout })),
+    (err: Error) => err.message !== DRAFT_TIMEOUT_MESSAGE && err.message.length > 0,
+  );
+  // jawaban sukses mengembalikan datanya apa adanya
+  const ok = functionsWith((() => Promise.resolve(jsonResponse(200, { application: { id: "a" } }))) as unknown as typeof fetch);
+  assert.deepEqual(await invokeWithDraftTimeout((timeout) => ok.invoke("generate-application", { body: {}, timeout })), { application: { id: "a" } });
+});
+
+test("temuan 13: draftErrorMessage membaca badan JSON server, dan jatuh ke pesan galat bila badannya rusak", async () => {
+  assert.equal(await draftErrorMessage({ name: "FunctionsHttpError", message: "Edge Function returned a non-2xx status code", context: { json: async () => ({ error: "Profil belum lengkap." }) } }), "Profil belum lengkap.");
+  assert.equal(await draftErrorMessage({ name: "FunctionsHttpError", message: "non-2xx", context: { json: async () => { throw new SyntaxError("Unexpected token"); } } }), "non-2xx");
+  assert.equal(await draftErrorMessage({ name: "FunctionsHttpError", message: "non-2xx", context: { json: async () => ({}) } }), "non-2xx");
+  assert.equal(await draftErrorMessage({ name: "FunctionsFetchError", message: "x", context: { name: "TimeoutError" } }), DRAFT_TIMEOUT_MESSAGE);
+  assert.equal(await draftErrorMessage({ name: "FunctionsFetchError", message: "x", context: new TypeError("Failed to fetch") }), "x");
 });
 
 test("jendela Lamar dengan AI menampilkan detik berjalan selama draf dibuat, dan membersihkan penghitungnya", () => {

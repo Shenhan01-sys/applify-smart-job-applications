@@ -61,3 +61,42 @@ export function isClientTimeout(err: unknown): boolean {
   const ctx = e.context as { name?: unknown } | null | undefined;
   return ctx?.name === "AbortError" || ctx?.name === "TimeoutError";
 }
+
+/** Bentuk galat dari `supabase.functions.invoke` yang dibaca di sini: nama, pesan, dan konteks (Response atau galat fetch). */
+export interface DraftInvokeError {
+  name?: unknown;
+  message?: string;
+  context?: any;
+}
+
+/**
+ * Pesan untuk galat pemanggilan Edge Function. Browser yang menyerah lebih dulu memakai DRAFT_TIMEOUT_MESSAGE;
+ * selain itu pesan asli dari badan jawaban server (`{ error }`) bila terbaca, kalau tidak pesan galatnya.
+ */
+export async function draftErrorMessage(error: DraftInvokeError): Promise<string> {
+  if (isClientTimeout(error)) return DRAFT_TIMEOUT_MESSAGE;
+  // supabase-js membungkus jawaban non-2xx; coba tampilkan pesan server yang sebenarnya
+  let msg = error.message ?? "";
+  try {
+    const ctx = await error.context?.json?.();
+    if (ctx?.error) msg = ctx.error;
+  } catch {
+    /* badan jawaban bukan JSON: pakai pesan galat */
+  }
+  return msg;
+}
+
+/**
+ * Memanggil Edge Function dengan batas waktu klien. `invoke` menerima batas waktunya dan mengembalikan
+ * `{ data, error }` seperti supabase-js. Galat (termasuk batas waktu) dilempar sebagai Error berpesan Indonesia
+ * yang ditampilkan jendela "Lamar dengan AI" bersama tombol "Coba lagi"; panggilan berikutnya tidak membawa sisa
+ * keadaan dari yang gagal.
+ */
+export async function invokeWithDraftTimeout<T>(
+  invoke: (timeoutMs: number) => PromiseLike<{ data: T | null; error: DraftInvokeError | null }>,
+  timeoutMs: number = DRAFT_CLIENT_TIMEOUT_MS,
+): Promise<T | null> {
+  const { data, error } = await invoke(timeoutMs);
+  if (error) throw new Error(await draftErrorMessage(error));
+  return data;
+}
