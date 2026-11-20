@@ -5,6 +5,11 @@ import {
   chatBody,
   DEFAULT_FREE_MODELS,
   DEFAULT_PRO_MODELS,
+  DEFAULT_AI_CALL_TIMEOUT_MS,
+  DEFAULT_AI_TOTAL_BUDGET_MS,
+  MIN_AI_CALL_MS,
+  nextCallTimeoutMs,
+  positiveMs,
   parseModelList,
   resolveChain,
   resolveModel,
@@ -46,10 +51,11 @@ test("penyedia: rantai bawaan Free diawali Gemini lalu Claude, Pro diawali Gemin
   assert.deepEqual(parseModelList(" a , b ,, ", "x"), ["a", "b"]);
 });
 
-test("Edge Function memakai rantai penyedia dan batas waktu per panggilan", () => {
+test("Edge Function memakai rantai penyedia dan batas waktu per panggilan yang dibatasi sisa anggaran total", () => {
   const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
   assert.match(src, /from "\.\.\/_shared\/providers\.ts"/);
-  assert.match(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
+  assert.match(src, /AbortSignal\.timeout\(callTimeoutMs\)/);
+  assert.doesNotMatch(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
   assert.doesNotMatch(src, /fetch\("https:\/\/openrouter\.ai/);
 });
 
@@ -82,4 +88,60 @@ test("model draf disimpan di ai_applications.model_used dan dibaca lagi saat mod
   assert.match(modal, /if \(app\.model_used\) setModelUsed\(app\.model_used\)/);
   const mig = readFileSync(new URL("../../database/migrations/2026-11-19_ai_applications_model_used.sql", import.meta.url), "utf8");
   assert.match(mig, /add column if not exists model_used text/);
+});
+
+// ---- batas waktu rantai (uji E2E klik 20 November 2026, temuan 13) -------------------------------------------
+
+test("nextCallTimeoutMs: satu panggilan paling lama perCallMs, dan tidak pernah melewati sisa anggaran", () => {
+  const base = { perCallMs: 20_000, totalBudgetMs: 34_000 };
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 1_000 }), 20_000);
+  // sisa 12 detik < batas per panggilan: dipotong ke sisa
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 22_000 }), 12_000);
+  // tepat di ambang minimum masih jalan; di bawahnya berhenti
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 34_000 - MIN_AI_CALL_MS }), MIN_AI_CALL_MS);
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 34_000 - MIN_AI_CALL_MS + 1 }), 0);
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 34_000 }), 0);
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 90_000 }), 0);
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: 10_000, minCallMs: 30_000 }), 0);
+  assert.equal(nextCallTimeoutMs({ ...base, elapsedMs: Number.NaN }), 0);
+});
+
+test("rantai yang semuanya lambat berhenti dalam anggaran, bukan jumlah model dikali batas per panggilan", () => {
+  // Tiruan rantai: setiap model memakai seluruh batas waktunya lalu gagal.
+  let elapsed = 1_500; // auth, kuota, dan konteks sebelum panggilan pertama
+  let calls = 0;
+  for (let i = 0; i < 4; i++) {
+    const timeout = nextCallTimeoutMs({ perCallMs: DEFAULT_AI_CALL_TIMEOUT_MS, totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS, elapsedMs: elapsed });
+    if (timeout === 0) break;
+    calls += 1;
+    elapsed += timeout;
+  }
+  assert.ok(calls >= 2, "sedikitnya satu cadangan sempat dicoba");
+  assert.ok(elapsed <= DEFAULT_AI_TOTAL_BUDGET_MS, `rantai selesai pada ${elapsed} ms`);
+});
+
+test("positiveMs: angka dari secret dipakai, kosong atau tidak valid kembali ke bawaan", () => {
+  assert.equal(positiveMs("15000", 20_000), 15_000);
+  assert.equal(positiveMs(undefined, 20_000), 20_000);
+  assert.equal(positiveMs("", 20_000), 20_000);
+  assert.equal(positiveMs("abc", 20_000), 20_000);
+  assert.equal(positiveMs("0", 20_000), 20_000);
+  assert.equal(positiveMs("-5", 20_000), 20_000);
+});
+
+test("Edge Function: anggaran total dihitung sejak permintaan masuk, rantai berhenti saat habis, auth tidak berubah", () => {
+  const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  assert.match(src, /const requestStarted = Date\.now\(\);\s*if \(req\.method === "OPTIONS"\)/);
+  assert.match(src, /AI_TOTAL_BUDGET_MS = positiveMs\(Deno\.env\.get\("AI_TOTAL_BUDGET_MS"\), DEFAULT_AI_TOTAL_BUDGET_MS\)/);
+  assert.match(src, /AI_CALL_TIMEOUT_MS = positiveMs\(Deno\.env\.get\("AI_CALL_TIMEOUT_MS"\), DEFAULT_AI_CALL_TIMEOUT_MS\)/);
+  assert.match(src, /elapsedMs: started - requestStarted/);
+  const loop = src.slice(src.indexOf("for (const candidate of models)"), src.indexOf("if (!parsed && soft)"));
+  assert.match(loop, /if \(callTimeoutMs === 0\) \{[\s\S]{0,260}break;/);
+  assert.match(loop, /note\("skipped time_budget", started\)/);
+  // galat tetap 502 "AI generation failed" (describeError di klien menerjemahkannya), dengan penanda anggaran
+  assert.match(src, /error: "AI generation failed"[^;]*budgetExhausted[^;]*\}, 502\)/);
+  // verifikasi pemanggil di dalam fungsi tidak disentuh
+  assert.match(src, /admin\.auth\.getUser\(token\)/);
+  assert.match(src, /Missing auth token/);
+  assert.equal(MIN_AI_CALL_MS < DEFAULT_AI_CALL_TIMEOUT_MS && DEFAULT_AI_CALL_TIMEOUT_MS < DEFAULT_AI_TOTAL_BUDGET_MS, true);
 });

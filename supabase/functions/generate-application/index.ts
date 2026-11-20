@@ -8,7 +8,17 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
-import { chatBody, DEFAULT_FREE_MODELS, DEFAULT_PRO_MODELS, parseModelList, resolveChain } from "../_shared/providers.ts";
+import {
+  chatBody,
+  DEFAULT_AI_CALL_TIMEOUT_MS,
+  DEFAULT_AI_TOTAL_BUDGET_MS,
+  DEFAULT_FREE_MODELS,
+  DEFAULT_PRO_MODELS,
+  nextCallTimeoutMs,
+  parseModelList,
+  positiveMs,
+  resolveChain,
+} from "../_shared/providers.ts";
 import {
   GROUNDING_RULES,
   acceptCoverLetter,
@@ -44,8 +54,12 @@ const PRO_MODELS = resolveChain(
   parseModelList(Deno.env.get("PRO_MODELS") ?? Deno.env.get("PRO_MODEL"), DEFAULT_PRO_MODELS),
   PROVIDER_KEYS,
 );
-// One slow provider must not use up the whole request: each call gets its own time limit.
-const AI_CALL_TIMEOUT_MS = Number(Deno.env.get("AI_CALL_TIMEOUT_MS") ?? 40000);
+// One slow provider must not use up the whole request: each call gets its own time limit, and the whole chain
+// shares one budget counted from the moment the request arrives. The browser gives up shortly after the budget
+// (src/lib/draftProgress.ts), so the server's error reply arrives first and the user sees the retry message
+// after about 35 seconds instead of after every model in the chain has timed out.
+const AI_CALL_TIMEOUT_MS = positiveMs(Deno.env.get("AI_CALL_TIMEOUT_MS"), DEFAULT_AI_CALL_TIMEOUT_MS);
+const AI_TOTAL_BUDGET_MS = positiveMs(Deno.env.get("AI_TOTAL_BUDGET_MS"), DEFAULT_AI_TOTAL_BUDGET_MS);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -71,6 +85,7 @@ function clamp(n: unknown): number {
 }
 
 Deno.serve(async (req: Request) => {
+  const requestStarted = Date.now();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -205,15 +220,29 @@ Return JSON exactly in this shape:
       attempts.push(entry);
       console.warn(`[generate-application] ${entry.model} ${entry.outcome} ${entry.ms}ms`);
     };
+    let budgetExhausted = false;
     for (const candidate of models) {
       model = candidate.entry;
       const started = Date.now();
+      // Total budget since the request arrived: stop the chain when too little is left for one more call.
+      const callTimeoutMs = nextCallTimeoutMs({
+        perCallMs: AI_CALL_TIMEOUT_MS,
+        totalBudgetMs: AI_TOTAL_BUDGET_MS,
+        elapsedMs: started - requestStarted,
+      });
+      if (callTimeoutMs === 0) {
+        budgetExhausted = true;
+        lastDetail = lastDetail || `${model}: skipped, time budget used up`;
+        rejectedReasons.push("time_budget");
+        note("skipped time_budget", started);
+        break;
+      }
       let aiResp: Response;
       try {
         aiResp = await fetch(candidate.url, {
           method: "POST",
           headers: candidate.headers,
-          signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS),
+          signal: AbortSignal.timeout(callTimeoutMs),
           body: JSON.stringify(chatBody(candidate, [
             { role: "system", content: sys },
             { role: "user", content: userPrompt },
@@ -274,7 +303,7 @@ Return JSON exactly in this shape:
       modelUsed = soft.modelUsed;
     }
     if (!parsed) {
-      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], attempts, models: models.map((m) => m.entry), quota }, 502);
+      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], budgetExhausted, elapsedMs: Date.now() - requestStarted, attempts, models: models.map((m) => m.entry), quota }, 502);
     }
 
     // 6b) Consume one monthly application only now that a draft exists

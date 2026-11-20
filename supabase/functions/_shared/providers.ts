@@ -84,3 +84,32 @@ export function chatBody(
   }
   return { model: target.model, messages, temperature: opts.temperature, max_tokens: opts.maxTokens };
 }
+
+// ---- batas waktu rantai ------------------------------------------------------------------------------------
+// Dulu tiap panggilan punya batas sendiri (40 detik) dan rantai tidak punya batas total, jadi empat model yang
+// lambat bisa menahan pengguna lebih dari 50 detik tanpa jawaban (uji E2E klik 20 November 2026, temuan 13).
+// Kini seluruh rantai berbagi satu anggaran waktu yang dihitung sejak permintaan masuk, dan klien menyerah
+// sedikit sesudahnya (src/lib/draftProgress.ts DRAFT_CLIENT_TIMEOUT_MS), jadi galat dari server tiba lebih dulu.
+
+/** Batas satu panggilan model bila secret AI_CALL_TIMEOUT_MS tidak diisi. */
+export const DEFAULT_AI_CALL_TIMEOUT_MS = 20_000;
+/** Anggaran total untuk semua panggilan model dalam satu permintaan, dihitung sejak permintaan masuk. */
+export const DEFAULT_AI_TOTAL_BUDGET_MS = 34_000;
+/** Sisa anggaran yang lebih kecil dari ini tidak cukup untuk satu panggilan model, jadi rantai berhenti. */
+export const MIN_AI_CALL_MS = 4_000;
+
+/**
+ * Batas waktu untuk panggilan model berikutnya: `perCallMs`, tetapi tidak melebihi sisa anggaran.
+ * 0 berarti sisa anggaran terlalu sedikit dan rantai harus berhenti.
+ */
+export function nextCallTimeoutMs(input: { perCallMs: number; totalBudgetMs: number; elapsedMs: number; minCallMs?: number }): number {
+  const remaining = input.totalBudgetMs - input.elapsedMs;
+  if (!(remaining >= (input.minCallMs ?? MIN_AI_CALL_MS))) return 0;
+  return Math.max(0, Math.min(input.perCallMs, remaining));
+}
+
+/** Angka dari secret (string) atau bawaan bila kosong, bukan angka, atau tidak positif. */
+export function positiveMs(raw: string | undefined | null, fallback: number): number {
+  const n = Number(raw);
+  return raw && Number.isFinite(n) && n > 0 ? n : fallback;
+}

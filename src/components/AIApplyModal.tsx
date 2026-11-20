@@ -12,6 +12,7 @@ import { applyBlockers } from "@/lib/onboarding";
 import { matchCaption, type JobMatch } from "@/lib/matchScore";
 import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
 import { applicationStatusLabel } from "@/lib/statusLabels";
+import { draftProgressText, draftWaitHint } from "@/lib/draftProgress";
 import { HitlTrack } from "@/components/HitlTrack";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -72,6 +73,8 @@ type ProfileCheck =
 
 export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, onClose, onSuccess }: AIApplyModalProps) {
   const [generating, setGenerating] = useState(false);
+  // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
+  const [generatingElapsed, setGeneratingElapsed] = useState(0);
   const [regenerating, setRegenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [enqueuing, setEnqueuing] = useState(false);
@@ -208,6 +211,18 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setQuotaError(describeError(err, "Sisa kuota belum bisa dimuat."));
     }
   };
+
+  // Penghitung detik hanya berjalan selama draf dibuat; dibersihkan saat selesai, gagal, atau jendela ditutup.
+  useEffect(() => {
+    if (!generating) {
+      setGeneratingElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setGeneratingElapsed(0);
+    const timer = setInterval(() => setGeneratingElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [generating]);
 
   // Generate the application draft (server-side AI; consumes 1 monthly quota)
   const generate = async () => {
@@ -410,11 +425,22 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {generating ? (
-            <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
-              <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" aria-hidden="true" />
-              <p className="text-sm text-muted-foreground">
-                {planLabel} sedang menulis lamaranmu...
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              {/* Hanya teks tetap ini yang dibacakan pembaca layar; penghitung detik di bawahnya diam. */}
+              <div role="status" aria-live="polite" className="flex flex-col items-center">
+                <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0] mb-3" aria-hidden="true" />
+                <p className="text-sm text-muted-foreground">
+                  {planLabel} sedang menulis lamaranmu...
+                </p>
+              </div>
+              <p data-testid="draft-progress" className="mt-3 text-sm font-semibold tabular-nums text-[#16150F]">
+                {draftProgressText(generatingElapsed)}
               </p>
+              {draftWaitHint(generatingElapsed) && (
+                <p data-testid="draft-wait-hint" className="mt-1 max-w-sm text-xs text-muted-foreground">
+                  {draftWaitHint(generatingElapsed)}
+                </p>
+              )}
             </div>
           ) : error && !application ? (
             <div className="space-y-3">
