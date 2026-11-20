@@ -61,6 +61,22 @@ export function visibleJobs<T extends JobFilterFields>(jobs: readonly T[]): T[] 
 export const JOBS_PAGE_LIMIT = 200;
 
 /**
+ * Lowongan yang tanggal tayangnya (posted_at) lebih lama dari ini tidak dimuat di halaman Lowongan. Iklan JobStreet
+ * berakhir 30 hari setelah tayang (expiresAt di halaman asli, dicek 20 November 2026). Datanya di database tidak diubah.
+ */
+export const JOB_MAX_AGE_DAYS = 30;
+
+/** Tanggal paling awal (YYYY-MM-DD, UTC) yang masih dimuat. */
+export function freshSinceDate(now: Date = new Date()): string {
+  return new Date(now.getTime() - JOB_MAX_AGE_DAYS * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Saringan `or` PostgREST: tayang sejak freshSinceDate, atau tanpa tanggal tayang (tidak dibuang hanya karena itu). */
+export function freshJobsFilter(now: Date = new Date()): string {
+  return `posted_at.gte.${freshSinceDate(now)},posted_at.is.null`;
+}
+
+/**
  * Kata kunci pencarian Lowongan, dipecah per kata. Karakter yang punya arti dalam sintaks `or` PostgREST
  * (koma, kurung, titik dua, tanda kutip, garis miring terbalik) dan wildcard (`%`, `*`) dibuang, supaya ketikan
  * pengguna tidak bisa mengubah bentuk kueri. Paling banyak 5 kata.

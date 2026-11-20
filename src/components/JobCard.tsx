@@ -5,7 +5,10 @@ import { listOrEmpty, postedDate, radarFromMatches } from "@/lib/jobCardData";
 import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { JOB_LABELS, jobTypeLabel, marketPositionLabel, workplaceLabel } from "@/lib/jobLabels";
 import {
+  CLOSED_JOB_NOTE,
   GLINTS_DETAIL_NOTE,
+  isClosedJob,
+  shouldCheckSource,
   benchmarkScale,
   benchmarkText,
   benchmarkView,
@@ -427,15 +430,24 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
 
   // First time the card is opened: JobStreet and Dealls rows only hold a teaser, so the server fetches the full
   // posting (description, requirements, salary). Once per job id; Glints cannot be fetched (see GLINTS_DETAIL_NOTE).
+  // Cards whose detail is already complete are checked too, silently: only the source page knows whether the posting
+  // was closed (the server then sets status "closed" and the card says so).
   useEffect(() => {
-    if (!expanded || !needsDetail(job) || detailAttempts.has(job.id)) return;
+    if (!expanded || !shouldCheckSource(job) || detailAttempts.has(job.id)) return;
     detailAttempts.add(job.id);
-    setDetail({ phase: "loading" });
+    const showProgress = needsDetail(job);
+    if (showProgress) setDetail({ phase: "loading" });
     (async () => {
       try {
         const res = await automationApi.enrichJob(job.id);
         const merged = res?.job ? mergeJobUpdate(job, res.job) : null;
         if (!res) {
+          setDetail({ phase: "idle" });
+        } else if (merged && isClosedJob(merged)) {
+          onJobUpdated?.(merged);
+          setDetail({ phase: "idle" });
+        } else if (!showProgress) {
+          if (merged && res.enriched) onJobUpdated?.(merged);
           setDetail({ phase: "idle" });
         } else if (merged && (res.enriched || !isThinDetail(merged) || DETAIL_SETTLED_REASONS.has(String(res.reason ?? "")))) {
           // Uji klik 20 November 2026: server menjawab enriched:false "sudah lengkap" karena percobaan sebelumnya
@@ -447,7 +459,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
         }
       } catch (err) {
         console.error("Error enriching job:", err);
-        setDetail({ phase: "failed", note: enrichFailureNote() });
+        setDetail(showProgress ? { phase: "failed", note: enrichFailureNote() } : { phase: "idle" });
       }
     })();
   }, [expanded, job.id, detailRetry]);
@@ -480,6 +492,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   const benchLoading = bench.phase === "idle" || bench.phase === "loading";
   const detailLoading = detail.phase === "loading";
   const thinDetail = isThinDetail(job);
+  const closed = isClosedJob(job);
 
   // A row from the job sources has none of the AI analysis (see lib/jobCardData.ts): show only what exists.
   // The skill chart below comes from `match` (computeMatch); skill_matches is only an extra source when present.
@@ -605,6 +618,11 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
       {/* Expandable Content */}
       {expanded && (
         <div className="border-t border-[#E0E0E0] p-5 space-y-6">
+          {closed && (
+            <p role="alert" className="rounded-xl bg-[#FEE2E2] p-3 text-sm font-medium text-[#991B1B]">
+              {CLOSED_JOB_NOTE}
+            </p>
+          )}
           {/* Detail lengkap dari situs asal: status pengambilan, atau alasan bila tidak bisa */}
           {detailLoading && (
             <p role="status" className="flex items-center gap-2 rounded-xl bg-[#F5F5F5] p-3 text-sm text-muted-foreground">
@@ -811,10 +829,11 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
         <button
           type="button"
           onClick={onApply}
-          className="flex-1 min-h-11 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+          disabled={closed}
+          className="flex-1 min-h-11 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-[#999999] disabled:hover:opacity-100"
         >
           <Send className="h-4 w-4" />
-          {JOB_LABELS.card.apply}
+          {closed ? JOB_LABELS.card.closed : JOB_LABELS.card.apply}
         </button>
         {job.external_url && (
           <a

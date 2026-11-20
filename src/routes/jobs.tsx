@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   NO_PROFILE_SKILLS_TEXT,
@@ -109,7 +109,9 @@ function JobsPage() {
         .select("*")
         .eq("status", "active")
         // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
-        .not("external_url", "is", null);
+        .not("external_url", "is", null)
+        // Lowongan yang tayang lebih dari JOB_MAX_AGE_DAYS hari lalu kemungkinan besar sudah ditutup di situs asal.
+        .or(freshJobsFilter());
       for (const filter of jobSearchFilters(search)) query = query.or(filter);
       // Urutan akhir ditentukan skor per pengguna di klien (jobs.match_score hanya satu angka global untuk semua orang).
       const { data, error } = await query.order("created_at", { ascending: false }).limit(JOBS_PAGE_LIMIT);

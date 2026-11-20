@@ -26,6 +26,16 @@ export interface JobDetailInput {
   platform_source?: unknown;
   description?: unknown;
   requirements?: unknown;
+  external_url?: unknown;
+  status?: unknown;
+}
+
+/** Nilai jobs.status yang ditulis server saat situs asal menyatakan lowongan sudah ditutup. */
+export const CLOSED_JOB_STATUS = "closed";
+export const CLOSED_JOB_NOTE = "Lowongan ini sudah ditutup di situs asal, jadi tidak bisa dilamar lagi.";
+
+export function isClosedJob(job: JobDetailInput): boolean {
+  return job.status === CLOSED_JOB_STATUS;
 }
 
 const platformOf = (job: JobDetailInput): string => (typeof job.platform_source === "string" ? job.platform_source.trim().toLowerCase() : "");
@@ -47,6 +57,17 @@ export function isThinDetail(job: JobDetailInput): boolean {
 /** True bila detail layak diambil dari server: sumbernya didukung dan isinya masih ringkasan. */
 export function needsDetail(job: JobDetailInput): boolean {
   return (DETAIL_PLATFORMS as readonly string[]).includes(platformOf(job)) && isThinDetail(job);
+}
+
+/**
+ * True bila kartu perlu dicek sekali ke situs asal saat dibuka: sumbernya didukung, alamatnya ada, dan belum
+ * ditandai ditutup. Kartu yang detailnya sudah lengkap juga dicek, karena hanya halaman aslinya yang tahu apakah
+ * lowongan masih dibuka (JobStreet tetap menampilkan halaman lowongan yang sudah Expired).
+ */
+export function shouldCheckSource(job: JobDetailInput): boolean {
+  return (DETAIL_PLATFORMS as readonly string[]).includes(platformOf(job))
+    && typeof job.external_url === "string" && job.external_url.startsWith("https://")
+    && !isClosedJob(job);
 }
 
 /** True bila lowongan Glints masih berisi ringkasan: detailnya tidak bisa diambil, jadi pengguna diarahkan ke situs asal. */

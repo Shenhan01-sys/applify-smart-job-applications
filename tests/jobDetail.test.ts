@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   BENCHMARK_MIN_SAMPLES,
+  CLOSED_JOB_NOTE,
   GLINTS_DETAIL_NOTE,
+  isClosedJob,
+  shouldCheckSource,
   benchmarkScale,
   benchmarkText,
   benchmarkView,
@@ -24,6 +27,35 @@ const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8"
 
 const LONG = "Deskripsi lengkap. ".repeat(40); // 760 karakter
 const TEASER = "Mencari staf IT support untuk perusahaan kami di Jakarta.";
+
+// ---- lowongan ditutup ----
+
+test("shouldCheckSource: JobStreet/Dealls dengan URL https dicek walau detailnya lengkap; yang closed, Glints, atau tanpa URL tidak", () => {
+  const url = "https://id.jobstreet.com/id/job/1";
+  assert.equal(shouldCheckSource({ platform_source: "jobstreet", external_url: url, status: "active", description: "x".repeat(700), requirements: ["Excel"] }), true);
+  assert.equal(shouldCheckSource({ platform_source: "dealls", external_url: "https://dealls.com/loker/a~b", status: "active" }), true);
+  assert.equal(shouldCheckSource({ platform_source: "jobstreet", external_url: url, status: "closed" }), false);
+  assert.equal(shouldCheckSource({ platform_source: "glints", external_url: "https://glints.com/x", status: "active" }), false);
+  assert.equal(shouldCheckSource({ platform_source: "jobstreet", external_url: null, status: "active" }), false);
+  assert.equal(shouldCheckSource({ platform_source: "jobstreet", external_url: "http://localhost/x", status: "active" }), false);
+});
+
+test("isClosedJob dan CLOSED_JOB_NOTE", () => {
+  assert.equal(isClosedJob({ status: "closed" }), true);
+  assert.equal(isClosedJob({ status: "active" }), false);
+  assert.equal(isClosedJob({}), false);
+  assert.match(CLOSED_JOB_NOTE, /sudah ditutup di situs asal/);
+});
+
+test("JobCard: kartu closed menampilkan catatan dan tombol lamar dimatikan; kartu lengkap dicek diam-diam", () => {
+  const src = readFileSync(new URL("../src/components/JobCard.tsx", import.meta.url), "utf8");
+  assert.match(src, /!shouldCheckSource\(job\) \|\| detailAttempts\.has\(job\.id\)/);
+  assert.match(src, /if \(showProgress\) setDetail\(\{ phase: "loading" \}\)/);
+  assert.match(src, /merged && isClosedJob\(merged\)\) \{\s*onJobUpdated\?\.\(merged\)/);
+  assert.match(src, /\{closed && \(\s*<p role="alert"[^>]*>\s*\{CLOSED_JOB_NOTE\}/);
+  assert.match(src, /disabled=\{closed\}/);
+  assert.match(src, /closed \? JOB_LABELS\.card\.closed : JOB_LABELS\.card\.apply/);
+});
 
 // ---- needsDetail ----
 
@@ -320,10 +352,11 @@ test("layanan: enrichJob dan getSalaryBenchmark memakai alamat, header, dan mode
   assert.match(svc, /import type \{ EnrichJobResult, SalaryBenchmarkResult \} from '@\/lib\/jobDetail'/);
 });
 
-test("kartu: detail lengkap diambil sekali saat dibuka, hanya bila needsDetail, dan id dicatat sebelum panggilan", () => {
+test("kartu: situs asal dicek sekali saat dibuka (shouldCheckSource), progres hanya bila needsDetail, dan id dicatat sebelum panggilan", () => {
   const card = read("../src/components/JobCard.tsx");
-  assert.match(card, /if \(!expanded \|\| !needsDetail\(job\) \|\| detailAttempts\.has\(job\.id\)\) return;/);
-  const effect = card.slice(card.indexOf("if (!expanded || !needsDetail(job)"), card.indexOf("// Salary comparison with similar postings"));
+  assert.match(card, /if \(!expanded \|\| !shouldCheckSource\(job\) \|\| detailAttempts\.has\(job\.id\)\) return;/);
+  const effect = card.slice(card.indexOf("if (!expanded || !shouldCheckSource(job)"), card.indexOf("// Salary comparison with similar postings"));
+  assert.match(effect, /const showProgress = needsDetail\(job\);/);
   assert.ok(effect.indexOf("detailAttempts.add(job.id)") < effect.indexOf("automationApi.enrichJob(job.id)"));
   assert.equal([...card.matchAll(/automationApi\.enrichJob\(/g)].length, 1);
   assert.match(effect, /\}, \[expanded, job\.id, detailRetry\]\);/);

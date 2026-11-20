@@ -1,7 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter } from "../src/lib/jobFilters.ts";
+
+test("freshSinceDate/freshJobsFilter: 30 hari ke belakang (UTC), baris tanpa posted_at tetap dimuat", () => {
+  assert.equal(JOB_MAX_AGE_DAYS, 30);
+  const now = new Date("2026-11-20T08:00:00.000Z");
+  assert.equal(freshSinceDate(now), "2026-10-21");
+  assert.equal(freshJobsFilter(now), "posted_at.gte.2026-10-21,posted_at.is.null");
+  assert.equal(freshSinceDate(new Date("2026-03-01T00:30:00.000Z")), "2026-01-30");
+});
+
+test("halaman Lowongan memasang saringan umur di kueri server", () => {
+  const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  assert.match(src, /\.eq\("status", "active"\)/);
+  assert.match(src, /\.or\(freshJobsFilter\(\)\)/);
+});
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 

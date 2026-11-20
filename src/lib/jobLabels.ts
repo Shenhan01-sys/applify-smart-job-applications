@@ -44,6 +44,7 @@ export const JOB_LABELS = {
     seeDetail: "Lihat detail",
     collapse: "Ringkas",
     apply: "Lamar dengan AI",
+    closed: "Lowongan sudah ditutup",
     salaryMissing: "Gaji tidak dicantumkan",
     strategy: "Strategi AI",
     skillAnalysis: "Analisis kecocokan skill",
