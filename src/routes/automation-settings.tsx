@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
+import { VISA_OPTIONS, visaSelectValue, visaValueToStore } from "@/lib/visaChoice";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -192,9 +193,9 @@ function AutomationSettingsPage() {
                 <InputField label="Lama pengalaman kerja (tahun)" value={settings.years_of_experience || ''} onChange={(v: string) => updateField('years_of_experience', v)} />
                 <SelectField 
                   label="Butuh sponsor visa kerja?" 
-                  value={settings.require_visa || 'no'} 
-                  options={[{value: 'no', label: 'Tidak'}, {value: 'yes', label: 'Ya'}]}
-                  onChange={(v: string) => updateField('require_visa', v)} 
+                  value={visaSelectValue(settings.require_visa)}
+                  options={VISA_OPTIONS}
+                  onChange={(v: string) => updateField('require_visa', visaValueToStore(v))}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
