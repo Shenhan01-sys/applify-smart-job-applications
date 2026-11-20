@@ -9,10 +9,12 @@ import {
   mockRateLimits,
   mockPlatforms,
   mockAiAnalysis,
+  mockLinkedInImportPreview,
 } from '@/mocks/mockData'
 
 import { getApiBaseUrl, isMockMode } from '@/lib/appConfig'
 import type { EnrichJobResult, SalaryBenchmarkResult } from '@/lib/jobDetail'
+import { LINKEDIN_IMPORT_TIMEOUT_MS, parseImportPreview, type ImportPreview } from '@/lib/linkedinImport'
 
 // Alamat server dibaca saat dipanggil. Di build produksi tanpa VITE_API_URL ini melempar ApiConfigError,
 // yang dijelaskan ke pengguna oleh describeApiError(). Localhost hanya dipakai saat `vite dev`.
@@ -407,6 +409,29 @@ export const automationApi = {
       { headers: await getAuthHeaders() },
       () => null,
     )
+  },
+
+  /**
+   * Impor profil dari PDF LinkedIn. Server hanya mengembalikan pratinjau dan tidak menulis apa pun; penulisan
+   * dilakukan setelah pengguna menyetujui pratinjau (services/linkedinImportService.ts). PDF dikirim mentah
+   * sebagai badan permintaan (Content-Type: application/pdf), bukan multipart. Tidak memakai kuota draf AI.
+   */
+  async importLinkedInPdf(file: File): Promise<ImportPreview> {
+    const auth = await getAuthHeaders()
+    const body = await apiFetch<unknown>(
+      `${apiBase()}/api/profile/import/linkedin-pdf`,
+      {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/pdf' },
+        body: file,
+        signal: AbortSignal.timeout(LINKEDIN_IMPORT_TIMEOUT_MS),
+      },
+      () => ({ success: true, preview: mockLinkedInImportPreview }),
+      1200,
+    )
+    const preview = parseImportPreview(body)
+    if (!preview) throw new ApiError(502, JSON.stringify({ success: false, code: 'bad_response', error: 'Jawaban server tidak dikenali.' }))
+    return preview
   },
 
   // Sessions

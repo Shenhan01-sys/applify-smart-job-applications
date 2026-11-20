@@ -790,6 +790,28 @@ export const mockFullProfile = {
   events: [],
 };
 
+/** Pratinjau impor PDF LinkedIn untuk mode demo. Tokoh dan perusahaannya fiktif; sebagian sengaja sama dengan profil demo supaya "Sudah ada" terlihat. */
+export const mockLinkedInImportPreview = {
+  profile: { full_name: "Demo User", current_title: "Senior Full Stack Engineer", location: "Jakarta, Indonesia", linkedin_url: "https://www.linkedin.com/in/demo-user" },
+  experiences: [
+    { company_name: "Tech Company Inc.", role_title: "Senior Full Stack Engineer", employment_type: "full-time", location_type: "hybrid", start_date: "2022-03-01", end_date: null, is_current: true, description: null, notes: [] },
+    { company_name: "Agensi Digital Contoh", role_title: "Frontend Developer", employment_type: "full-time", location_type: "on-site", start_date: "2018-07-01", end_date: "2020-05-01", is_current: false, description: "Membangun antarmuka web untuk klien ritel.", notes: [] },
+  ],
+  education: [
+    { institution: "Universitas Indonesia", degree: "Bachelor", field_of_study: "Computer Science", start_year: 2016, end_year: 2020, is_current: false, notes: [] },
+    { institution: "Sekolah Menengah Atas Contoh 1", degree: "SMA", field_of_study: "IPA", start_year: 2013, end_year: 2016, is_current: false, notes: [] },
+  ],
+  certifications: [{ name: "Google Data Analytics Professional Certificate", issuer: "" }],
+  skills: [
+    { name: "TypeScript", category: "technical", proficiency_level: 3 },
+    { name: "Next.js", category: "technical", proficiency_level: 3 },
+    { name: "Indonesian", category: "language", proficiency_level: 5 },
+    { name: "English", category: "language", proficiency_level: 4 },
+  ],
+  meta: { method: "ai", model: "demo", pages: 2, truncated: false, dropped: { experiences: 0, education: 0, certifications: 0, skills: 0 } },
+  warnings: [],
+};
+
 export const mockAiAnalysis = {
   coverLetter: generateCoverLetter("Senior Backend Engineer", "Gojek"),
   optimizedCV: {
