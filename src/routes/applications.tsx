@@ -16,7 +16,15 @@ import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import {
+  BOARD_MOUSE_CONSTRAINT,
+  BOARD_ROLE_DESCRIPTION,
+  BOARD_SCREEN_READER_INSTRUCTIONS,
+  BOARD_TOUCH_CONSTRAINT,
+  boardAnnouncements,
+  dragEndMove,
+} from "@/lib/boardDnd";
 import {
   LayoutGrid,
   List,
@@ -89,7 +97,7 @@ function FillYourselfBadge() {
 }
 
 function DraggableKanbanCard({ app, gaps, fillYourself, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app, attributes: { roleDescription: BOARD_ROLE_DESCRIPTION } });
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
     opacity: isDragging ? 0.5 : 1,
@@ -129,8 +137,9 @@ function DraggableKanbanCard({ app, gaps, fillYourself, onOpen }: { app: AIAppli
         )}
         <button
           type="button"
-          // Tombol ini bukan bagian dari seretan: pointer-down tidak boleh memulai drag.
-          onPointerDown={(e) => e.stopPropagation()}
+          // Tombol ini bukan bagian dari seretan: tekan mouse, sentuhan, dan keyboard di sini tidak boleh memulai drag.
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           onClick={onOpen}
           className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg border-2 border-[#0A5BE0]/30 text-sm font-medium text-[#0A5BE0] hover:bg-[#0A5BE0]/5"
@@ -293,8 +302,10 @@ export function AppsPage() {
     setViewKey(k => k + 1);
   };
 
+  // Mouse, sentuhan, dan keyboard (lib/boardDnd.ts). Bukan PointerSensor: seretan jari dibatalkan peramban saat halaman menggulir.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: BOARD_MOUSE_CONSTRAINT }),
+    useSensor(TouchSensor, { activationConstraint: BOARD_TOUCH_CONSTRAINT }),
     useSensor(KeyboardSensor),
   );
 
@@ -427,10 +438,8 @@ export function AppsPage() {
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragApp(null);
-    const { active, over } = event;
-    if (!over) return;
-    const target = over.data.current?.status as ApplicationStatus | undefined;
-    if (target) moveApplication(String(active.id), target);
+    const move = dragEndMove(event);
+    if (move) moveApplication(move.appId, move.status);
   }, [moveApplication]);
 
   const stats = {
@@ -535,7 +544,19 @@ export function AppsPage() {
               </div>
             ) : view === "kanban" ? (
               <>
-                <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragCancel={() => setActiveDragApp(null)}
+                  accessibility={{
+                    screenReaderInstructions: { draggable: BOARD_SCREEN_READER_INSTRUCTIONS },
+                    announcements: boardAnnouncements((id) => {
+                      const card = applications.find((a) => a.id === id);
+                      return (card && jobOf(card)?.title) || "Lowongan";
+                    }),
+                  }}
+                >
                   <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-3">
                     {APPLICATION_STATUSES.map((status) => (
                       <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
