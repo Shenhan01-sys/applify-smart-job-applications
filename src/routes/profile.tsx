@@ -6,9 +6,9 @@ import {
   Loader2, Save, Briefcase, GraduationCap, Award, Wrench, 
   Target, CheckCircle2, User, MapPin, Phone, Link2, Mail,
   Calendar, DollarSign, Clock,
-  Layers, Sparkles
+  Layers, Sparkles, Paperclip, Eye, RefreshCw, Trash2, Upload
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 // Sample profile data is only used in the explicit demo mode (VITE_MOCK_MODE=true). A real user starts empty.
 import {
@@ -23,6 +23,8 @@ import { automationApi } from "@/services/automationApi";
 import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { describeApiError } from "@/lib/apiErrors";
+import { RESUME_ACCEPT, resumeFileLabel, type ResumeRef } from "@/lib/resumeUpload";
+import { getResume, uploadResume, removeResume, openResume, ResumeError } from "@/services/resumeService";
 import { WELCOME_STEPS } from "@/lib/onboarding";
 import {
   EMPTY_PREFERENCES,
@@ -553,7 +555,8 @@ function ProfilePage() {
           </div>
         </div>
 
-        {/* RIGHT: Live Preview */}
+        {/* RIGHT: Live Preview + CV untuk dilampirkan (kartu CV tampil di semua langkah) */}
+        <div className="space-y-6">
         <div className="glass rounded-2xl p-5 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -677,8 +680,177 @@ function ProfilePage() {
             </button>
           </div>
         </div>
+        {user && <ResumeCard userId={user.id} />}
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+// ===== CV UNTUK DILAMPIRKAN =====
+
+type ResumeBusy = "" | "load" | "upload" | "view" | "remove";
+
+// Kartu ini hidup di luar stepper, jadi tampil di semua langkah. Berkasnya disimpan di Storage privat `resumes`
+// dan path-nya di profiles.resume_url (lihat services/resumeService.ts); agen melampirkannya saat mengisi formulir.
+function ResumeCard({ userId }: { userId: string }) {
+  const [resume, setResume] = useState<ResumeRef | null>(null);
+  const [busy, setBusy] = useState<ResumeBusy>("load");
+  const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBusy("load");
+    setLoadFailed(false);
+    getResume(userId)
+      .then((found) => { if (!cancelled) setResume(found); })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadFailed(true);
+        setError(err instanceof ResumeError ? err.message : describeError(err, "CV belum bisa dimuat. Coba lagi."));
+      })
+      .finally(() => { if (!cancelled) setBusy(""); });
+    return () => { cancelled = true; };
+  }, [userId, reloadKey]);
+
+  const fail = (err: unknown, fallback: string) => {
+    const message = err instanceof ResumeError ? err.message : describeError(err, fallback);
+    setError(message);
+    toast.error(message);
+  };
+
+  // Input berkas disembunyikan saat CV sudah ada; fokus dipindah ke judul kartu supaya tidak hilang.
+  const focusHeading = () => window.setTimeout(() => heading.current?.focus(), 0);
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError("");
+    setBusy("upload");
+    try {
+      setResume(await uploadResume(userId, file));
+      toast.success("CV tersimpan");
+      focusHeading();
+    } catch (err) {
+      fail(err, "CV belum terunggah. Coba lagi.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const onView = async () => {
+    if (!resume) return;
+    setError("");
+    setBusy("view");
+    // Tab dibuka saat klik, sebelum await, supaya Safari tidak memblokirnya sebagai popup. Alamatnya diisi
+    // setelah signed URL jadi; opener diputus supaya halaman CV tidak bisa mengakses tab Applify.
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
+    try {
+      const url = await openResume(resume.path);
+      if (tab) tab.location.href = url;
+      else window.location.assign(url);
+    } catch (err) {
+      tab?.close();
+      fail(err, "CV belum bisa dibuka. Coba lagi.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const onRemove = async () => {
+    setError("");
+    setBusy("remove");
+    try {
+      await removeResume(userId);
+      setResume(null);
+      toast.success("CV dihapus");
+      focusHeading();
+    } catch (err) {
+      fail(err, "CV belum terhapus. Coba lagi.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const working = busy !== "";
+  const btnBase = "min-h-11 px-4 rounded-lg border-2 text-sm font-medium inline-flex items-center justify-center gap-2 transition disabled:opacity-60 disabled:cursor-not-allowed";
+  const actionBtn = `${btnBase} border-black/[8%] bg-black/[4%] hover:bg-black/[7%]`;
+  const showPicker = !resume && !loadFailed;
+  const spinner = <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />;
+
+  return (
+    <section aria-labelledby="resume-heading" className="glass rounded-2xl p-5 md:p-6">
+      <h2 id="resume-heading" ref={heading} tabIndex={-1} className="font-semibold flex items-center gap-2 focus:outline-none">
+        <Paperclip className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> CV untuk Dilampirkan
+      </h2>
+      <p id="resume-hint" className="mt-1 text-xs text-muted-foreground">
+        Agen melampirkan berkas ini saat mengisi formulir lamaran. PDF, DOC, atau DOCX, maksimal 5 MB.
+      </p>
+
+      <div className="mt-4" aria-busy={working}>
+        <input
+          ref={fileInput}
+          id="resume-file"
+          type="file"
+          accept={RESUME_ACCEPT}
+          onChange={onPick}
+          disabled={working}
+          aria-describedby={error ? "resume-hint resume-error" : "resume-hint"}
+          aria-label={resume ? "Pilih berkas CV pengganti" : undefined}
+          className={showPicker ? "peer sr-only" : "hidden"}
+        />
+
+        {busy === "load" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+            {spinner} Memuat CV...
+          </p>
+        )}
+
+        {busy !== "load" && showPicker && (
+          <label
+            htmlFor="resume-file"
+            className={`${btnBase} w-full sm:w-auto border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] hover:bg-[#0A5BE0]/10 peer-focus-visible:ring-2 peer-focus-visible:ring-[#0A5BE0] ${working ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
+          >
+            {busy === "upload" ? spinner : <Upload className="h-4 w-4" aria-hidden="true" />}
+            {busy === "upload" ? "Mengunggah..." : "Unggah CV"}
+          </label>
+        )}
+
+        {busy !== "load" && resume && (
+          <div className="space-y-3">
+            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+              <FileCheck2 className="h-4 w-4 shrink-0 text-green-700" aria-hidden="true" />
+              <span className="truncate" title={resumeFileLabel(resume.path)}>{resumeFileLabel(resume.path)}</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={onView} disabled={working} className={actionBtn}>
+                {busy === "view" ? spinner : <Eye className="h-4 w-4" aria-hidden="true" />} Lihat
+              </button>
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={working} className={actionBtn}>
+                {busy === "upload" ? spinner : <RefreshCw className="h-4 w-4" aria-hidden="true" />} Ganti
+              </button>
+              <button type="button" onClick={onRemove} disabled={working} className={`${actionBtn} text-red-700`}>
+                {busy === "remove" ? spinner : <Trash2 className="h-4 w-4" aria-hidden="true" />} Hapus
+              </button>
+            </div>
+          </div>
+        )}
+
+        {busy !== "load" && loadFailed && (
+          <button type="button" onClick={() => { setError(""); setReloadKey((k) => k + 1); }} className={actionBtn}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Muat ulang
+          </button>
+        )}
+      </div>
+
+      {error && <p id="resume-error" className="mt-3 text-xs text-red-600" role="alert">{error}</p>}
+    </section>
   );
 }
 
