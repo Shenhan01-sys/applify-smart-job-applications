@@ -6,6 +6,13 @@
  * memuat label isian wajib yang tidak bisa diisi. Status lamaran tetap "ready"; layar hanya menampilkan
  * kekurangannya.
  *
+ * Baris berstatus "incomplete" berarti agen berhenti sebelum formulir tuntas. `details.reason` memberi sebabnya
+ * (no_fields_filled, partly_filled, page_mismatch, timeout, atau kosong pada log lama), `details.fields_filled`
+ * jumlah isian yang berhasil diisi, dan `details.application_status` apa yang terjadi pada lamaran: "ready"
+ * bila ada isian yang terisi, "unchanged" bila tidak ada satu pun (status lamaran tidak berubah). Untuk
+ * no_fields_filled tidak ada daftar kekurangan (agen tidak mengisi apa pun), tetapi layar perlu tahu bahwa
+ * pengguna harus mengisi sendiri: itu dibaca lewat latestApplyAttempt.
+ *
  * Fungsi murni tanpa impor, supaya bisa dites dengan `node --test`. Masukan dari database tidak dipercaya:
  * bentuk yang rusak diabaikan dan tidak pernah melempar galat.
  */
@@ -17,7 +24,26 @@ export type FormGaps = {
   at: string;
   /** true bila agen melampirkan berkas CV, false bila tidak, null bila log lama tidak mencatatnya. */
   cvAttached: boolean | null;
+  /** details.reason percobaan itu (partly_filled, page_mismatch, timeout), null pada log "ready" dan log lama. */
+  reason: string | null;
+  /** details.fields_filled: jumlah isian yang terisi, null bila log tidak mencatatnya. */
+  fieldsFilled: number | null;
 };
+
+/** Percobaan agen terbaru untuk satu lowongan, apa pun hasilnya (bukan hanya yang punya kekurangan isian). */
+export type ApplyAttempt = {
+  /** application_logs.status: ready, incomplete, success, atau nilai lain yang ditulis worker. */
+  status: string;
+  at: string;
+  reason: string | null;
+  fieldsFilled: number | null;
+  /** details.application_status: "ready", "submitted", atau "unchanged"; null pada log lama. */
+  applicationStatus: string | null;
+  /** details.queue_job_id: id baris automation_queue yang menjalankan percobaan ini; null pada log lama. */
+  queueJobId: string | null;
+};
+
+export const REASON_NO_FIELDS_FILLED = "no_fields_filled";
 
 export const MAX_GAP_ITEMS = 20;
 export const MAX_GAP_LABEL_LENGTH = 200;
@@ -49,14 +75,23 @@ function cvAttachedFrom(details: Record<string, unknown>): boolean | null {
   return null;
 }
 
-/**
- * Kekurangan isian pada percobaan agen terbaru untuk satu lowongan, atau null.
- * Hanya baris terbaru yang dihitung: bila percobaan terbaru bukan "ready" (misalnya sudah terkirim atau gagal),
- * kekurangan dari percobaan yang lebih lama tidak ditampilkan lagi.
- */
-export function latestFormGaps(rows: unknown, jobId: string): FormGaps | null {
-  if (!Array.isArray(rows) || typeof jobId !== "string" || !jobId) return null;
+function cleanReason(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const r = value.trim().slice(0, 40);
+  return r || null;
+}
 
+function cleanCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+}
+
+function cleanId(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 80) : null;
+}
+
+/** Baris log terbaru untuk satu lowongan (kueri sudah mengurutkan terbaru dulu, jadi waktu sama: yang lebih dulu menang). */
+function newestRow(rows: unknown, jobId: string): Record<string, unknown> | null {
+  if (!Array.isArray(rows) || typeof jobId !== "string" || !jobId) return null;
   let newest: Record<string, unknown> | null = null;
   let newestTime = -Infinity;
   for (const row of rows) {
@@ -64,20 +99,62 @@ export function latestFormGaps(rows: unknown, jobId: string): FormGaps | null {
     if (typeof row.created_at !== "string") continue;
     const time = Date.parse(row.created_at);
     if (Number.isNaN(time)) continue;
-    // Sama waktunya: baris yang lebih dulu di daftar tetap menang (kueri sudah mengurutkan terbaru lebih dulu).
     if (time > newestTime) {
       newest = row;
       newestTime = time;
     }
   }
-  if (!newest || newest.status !== "ready") return null;
+  return newest;
+}
+
+/**
+ * Percobaan agen terbaru untuk satu lowongan, atau null bila belum ada log. Dipakai layar untuk tahu hasil
+ * percobaan itu (reason, fields_filled) walau tidak ada kekurangan isian yang bisa didaftar.
+ */
+export function latestApplyAttempt(rows: unknown, jobId: string): ApplyAttempt | null {
+  const newest = newestRow(rows, jobId);
+  if (!newest) return null;
+  const details = isRecord(newest.details) ? newest.details : {};
+  return {
+    status: typeof newest.status === "string" ? newest.status : "",
+    at: newest.created_at as string,
+    reason: cleanReason(details.reason),
+    fieldsFilled: cleanCount(details.fields_filled),
+    applicationStatus: cleanReason(details.application_status),
+    queueJobId: cleanId(details.queue_job_id),
+  };
+}
+
+/**
+ * True bila percobaan terbaru berhenti karena agen tidak berhasil mengisi satu isian pun (halaman mungkin
+ * meminta masuk). Lamaran belum terkirim dan pengguna perlu mengisi sendiri di situs lowongan.
+ */
+export function needsFillYourself(attempt: ApplyAttempt | null | undefined): boolean {
+  return !!attempt && attempt.status === "incomplete" && attempt.reason === REASON_NO_FIELDS_FILLED;
+}
+
+/**
+ * Kekurangan isian pada percobaan agen terbaru untuk satu lowongan, atau null.
+ * Hanya baris terbaru yang dihitung: bila percobaan terbaru bukan "ready" atau "incomplete" (misalnya sudah
+ * terkirim atau gagal), kekurangan dari percobaan yang lebih lama tidak ditampilkan lagi.
+ *
+ * Baris "incomplete" juga dibaca, supaya "Perlu dilengkapi" muncul untuk partly_filled. Tidak ada daftar bila
+ * agen tidak mengisi apa pun (reason no_fields_filled, atau log lama dengan fields_filled 0): daftar
+ * remaining_required pada percobaan seperti itu hanya semua isian wajib, bukan sisa yang belum terisi.
+ */
+export function latestFormGaps(rows: unknown, jobId: string): FormGaps | null {
+  const newest = newestRow(rows, jobId);
+  if (!newest || (newest.status !== "ready" && newest.status !== "incomplete")) return null;
 
   const details = newest.details;
   if (!isRecord(details)) return null;
+  const reason = cleanReason(details.reason);
+  const fieldsFilled = cleanCount(details.fields_filled);
+  if (newest.status === "incomplete" && (reason === REASON_NO_FIELDS_FILLED || fieldsFilled === 0)) return null;
   const remaining = cleanRemaining(details.remaining_required);
   if (remaining.length === 0) return null;
 
-  return { remaining, at: newest.created_at as string, cvAttached: cvAttachedFrom(details) };
+  return { remaining, at: newest.created_at as string, cvAttached: cvAttachedFrom(details), reason, fieldsFilled };
 }
 
 /** Kekurangan isian untuk banyak lowongan sekaligus; lowongan tanpa kekurangan tidak ikut di hasil. */
@@ -90,6 +167,20 @@ export function gapsByJob(rows: unknown, jobIds: unknown): Record<string, FormGa
     done.add(id);
     const gaps = latestFormGaps(rows, id);
     if (gaps) entries.push([id, gaps]);
+  }
+  return Object.fromEntries(entries);
+}
+
+/** Percobaan agen terbaru untuk banyak lowongan sekaligus; lowongan tanpa log tidak ikut di hasil. */
+export function attemptsByJob(rows: unknown, jobIds: unknown): Record<string, ApplyAttempt> {
+  if (!Array.isArray(jobIds)) return {};
+  const entries: [string, ApplyAttempt][] = [];
+  const done = new Set<string>();
+  for (const id of jobIds) {
+    if (typeof id !== "string" || !id || done.has(id)) continue;
+    done.add(id);
+    const attempt = latestApplyAttempt(rows, id);
+    if (attempt) entries.push([id, attempt]);
   }
   return Object.fromEntries(entries);
 }

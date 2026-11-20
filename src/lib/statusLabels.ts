@@ -73,8 +73,25 @@ export function queueDisplayLabel(status?: string | null, errorMessage?: string 
   return isQueueSkipped(status, errorMessage) ? "Dilewati" : queueStatusLabel(status);
 }
 
-/** Penjelasan satu kalimat untuk pengguna awam: apa artinya status antrean ini dan apa yang perlu dilakukan. */
-export function queueStatusHint(status: string | null | undefined, jobType?: string | null, errorMessage?: string | null): string {
+/**
+ * Label dan penjelasan bila agen tidak berhasil mengisi satu isian pun (application_logs.details.reason
+ * "no_fields_filled"): lamaran tidak berubah status dan belum terkirim, pengguna perlu mengisi sendiri.
+ */
+export const FILL_YOURSELF_LABEL = "Isi sendiri di situs";
+export const NO_FIELDS_FILLED_TEXT =
+  "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi sendiri di situs lowongan, atau ajukan lagi.";
+
+/**
+ * Penjelasan satu kalimat untuk pengguna awam: apa artinya status antrean ini dan apa yang perlu dilakukan.
+ * `fieldsFilled` (dari log percobaan agen untuk tugas itu) membedakan tugas apply yang selesai tanpa mengisi
+ * apa pun (0) dari yang mengisi sebagian atau seluruhnya; null atau kosong berarti belum diketahui.
+ */
+export function queueStatusHint(
+  status: string | null | undefined,
+  jobType?: string | null,
+  errorMessage?: string | null,
+  fieldsFilled?: number | null,
+): string {
   if (isQueueSkipped(status, errorMessage)) {
     return "Dilewati: lowongan ini tidak punya tautan untuk dilamar. Pilih lowongan lain di halaman Lowongan.";
   }
@@ -84,6 +101,7 @@ export function queueStatusHint(status: string | null | undefined, jobType?: str
     case "processing":
       return "Agen sedang mengerjakan tugas ini. Halaman ini bisa ditinggalkan; hasilnya muncul di sini.";
     case "completed":
+      if (jobType === "apply" && fieldsFilled === 0) return NO_FIELDS_FILLED_TEXT;
       return jobType === "apply"
         ? "Agen sudah mencoba mengisi formulir di peramban server dan berhenti sebelum tombol kirim. Isian itu tidak tersimpan di perangkatmu, jadi kirim sendiri lewat situs lowongan bila sudah yakin."
         : "Tugas selesai.";
@@ -96,3 +114,15 @@ export function queueStatusHint(status: string | null | undefined, jobType?: str
 
 /** Antrean yang masih berjalan (belum selesai atau gagal): dipakai untuk lencana dan muat ulang berkala. */
 export const isQueueActive = (status?: string | null) => status === "pending" || status === "processing";
+
+/**
+ * True bila ada tugas apply yang tadi masih berjalan (pending atau processing) dan kini selesai atau gagal.
+ * `before` adalah status per id dari pemuatan sebelumnya; tugas yang belum pernah terlihat tidak dihitung
+ * (pemuatan pertama sudah memuat data terbaru, dan status akhirnya tidak berarti baru saja berubah).
+ */
+export function applyJobFinished(
+  before: ReadonlyMap<string, string>,
+  items: ReadonlyArray<{ id: string; status: string; job_type?: string | null }>,
+): boolean {
+  return items.some((i) => i.job_type === "apply" && !isQueueActive(i.status) && isQueueActive(before.get(i.id)));
+}

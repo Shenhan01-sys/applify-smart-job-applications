@@ -118,7 +118,7 @@ test("gapsByJob: hanya lowongan dengan kekurangan yang masuk; id rusak dan kemba
   ];
   const out = gapsByJob(rows, ["a", "b", "c", "d", "b", "", null, 7]);
   assert.deepEqual(Object.keys(out), ["b"]);
-  assert.deepEqual(out.b, { remaining: ["City"], at: T2, cvAttached: false });
+  assert.deepEqual(out.b, { remaining: ["City"], at: T2, cvAttached: false, reason: null, fieldsFilled: null });
   assert.deepEqual(gapsByJob(rows, null), {});
   assert.deepEqual(gapsByJob(null, ["a"]), {});
   assert.deepEqual(gapsByJob([], []), {});
@@ -130,9 +130,10 @@ test("formGaps.ts murni: tanpa impor, supaya jalan di node --test", () => {
   assert.doesNotMatch(read("../src/lib/formGaps.ts"), /^\s*import\s/m);
 });
 
-test("service getFormGaps: membaca application_logs milik pengguna, action apply, per job_id, terbaru dulu, galat dilempar, mode demo kosong", () => {
+test("service getApplyState/getFormGaps: membaca application_logs milik pengguna, action apply, per job_id, terbaru dulu, galat dilempar, mode demo kosong", () => {
   const svc = read("../src/services/formGapService.ts");
   assert.match(svc, /export async function getFormGaps\(jobIds: string\[\]\)/);
+  assert.match(svc, /export async function getApplyState\(jobIds: string\[\]\)/);
   assert.match(svc, /\.from\("application_logs"\)/);
   assert.match(svc, /\.select\("job_id,status,created_at,details"\)/);
   assert.match(svc, /\.eq\("user_id", user\.id\)/);
@@ -142,21 +143,23 @@ test("service getFormGaps: membaca application_logs milik pengguna, action apply
   assert.match(svc, /\.limit\(500\)/);
   assert.match(svc, /if \(error\) throw error/);
   assert.match(svc, /import \{ isMockMode \} from "@\/lib\/appConfig"/);
-  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{\}/);
+  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{ gaps: \{\}, attempts: \{\} \}/);
+  // satu kueri untuk kekurangan dan percobaan terbaru
+  assert.equal([...svc.matchAll(/\.from\("application_logs"\)/g)].length, 1);
   // pencocokan lewat job_id (application_id di baris log kosong), bukan application_id
   assert.doesNotMatch(svc, /\.eq\("application_id"/);
 });
 
-test("Lamaran Saya: kekurangan dimuat tanpa memblokir, hanya untuk lamaran ready, gagal hanya console.warn", () => {
+test("Lamaran Saya: hasil percobaan dimuat tanpa memblokir, untuk lamaran draf dan ready, gagal hanya console.warn", () => {
   const src = read("../src/routes/applications.tsx");
-  assert.match(src, /import \{ getFormGaps \} from "@\/services\/formGapService"/);
-  assert.match(src, /a\.status === "ready" && a\.job_id/);
-  const effect = src.slice(src.indexOf("getFormGaps(readyJobKey"), src.indexOf("}, [readyJobKey]);"));
+  assert.match(src, /import \{ getApplyState \} from "@\/services\/formGapService"/);
+  assert.match(src, /canRequestApproval\(a\.status\) && a\.job_id/);
+  const effect = src.slice(src.indexOf("getApplyState(agentJobKey"), src.indexOf("}, [agentJobKey, applyReloads]);"));
   assert.match(effect, /\.catch\(\(err\) => \{\s*console\.warn\(/);
   assert.doesNotMatch(effect, /toast|setLoadError/);
   // pemuatan lamaran sendiri tidak menunggu kekurangan
   const load = src.slice(src.indexOf("const loadApplications"), src.indexOf("}, [loadApplications]);"));
-  assert.doesNotMatch(load, /getFormGaps/);
+  assert.doesNotMatch(load, /getApplyState|getFormGaps/);
 });
 
 test("Lamaran Saya: lencana 'Perlu dilengkapi' ada di kartu Kanban dan baris daftar, hanya untuk ready dengan kekurangan", () => {

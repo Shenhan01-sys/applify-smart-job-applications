@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, CheckCircle2, Clock, Loader2, XCircle, RefreshCw } from "lucide-react";
 import { automationQueue, type QueueItem } from "@/services/automationQueue";
 import { describeError } from "@/lib/authErrors";
-import { isQueueActive, queueDisplayLabel, queueStatusHint, queueTypeLabel } from "@/lib/statusLabels";
+import { applyJobFinished, isQueueActive, queueDisplayLabel, queueStatusHint, queueTypeLabel } from "@/lib/statusLabels";
 import { relativeTime } from "@/lib/dashboardStats";
 
 const POLL_MS = 15_000;
@@ -25,17 +25,37 @@ function StatusIcon({ status }: { status: string }) {
  * Antrean tugas agen milik pengguna (tabel automation_queue). Tombol "Isi Formulir Saja" di jendela AI Apply
  * menjanjikan "Pantau di Applications"; panel ini yang memenuhi janji itu. Dimuat ulang tiap 15 detik selama
  * ada tugas yang belum selesai.
+ *
+ * Worker mengubah lamaran dan menulis log percobaan saat tugas apply selesai, padahal halaman Lamaran hanya
+ * memuat datanya sekali. Karena itu panel memanggil `onApplyFinished` saat sebuah tugas apply berpindah dari
+ * berjalan ke selesai atau gagal (tanpa polling tambahan: pemuatan berkala panel ini sudah ada).
+ * `fieldsFilledByQueue` (id tugas -> isian yang terisi, dari log percobaan) membuat petunjuk tugas apply yang
+ * selesai tanpa mengisi apa pun berbeda dari yang berhasil mengisi.
  */
-export function QueuePanel() {
+export function QueuePanel({
+  onApplyFinished,
+  fieldsFilledByQueue,
+}: {
+  onApplyFinished?: () => void;
+  fieldsFilledByQueue?: Record<string, number | null>;
+}) {
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  // Status tiap tugas pada pemuatan sebelumnya, untuk mendeteksi tugas apply yang baru saja selesai.
+  const seen = useRef(new Map<string, string>());
+  const finishedRef = useRef(onApplyFinished);
+  finishedRef.current = onApplyFinished;
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      setItems(await automationQueue.getQueue(10));
+      const next = await automationQueue.getQueue(10);
+      const finished = applyJobFinished(seen.current, next);
+      seen.current = new Map(next.map((i) => [i.id, i.status]));
+      setItems(next);
       setError("");
+      if (finished) finishedRef.current?.();
     } catch (err) {
       setError(describeError(err, "Antrean agen belum bisa dimuat."));
     } finally {
@@ -95,7 +115,7 @@ export function QueuePanel() {
               </span>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message)}
+              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message, fieldsFilledByQueue?.[q.id])}
             </p>
             {q.status === "failed" && q.error_message && (
               <details className="mt-1.5 text-xs text-muted-foreground">

@@ -7,10 +7,10 @@ import { mockAIApplications } from "@/mocks/mockData";
 import { QueuePanel } from "@/components/QueuePanel";
 import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
-import { applicationStatusLabel } from "@/lib/statusLabels";
+import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
-import type { FormGaps } from "@/lib/formGaps";
-import { getFormGaps } from "@/services/formGapService";
+import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
+import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -74,7 +74,19 @@ function FormGapBadge({ gaps }: { gaps: FormGaps }) {
   );
 }
 
-function DraggableKanbanCard({ app, gaps, onOpen }: { app: AIApplicationData; gaps?: FormGaps; onOpen: () => void }) {
+// Lencana bila agen tidak berhasil mengisi satu isian pun (halaman mungkin meminta masuk): lamaran belum
+// terkirim, pengguna mengisi sendiri di situs lowongan. Dasarnya log percobaan terbaru (reason no_fields_filled).
+function FillYourselfBadge() {
+  return (
+    <span title={NO_FIELDS_FILLED_TEXT} className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-1 text-xs font-medium text-[#92400E]">
+      <AlertCircle className="h-3 w-3" aria-hidden="true" />
+      {FILL_YOURSELF_LABEL}
+      <span className="sr-only">: {NO_FIELDS_FILLED_TEXT}</span>
+    </span>
+  );
+}
+
+function DraggableKanbanCard({ app, gaps, fillYourself, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app });
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -100,6 +112,11 @@ function DraggableKanbanCard({ app, gaps, onOpen }: { app: AIApplicationData; ga
         {app.status === "ready" && gaps && (
           <div className="mt-2">
             <FormGapBadge gaps={gaps} />
+          </div>
+        )}
+        {fillYourself && (
+          <div className="mt-2">
+            <FillYourselfBadge />
           </div>
         )}
         {app.follow_up_scheduled && !app.follow_up_sent && (
@@ -148,7 +165,7 @@ function DroppableColumn({ status, apps, children }: {
   );
 }
 
-function AppListRow({ app, gaps, onOpen }: { app: AIApplicationData; gaps?: FormGaps; onOpen: () => void }) {
+function AppListRow({ app, gaps, fillYourself, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; onOpen: () => void }) {
   const config = statusConfig[app.status] ?? statusConfig.draft;
   const job = jobOf(app);
   return (
@@ -171,6 +188,11 @@ function AppListRow({ app, gaps, onOpen }: { app: AIApplicationData; gaps?: Form
         {app.status === "ready" && gaps && (
           <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
             <FormGapBadge gaps={gaps} />
+          </span>
+        )}
+        {fillYourself && (
+          <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
+            <FillYourselfBadge />
           </span>
         )}
       </div>
@@ -205,6 +227,10 @@ export function AppsPage() {
   const [approvalError, setApprovalError] = useState("");
   // Isian wajib yang masih kosong saat agen berhenti, per job_id. Hanya untuk lamaran berstatus ready.
   const [formGaps, setFormGaps] = useState<Record<string, FormGaps>>({});
+  // Percobaan agen terbaru per job_id (draf dan ready), apa pun hasilnya: dasar lencana "Isi sendiri di situs"
+  // dan teks di jendela detail. Naik satu setiap kali tugas apply selesai, supaya log baru dibaca lagi.
+  const [attempts, setAttempts] = useState<Record<string, ApplyAttempt>>({});
+  const [applyReloads, setApplyReloads] = useState(0);
 
   // Draf yang belum dikirim: periksa apakah sudah menunggu persetujuan, supaya tidak diajukan dua kali.
   const selectedId = selectedApp?.id;
@@ -293,31 +319,63 @@ export function AppsPage() {
     loadApplications();
   }, [loadApplications]);
 
-  // Lamaran ready: ambil kekurangan isian dari log percobaan agen. Tidak memblokir halaman; bila gagal,
-  // lencana dan daftar kekurangan tidak tampil dan halaman tetap berfungsi. Kuncinya berubah juga saat
-  // kartu dipindah ke atau dari kolom ready, jadi data ikut diperbarui.
-  const readyJobKey = useMemo(
-    () => [...new Set(applications.filter((a) => a.status === "ready" && a.job_id).map((a) => a.job_id))].sort().join(","),
+  // Tugas apply di antrean baru selesai: worker sudah mengubah lamaran dan menulis log percobaan, padahal daftar
+  // ini dimuat sekali saat halaman dibuka. Muat ulang tanpa kerangka pemuatan; bila gagal, daftar yang ada
+  // dipertahankan (galatnya hanya dicatat). Pembacaan log ikut diulang lewat applyReloads, dalam satu render
+  // dengan daftar baru, jadi hanya ada satu kueri log.
+  const reloadAfterApply = useCallback(async () => {
+    if (isMockMode()) return;
+    try {
+      const fresh = await aiApplicationService.getApplications();
+      setApplications(fresh);
+      setSelectedApp((prev) => (prev ? fresh.find((a) => a.id === prev.id) ?? prev : prev));
+      setApplyReloads((n) => n + 1);
+    } catch (err) {
+      console.warn("Lamaran belum bisa dimuat ulang setelah tugas agen selesai:", err);
+    }
+  }, []);
+
+  // Lamaran draf dan ready: ambil hasil percobaan agen dari log (kekurangan isian, dan apakah agen tidak
+  // mengisi apa pun). Tidak memblokir halaman; bila gagal, lencana dan daftar kekurangan tidak tampil dan halaman
+  // tetap berfungsi. Kuncinya berubah juga saat kartu dipindah ke atau dari kolom itu, jadi data ikut diperbarui.
+  const agentJobKey = useMemo(
+    () => [...new Set(applications.filter((a) => canRequestApproval(a.status) && a.job_id).map((a) => a.job_id))].sort().join(","),
     [applications],
   );
   useEffect(() => {
-    if (!readyJobKey) {
+    if (!agentJobKey) {
       setFormGaps({});
+      setAttempts({});
       return;
     }
     let alive = true;
-    getFormGaps(readyJobKey.split(","))
-      .then((gaps) => {
-        if (alive) setFormGaps(gaps);
+    getApplyState(agentJobKey.split(","))
+      .then(({ gaps, attempts: latest }) => {
+        if (!alive) return;
+        setFormGaps(gaps);
+        setAttempts(latest);
       })
       .catch((err) => {
-        console.warn("Isian wajib yang kosong belum bisa dimuat:", err);
-        if (alive) setFormGaps({});
+        console.warn("Hasil percobaan agen belum bisa dimuat:", err);
+        if (alive) {
+          setFormGaps({});
+          setAttempts({});
+        }
       });
     return () => {
       alive = false;
     };
-  }, [readyJobKey]);
+  }, [agentJobKey, applyReloads]);
+
+  // Id tugas antrean -> isian yang terisi pada percobaan itu, untuk petunjuk tugas apply yang selesai tanpa
+  // mengisi apa pun. Hanya percobaan terbaru per lowongan yang dikenal; tugas lama tidak diberi petunjuk khusus.
+  const fieldsFilledByQueue = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const a of Object.values(attempts)) if (a.queueJobId) out[a.queueJobId] = a.fieldsFilled;
+    return out;
+  }, [attempts]);
+  // Lamaran yang belum dikirim dan percobaan agen terbarunya tidak mengisi apa pun.
+  const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attempts[app.job_id]);
 
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
   // mengirim email follow-up. Pengingat Telegram worker memakai satu chat milik pengelola (TELEGRAM_CHAT_ID),
@@ -397,6 +455,8 @@ export function AppsPage() {
 
   const selectedJob = selectedApp ? jobOf(selectedApp) : undefined;
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
+  const selectedAttempt = selectedApp ? attempts[selectedApp.job_id] : undefined;
+  const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
 
   return (
     <AppShell>
@@ -438,7 +498,7 @@ export function AppsPage() {
       </header>
 
       {/* Antrean tugas agen: tempat memantau tombol "Isi Formulir Saja" */}
-      <QueuePanel />
+      <QueuePanel onApplyFinished={reloadAfterApply} fieldsFilledByQueue={fieldsFilledByQueue} />
 
       {loadError ? (
         <ErrorState title="Daftar lamaran belum bisa dimuat" message={loadError} onRetry={loadApplications} />
@@ -479,7 +539,7 @@ export function AppsPage() {
                     {APPLICATION_STATUSES.map((status) => (
                       <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
                         {groupedApps[status].map((app) => (
-                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />
+                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
                     ))}
@@ -495,12 +555,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />)}
+                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} onOpen={() => setSelectedApp(app)} />)}
+                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
@@ -525,6 +585,7 @@ export function AppsPage() {
                   <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${(statusConfig[selectedApp.status] ?? statusConfig.draft).color}`}>
                     {applicationStatusLabel(selectedApp.status)}
                   </span>
+                  {selectedFillYourself && <FillYourselfBadge />}
                   {selectedApp.submitted_at && (
                     <span className="text-xs text-muted-foreground">
                       Dikirim {new Date(selectedApp.submitted_at).toLocaleDateString("id-ID")}
@@ -565,10 +626,16 @@ export function AppsPage() {
                     ) : (
                       <>
                         <p className="text-sm text-muted-foreground">
-                          {selectedApp.status === "ready"
-                            ? // Status ready ditulis worker sesudah mengisi formulir (atau dipilih lewat Ubah status), jadi draf ini sudah pernah disetujui.
-                              "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang."
-                            : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}
+                          {selectedFillYourself
+                            ? // Agen tidak mengisi satu isian pun: lamaran belum terkirim, jadi jangan menulis bahwa formulir sudah dibuka dan diisi.
+                              NO_FIELDS_FILLED_TEXT
+                            : selectedApp.status === "ready"
+                              ? (selectedAttempt?.fieldsFilled ?? 0) > 0
+                                ? // Status ready ditulis worker sesudah mengisi sebagian atau seluruh formulir. Teks ini hanya untuk percobaan yang mengisi minimal satu isian (fields_filled > 0).
+                                  "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang."
+                                : // Ready lewat Ubah status, atau percobaan agen tidak tercatat: tidak ada bukti agen mengisi formulir.
+                                  "Draf ini ditandai siap dikirim, tetapi belum ada catatan bahwa agen berhasil mengisi formulirnya. Kirim sendiri di situs lowongan, atau ajukan lagi supaya agen mencoba mengisi formulir."
+                              : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}
                         </p>
                         {selectedGaps && (
                           <div className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E] space-y-2">

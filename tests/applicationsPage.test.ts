@@ -32,7 +32,7 @@ test("Lamaran: status berbahasa Indonesia, rollback seret memunculkan toast, daf
 
 test("Lamaran: antrean agen terlihat dan jendela detail memakai Radix Dialog", () => {
   const src = read("../src/routes/applications.tsx");
-  assert.match(src, /<QueuePanel \/>/);
+  assert.match(src, /<QueuePanel onApplyFinished=\{reloadAfterApply\} fieldsFilledByQueue=\{fieldsFilledByQueue\} \/>/);
   assert.match(src, /import \{ Dialog,/);
   assert.doesNotMatch(src, /fixed inset-0 z-50/);
   const panel = read("../src/components/QueuePanel.tsx");
