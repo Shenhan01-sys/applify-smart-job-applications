@@ -512,6 +512,165 @@ export function sortSkills<T extends { name?: unknown; proficiency_level?: unkno
 }
 
 // ---------------------------------------------------------------------------------------------
+// Achievements: penghargaan dan publikasi  (table achievements)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `achievements.category` adalah teks bebas di database. Nilai yang dipakai: "award" dan "publication" (impor PDF
+ * LinkedIn dan editor), "other" (pilihan Lainnya di editor), serta nilai lama dari data contoh seperti "competition"
+ * dan "community". Nilai lama itu tampil sebagai Lainnya dan tetap dipertahankan saat barisnya diubah.
+ */
+export const ACHIEVEMENT_CATEGORIES = [
+  { value: "award", label: "Penghargaan" },
+  { value: "publication", label: "Publikasi" },
+  { value: "other", label: "Lainnya" },
+] as const;
+
+export const ACHIEVEMENT_TITLE_MAX = 200;
+export const ACHIEVEMENT_ISSUER_MAX = 120;
+export const ACHIEVEMENT_DESCRIPTION_MAX = LIMITS.longText;
+
+/** Baris `achievements` yang ditulis (kolom `url` tidak disentuh, user_id ditambahkan layanan). */
+export interface AchievementRow {
+  title: string;
+  category: string;
+  issuer: string | null;
+  /** `YYYY-MM-01` */
+  achievement_date: string | null;
+  description: string | null;
+  is_featured: boolean;
+}
+
+export interface AchievementInput {
+  title: unknown;
+  category: unknown;
+  issuer: unknown;
+  achievement_date: unknown;
+  description: unknown;
+  is_featured?: unknown;
+}
+
+export type AchievementField = "title" | "category" | "issuer" | "achievement_date" | "description";
+export type AchievementErrors = Partial<Record<AchievementField, string>>;
+
+/** Jenis yang dihasilkan impor PDF LinkedIn (Honors-Awards dan Publications). Editor juga menerima "other". */
+export const IMPORT_ACHIEVEMENT_CATEGORIES: readonly string[] = ["award", "publication"];
+
+/**
+ * Satu-satunya aturan penghargaan dan publikasi, dipakai editor Profil dan impor PDF LinkedIn: judul wajib dan paling
+ * banyak 200 karakter, jenis termasuk `categories`, penyelenggara paling banyak 120, deskripsi paling banyak 2000,
+ * tanggal (bila ada) sah, tidak sebelum tahun 1950, dan tidak di masa depan. Tanggal dinormalkan ke `YYYY-MM-01`.
+ * Galat diurutkan judul, jenis, penyelenggara, deskripsi, tanggal.
+ */
+export function checkAchievement(
+  a: AchievementInput,
+  now: Date = new Date(),
+  categories: readonly string[] = IMPORT_ACHIEVEMENT_CATEGORIES,
+): { ok: true; row: AchievementRow } | { ok: false; errors: AchievementErrors } {
+  const errors: AchievementErrors = {};
+  const title = trim(a.title);
+  const issuer = trim(a.issuer);
+  const description = trim(a.description);
+  const dateRaw = trim(a.achievement_date);
+  if (!title) errors.title = "Judul kosong.";
+  else if (title.length > ACHIEVEMENT_TITLE_MAX) errors.title = `Judul maksimal ${ACHIEVEMENT_TITLE_MAX} karakter.`;
+  if (typeof a.category !== "string" || !categories.includes(a.category)) {
+    errors.category = categories.includes("other") ? "Pilih jenis: penghargaan, publikasi, atau lainnya." : "Jenis harus penghargaan atau publikasi.";
+  }
+  if (issuer.length > ACHIEVEMENT_ISSUER_MAX) errors.issuer = `Penyelenggara maksimal ${ACHIEVEMENT_ISSUER_MAX} karakter.`;
+  if (description.length > ACHIEVEMENT_DESCRIPTION_MAX) errors.description = `Deskripsi maksimal ${ACHIEVEMENT_DESCRIPTION_MAX} karakter.`;
+  let date: string | null = null;
+  if (dateRaw) {
+    const d = toDbDate(dateRaw);
+    if (!d) errors.achievement_date = "Tanggal tidak valid.";
+    else if (Number(d.slice(0, 4)) < MIN_YEAR) errors.achievement_date = `Tahun tidak boleh sebelum ${MIN_YEAR}.`;
+    else if (d.slice(0, 7) > currentMonth(now)) errors.achievement_date = "Tanggal tidak boleh di masa depan.";
+    else date = d;
+  }
+  if (Object.keys(errors).length > 0 || typeof a.category !== "string") return { ok: false, errors };
+  return {
+    ok: true,
+    row: { title, category: a.category, issuer: issuer || null, achievement_date: date, description: description || null, is_featured: a.is_featured === true },
+  };
+}
+
+/** Validator impor PDF LinkedIn: hasilnya alasan pertama yang gagal, bukan peta galat per kolom. */
+export function validateAchievement(
+  a: AchievementInput,
+  now: Date = new Date(),
+): { ok: true; row: AchievementRow } | { ok: false; reason: string } {
+  const r = checkAchievement(a, now, IMPORT_ACHIEVEMENT_CATEGORIES);
+  if (r.ok) return r;
+  return { ok: false, reason: Object.values(r.errors).find((m) => !!m) ?? "Data tidak valid." };
+}
+
+export interface AchievementForm {
+  title: string;
+  /** "award", "publication", atau "other" (nilai pilihan di formulir) */
+  category: string;
+  issuer: string;
+  /** month input, YYYY-MM; boleh kosong */
+  achievement_date: string;
+  description: string;
+  /** dibawa dari baris yang diubah; editor tidak mengubahnya */
+  is_featured: boolean;
+  /** nilai category lama di luar tiga pilihan ("competition", "community"), dipertahankan saat tetap memilih Lainnya */
+  legacy_category: string;
+}
+
+export const emptyAchievementForm = (): AchievementForm => ({
+  title: "",
+  category: "award",
+  issuer: "",
+  achievement_date: "",
+  description: "",
+  is_featured: false,
+  legacy_category: "",
+});
+
+export function achievementToForm(row: Record<string, any>): AchievementForm {
+  const raw = trim(row.category);
+  const known = raw === "award" || raw === "publication";
+  return {
+    title: trim(row.title),
+    category: known ? raw : "other",
+    issuer: trim(row.issuer),
+    achievement_date: toMonthInput(row.achievement_date),
+    description: trim(row.description),
+    is_featured: row.is_featured === true,
+    legacy_category: known || raw === "other" ? "" : raw,
+  };
+}
+
+export function validateAchievementForm(form: AchievementForm, now: Date = new Date()): ValidationResult<AchievementForm, AchievementRow> {
+  const res = checkAchievement(form, now, ACHIEVEMENT_CATEGORIES.map((c) => c.value));
+  if (!res.ok) return { ok: false, errors: res.errors };
+  // Memilih Lainnya pada baris lama tidak boleh menimpa nilai aslinya ("competition" tetap "competition").
+  const legacy = trim(form.legacy_category);
+  const category = res.row.category === "other" && legacy ? legacy : res.row.category;
+  return { ok: true, row: { ...res.row, category } };
+}
+
+/** "award" -> "Penghargaan", "publication" -> "Publikasi", selain itu (juga null) -> "Lainnya". */
+export function achievementCategoryLabel(raw: unknown): string {
+  const v = trim(raw);
+  return ACHIEVEMENT_CATEGORIES.find((c) => c.value === v && c.value !== "other")?.label ?? "Lainnya";
+}
+
+/** Unggulan dulu, lalu tanggal terbaru (tanpa tanggal paling akhir), lalu judul. */
+export function sortAchievements<T extends { title?: unknown; achievement_date?: unknown; is_featured?: unknown }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const fa = a.is_featured === true ? 1 : 0;
+    const fb = b.is_featured === true ? 1 : 0;
+    if (fa !== fb) return fb - fa;
+    const da = trim(a.achievement_date);
+    const db = trim(b.achievement_date);
+    if (da !== db) return !da ? 1 : !db ? -1 : da < db ? 1 : -1;
+    return trim(a.title).localeCompare(trim(b.title));
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Basic profile  (table profiles)
 // ---------------------------------------------------------------------------------------------
 

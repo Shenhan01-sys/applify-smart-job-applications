@@ -6,7 +6,7 @@ import {
   Loader2, Save, Briefcase, GraduationCap, Award, Wrench, 
   Target, CheckCircle2, User, MapPin, Phone, Link2, Mail,
   Calendar, DollarSign, Clock,
-  Layers, Sparkles, Paperclip, Eye, RefreshCw, Trash2, Upload
+  Layers, Sparkles, Paperclip, Eye, RefreshCw, Trash2, Upload, Trophy
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,17 +38,20 @@ import {
   type PreferencesErrors,
   type PreferencesForm,
 } from "@/lib/profilePreferences";
-import { ExperienceEditor, EducationEditor, SkillsEditor } from "@/components/profile/ProfileEditors";
+import { ExperienceEditor, EducationEditor, SkillsEditor, AchievementEditor } from "@/components/profile/ProfileEditors";
 import LinkedInImportCard from "@/components/profile/LinkedInImportCard";
 import { applyProfilePatch, type CommitResult } from "@/lib/linkedinImport";
 import {
+  achievementCategoryLabel,
   buildProfileRow,
   formatMonthYear,
   profileGaps,
+  sortAchievements,
   sortExperiences,
   sortEducation,
   sortSkills,
   EMPLOYMENT_TYPES,
+  type AchievementRow,
   type EducationRow,
   type ExperienceRow,
   type SkillRow,
@@ -135,7 +138,7 @@ function ProfilePage() {
   const [workExps, setWorkExps] = useState<any[]>(() => (isMockMode() ? [...mockWorkExperiences] : []));
   const [educations, setEducations] = useState<any[]>(() => (isMockMode() ? [...mockEducation] : []));
   const [certs, setCerts] = useState<any[]>(() => (isMockMode() ? [...mockCertifications] : []));
-  // Tabel achievements belum punya editor di halaman ini; daftarnya hanya dipakai untuk mendeteksi duplikat saat impor PDF LinkedIn.
+  // Penghargaan dan publikasi (tabel achievements): diedit di langkah 3, dipakai juga untuk mendeteksi duplikat saat impor PDF LinkedIn.
   const [achievements, setAchievements] = useState<any[]>(() => (isMockMode() ? [...mockAchievements] : []));
   const [userSkills, setUserSkills] = useState<any[]>(() => (isMockMode() ? [...mockUserSkills] : []));
   // Preferensi langkah 4 disimpan ke user_automation_settings (lewat server otomasi). 'failed' = belum bisa
@@ -356,6 +359,28 @@ function ProfilePage() {
     toast.success("Pendidikan dihapus.");
   }, []);
 
+  const saveAchievement = useCallback(async (row: AchievementRow, id: string | null) => {
+    let saved: any;
+    if (isMockMode()) {
+      saved = { ...(achievements.find((x) => x.id === id) ?? {}), ...row, id: id ?? newMockId("ach"), user_id: user?.id };
+    } else {
+      const res = id ? await profileService.updateAchievement(id, row) : await profileService.createAchievement(row);
+      if (res.error) throw new Error(res.error.message);
+      saved = res.data;
+    }
+    setAchievements((prev) => (id ? prev.map((x) => (x.id === id ? saved : x)) : [saved, ...prev]));
+    toast.success(id ? "Penghargaan atau publikasi diperbarui." : "Penghargaan atau publikasi ditambahkan.");
+  }, [user, achievements]);
+
+  const deleteAchievement = useCallback(async (id: string) => {
+    if (!isMockMode()) {
+      const res = await profileService.deleteAchievement(id);
+      if (res.error) { toast.error(`Belum terhapus. ${describeError(res.error, "Coba lagi.")}`); return; }
+    }
+    setAchievements((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Penghargaan atau publikasi dihapus.");
+  }, []);
+
   const saveSkill = useCallback(async (row: SkillRow, id: string | null) => {
     let saved: any;
     if (isMockMode()) {
@@ -495,7 +520,7 @@ function ProfilePage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {step === 1 && "Ceritakan tentang dirimu. Agen akan menggunakan ini untuk personalisasi lamaran."}
               {step === 2 && "Tambahkan pengalaman kerja. Setiap perubahan langsung tersimpan."}
-              {step === 3 && "Lengkapi pendidikan dan skills. Setiap perubahan langsung tersimpan."}
+              {step === 3 && "Lengkapi pendidikan, skills, serta penghargaan dan publikasi. Setiap perubahan langsung tersimpan."}
               {step === 4 && "Atur preferensi kerja. Semuanya boleh dikosongkan; pilihan yang kamu isi dipakai agen saat mencari lowongan dan mengisi formulir."}
               {step === 5 && "Periksa profilmu, lalu tekan Simpan & Selesai."}
             </p>
@@ -526,6 +551,12 @@ function ProfilePage() {
                     <Wrench className="h-4 w-4 text-[#0A5BE0]" /> Skills &amp; Keahlian
                   </h3>
                   <SkillsEditor items={userSkills} onSave={saveSkill} onDelete={deleteSkill} />
+                </section>
+                <section aria-labelledby="ach-heading">
+                  <h3 id="ach-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Trophy className="h-4 w-4 text-[#0A5BE0]" /> Penghargaan dan Publikasi
+                  </h3>
+                  <AchievementEditor items={achievements} onSave={saveAchievement} onDelete={deleteAchievement} />
                 </section>
               </div>
             )}
@@ -692,6 +723,22 @@ function ProfilePage() {
                   <span key={c.id ?? i} className="text-xs px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border-2 border-purple-200">
                     {c.name}
                   </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Achievements */}
+            <div>
+              <p className="text-xs uppercase tracking-wider text-rose-700 font-bold flex items-center gap-1">
+                <Trophy className="h-3 w-3" /> Penghargaan dan Publikasi
+              </p>
+              <div className="mt-2 space-y-2">
+                {achievements.length === 0 && <span className="text-xs text-muted-foreground">Belum ada penghargaan atau publikasi</span>}
+                {sortAchievements(achievements).map((a, i) => (
+                  <div key={a.id ?? i} className="text-xs">
+                    <p className="font-semibold">{a.title}</p>
+                    <p className="text-muted-foreground">{[achievementCategoryLabel(a.category), a.issuer, formatMonthYear(a.achievement_date)].filter(Boolean).join(" · ")}</p>
+                  </div>
                 ))}
               </div>
             </div>

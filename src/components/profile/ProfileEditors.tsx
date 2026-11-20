@@ -1,15 +1,22 @@
 import { useId, useState, type ReactNode } from "react";
 import {
   Briefcase, GraduationCap, Wrench, Building2, Calendar, MapPin, Layers, Star,
-  Pencil, Trash2, Plus, X, Loader2, AlertCircle,
+  Pencil, Trash2, Plus, X, Loader2, AlertCircle, Trophy,
 } from "lucide-react";
 import {
+  ACHIEVEMENT_CATEGORIES,
+  ACHIEVEMENT_DESCRIPTION_MAX,
+  ACHIEVEMENT_ISSUER_MAX,
+  ACHIEVEMENT_TITLE_MAX,
   DEGREE_SUGGESTIONS,
   EMPLOYMENT_TYPES,
   LIMITS,
   LOCATION_TYPES,
   PROFICIENCY_LEVELS,
   SKILL_CATEGORIES,
+  achievementCategoryLabel,
+  achievementToForm,
+  emptyAchievementForm,
   emptyEducationForm,
   emptyExperienceForm,
   emptySkillForm,
@@ -19,12 +26,16 @@ import {
   normalizeAchievements,
   normalizeStringList,
   skillToForm,
+  sortAchievements,
   sortEducation,
   sortExperiences,
   sortSkills,
+  validateAchievementForm,
   validateEducation,
   validateExperience,
   validateSkill,
+  type AchievementForm,
+  type AchievementRow,
   type EducationForm,
   type EducationRow,
   type ExperienceForm,
@@ -447,6 +458,106 @@ export function SkillsEditor({ items, onSave, onDelete }: {
         </FormShell>
       ) : (
         <button type="button" onClick={() => open("new", emptySkillForm())} className="h-10 px-4 rounded-xl border-2 border-dashed border-black/[12%] text-sm text-muted-foreground hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0] transition-all inline-flex items-center gap-2"><Plus className="h-4 w-4" /> Tambah Skill</button>
+      )}
+    </div>
+  );
+}
+
+// ================================================================================================
+// Achievements: penghargaan dan publikasi
+// ================================================================================================
+
+export function AchievementEditor({ items, onSave, onDelete, now }: {
+  items: any[];
+  onSave: (row: AchievementRow, id: string | null) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  now?: Date;
+}) {
+  const uid = useId();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<AchievementForm>(emptyAchievementForm());
+  const [errors, setErrors] = useState<FieldErrors<AchievementForm>>({});
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const open = (id: string | null, f: AchievementForm) => { setEditing(id); setForm(f); setErrors({}); setFormError(""); };
+  const set = <K extends keyof AchievementForm>(k: K, v: AchievementForm[K]) => setForm((p) => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    const res = validateAchievementForm(form, now);
+    if (!res.ok) { setErrors(res.errors); setFormError("Periksa kolom yang ditandai merah."); return; }
+    setSaving(true); setFormError("");
+    try {
+      await onSave(res.row, editing === "new" ? null : editing);
+      setEditing(null);
+    } catch (e: any) {
+      setFormError(e?.message ? `Gagal menyimpan: ${e.message}` : "Gagal menyimpan. Coba lagi.");
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (id: string) => {
+    setBusyId(id);
+    try { await onDelete(id); } finally { setBusyId(null); }
+  };
+
+  const sorted = sortAchievements(items);
+
+  return (
+    <div className="space-y-3">
+      {sorted.length === 0 && editing === null && (
+        <EmptyState icon={Trophy} title="Belum ada penghargaan atau publikasi" hint="Tambahkan penghargaan, juara lomba, atau publikasi yang benar-benar kamu raih. Draf lamaran boleh menyebutnya, tetapi hanya yang tercantum di sini." />
+      )}
+
+      {sorted.map((a, i) => {
+        if (editing === a.id) return null;
+        const meta = [achievementCategoryLabel(a.category), a.issuer, formatMonthYear(a.achievement_date)].filter(Boolean).join(" · ");
+        return (
+          <div key={a.id} className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 transition-all duration-300" style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.05}s both` }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-purple-100 text-purple-700 grid place-items-center shrink-0"><Trophy className="h-5 w-5" /></div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{a.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{meta}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button type="button" onClick={() => open(a.id, achievementToForm(a))} aria-label={`Ubah penghargaan atau publikasi ${a.title}`} title="Ubah" className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-[#0A5BE0] hover:bg-[#0A5BE0]/10"><Pencil className="h-3.5 w-3.5" /></button>
+                <DeleteButton onConfirm={() => remove(a.id)} busy={busyId === a.id} label={`Hapus penghargaan atau publikasi ${a.title}`} />
+              </div>
+            </div>
+            {a.description && <p className="mt-2 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{a.description}</p>}
+          </div>
+        );
+      })}
+
+      {editing !== null ? (
+        <FormShell title={editing === "new" ? "Tambah penghargaan atau publikasi" : "Ubah penghargaan atau publikasi"} saving={saving} onCancel={() => setEditing(null)} onSubmit={submit} error={formError}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label="Judul" htmlFor={`${uid}-title`} error={errors.title}>
+                <input id={`${uid}-title`} className={inputCls} aria-invalid={!!errors.title} maxLength={ACHIEVEMENT_TITLE_MAX} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Contoh: Juara 1 Lomba Karya Tulis Ilmiah" />
+              </Field>
+            </div>
+            <Field label="Jenis" htmlFor={`${uid}-cat`} error={errors.category}>
+              <select id={`${uid}-cat`} className={inputCls} aria-invalid={!!errors.category} value={form.category} onChange={(e) => set("category", e.target.value)}>
+                {ACHIEVEMENT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Penyelenggara atau penerbit (opsional)" htmlFor={`${uid}-issuer`} error={errors.issuer}>
+              <input id={`${uid}-issuer`} className={inputCls} aria-invalid={!!errors.issuer} maxLength={ACHIEVEMENT_ISSUER_MAX} value={form.issuer} onChange={(e) => set("issuer", e.target.value)} placeholder="Contoh: Kemendikbudristek" />
+            </Field>
+            <Field label="Bulan dan tahun (opsional)" htmlFor={`${uid}-date`} error={errors.achievement_date}>
+              <input id={`${uid}-date`} type="month" className={inputCls} aria-invalid={!!errors.achievement_date} value={form.achievement_date} onChange={(e) => set("achievement_date", e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Deskripsi (opsional)" htmlFor={`${uid}-adesc`} error={errors.description} hint={`${form.description.trim().length}/${ACHIEVEMENT_DESCRIPTION_MAX}. Tulis hanya yang benar-benar terjadi.`}>
+            <textarea id={`${uid}-adesc`} rows={3} className={textareaCls} aria-invalid={!!errors.description} value={form.description} onChange={(e) => set("description", e.target.value)} />
+          </Field>
+        </FormShell>
+      ) : (
+        <button type="button" onClick={() => open("new", emptyAchievementForm())} className={dashedBtn}><Trophy className="h-4 w-4" /> Tambah Penghargaan atau Publikasi</button>
       )}
     </div>
   );

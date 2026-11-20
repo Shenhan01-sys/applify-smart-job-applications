@@ -11,17 +11,16 @@
  * sudah terisi tidak pernah ditimpa. Tanpa impor selain berkas lib lain, supaya bisa dites dengan `node --test`.
  */
 import {
-  LIMITS,
-  MIN_YEAR,
   PROFICIENCY_LEVELS,
   SKILL_CATEGORIES,
   buildProfileRow,
   formatMonthYear,
-  toDbDate,
   toMonthInput,
+  validateAchievement,
   validateEducation,
   validateExperience,
   validateSkill,
+  type AchievementRow,
   type EducationRow,
   type ExperienceRow,
   type ProfileFormData,
@@ -299,23 +298,11 @@ export interface CertificationRow {
 export const CERT_NAME_MAX = 200;
 export const CERT_ISSUER_MAX = 120;
 
-/**
- * Baris `achievements` yang ditulis (kolom `url` dibiarkan kosong, user_id ditambahkan layanan). `category` berupa
- * teks bebas di database; impor memakai "award" (Honors-Awards) dan "publication" (Publications).
- */
-export interface AchievementRow {
-  title: string;
-  category: AchievementCategory;
-  issuer: string | null;
-  /** `YYYY-MM-01` */
-  achievement_date: string | null;
-  description: string | null;
-  is_featured: boolean;
-}
+// Aturan, batas, dan tipe baris penghargaan dan publikasi ada di profileForms.ts, satu sumber untuk editor Profil
+// dan impor ini. Diekspor ulang di sini supaya pemakai impor tidak perlu tahu letaknya.
+export { ACHIEVEMENT_DESCRIPTION_MAX, ACHIEVEMENT_ISSUER_MAX, ACHIEVEMENT_TITLE_MAX, validateAchievement } from "./profileForms.ts";
+export type { AchievementRow } from "./profileForms.ts";
 
-export const ACHIEVEMENT_TITLE_MAX = 200;
-export const ACHIEVEMENT_ISSUER_MAX = 120;
-export const ACHIEVEMENT_DESCRIPTION_MAX = LIMITS.longText;
 const ACHIEVEMENT_LABELS: Record<AchievementCategory, string> = { award: "Penghargaan", publication: "Publikasi" };
 
 export type ItemStatus = "new" | "duplicate" | "invalid";
@@ -398,38 +385,6 @@ export function validateCertification(c: { name: unknown; issuer: unknown }): { 
   if (name.length > CERT_NAME_MAX) return { ok: false, reason: `Nama sertifikasi maksimal ${CERT_NAME_MAX} karakter.` };
   if (issuer.length > CERT_ISSUER_MAX) return { ok: false, reason: `Penerbit maksimal ${CERT_ISSUER_MAX} karakter.` };
   return { ok: true, row: { name, issuer, is_verified: false } };
-}
-
-const currentMonth = (now: Date) => `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-
-/**
- * Validator penghargaan dan publikasi (editor Profil belum punya formulir untuk tabel `achievements`, jadi aturannya
- * ada di sini, setara validateCertification): judul wajib dan paling banyak 200 karakter, jenis award atau
- * publication, penyelenggara paling banyak 120, deskripsi paling banyak 2000, tanggal (bila ada) sah, tidak
- * sebelum tahun 1950, dan tidak di masa depan. Tanggal dinormalkan ke `YYYY-MM-01`.
- */
-export function validateAchievement(
-  a: { title: unknown; category: unknown; issuer: unknown; achievement_date: unknown; description: unknown },
-  now: Date = new Date(),
-): { ok: true; row: AchievementRow } | { ok: false; reason: string } {
-  const title = text(a.title);
-  const issuer = text(a.issuer);
-  const description = text(a.description);
-  const dateRaw = text(a.achievement_date);
-  if (!title) return { ok: false, reason: "Judul kosong." };
-  if (title.length > ACHIEVEMENT_TITLE_MAX) return { ok: false, reason: `Judul maksimal ${ACHIEVEMENT_TITLE_MAX} karakter.` };
-  if (a.category !== "award" && a.category !== "publication") return { ok: false, reason: "Jenis harus penghargaan atau publikasi." };
-  if (issuer.length > ACHIEVEMENT_ISSUER_MAX) return { ok: false, reason: `Penyelenggara maksimal ${ACHIEVEMENT_ISSUER_MAX} karakter.` };
-  if (description.length > ACHIEVEMENT_DESCRIPTION_MAX) return { ok: false, reason: `Deskripsi maksimal ${ACHIEVEMENT_DESCRIPTION_MAX} karakter.` };
-  let date: string | null = null;
-  if (dateRaw) {
-    const d = toDbDate(dateRaw);
-    if (!d) return { ok: false, reason: "Tanggal tidak valid." };
-    if (Number(d.slice(0, 4)) < MIN_YEAR) return { ok: false, reason: `Tahun tidak boleh sebelum ${MIN_YEAR}.` };
-    if (d.slice(0, 7) > currentMonth(now)) return { ok: false, reason: "Tanggal tidak boleh di masa depan." };
-    date = d;
-  }
-  return { ok: true, row: { title, category: a.category, issuer: issuer || null, achievement_date: date, description: description || null, is_featured: false } };
 }
 
 /**

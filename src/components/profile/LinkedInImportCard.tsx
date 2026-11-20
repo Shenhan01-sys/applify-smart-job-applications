@@ -228,9 +228,7 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
                   note={
                     key === "skills"
                       ? "Tingkat skill diisi otomatis karena PDF LinkedIn tidak memuatnya. Ubah nanti di langkah Pendidikan dan skills."
-                      : key === "achievements"
-                        ? "Datanya tersimpan di akunmu, tetapi halaman Profil belum punya daftar untuk melihat atau mengubahnya."
-                        : undefined
+                      : undefined
                   }
                   onToggle={(itemKey) => setSelected((prev) => toggleItem(plan, itemKey, prev))}
                   onAll={(on) => setSelected((prev) => setSectionSelection(plan, key, prev, on))}
