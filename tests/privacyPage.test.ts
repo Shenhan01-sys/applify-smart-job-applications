@@ -6,6 +6,13 @@ import { PRIVACY_INTRO, PRIVACY_SECTIONS, PRIVACY_UPDATED } from "../src/lib/pri
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const allText = [PRIVACY_INTRO, ...PRIVACY_SECTIONS.flatMap((s) => [s.title, ...(s.paragraphs ?? []), ...(s.items ?? [])])].join("\n");
 
+test("kontak peneliti: Ketentuan dan Privasi memakai email yang sama, tanpa penanda data kosong", () => {
+  const terms = read("../src/routes/terms.tsx");
+  assert.doesNotMatch(terms, /MENUNGGU DATA/);
+  assert.match(terms, /RESEARCHER_EMAIL/);
+  assert.match(allText, /hansgunawan775@gmail\.com/);
+});
+
 test("kebijakan privasi: tanggal pembaruan 21 November 2026 dan tampil di halaman", () => {
   assert.equal(PRIVACY_UPDATED, "21 November 2026");
   assert.match(read("../src/routes/privacy.tsx"), /\{PRIVACY_UPDATED\}/);
@@ -29,8 +36,9 @@ test("kebijakan privasi: menyebut data, penyimpanan, pihak ketiga, persetujuan, 
   assert.match(allText, /belum punya tombol hapus akun/);
 });
 
-test("kebijakan privasi: tidak ada alamat email pribadi dan tidak ada penanda data kosong di halaman", () => {
-  assert.doesNotMatch(allText, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+test("kebijakan privasi: satu-satunya alamat email adalah kontak peneliti, dan tidak ada penanda data kosong di halaman", () => {
+  const emails = allText.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? [];
+  assert.deepEqual([...new Set(emails)], ["hansgunawan775@gmail.com"]);
   assert.doesNotMatch(allText, /MENUNGGU DATA/);
 });
 

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { RESEARCHER_EMAIL } from "@/lib/privacyContent";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({ meta: [{ title: "Ketentuan & Privasi — Applify" }] }),
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/terms")({
 
 // Isi halaman ini harus tetap sama dengan perilaku kode. Setiap pernyataan diperiksa terhadap skema database
 // (database/schema.sql), fungsi draf AI (supabase/functions/generate-application), dan fitur yang benar-benar ada.
-// Kontak peneliti sengaja belum diisi: ganti penanda di bawah setelah datanya ada.
+// Kontak peneliti memakai email dukungan yang juga tampil di layar persetujuan Google (keputusan Hans, 21 November 2026).
 const DATA_STORED = [
   "Akun: email dan identitas login (dikelola Supabase Auth). Bila kamu masuk dengan Google, Google memberi tahu Applify email dan namamu.",
   "Profil: nama, jabatan, lokasi, nomor telepon, tautan LinkedIn dan portofolio, pengalaman kerja, pendidikan, sertifikasi, proyek, pencapaian, dan skill yang kamu isi.",
@@ -75,8 +76,8 @@ function TermsPage() {
             laporan skripsi.
           </p>
           <p>
-            Cara data dilaporkan, lama penyimpanan, dan cara meminta data dihapus ditentukan peneliti:
-            [MENUNGGU DATA: kebijakan pelaporan dan penyimpanan data penelitian]. Sampai ada keterangan resmi,
+            Jawaban kuesioner dilaporkan sebagai angka gabungan, tanpa nama atau kontak peserta. Lama penyimpanan data
+            penelitian disampaikan peneliti pada lembar persetujuan sebelum sesi uji. Untuk meminta datamu dihapus,
             hubungi peneliti lewat kontak di bawah.
           </p>
         </Section>
@@ -90,7 +91,10 @@ function TermsPage() {
         </Section>
 
         <Section title="Kontak peneliti">
-          <p>[MENUNGGU DATA: kontak peneliti]</p>
+          <p>
+            Hans Gunawan, Program Studi Sistem Informasi, Universitas Kristen Duta Wacana. Email:{" "}
+            <a href={`mailto:${RESEARCHER_EMAIL}`} className="text-primary underline underline-offset-2">{RESEARCHER_EMAIL}</a>
+          </p>
           <p>
             Penjelasan lengkap tentang data, penyimpanan, dan penghapusan ada di{" "}
             <Link to="/privacy" className="text-primary underline underline-offset-2">Kebijakan Privasi</Link>.

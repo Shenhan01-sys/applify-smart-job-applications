@@ -15,12 +15,15 @@
 // - nilai ALLOW_REAL_SUBMIT di server produksi saat ini (kalimat "dimatikan selama penelitian" mengikuti aturan proyek);
 // - lokasi server worker dan penyedia model AI mana yang benar-benar aktif di produksi (bergantung kunci API yang diset);
 // - lama penyimpanan data (tidak ada pekerjaan terjadwal penghapusan di kode) dan wilayah (region) proyek Supabase;
-// - kontak peneliti: halaman Ketentuan masih berisi penanda [MENUNGGU DATA: kontak peneliti], jadi halaman ini hanya
-//   menautkan ke sana, tidak menulis alamat email.
+// - kontak peneliti: RESEARCHER_EMAIL di bawah, sama dengan email dukungan pada layar persetujuan Google
+//   (keputusan Hans, 21 November 2026). Halaman Ketentuan memakai konstanta yang sama.
 // - tidak ada fitur hapus akun di aplikasi (pencarian deleteUser, hapus akun di src dan backend kosong); hapus data
 //   hanya lewat permintaan ke peneliti.
 
 export const PRIVACY_UPDATED = "21 November 2026";
+
+/** Kontak peneliti untuk pertanyaan dan permintaan hapus data. */
+export const RESEARCHER_EMAIL = "hansgunawan775@gmail.com";
 
 export interface PrivacySection {
   id: string;
@@ -100,7 +103,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     title: "Mengubah dan menghapus datamu",
     paragraphs: [
       "Kamu bisa mengubah profil, menghapus skill, dan menghapus lowongan tersimpan langsung di aplikasi.",
-      "Applify belum punya tombol hapus akun di dalam aplikasi. Untuk menghapus akun beserta seluruh datamu, kirim permintaan lewat kontak peneliti yang tertera di halaman Ketentuan & Privasi.",
+      "Applify belum punya tombol hapus akun di dalam aplikasi. Untuk menghapus akun beserta seluruh datamu, kirim permintaan ke peneliti di hansgunawan775@gmail.com. Kontak yang sama juga tertera di halaman Ketentuan & Privasi.",
     ],
   },
   {
