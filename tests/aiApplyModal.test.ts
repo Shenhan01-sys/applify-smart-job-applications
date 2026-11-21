@@ -35,3 +35,22 @@ test("pengajuan persetujuan yang gagal: galat tampil di footer dekat tombol dan 
   assert.match(footer.slice(Math.max(0, alertAt - 60), alertAt + 80), /role="alert"/);
   assert.match(footer, /aria-describedby=\{approvalError \? "apply-approval-error" : undefined\}/);
 });
+
+test("temuan 32: draf baru membuat lencana kuota di halaman Lowongan dibaca ulang, draf ulang gratis tidak", () => {
+  const modal = read("../src/components/AIApplyModal.tsx");
+  assert.match(modal, /onDraftCreated\?: \(\) => void;/);
+  assert.match(modal, /onSuccess, onDraftCreated \}: AIApplyModalProps/);
+  const generate = modal.slice(modal.indexOf("const generate = async"), modal.indexOf("// Free preview-style regeneration"));
+  assert.match(generate, /onDraftCreated\?\.\(\);/);
+  // dipanggil sesudah draf berhasil dibuat, bukan sebelum atau saat gagal
+  assert.ok(generate.indexOf("createDraftWithAnalysis") < generate.indexOf("onDraftCreated?.()"));
+  assert.ok(generate.indexOf("onDraftCreated?.()") < generate.indexOf("} catch (err"));
+  // menulis ulang surat (mode analyze) tidak memakai kuota, jadi tidak membaca ulang kuota
+  const regenerate = modal.slice(modal.indexOf("const regenerate = async"), modal.indexOf("const regenerate = async") + 1500);
+  assert.doesNotMatch(regenerate.slice(0, regenerate.indexOf("finally")), /onDraftCreated/);
+
+  const jobs = read("../src/routes/jobs.tsx");
+  assert.match(jobs, /const \{ quota: draftQuota, reload: reloadQuota \} = useSubscription\(\);/);
+  assert.match(jobs, /onDraftCreated=\{reloadQuota\}/);
+  assert.match(jobs, /\$\{draftQuota\.remaining\} draf AI tersisa bulan ini/);
+});

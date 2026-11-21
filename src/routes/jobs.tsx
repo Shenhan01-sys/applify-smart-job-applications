@@ -426,6 +426,7 @@ function JobsPage() {
           match={matchOf(selectedJob)}
           onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
           onSuccess={() => { fetchJobs(searchQuery); reloadQuota(); }}
+          onDraftCreated={reloadQuota}
         />
       )}
     </AppShell>

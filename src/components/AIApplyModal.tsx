@@ -51,6 +51,8 @@ interface AIApplyModalProps {
   match?: JobMatch | null;
   onClose: () => void;
   onSuccess: () => void;
+  /** Dipanggil setelah draf baru dibuat (satu kuota terpakai), supaya halaman di belakang jendela membaca ulang kuotanya. */
+  onDraftCreated?: () => void;
 }
 
 interface QuotaState {
@@ -71,7 +73,7 @@ type ProfileCheck =
   | { state: "blocked"; missing: string[] }
   | { state: "error"; message: string };
 
-export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, onClose, onSuccess }: AIApplyModalProps) {
+export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, onClose, onSuccess, onDraftCreated }: AIApplyModalProps) {
   const [generating, setGenerating] = useState(false);
   // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
@@ -250,6 +252,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setPreparedAnswers([]);
       setApprovalError("");
       setIsEditing(false);
+      // Draf terbuat berarti kuota terpakai: lencana kuota di halaman Lowongan (di belakang jendela ini) harus
+      // dibaca ulang, kalau tidak ia tetap menulis angka lama (temuan 32, uji klik 21 November 2026).
+      onDraftCreated?.();
       // The Edge Function reports the quota after this draft; use it so the screen is right at once.
       // Without it (older response), ask the database again.
       if (analysis.quota) {
