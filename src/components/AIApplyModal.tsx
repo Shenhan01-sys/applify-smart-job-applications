@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
@@ -9,7 +9,7 @@ import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
-import { highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
+import { displaySkillGaps, highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
 import { applicationStatusLabel } from "@/lib/statusLabels";
 import { draftProgressText, draftWaitHint } from "@/lib/draftProgress";
@@ -103,6 +103,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   const [confirmNewDraft, setConfirmNewDraft] = useState(false);
   // Skill gaps the model reported for the last draft or preview (not stored in the database).
   const [skillGaps, setSkillGaps] = useState<string[] | null>(null);
+  // Keluaran model disaring saat ditampilkan: judul jabatan, kalimat persyaratan, dan syarat pendidikan bukan skill (temuan 29).
+  const shownSkillGaps = useMemo(() => (skillGaps === null ? null : displaySkillGaps(skillGaps, jobTitle)), [skillGaps, jobTitle]);
   const [aiGenerated, setAiGenerated] = useState<{
     coverLetter: string;
     optimizedCV: Record<string, any>;
@@ -777,14 +779,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                     <div className="rounded-xl bg-[#F5F5F5] p-5">
                       <pre className="text-sm whitespace-pre-wrap leading-relaxed font-sans">{aiGenerated.aiNotes || "—"}</pre>
                     </div>
-                    {skillGaps !== null && (
+                    {shownSkillGaps !== null && (
                       <div className="rounded-xl border-2 border-[#FDE68A] bg-[#FFFBEB] p-4">
                         <p className="text-xs font-semibold text-[#92400E] flex items-center gap-1.5">
                           <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Skill yang diminta lowongan tetapi belum ada di profilmu
                         </p>
-                        {skillGaps.length > 0 ? (
+                        {shownSkillGaps.length > 0 ? (
                           <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Kesenjangan skill">
-                            {skillGaps.map((g) => (
+                            {shownSkillGaps.map((g) => (
                               <li key={g} className="text-xs bg-white border border-[#FCD34D] text-[#92400E] px-2 py-0.5 rounded-full">{g}</li>
                             ))}
                           </ul>

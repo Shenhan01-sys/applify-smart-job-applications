@@ -454,3 +454,26 @@ export function highlightedSkills(raw: unknown, matched: readonly string[] = [],
   }
   return out.slice(0, max);
 }
+
+/**
+ * Daftar "Skill yang diminta lowongan tetapi belum ada di profilmu" pada tab Strategi AI. Isinya perkiraan model
+ * bahasa, jadi disaring saat ditampilkan dengan penyaring frasa skill yang sama (cleanSkillTerm): judul jabatan,
+ * kalimat persyaratan ("Pengalaman kerja merchandising"), dan syarat pendidikan ("Pendidikan S1 semua jurusan")
+ * dibuang (uji klik 21 November 2026, temuan 29). Butir yang sama dengan, atau terkandung dalam, judul lowongan
+ * juga dibuang, kecuali skill kamus ("React" pada "React Developer" tetap skill).
+ */
+export function displaySkillGaps(raw: unknown, jobTitle: unknown = "", max = 8): string[] {
+  const titleN = typeof jobTitle === "string" ? normalize(jobTitle) : "";
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    const t = cleanSkillTerm(item);
+    if (!t) continue;
+    const n = normalize(t);
+    if (!n || seen.has(n)) continue;
+    if (titleN && containsTerm(titleN, n) && dictionarySkills(n).length === 0) continue;
+    seen.add(n);
+    out.push(t);
+  }
+  return out.slice(0, max);
+}

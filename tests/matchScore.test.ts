@@ -6,6 +6,7 @@ import {
   NO_PROFILE_SKILLS_TEXT,
   cleanSkillTerm,
   computeMatch,
+  displaySkillGaps,
   highlightedSkills,
   matchCaption,
   profileSkillList,
@@ -296,4 +297,40 @@ test("temuan 24: draf lama dengan kalimat di tailored_skills disaring saat ditam
   }
   assert.doesNotMatch(read("../src/routes/applications.tsx"), /selectedApp\.tailored_skills\.map/);
   assert.match(read("../src/lib/draftApproval.ts"), /highlightedSkills\(app\.tailored_skills, matchedSkills\)/);
+});
+
+test("temuan 29: daftar skill yang belum ada di profil membuang judul jabatan, kalimat persyaratan, dan syarat pendidikan", () => {
+  // butir nyata dari uji klik 21 November 2026 (draf Staf Merchandiser)
+  const model = [
+    "Staf Merchandiser",
+    "Pendidikan S1 semua jurusan",
+    "Pengalaman kerja merchandising",
+    "Visual Merchandising",
+    "Analisis penjualan",
+    "Microsoft Excel",
+  ];
+  assert.deepEqual(displaySkillGaps(model, "Staf Merchandiser"), ["Visual Merchandising", "Analisis penjualan", "Microsoft Excel"]);
+  // judul yang lebih panjang memuat potongan "Staf Merchandiser"
+  assert.deepEqual(displaySkillGaps(["Staf Merchandiser", "SQL"], "Staf Merchandiser - Fullstack Developer"), ["SQL"]);
+  // huruf besar-kecil dan tanda baca pada judul tidak menghalangi
+  assert.deepEqual(displaySkillGaps(["staf merchandiser"], "STAF MERCHANDISER (Jakarta)"), []);
+  // skill kamus tetap skill walau kata itu ada di judul
+  assert.deepEqual(displaySkillGaps(["React"], "React Developer"), ["React"]);
+  // kata judul yang hanya potongan kata lain tidak ikut terbuang ("java" bukan bagian dari "javascript")
+  assert.deepEqual(displaySkillGaps(["Java"], "JavaScript Developer"), ["Java"]);
+  // tanpa judul, hanya penyaring frasa yang berlaku
+  assert.deepEqual(displaySkillGaps(model), ["Staf Merchandiser", "Visual Merchandising", "Analisis penjualan", "Microsoft Excel"]);
+  // duplikat dibuang, batas 8 butir, bentuk rusak tidak melempar
+  assert.deepEqual(displaySkillGaps(["Excel", "excel", "EXCEL"], ""), ["Excel"]);
+  assert.equal(displaySkillGaps("ABCDEFGHIJ".split("").map((c) => `Skill ${c}`), "").length, 8);
+  for (const bad of [undefined, null, "Excel", 5, {}, [1, null, ""]]) assert.deepEqual(displaySkillGaps(bad, "x"), []);
+  for (const badTitle of [undefined, null, 5, {}]) assert.deepEqual(displaySkillGaps(["Excel"], badTitle), ["Excel"]);
+});
+
+test("temuan 29: tab Strategi AI menampilkan daftar yang sudah disaring dengan judul lowongan", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  assert.match(src, /displaySkillGaps\(skillGaps, jobTitle\)/);
+  const tab = src.slice(src.indexOf('activeTab === "strategy"'), src.indexOf("{/* Footer Actions */}"));
+  assert.match(tab, /shownSkillGaps\.map\(/);
+  assert.doesNotMatch(tab, /[^n]skillGaps\.map\(/);
 });
