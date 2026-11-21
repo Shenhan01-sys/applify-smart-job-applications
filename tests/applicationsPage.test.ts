@@ -56,3 +56,20 @@ test("Persetujuan: label Indonesia dan galat tidak diganti data contoh", () => {
   const settings = read("../src/routes/automation-settings.tsx");
   assert.doesNotMatch(settings, /catch \(error\) \{[^}]*setSettings\(mockAutomationSettings\)/s);
 });
+
+test("temuan 31: panel Antrean Agen ada di bawah papan dan daftar, jadi muncul belakangan tidak menggeser papan", () => {
+  const src = read("../src/routes/applications.tsx");
+  const page = src.slice(src.indexOf("return (\n    <AppShell>\n      <header"));
+  const header = page.indexOf("<header");
+  const board = page.indexOf("key={viewKey}");
+  const queue = page.indexOf("<QueuePanel");
+  assert.ok(header >= 0 && board > header, "papan setelah header");
+  assert.ok(queue > board, "panel antrean setelah papan dan daftar");
+  assert.equal(src.split("<QueuePanel").length - 1, 1, "satu panel saja");
+  // panel ada sesudah blok papan/galat, jadi tetap tampil walau daftar lamaran gagal dimuat
+  assert.ok(queue > page.indexOf("{loadError ? ("));
+  // jaraknya margin atas (di bawah papan), bukan margin bawah (yang dulu memisahkannya dari papan di bawahnya)
+  const panel = read("../src/components/QueuePanel.tsx");
+  assert.match(panel, /<section aria-labelledby="queue-heading" className="mt-6 /);
+  assert.doesNotMatch(panel, /<section aria-labelledby="queue-heading" className="mb-6/);
+});

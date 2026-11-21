@@ -556,9 +556,6 @@ export function AppsPage() {
         </div>
       </header>
 
-      {/* Antrean tugas agen: tempat memantau tombol "Isi Formulir Saja" */}
-      <QueuePanel onApplyFinished={reloadAfterApply} fieldsFilledByQueue={fieldsFilledByQueue} />
-
       {loadError ? (
         <ErrorState title="Daftar lamaran belum bisa dimuat" message={loadError} onRetry={loadApplications} />
       ) : (
@@ -642,6 +639,11 @@ export function AppsPage() {
           </div>
         </>
       )}
+
+      {/* Antrean tugas agen: tempat memantau tombol "Isi Formulir Saja". Di bawah papan, bukan di atasnya: panel
+          baru muncul beberapa detik setelah halaman terbuka dan tingginya berubah-ubah (kosong, satu tugas, sepuluh
+          tugas), jadi di atas papan ia menggeser papan sekitar 230 px ke bawah (temuan 31, uji klik 21 November 2026). */}
+      <QueuePanel onApplyFinished={reloadAfterApply} fieldsFilledByQueue={fieldsFilledByQueue} />
 
       {/* Detail lamaran: dialog Radix (Esc menutup, fokus terkunci di dalam, dibaca pembaca layar sebagai dialog) */}
       <Dialog open={!!pendingSubmitted} onOpenChange={(open) => { if (!open) setPendingSubmitted(null); }}>

@@ -24,7 +24,8 @@ function StatusIcon({ status }: { status: string }) {
 /**
  * Antrean tugas agen milik pengguna (tabel automation_queue). Tombol "Isi Formulir Saja" di jendela AI Apply
  * menjanjikan "Pantau di Applications"; panel ini yang memenuhi janji itu. Dimuat ulang tiap 15 detik selama
- * ada tugas yang belum selesai.
+ * ada tugas yang belum selesai. Ditaruh di bawah papan lamaran dengan margin atas (`mt-6`): panel muncul belakangan
+ * dan tingginya berubah-ubah, jadi di atas papan ia menggeser papan (temuan 31).
  *
  * Worker mengubah lamaran dan menulis log percobaan saat tugas apply selesai, padahal halaman Lamaran hanya
  * memuat datanya sekali. Karena itu panel memanggil `onApplyFinished` saat sebuah tugas apply berpindah dari
@@ -78,7 +79,7 @@ export function QueuePanel({
   if (!error && items && items.length === 0) return null;
 
   return (
-    <section aria-labelledby="queue-heading" className="mb-6 rounded-2xl border-2 border-[#999999] bg-white p-4">
+    <section aria-labelledby="queue-heading" className="mt-6 rounded-2xl border-2 border-[#999999] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 id="queue-heading" className="flex items-center gap-2 text-base font-bold">
           <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> Antrean Agen
