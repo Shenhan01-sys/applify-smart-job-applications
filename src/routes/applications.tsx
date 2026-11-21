@@ -15,7 +15,7 @@ import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
-import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
+import { attemptForApplication, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -423,8 +423,15 @@ export function AppsPage() {
     for (const a of Object.values(attempts)) if (a.queueJobId) out[a.queueJobId] = a.fieldsFilled;
     return out;
   }, [attempts]);
-  // Lamaran yang belum dikirim dan percobaan agen terbarunya tidak mengisi apa pun.
-  const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attempts[app.job_id]);
+  // Lencana "Isi sendiri di situs" hanya untuk lamaran yang belum dikirim dan yang percobaan agennya sungguh ada
+  // dan tidak mengisi apa pun (log status incomplete, reason no_fields_filled). Percobaan dicari per lowongan, jadi
+  // yang tercatat sebelum lamaran ini dibuat tidak dihitung (attemptForApplication): draf baru yang belum pernah
+  // diajukan atau diserahkan ke agen tidak mewarisi kegagalan draf lama untuk lowongan yang sama (temuan 33).
+  // Untuk draf yang belum pernah dicoba agen, layar sengaja tidak menampilkan apa-apa, bukan petunjuk semacam
+  // "Agen belum mendukung situs ini": tidak ada data di kode yang menyatakan sumber mana yang tidak bisa diisi agen
+  // (hasilnya bergantung pada halaman, misalnya perlu masuk dulu), jadi petunjuk itu akan menjadi klaim tanpa bukti.
+  const attemptOf = (app: AIApplicationData) => attemptForApplication(attempts[app.job_id], app);
+  const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attemptOf(app));
 
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
   // mengirim email follow-up. Pengingat Telegram worker memakai satu chat milik pengelola (TELEGRAM_CHAT_ID),
@@ -513,7 +520,7 @@ export function AppsPage() {
 
   const selectedJob = selectedApp ? jobOf(selectedApp) : undefined;
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
-  const selectedAttempt = selectedApp ? attempts[selectedApp.job_id] : undefined;
+  const selectedAttempt = selectedApp ? attemptOf(selectedApp) : undefined;
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, [], 8, profileSkills) : [];
 

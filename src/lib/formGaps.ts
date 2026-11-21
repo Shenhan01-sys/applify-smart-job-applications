@@ -138,6 +138,31 @@ export function latestApplyAttempt(rows: unknown, jobId: string): ApplyAttempt |
 }
 
 /**
+ * Percobaan agen yang boleh dikaitkan dengan satu lamaran, atau undefined.
+ *
+ * Log percobaan tidak menyimpan application_id, jadi `getApplyState` mencocokkannya lewat job_id. Akibatnya
+ * lowongan yang sama membawa percobaan lama ke draf barunya: pengguna menyerahkan draf pertama ke agen, agen
+ * gagal, lalu pengguna membuat draf baru untuk lowongan itu, dan kartu draf baru yang belum pernah diajukan
+ * langsung berlencana "Isi sendiri di situs" (temuan 33, uji klik 21 November 2026). Percobaan yang tercatat
+ * sebelum lamaran ini dibuat pasti bukan percobaan atas lamaran ini, jadi tidak dikembalikan. Tanggal yang tidak
+ * terbaca juga tidak dikembalikan: lebih baik tanpa lencana daripada lencana yang tidak bisa dibuktikan.
+ *
+ * Batas yang diketahui: bila satu lowongan punya dua draf dan percobaan terjadi sesudah keduanya dibuat, log
+ * tidak menunjukkan draf mana yang dikerjakan agen, sehingga keduanya mewarisinya (kartunya sudah diberi baris
+ * "Lamaran ke-N dari M", lib/applicationCards.ts).
+ */
+export function attemptForApplication(
+  attempt: ApplyAttempt | null | undefined,
+  application: { created_at?: unknown } | null | undefined,
+): ApplyAttempt | undefined {
+  if (!attempt || !application || typeof application.created_at !== "string") return undefined;
+  const made = Date.parse(attempt.at);
+  const created = Date.parse(application.created_at);
+  if (Number.isNaN(made) || Number.isNaN(created)) return undefined;
+  return made >= created ? attempt : undefined;
+}
+
+/**
  * True bila percobaan terbaru berhenti karena agen tidak berhasil mengisi satu isian pun (halaman mungkin
  * meminta masuk). Lamaran belum terkirim dan pengguna perlu mengisi sendiri di situs lowongan.
  */

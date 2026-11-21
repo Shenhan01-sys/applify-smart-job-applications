@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, CheckCircle2, Clock, Loader2, XCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Bot, CheckCircle2, Clock, Loader2, XCircle, RefreshCw } from "lucide-react";
 import { automationQueue, type QueueItem } from "@/services/automationQueue";
 import { describeError } from "@/lib/authErrors";
-import { applyJobFinished, isQueueActive, queueDisplayLabel, queueStatusHint, queueTypeLabel } from "@/lib/statusLabels";
+import { applyJobFinished, isQueueActive, isQueueNeedsManual, queueDisplayLabel, queueStatusHint, queueTypeLabel } from "@/lib/statusLabels";
 import { relativeTime } from "@/lib/dashboardStats";
 
 const POLL_MS = 15_000;
@@ -12,9 +12,13 @@ const TONE: Record<string, string> = {
   processing: "bg-blue-100 text-blue-900 border-blue-300",
   completed: "bg-green-100 text-green-900 border-green-300",
   failed: "bg-red-100 text-red-900 border-red-300",
+  // Tugas apply yang selesai tanpa mengisi apa pun (isQueueNeedsManual): bukan sukses, bukan galat. Kuning, sama
+  // dengan lencana "Isi sendiri di situs" pada kartu lamaran.
+  needs_manual: "bg-amber-100 text-amber-900 border-amber-300",
 };
 
 function StatusIcon({ status }: { status: string }) {
+  if (status === "needs_manual") return <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />;
   if (status === "processing") return <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />;
   if (status === "completed") return <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />;
   if (status === "failed") return <XCircle className="h-3.5 w-3.5" aria-hidden="true" />;
@@ -104,19 +108,23 @@ export function QueuePanel({
       )}
 
       <ul className="mt-3 space-y-2" aria-live="polite">
-        {(items ?? []).map((q) => (
+        {(items ?? []).map((q) => {
+          // Status yang tampil: "completed" milik tugas apply tanpa isian terisi tidak ditampilkan sebagai sukses.
+          const fieldsFilled = fieldsFilledByQueue?.[q.id];
+          const shown = isQueueNeedsManual(q.status, q.job_type, fieldsFilled) ? "needs_manual" : q.status;
+          return (
           <li key={q.id} className="rounded-xl border-2 border-[#E0E0E0] bg-[#F5F5F5] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{queueTypeLabel(q.job_type)}</p>
                 {q.job && <p className="truncate text-sm text-muted-foreground">{q.job.title} · {q.job.company}</p>}
               </div>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[q.status] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}>
-                <StatusIcon status={q.status} /> {queueDisplayLabel(q.status, q.error_message)}
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[shown] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}>
+                <StatusIcon status={shown} /> {queueDisplayLabel(q.status, q.error_message, q.job_type, fieldsFilled)}
               </span>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message, fieldsFilledByQueue?.[q.id])}
+              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message, fieldsFilled)}
             </p>
             {q.status === "failed" && q.error_message && (
               <details className="mt-1.5 text-xs text-muted-foreground">
@@ -125,7 +133,8 @@ export function QueuePanel({
               </details>
             )}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

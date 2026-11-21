@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   REASON_NO_FIELDS_FILLED,
+  attemptForApplication,
   attemptsByJob,
   gapsByJob,
   latestApplyAttempt,
@@ -12,7 +13,10 @@ import {
 import {
   FILL_YOURSELF_LABEL,
   NO_FIELDS_FILLED_TEXT,
+  QUEUE_NEEDS_MANUAL_LABEL,
   applyJobFinished,
+  isQueueNeedsManual,
+  queueDisplayLabel,
   queueStatusHint,
 } from "../src/lib/statusLabels.ts";
 
@@ -168,7 +172,8 @@ test("QueuePanel: memanggil onApplyFinished saat tugas apply selesai, memakai pe
   assert.match(src, /seen\.current = new Map\(next\.map\(\(i\) => \[i\.id, i\.status\]\)\)/);
   assert.match(src, /if \(finished\) finishedRef\.current\?\.\(\)/);
   assert.equal([...src.matchAll(/setInterval\(/g)].length, 1, "satu polling saja, yang lama");
-  assert.match(src, /queueStatusHint\(q\.status, q\.job_type, q\.error_message, fieldsFilledByQueue\?\.\[q\.id\]\)/);
+  assert.match(src, /const fieldsFilled = fieldsFilledByQueue\?\.\[q\.id\];/);
+  assert.match(src, /queueStatusHint\(q\.status, q\.job_type, q\.error_message, fieldsFilled\)/);
 });
 
 test("Lamaran Saya: muat ulang diam-diam setelah tugas apply selesai, daftar lama dipertahankan bila gagal, log dibaca lagi sekali", () => {
@@ -197,7 +202,7 @@ test("Lamaran Saya: lencana 'Isi sendiri di situs' di kartu Kanban, baris daftar
   assert.match(row, /\{fillYourself && \(\s*<span[^>]*>\s*<FillYourselfBadge \/>/);
   assert.equal(src.split("fillYourself={fillYourselfFor(app)}").length - 1, 3, "kartu Kanban, daftar layar sempit, daftar");
   // hanya untuk lamaran yang belum dikirim
-  assert.match(src, /const fillYourselfFor = \(app: AIApplicationData\) => canRequestApproval\(app\.status\) && needsFillYourself\(attempts\[app\.job_id\]\)/);
+  assert.match(src, /const fillYourselfFor = \(app: AIApplicationData\) => canRequestApproval\(app\.status\) && needsFillYourself\(attemptOf\(app\)\)/);
   // detail: lencana di baris status dan penjelasan di kotak Persetujuan
   assert.match(src, /\{selectedFillYourself && <FillYourselfBadge \/>\}/);
   assert.match(src, /\{selectedFillYourself\s*\?[^]*?NO_FIELDS_FILLED_TEXT/);
@@ -220,4 +225,96 @@ test("Lamaran Saya: teks tampilan baru tanpa tanda pisah panjang", () => {
   const src = read("../src/routes/applications.tsx");
   const lines = src.split("\n").filter((l) => /FillYourself|belum ada catatan|selectedFillYourself/.test(l));
   for (const l of lines) assert.doesNotMatch(l, /—/);
+});
+
+// ---- temuan 33: percobaan agen hanya milik lamaran yang dibuat sebelum percobaan itu ----
+
+const failedAttempt = () => latestApplyAttempt([log({ created_at: T2 }, { reason: "no_fields_filled", fields_filled: 0, application_status: "unchanged" })], "job-1");
+
+test("attemptForApplication: percobaan sebelum lamaran dibuat bukan milik lamaran itu (draf baru tidak mewarisi kegagalan draf lama)", () => {
+  const attempt = failedAttempt();
+  assert.ok(attempt);
+  assert.equal(needsFillYourself(attempt), true);
+  // draf lama dibuat sebelum percobaan: percobaan miliknya
+  assert.equal(attemptForApplication(attempt, { created_at: T1 }), attempt);
+  // draf baru dibuat sesudah percobaan: bukan miliknya, jadi lencana tidak muncul
+  assert.equal(attemptForApplication(attempt, { created_at: T3 }), undefined);
+  assert.equal(needsFillYourself(attemptForApplication(attempt, { created_at: T3 })), false);
+  // tepat pada waktu yang sama dihitung milik lamaran itu
+  assert.equal(attemptForApplication(attempt, { created_at: T2 }), attempt);
+});
+
+test("attemptForApplication: format waktu Supabase dengan mikrodetik dan zona +00:00 terbaca", () => {
+  const attempt = { ...failedAttempt()!, at: "2026-11-21T06:10:30.123456+00:00" };
+  assert.equal(attemptForApplication(attempt, { created_at: "2026-11-21T06:10:29.999999+00:00" }), attempt);
+  assert.equal(attemptForApplication(attempt, { created_at: "2026-11-21T06:10:30.500000+00:00" }), undefined);
+  // zona waktu berbeda, instan yang sama
+  assert.equal(attemptForApplication(attempt, { created_at: "2026-11-21T13:10:30.123456+07:00" }), attempt);
+});
+
+test("attemptForApplication: masukan kosong atau rusak tidak menghasilkan percobaan dan tidak melempar", () => {
+  const attempt = failedAttempt()!;
+  assert.equal(attemptForApplication(undefined, { created_at: T1 }), undefined);
+  assert.equal(attemptForApplication(null, { created_at: T1 }), undefined);
+  assert.equal(attemptForApplication(attempt, undefined), undefined);
+  assert.equal(attemptForApplication(attempt, null), undefined);
+  assert.equal(attemptForApplication(attempt, {}), undefined);
+  assert.equal(attemptForApplication(attempt, { created_at: 5 }), undefined);
+  assert.equal(attemptForApplication(attempt, { created_at: "bukan tanggal" }), undefined);
+  assert.equal(attemptForApplication({ ...attempt, at: "rusak" }, { created_at: T1 }), undefined);
+});
+
+test("Lamaran Saya: lencana dan detail memakai percobaan yang dikaitkan dengan lamaran, bukan hasil per lowongan mentah", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /const attemptOf = \(app: AIApplicationData\) => attemptForApplication\(attempts\[app\.job_id\], app\);/);
+  assert.match(src, /const selectedAttempt = selectedApp \? attemptOf\(selectedApp\) : undefined;/);
+  // tidak ada pembacaan percobaan per lowongan yang melewati penjaga itu
+  assert.equal(src.split("attempts[").length - 1, 1, "hanya di dalam attemptOf");
+  // tidak ada petunjuk "belum mendukung situs" tanpa dasar data
+  assert.doesNotMatch(src.replace(/^\s*\/\/.*$/gm, ""), /belum mendukung/i);
+});
+
+// ---- temuan 25: label tugas apply yang selesai tanpa mengisi apa pun ----
+
+test("isQueueNeedsManual: hanya tugas apply completed dengan fields_filled 0", () => {
+  assert.equal(isQueueNeedsManual("completed", "apply", 0), true);
+  assert.equal(isQueueNeedsManual("completed", "apply", 3), false);
+  assert.equal(isQueueNeedsManual("completed", "apply", null), false, "belum diketahui tetap Selesai");
+  assert.equal(isQueueNeedsManual("completed", "apply", undefined), false);
+  assert.equal(isQueueNeedsManual("completed", "search", 0), false, "bukan tugas apply");
+  assert.equal(isQueueNeedsManual("completed", "email_apply", 0), false);
+  assert.equal(isQueueNeedsManual("failed", "apply", 0), false);
+  assert.equal(isQueueNeedsManual("processing", "apply", 0), false);
+  assert.equal(isQueueNeedsManual(undefined, undefined, undefined), false);
+});
+
+test("queueDisplayLabel: 'Selesai' hanya bila agen tidak mengaku gagal mengisi; label sama dengan petunjuknya", () => {
+  assert.equal(QUEUE_NEEDS_MANUAL_LABEL, "Perlu diisi sendiri");
+  assert.equal(queueDisplayLabel("completed", null, "apply", 0), "Perlu diisi sendiri");
+  assert.equal(queueDisplayLabel("completed", null, "apply", 4), "Selesai");
+  assert.equal(queueDisplayLabel("completed", null, "apply", null), "Selesai");
+  assert.equal(queueDisplayLabel("completed", null, "apply"), "Selesai");
+  assert.equal(queueDisplayLabel("completed"), "Selesai", "pemanggilan lama dua argumen tidak berubah");
+  assert.equal(queueDisplayLabel("completed", null, "search", 0), "Selesai");
+  assert.equal(queueDisplayLabel("failed", "Job tidak punya tautan lowongan", "apply", 0), "Dilewati");
+  assert.equal(queueDisplayLabel("failed", "x", "apply", 0), "Gagal");
+  assert.equal(queueDisplayLabel("pending", null, "apply", 0), "Menunggu giliran");
+  // label dan petunjuk memakai syarat yang sama: bila label bukan "Selesai", petunjuknya juga bukan petunjuk sukses
+  for (const filled of [0, 2, null, undefined] as const) {
+    const label = queueDisplayLabel("completed", null, "apply", filled);
+    const hint = queueStatusHint("completed", "apply", null, filled);
+    assert.equal(label === QUEUE_NEEDS_MANUAL_LABEL, hint === NO_FIELDS_FILLED_TEXT, String(filled));
+  }
+});
+
+test("QueuePanel: tugas apply tanpa isian tampil kuning dengan ikon peringatan, bukan hijau", () => {
+  const src = read("../src/components/QueuePanel.tsx");
+  assert.match(src, /needs_manual: "bg-amber-100 text-amber-900 border-amber-300"/);
+  assert.match(src, /status === "needs_manual"\) return <AlertCircle/);
+  assert.match(src, /const shown = isQueueNeedsManual\(q\.status, q\.job_type, fieldsFilled\) \? "needs_manual" : q\.status;/);
+  assert.match(src, /TONE\[shown\]/);
+  assert.match(src, /<StatusIcon status=\{shown\} \/>/);
+  assert.match(src, /queueDisplayLabel\(q\.status, q\.error_message, q\.job_type, fieldsFilled\)/);
+  // warna hijau tetap hanya milik "completed" yang sungguh selesai
+  assert.match(src, /completed: "bg-green-100 text-green-900 border-green-300"/);
 });

@@ -71,7 +71,27 @@ export function isQueueSkipped(status?: string | null, errorMessage?: string | n
   return status === "failed" && /tidak punya tautan/i.test(errorMessage ?? "");
 }
 
-export function queueDisplayLabel(status?: string | null, errorMessage?: string | null): string {
+/**
+ * True bila tugas apply berstatus completed tetapi agen tidak mengisi satu isian pun (log percobaan untuk tugas
+ * itu mencatat details.fields_filled = 0). Bagi worker tugasnya memang selesai, tetapi bagi pengguna hasilnya
+ * belum berhasil: lamaran belum terkirim dan formulirnya harus diisi sendiri. Label hijau "Selesai" untuk kasus
+ * ini menyesatkan (uji klik 21 November 2026, temuan 25). Dasarnya kolom terstruktur fields_filled, bukan
+ * pencocokan teks pesan. null atau undefined berarti belum diketahui, jadi label tetap "Selesai".
+ */
+export function isQueueNeedsManual(status?: string | null, jobType?: string | null, fieldsFilled?: number | null): boolean {
+  return status === "completed" && jobType === "apply" && fieldsFilled === 0;
+}
+
+/** Label untuk tugas apply yang selesai tanpa mengisi apa pun; bukan keadaan sukses, jadi tidak memakai "Selesai". */
+export const QUEUE_NEEDS_MANUAL_LABEL = "Perlu diisi sendiri";
+
+export function queueDisplayLabel(
+  status?: string | null,
+  errorMessage?: string | null,
+  jobType?: string | null,
+  fieldsFilled?: number | null,
+): string {
+  if (isQueueNeedsManual(status, jobType, fieldsFilled)) return QUEUE_NEEDS_MANUAL_LABEL;
   return isQueueSkipped(status, errorMessage) ? "Dilewati" : queueStatusLabel(status);
 }
 
@@ -103,7 +123,7 @@ export function queueStatusHint(
     case "processing":
       return "Agen sedang mengerjakan tugas ini. Halaman ini bisa ditinggalkan; hasilnya muncul di sini.";
     case "completed":
-      if (jobType === "apply" && fieldsFilled === 0) return NO_FIELDS_FILLED_TEXT;
+      if (isQueueNeedsManual(status, jobType, fieldsFilled)) return NO_FIELDS_FILLED_TEXT;
       return jobType === "apply"
         ? "Agen sudah mencoba mengisi formulir di peramban server dan berhenti sebelum tombol kirim. Isian itu tidak tersimpan di perangkatmu, jadi kirim sendiri lewat situs lowongan bila sudah yakin."
         : "Tugas selesai.";
