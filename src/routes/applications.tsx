@@ -15,7 +15,7 @@ import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
-import { attemptForApplication, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
+import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -418,13 +418,10 @@ export function AppsPage() {
 
   // Id tugas antrean -> isian yang terisi pada percobaan itu, untuk petunjuk tugas apply yang selesai tanpa
   // mengisi apa pun. Hanya percobaan terbaru per lowongan yang dikenal; tugas lama tidak diberi petunjuk khusus.
-  const fieldsFilledByQueue = useMemo(() => {
-    const out: Record<string, number | null> = {};
-    for (const a of Object.values(attempts)) if (a.queueJobId) out[a.queueJobId] = a.fieldsFilled;
-    return out;
-  }, [attempts]);
+  // Dihitung dari aturan yang sama dengan lencana kartu (needsFillYourself): label antrean dan lencana tidak bisa berbeda.
+  const fieldsFilledByQueue = useMemo(() => fieldsFilledByQueueJob(attempts), [attempts]);
   // Lencana "Isi sendiri di situs" hanya untuk lamaran yang belum dikirim dan yang percobaan agennya sungguh ada
-  // dan tidak mengisi apa pun (log status incomplete, reason no_fields_filled). Percobaan dicari per lowongan, jadi
+  // dan tidak mengisi apa pun (log status incomplete dengan 0 isian terisi atau reason no_fields_filled). Percobaan dicari per lowongan, jadi
   // yang tercatat sebelum lamaran ini dibuat tidak dihitung (attemptForApplication): draf baru yang belum pernah
   // diajukan atau diserahkan ke agen tidak mewarisi kegagalan draf lama untuk lowongan yang sama (temuan 33).
   // Untuk draf yang belum pernah dicoba agen, layar sengaja tidak menampilkan apa-apa, bukan petunjuk semacam

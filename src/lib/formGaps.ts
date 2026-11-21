@@ -163,11 +163,36 @@ export function attemptForApplication(
 }
 
 /**
- * True bila percobaan terbaru berhenti karena agen tidak berhasil mengisi satu isian pun (halaman mungkin
- * meminta masuk). Lamaran belum terkirim dan pengguna perlu mengisi sendiri di situs lowongan.
+ * True bila percobaan ini berhenti karena agen tidak berhasil mengisi satu isian pun (halaman mungkin meminta
+ * masuk). Lamaran belum terkirim dan pengguna perlu mengisi sendiri di situs lowongan.
+ *
+ * SATU aturan untuk lencana "Isi sendiri di situs" pada kartu dan label "Perlu diisi sendiri" di Antrean Agen
+ * (fieldsFilledForQueue). Dasarnya fakta yang ada di setiap log: status "incomplete" dan nol isian terisi
+ * (`fields_filled` 0), atau kode `reason` no_fields_filled. Log yang ditulis worker sebelum perbaikan 3a3812b
+ * (20 November 2026, 22.47) belum punya `reason` tetapi sudah punya `fields_filled`; aturan lama yang hanya membaca `reason`
+ * membuat kartu Web3 Developer tanpa lencana sementara Antrean Agen menulis "Perlu diisi sendiri" untuk percobaan
+ * yang sama (temuan 35, uji klik 21 November 2026). Log yang tidak mencatat jumlah isian dan tidak punya reason
+ * tidak dianggap gagal: lebih baik tanpa lencana daripada lencana yang tidak bisa dibuktikan.
  */
 export function needsFillYourself(attempt: ApplyAttempt | null | undefined): boolean {
-  return !!attempt && attempt.status === "incomplete" && attempt.reason === REASON_NO_FIELDS_FILLED;
+  return !!attempt && attempt.status === "incomplete" && (attempt.reason === REASON_NO_FIELDS_FILLED || attempt.fieldsFilled === 0);
+}
+
+/**
+ * Jumlah isian terisi yang dibaca label Antrean Agen untuk percobaan ini: 0 tepat bila needsFillYourself, jadi
+ * label antrean dan lencana kartu tidak bisa berbeda untuk percobaan yang sama. Nilai lain meneruskan
+ * `fields_filled` apa adanya; 0 pada log yang bukan "incomplete" menjadi null (belum diketahui, tetap "Selesai").
+ */
+export function fieldsFilledForQueue(attempt: ApplyAttempt): number | null {
+  if (needsFillYourself(attempt)) return 0;
+  return attempt.fieldsFilled === 0 ? null : attempt.fieldsFilled;
+}
+
+/** Id tugas antrean -> isian terisi (fieldsFilledForQueue), dari percobaan terbaru per lowongan; tugas tanpa log tidak ikut. */
+export function fieldsFilledByQueueJob(attempts: Record<string, ApplyAttempt>): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const a of Object.values(attempts)) if (a.queueJobId) out[a.queueJobId] = fieldsFilledForQueue(a);
+  return out;
 }
 
 /**

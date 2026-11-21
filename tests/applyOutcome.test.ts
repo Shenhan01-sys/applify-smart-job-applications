@@ -5,10 +5,13 @@ import {
   REASON_NO_FIELDS_FILLED,
   attemptForApplication,
   attemptsByJob,
+  fieldsFilledByQueueJob,
+  fieldsFilledForQueue,
   gapsByJob,
   latestApplyAttempt,
   latestFormGaps,
   needsFillYourself,
+  type ApplyAttempt,
 } from "../src/lib/formGaps.ts";
 import {
   FILL_YOURSELF_LABEL,
@@ -106,14 +109,80 @@ test("latestApplyAttempt: log lama tanpa details tidak melempar dan semua kolom 
   assert.equal(latestApplyAttempt([{ job_id: "job-1", status: 5, created_at: T1 }], "job-1")?.status, "");
 });
 
-test("needsFillYourself: hanya status incomplete dengan reason no_fields_filled", () => {
-  const rows = (status: string, reason: string | null, f = 0) => [{ job_id: "job-1", status, created_at: T1, details: { reason, fields_filled: f } }];
-  assert.equal(needsFillYourself(latestApplyAttempt(rows("incomplete", "no_fields_filled"), "job-1")), true);
-  for (const [s, r] of [["incomplete", "partly_filled"], ["incomplete", "page_mismatch"], ["incomplete", "timeout"], ["incomplete", null], ["ready", null], ["success", null], ["ready", "no_fields_filled"]] as const) {
-    assert.equal(needsFillYourself(latestApplyAttempt(rows(s, r), "job-1")), false, `${s}/${r}`);
+test("needsFillYourself: status incomplete dengan nol isian terisi atau reason no_fields_filled", () => {
+  const rows = (status: string, reason: string | null, f: number | null) => [{ job_id: "job-1", status, created_at: T1, details: { reason, fields_filled: f } }];
+  const cek = (status: string, reason: string | null, f: number | null) => needsFillYourself(latestApplyAttempt(rows(status, reason, f), "job-1"));
+  // log baru: reason no_fields_filled
+  assert.equal(cek("incomplete", "no_fields_filled", 0), true);
+  // log lama (worker sebelum 3a3812b) tanpa reason tetapi dengan fields_filled 0: dulu tanpa lencana (temuan 35)
+  assert.equal(cek("incomplete", null, 0), true);
+  // berhenti karena halaman berpindah atau waktu habis, tanpa satu isian pun: agen tetap tidak mengisi apa pun
+  assert.equal(cek("incomplete", "timeout", 0), true);
+  assert.equal(cek("incomplete", "page_mismatch", 0), true);
+  // reason tanpa jumlah isian tetap dipercaya
+  assert.equal(cek("incomplete", "no_fields_filled", null), true);
+  // sebagian terisi, atau tidak diketahui sama sekali: tanpa lencana
+  for (const [s, r, f] of [["incomplete", "partly_filled", 6], ["incomplete", "page_mismatch", 2], ["incomplete", "timeout", 3], ["incomplete", null, 4], ["incomplete", null, null]] as const) {
+    assert.equal(cek(s, r, f), false, `${s}/${r}/${f}`);
+  }
+  // status lain (formulir terisi sampai tombol kirim, terkirim): bukan kegagalan mengisi
+  for (const [s, r, f] of [["ready", null, 0], ["success", null, 0], ["ready", "no_fields_filled", 0]] as const) {
+    assert.equal(cek(s, r, f), false, `${s}/${r}/${f}`);
   }
   assert.equal(needsFillYourself(null), false);
   assert.equal(needsFillYourself(undefined), false);
+});
+
+test("temuan 35: percobaan yang sama menghasilkan lencana kartu dan label antrean yang sama, log baru maupun lama", () => {
+  const T = "2026-11-20T15:30:00.000Z";
+  // pasangan (status, reason, fields_filled) yang mungkin ada di application_logs, termasuk log lama tanpa reason
+  const kasus: [string, string | null, number | null][] = [
+    ["incomplete", "no_fields_filled", 0], ["incomplete", null, 0], ["incomplete", "timeout", 0], ["incomplete", "page_mismatch", 0],
+    ["incomplete", "no_fields_filled", null], ["incomplete", "partly_filled", 6], ["incomplete", null, 3], ["incomplete", null, null],
+    ["ready", null, 5], ["ready", null, 0], ["success", null, 7],
+  ];
+  for (const [status, reason, f] of kasus) {
+    const attempt = latestApplyAttempt([{ job_id: "job-w3", status, created_at: T, details: { reason, fields_filled: f, queue_job_id: "q-w3" } }], "job-w3")!;
+    const kartu = needsFillYourself(attemptForApplication(attempt, { created_at: "2026-11-20T15:10:00.000Z" }));
+    const fieldsFilled = fieldsFilledByQueueJob({ "job-w3": attempt })["q-w3"];
+    const antrean = isQueueNeedsManual("completed", "apply", fieldsFilled);
+    assert.equal(antrean, kartu, `${status}/${reason}/${f}`);
+    assert.equal(queueDisplayLabel("completed", null, "apply", fieldsFilled) === "Perlu diisi sendiri", kartu, `label ${status}/${reason}/${f}`);
+  }
+});
+
+test("temuan 35: kasus Web3 Developer, log lama tanpa reason, kartu berlencana dan antrean 'Perlu diisi sendiri'", () => {
+  // draf dibuat 20 Nov 22.13 WIB, tugas 'Isi formulir lowongan' sekitar 22.30 WIB, log tanpa reason (sebelum perbaikan worker)
+  const draf = { created_at: "2026-11-20T15:13:00+00:00" };
+  const attempt = latestApplyAttempt([
+    { job_id: "job-w3", status: "incomplete", created_at: "2026-11-20T15:30:12.345678+00:00", details: { note: "tidak ada field yang terisi; tombol kirim tidak ditekan", fields_filled: 0, queue_job_id: "q-w3" } },
+  ], "job-w3")!;
+  assert.equal(attempt.reason, null);
+  assert.equal(needsFillYourself(attemptForApplication(attempt, draf)), true, "kartu Web3 Developer berlencana");
+  assert.equal(fieldsFilledByQueueJob({ "job-w3": attempt })["q-w3"], 0);
+  assert.equal(queueDisplayLabel("completed", null, "apply", fieldsFilledByQueueJob({ "job-w3": attempt })["q-w3"]), "Perlu diisi sendiri");
+  // draf baru yang dibuat sesudah percobaan itu tetap tanpa lencana (temuan 33)
+  assert.equal(needsFillYourself(attemptForApplication(attempt, { created_at: "2026-11-21T06:53:00+00:00" })), false);
+});
+
+test("temuan 35: Lamaran Saya menurunkan lencana kartu dan label antrean dari satu aturan (needsFillYourself)", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /const fieldsFilledByQueue = useMemo\(\(\) => fieldsFilledByQueueJob\(attempts\), \[attempts\]\);/);
+  assert.match(src, /needsFillYourself\(attemptOf\(app\)\)/);
+  // tidak ada lagi pembacaan fieldsFilled mentah untuk antrean di halaman
+  assert.doesNotMatch(src, /out\[a\.queueJobId\] = a\.fieldsFilled/);
+  const formGaps = read("../src/lib/formGaps.ts");
+  assert.equal([...formGaps.matchAll(/export function needsFillYourself\(/g)].length, 1);
+  assert.match(formGaps, /if \(needsFillYourself\(attempt\)\) return 0;/);
+});
+
+test("fieldsFilledByQueueJob: hanya percobaan yang punya id tugas antrean, 0 tepat bila agen tidak mengisi apa pun", () => {
+  const a = (over: Partial<ApplyAttempt>): ApplyAttempt => ({ status: "incomplete", at: T2, reason: null, fieldsFilled: 5, applicationStatus: "ready", queueJobId: "q-1", ...over });
+  assert.deepEqual(fieldsFilledByQueueJob({ x: a({}), y: a({ queueJobId: null }), z: a({ queueJobId: "q-3", fieldsFilled: 0 }) }), { "q-1": 5, "q-3": 0 });
+  assert.equal(fieldsFilledForQueue(a({ reason: "no_fields_filled", fieldsFilled: null })), 0);
+  assert.equal(fieldsFilledForQueue(a({ status: "ready", fieldsFilled: 0 })), null, "0 pada log bukan incomplete belum dianggap gagal");
+  assert.equal(fieldsFilledForQueue(a({ fieldsFilled: null })), null);
+  assert.deepEqual(fieldsFilledByQueueJob({}), {});
 });
 
 test("attemptsByJob: satu entri per lowongan yang punya log; id rusak dan kembar tidak melempar", () => {
