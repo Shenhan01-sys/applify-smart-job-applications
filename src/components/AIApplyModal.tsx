@@ -49,6 +49,12 @@ interface AIApplyModalProps {
   jobData: any;
   /** Per-user match for this job (lib/matchScore.ts); null when it could not be worked out. */
   match?: JobMatch | null;
+  /**
+   * Skill profil pengguna (profileSkillList), dibaca halaman Lowongan dengan pemuat yang sama seperti Lamaran Saya.
+   * Dipakai menyaring "Skill yang Disorot" saat ditampilkan: draf lama masih memuat skill lowongan yang bukan skill
+   * profil (temuan 30). null = belum dimuat atau gagal dimuat, jadi hanya penyaring frasa yang berlaku.
+   */
+  profileSkills?: readonly string[] | null;
   onClose: () => void;
   onSuccess: () => void;
   /** Dipanggil setelah draf baru dibuat (satu kuota terpakai), supaya halaman di belakang jendela membaca ulang kuotanya. */
@@ -73,7 +79,7 @@ type ProfileCheck =
   | { state: "blocked"; missing: string[] }
   | { state: "error"; message: string };
 
-export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, onClose, onSuccess, onDraftCreated }: AIApplyModalProps) {
+export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, profileSkills = null, onClose, onSuccess, onDraftCreated }: AIApplyModalProps) {
   const [generating, setGenerating] = useState(false);
   // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
@@ -110,9 +116,16 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   const [aiGenerated, setAiGenerated] = useState<{
     coverLetter: string;
     optimizedCV: Record<string, any>;
-    tailoredSkills: string[];
     aiNotes: string;
   } | null>(null);
+  // Isi mentah tailored_skills dari draf yang sedang tampil (kolom database atau keluaran model, belum disaring).
+  // Daftar yang tampil disaring saat render, bukan saat draf dimuat: skill profil bisa baru selesai dimuat sesudah
+  // draf terbuka, dan penyaringan sebelum dipotong 8 butir tidak membuang skill profil yang kebetulan di urutan akhir.
+  const [rawSkills, setRawSkills] = useState<unknown>([]);
+  const shownSkills = useMemo(
+    () => highlightedSkills(rawSkills, match?.matched, 8, profileSkills),
+    [rawSkills, match, profileSkills],
+  );
 
   // The chain of models rotates (see PLAN_MODELS), so before a draft exists the UI names the plan, not a model.
   // After a draft it names the model the Edge Function reports in analysis.modelUsed.
@@ -162,6 +175,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       // Draf baru menyimpan modelnya; draf lama (null) tetap memakai label paket.
       if (app.model_used) setModelUsed(app.model_used);
       setAiGenerated(view);
+      setRawSkills(app.tailored_skills);
       setEditedCoverLetter(view.coverLetter);
       setExisting({ state: "found" });
       if (canRequestApproval(app.status)) {
@@ -241,9 +255,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setAiGenerated({
         coverLetter: app.cover_letter,
         optimizedCV: (app.optimized_cv as Record<string, any>) || {},
-        tailoredSkills: highlightedSkills(app.tailored_skills, match?.matched),
         aiNotes: app.ai_notes,
       });
+      setRawSkills(app.tailored_skills);
       setEditedCoverLetter(app.cover_letter);
       // A new draft replaces whatever was on screen (an earlier draft stays saved in Lamaran Saya).
       setExisting({ state: "none" });
@@ -283,9 +297,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setAiGenerated({
         coverLetter: insights.coverLetter,
         optimizedCV: insights.optimizedCV as Record<string, any>,
-        tailoredSkills: highlightedSkills(insights.tailoredSkills, match?.matched),
         aiNotes: insights.aiNotes,
       });
+      setRawSkills(insights.tailoredSkills);
       await aiApplicationService.updateCoverLetter(application.id, insights.coverLetter);
       setApplication({ ...application, cover_letter: insights.coverLetter });
     } catch (err: any) {
@@ -654,7 +668,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-3 text-center">
                   <Target className="h-5 w-5 mx-auto text-[#0A5BE0] mb-1" aria-hidden="true" />
-                  <div className="text-lg font-bold text-[#0A5BE0]">{aiGenerated.tailoredSkills?.length || 0}</div>
+                  <div className="text-lg font-bold text-[#0A5BE0]">{shownSkills.length}</div>
                   <div className="text-xs text-muted-foreground">Skill disorot AI</div>
                 </div>
                 <div className="rounded-xl bg-[#D2F801]/10 border border-[#D2F801]/30 p-3 text-center">
@@ -760,13 +774,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Skill yang Disorot</h4>
                         <ul className="flex flex-wrap gap-2">
-                          {aiGenerated.tailoredSkills?.map((skill: string, i: number) => (
+                          {shownSkills.map((skill, i) => (
                             <li key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
                               {skill}
                             </li>
                           ))}
                         </ul>
-                        {!aiGenerated.tailoredSkills?.length && (
+                        {shownSkills.length === 0 && (
                           <p className="text-xs text-muted-foreground">Belum ada skill di profilmu yang cocok dengan lowongan ini.</p>
                         )}
                       </div>

@@ -54,3 +54,25 @@ test("temuan 32: draf baru membuat lencana kuota di halaman Lowongan dibaca ulan
   assert.match(jobs, /onDraftCreated=\{reloadQuota\}/);
   assert.match(jobs, /\$\{draftQuota\.remaining\} draf AI tersisa bulan ini/);
 });
+
+test("temuan 30: jendela draf menyaring Skill yang Disorot dengan skill profil dari halaman Lowongan", () => {
+  const modal = read("../src/components/AIApplyModal.tsx");
+  const jobs = read("../src/routes/jobs.tsx");
+  // halaman Lowongan memuat skill profil dengan pemuat yang sama seperti Lamaran Saya dan meneruskannya ke jendela
+  assert.match(jobs, /profileSkillList\(await profileService\.getSkillSource\(userId\)\)/);
+  assert.match(jobs, /<AIApplyModal[^>]*?profileSkills=\{profileSkills\}/s);
+  assert.match(modal, /profileSkills\?: readonly string\[\] \| null;/);
+  assert.match(modal, /match = null, profileSkills = null, onClose/);
+  // daftar yang tampil dihitung saat render dari isi mentah draf, dengan skill profil
+  assert.match(modal, /highlightedSkills\(rawSkills, match\?\.matched, 8, profileSkills\)/);
+  // ketiga jalur yang mengisi draf (draf lama, draf baru, tulis ulang) menyimpan isi mentahnya
+  assert.equal(modal.split("setRawSkills(app.tailored_skills)").length - 1, 2, "draf lama dan draf baru");
+  assert.match(modal, /setRawSkills\(insights\.tailoredSkills\)/);
+  // tab CV dan hitungan "Skill disorot AI" memakai daftar yang sudah disaring, bukan isi mentah
+  const cv = modal.slice(modal.indexOf('activeTab === "cv"'), modal.indexOf('activeTab === "strategy"'));
+  assert.match(cv, /shownSkills\.map\(/);
+  assert.match(modal, /\{shownSkills\.length\}/);
+  assert.doesNotMatch(modal, /aiGenerated\.tailoredSkills/);
+  // tidak ada pemanggilan tanpa skill profil yang tersisa di jendela ini
+  assert.doesNotMatch(modal, /highlightedSkills\((?:app|insights)\./);
+});

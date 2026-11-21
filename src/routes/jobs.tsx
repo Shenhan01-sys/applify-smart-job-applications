@@ -424,6 +424,7 @@ function JobsPage() {
           company={selectedJob.company}
           jobData={selectedJob}
           match={matchOf(selectedJob)}
+          profileSkills={profileSkills}
           onClose={() => { setShowApplyModal(false); setSelectedJob(null); }}
           onSuccess={() => { fetchJobs(searchQuery); reloadQuota(); }}
           onDraftCreated={reloadQuota}
