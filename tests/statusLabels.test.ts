@@ -45,13 +45,21 @@ test("isQueueActive: hanya pending dan processing", () => {
   for (const s of ["completed", "failed", undefined, null]) assert.equal(isQueueActive(s as any), false);
 });
 
-test("status persetujuan yang masa berlakunya lewat ditampilkan kedaluwarsa, bukan Disetujui", () => {
+test("temuan 22: Kedaluwarsa hanya untuk baris yang belum diputuskan; Disetujui dan Ditolak tetap walau waktunya lewat", () => {
   const now = Date.parse("2026-11-19T16:00:00Z");
-  assert.equal(effectiveApprovalStatus("approved", "2026-11-19T15:05:00Z", now), "expired");
-  assert.equal(effectiveApprovalStatus("pending", "2026-11-19T15:05:00Z", now), "expired");
-  assert.equal(effectiveApprovalStatus("approved", "2026-11-19T17:00:00Z", now), "approved");
-  assert.equal(effectiveApprovalStatus("rejected", "2026-11-19T15:05:00Z", now), "rejected");
+  const lewat = "2026-11-19T15:05:00Z";
+  const belum = "2026-11-19T17:00:00Z";
+  assert.equal(effectiveApprovalStatus("pending", lewat, now), "expired");
+  assert.equal(effectiveApprovalStatus("pending", belum, now), "pending");
+  assert.equal(effectiveApprovalStatus("approved", lewat, now), "approved");
+  assert.equal(effectiveApprovalStatus("approved", belum, now), "approved");
+  assert.equal(effectiveApprovalStatus("rejected", lewat, now), "rejected");
   assert.equal(effectiveApprovalStatus("approved", null, now), "approved");
+  assert.equal(effectiveApprovalStatus("pending", null, now), "pending");
+  assert.equal(effectiveApprovalStatus("expired", lewat, now), "expired");
+  // label yang tampil di Riwayat: tujuh baris, lima disetujui dan lewat waktu, satu ditolak, satu pending lewat waktu
+  const rows = [...Array(5).fill("approved"), "rejected", "pending"].map((status) => approvalStatusLabel(effectiveApprovalStatus(status, lewat, now)));
+  assert.deepEqual(rows, ["Disetujui", "Disetujui", "Disetujui", "Disetujui", "Disetujui", "Ditolak", "Kedaluwarsa"]);
   const src = readFileSync(new URL("../src/routes/approvals.tsx", import.meta.url), "utf8");
   assert.match(src, /approvalStatusLabel\(shownStatus\)/);
 });

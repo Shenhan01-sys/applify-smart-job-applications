@@ -87,6 +87,9 @@ test("kedaluwarsa (atau tanggal rusak, atau tepat pada batas) menonaktifkan tomb
     assert.equal(s.visible, true);
     assert.equal(s.enabled, false, String(expires_at));
     assert.equal(s.block, "expired");
+    // temuan 22: lencana Riwayat tetap "Disetujui", jadi panel menjelaskan bahwa yang habis adalah masa berlaku 1 jam
+    assert.match(s.message ?? "", /tetap tercatat/);
+    assert.match(s.message ?? "", /1 jam/);
   }
 });
 

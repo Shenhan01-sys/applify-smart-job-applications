@@ -13,12 +13,14 @@ export const APPROVAL_STATUS_LABEL: Record<string, string> = {
 
 /**
  * Status yang ditampilkan untuk satu permintaan persetujuan. Kolom status di database tidak berubah sendiri
- * saat masa berlaku habis, jadi permintaan `pending` atau `approved` yang `expires_at`-nya sudah lewat
- * ditampilkan sebagai `expired`. Tanpa ini, badge menulis "Disetujui" sementara panel email di bawahnya
- * menulis "sudah kedaluwarsa" (uji klik produksi 19 November 2026).
+ * saat masa berlaku habis. Hanya permintaan yang belum diputuskan (`pending`) dan sudah lewat `expires_at`
+ * yang ditampilkan `expired`. Baris yang sudah diputuskan tetap "Disetujui" atau "Ditolak": keputusan pengguna
+ * tidak hilang karena waktu (uji klik produksi 21 November 2026, temuan 22: lima dari tujuh baris riwayat,
+ * termasuk yang sudah disetujui, tertulis "Kedaluwarsa"). Bahwa masa berlaku 1 jam untuk pengiriman email sudah
+ * lewat dijelaskan terpisah oleh panel email (lib/emailApply.ts).
  */
 export function effectiveApprovalStatus(status: string, expiresAt: string | null | undefined, now: number = Date.now()): string {
-  if ((status === "pending" || status === "approved") && expiresAt) {
+  if (status === "pending" && expiresAt) {
     const t = new Date(expiresAt).getTime();
     if (Number.isFinite(t) && t <= now) return "expired";
   }
