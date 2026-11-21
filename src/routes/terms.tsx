@@ -21,7 +21,7 @@ const DATA_STORED = [
 
 const SHARED_WITH = [
   "Supabase menyimpan database dan mengelola akun login.",
-  "Penyedia model AI (OpenRouter dan Groq) menerima bagian profil dan deskripsi lowongan yang diperlukan untuk menulis draf lamaran atau menilai asesmen. Jangan menulis data yang tidak ingin kamu bagikan ke penyedia tersebut.",
+  "Penyedia model AI (Google Gemini, Anthropic Claude, OpenRouter, dan Groq) menerima bagian profil dan deskripsi lowongan yang diperlukan untuk menulis draf lamaran atau menilai asesmen. Jangan menulis data yang tidak ingin kamu bagikan ke penyedia tersebut.",
   "Google, bila kamu memilih masuk dengan Google atau menghubungkan Gmail.",
   "Telegram: saat status lamaran berubah, server dapat mengirim pemberitahuan berisi judul lowongan dan nama perusahaan ke satu chat Telegram milik pengelola aplikasi, bukan ke akunmu. Ini hanya terjadi bila Telegram diatur di server.",
 ];
@@ -91,6 +91,10 @@ function TermsPage() {
 
         <Section title="Kontak peneliti">
           <p>[MENUNGGU DATA: kontak peneliti]</p>
+          <p>
+            Penjelasan lengkap tentang data, penyimpanan, dan penghapusan ada di{" "}
+            <Link to="/privacy" className="text-primary underline underline-offset-2">Kebijakan Privasi</Link>.
+          </p>
         </Section>
       </main>
     </div>

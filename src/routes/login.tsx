@@ -313,6 +313,7 @@ function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Dengan masuk atau mendaftar, kamu menyetujui <Link to="/terms" className="underline hover:text-foreground">Ketentuan &amp; Privasi</Link> Applify.
+          {" "}Baca juga <Link to="/privacy" className="underline hover:text-foreground">Kebijakan Privasi</Link>.
         </p>
       </div>
     </div>

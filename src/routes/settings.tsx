@@ -101,6 +101,9 @@ function SettingsPage() {
             <Link to="/terms" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">
               Baca Ketentuan &amp; Privasi <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Link>
+            <Link to="/privacy" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">
+              Kebijakan Privasi <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
             <SoonButton icon={Lock}>Ekspor data</SoonButton>
           </div>
         </Card>

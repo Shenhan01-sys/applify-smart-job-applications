@@ -16,6 +16,7 @@ import { Route as SkillRadarRouteImport } from './routes/skill-radar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PaymentRouteImport } from './routes/payment'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LinkedinSessionRouteImport } from './routes/linkedin-session'
@@ -65,6 +66,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentRoute = PaymentRouteImport.update({
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/linkedin-session': typeof LinkedinSessionRoute
   '/login': typeof LoginRoute
   '/payment': typeof PaymentRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/linkedin-session'
     | '/login'
     | '/payment'
+    | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/linkedin-session'
     | '/login'
     | '/payment'
+    | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -279,6 +290,7 @@ export interface FileRouteTypes {
     | '/linkedin-session'
     | '/login'
     | '/payment'
+    | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -304,6 +316,7 @@ export interface RootRouteChildren {
   LinkedinSessionRoute: typeof LinkedinSessionRoute
   LoginRoute: typeof LoginRoute
   PaymentRoute: typeof PaymentRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment': {
@@ -498,6 +518,7 @@ const rootRouteChildren: RootRouteChildren = {
   LinkedinSessionRoute: LinkedinSessionRoute,
   LoginRoute: LoginRoute,
   PaymentRoute: PaymentRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,

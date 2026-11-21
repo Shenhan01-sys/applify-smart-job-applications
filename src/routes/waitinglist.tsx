@@ -318,6 +318,8 @@ function WaitinglistPage() {
           <div className="inline-flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-[#146B3D]" aria-hidden="true" />
             <Link to="/terms" className="underline underline-offset-2">Baca Ketentuan dan Privasi</Link>
+            <span aria-hidden="true"> · </span>
+            <Link to="/privacy" className="underline underline-offset-2">Kebijakan Privasi</Link>
           </div>
         </div>
       </main>
