@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { hasGreenEvidence } from "@/lib/greenEvidence";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -60,7 +61,9 @@ export const greenCareerService = {
       .eq("status", "active")
       .order("match_score", { ascending: false });
     if (error) throw error;
-    return (data ?? []) as GreenJob[];
+    // Penandaan is_green lama berasal dari tebakan model atas nama perusahaan (temuan 26, 21 November 2026): peran
+    // yang judul dan deskripsinya tidak memuat istilah lingkungan tidak ditampilkan di sini (lib/greenEvidence.ts).
+    return ((data ?? []) as GreenJob[]).filter((j) => hasGreenEvidence(j.title, j.description));
   },
 
   async startAssessment(jobId: string): Promise<{ assessmentId: string; job: any; questions: AssessmentQuestion[] }> {
