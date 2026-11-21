@@ -200,6 +200,21 @@ const WORKPLACE_COPY: Record<string, { title: string; label: string }> = {
   onsite: { title: "Belum ada lowongan di kantor", label: "Di kantor" },
 };
 
+/** Label tombol pemindai di halaman Lowongan; teks lain menyebutnya dengan nama ini, bukan dengan letaknya. */
+export const SCANNER_BUTTON_LABEL = "Cari lowongan baru dari banyak situs";
+
+/**
+ * Subjudul halaman Lowongan saat tidak ada lowongan yang tampil. Tombol pemindai ada di atas kotak cari, bukan di
+ * bawah, dan keadaan kosong di bawahnya tidak punya tombol itu (uji klik 21 November 2026, temuan 27), jadi teks
+ * menyebut tombolnya dengan nama dan tanpa kata letak.
+ */
+export function jobsEmptySubtitle(searchQuery: string): string {
+  const q = searchQuery.trim();
+  return q
+    ? `Tidak ada lowongan untuk pencarian "${q}". Coba kata kunci lain, atau tekan "${SCANNER_BUTTON_LABEL}".`
+    : `Mulai dengan menekan "${SCANNER_BUTTON_LABEL}".`;
+}
+
 export const GENERIC_EMPTY_TITLE = "Tidak ada lowongan yang cocok";
 export const GENERIC_EMPTY_TEXT = "Coba ubah penyaring atau kata kunci pencarian.";
 

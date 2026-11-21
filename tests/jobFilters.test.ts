@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, SCANNER_BUTTON_LABEL, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
 
 test("freshSinceDate/freshJobsFilter: 30 hari ke belakang (UTC), baris tanpa posted_at tetap dimuat", () => {
   assert.equal(JOB_MAX_AGE_DAYS, 30);
@@ -326,4 +326,23 @@ test("temuan 7: halaman memasang penyaring tempat kerja di kueri server, memuat 
 test("temuan 7: keadaan kosong 80% tetap menyebut hanya lowongan yang dimuat", () => {
   const s = jobsEmptyState({ ...emptyBase, filter: "high-match" });
   assert.match(s.text, /Penyaring ini hanya menghitung lowongan yang dimuat di layar/);
+});
+
+// Uji klik 21 November 2026, temuan 27: subjudul menulis tombol cari ada "di bawah" padahal ada di atas kotak cari.
+test("temuan 27: subjudul kosong menyebut tombol dengan namanya, tanpa kata letak yang salah", () => {
+  assert.equal(SCANNER_BUTTON_LABEL, "Cari lowongan baru dari banyak situs");
+  assert.equal(jobsEmptySubtitle(""), 'Mulai dengan menekan "Cari lowongan baru dari banyak situs".');
+  assert.equal(jobsEmptySubtitle("   "), jobsEmptySubtitle(""));
+  assert.equal(
+    jobsEmptySubtitle(" Blockchain "),
+    'Tidak ada lowongan untuk pencarian "Blockchain". Coba kata kunci lain, atau tekan "Cari lowongan baru dari banyak situs".',
+  );
+  for (const q of ["", "Blockchain"]) assert.doesNotMatch(jobsEmptySubtitle(q), /di bawah|di atas/);
+});
+
+test("temuan 27: halaman Lowongan memakai subjudul dan label tombol dari pustaka yang sama", () => {
+  const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  assert.match(src, /: jobsEmptySubtitle\(searchQuery\)\}/);
+  assert.match(src, /: SCANNER_BUTTON_LABEL\}/);
+  assert.doesNotMatch(src, /tombol cari lowongan di bawah/);
 });

@@ -11,7 +11,7 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, freshJobsFilter, JOBS_PAGE_LIMIT } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, freshJobsFilter, JOBS_PAGE_LIMIT, SCANNER_BUTTON_LABEL } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   computeMatch,
@@ -281,7 +281,7 @@ function JobsPage() {
                   ? `Menampilkan ${JOBS_PAGE_LIMIT} lowongan terbaru. Pakai kotak cari untuk menemukan yang lain.`
                   : jobs.length > 0
                     ? `${jobs.length} lowongan ditemukan dari sumber yang didukung`
-                    : "Mulai dengan menekan tombol cari lowongan di bawah"}
+                    : jobsEmptySubtitle(searchQuery)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -311,7 +311,7 @@ function JobsPage() {
             className="w-full min-h-12 rounded-xl border-2 border-[#0A5BE0] bg-[#0A5BE0]/5 text-[#0A5BE0] font-semibold text-sm hover:bg-[#0A5BE0]/10 transition flex items-center justify-center gap-2"
           >
             <Brain className="h-4 w-4" aria-hidden="true" />
-            {showScanner ? "Tutup pencarian lowongan" : "Cari lowongan baru dari banyak situs"}
+            {showScanner ? "Tutup pencarian lowongan" : SCANNER_BUTTON_LABEL}
           </button>
         </div>
 
