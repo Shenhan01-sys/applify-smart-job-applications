@@ -74,26 +74,26 @@ test("Karier Hijau: tanpa biaya dan refund karangan, ada langkah berikutnya, gal
 // Uji E2E klik 20 November 2026 (temuan 11): profil niche hanya melihat keadaan kosong.
 test("temuan 11: skill di luar enam bidang dikembalikan, bukan dibuang", () => {
   const skills = [
-    { name: "Solidity", category: "Kripto", proficiency_level: 4 },
+    { name: "Fotografi", category: "Seni", proficiency_level: 4 },
     { name: "Memasak", category: "Dapur", proficiency_level: 3 },
   ];
   const r = buildRadarData(skills);
   assert.equal(r.status, "unmatched");
   assert.deepEqual(r.data, []);
   assert.deepEqual(r.unmatched, skills);
-  assert.deepEqual(unmatchedSkillLabels(r.unmatched), ["Solidity (4/5)", "Memasak (3/5)"]);
+  assert.deepEqual(unmatchedSkillLabels(r.unmatched), ["Fotografi (4/5)", "Memasak (3/5)"]);
 });
 
 test("temuan 11: profil campuran: radar untuk yang cocok, sisanya masuk daftar di luar enam bidang", () => {
   const r = buildRadarData([
     { name: "React", category: "Frontend", proficiency_level: 4 },
-    { name: "Solidity", category: "Kripto", proficiency_level: 5 },
+    { name: "Fotografi", category: "Seni", proficiency_level: 5 },
     { name: "Hukum Kontrak", category: null, proficiency_level: 2 },
   ]);
   assert.equal(r.status, "ok");
   assert.equal(r.data.find((d) => d.name === "Frontend")?.userLevel, 80);
   assert.equal(r.matchedCount, 1);
-  assert.deepEqual(r.unmatched.map((s) => s.name), ["Solidity", "Hukum Kontrak"]);
+  assert.deepEqual(r.unmatched.map((s) => s.name), ["Fotografi", "Hukum Kontrak"]);
   // semua cocok: tidak ada daftar tambahan
   assert.deepEqual(buildRadarData([{ name: "Docker", category: "DevOps", proficiency_level: 3 }]).unmatched, []);
   // tanpa skill: tidak ada apa pun
@@ -135,12 +135,15 @@ test("temuan 11: halaman Peta Skill menampilkan bagian Skill di luar enam bidang
 const axisOf = (skill: { name: string; category?: string | null; proficiency_level?: number }) =>
   buildRadarData([{ proficiency_level: 4, ...skill }]).data.filter((d) => d.userLevel > 0).map((d) => d.name);
 
-test("kata kunci: Blockchain tidak masuk Data/AI karena memuat ai, dan profil Web3 tetap di luar enam bidang", () => {
+test("kata kunci: Blockchain tidak masuk Data/AI karena memuat ai; sejak 21 November 2026 profil Web3 masuk Backend", () => {
   assert.equal(hasKeyword("Blockchain", "ai"), false);
-  assert.deepEqual(axisOf({ name: "Solidity", category: "Blockchain" }), []);
+  // bukan Data/AI, melainkan Backend (kata kunci "blockchain", "solidity", "smart contract", "web3")
+  assert.deepEqual(axisOf({ name: "Solidity", category: "Blockchain" }), ["Backend"]);
+  assert.deepEqual(axisOf({ name: "Blockchain" }), ["Backend"]);
   const r = buildRadarData([{ name: "Solidity", category: "Blockchain", proficiency_level: 5 }, { name: "Smart Contract", category: "Web3", proficiency_level: 4 }]);
-  assert.equal(r.status, "unmatched");
-  assert.equal(r.unmatched.length, 2);
+  assert.equal(r.status, "ok");
+  assert.equal(r.unmatched.length, 0);
+  assert.deepEqual(r.data.filter((d) => d.userLevel > 0).map((d) => d.name), ["Backend"]);
 });
 
 test("kata kunci: potongan kata lain yang dulu salah tangkap tidak lagi cocok", () => {
@@ -217,4 +220,57 @@ test("kata kunci: kasus nyata tetap masuk bidangnya, dan bentuk yang dulu awalan
   assert.deepEqual(axisOf({ name: "Data Analytics", category: "technical" }), ["Data/AI"]);
   // semua kata kunci kata utuh cocok dengan dirinya sendiri
   for (const ax of AXES) for (const k of ax.kw) assert.equal(hasKeyword(k, k), true, `${ax.name}: ${k}`);
+});
+
+// Item J (21 November 2026): profil nyata dengan "Google Gemini", "Web3", dan "Privy Wallet" tidak memetakan ke bidang mana pun.
+test("J: Google Gemini masuk Data/AI, Web3 masuk Backend, Privy Wallet tetap di luar enam bidang", () => {
+  assert.deepEqual(axisOf({ name: "Google Gemini" }), ["Data/AI"]);
+  assert.deepEqual(axisOf({ name: "Web3" }), ["Backend"]);
+  assert.deepEqual(axisOf({ name: "Privy Wallet" }), []);
+  const r = buildRadarData([
+    { name: "Google Gemini", proficiency_level: 4 },
+    { name: "Web3", proficiency_level: 3 },
+    { name: "Privy Wallet", proficiency_level: 3 },
+  ]);
+  assert.equal(r.status, "ok", "radar tampil");
+  assert.equal(r.matchedCount, 2);
+  assert.equal(r.data.find((d) => d.name === "Data/AI")?.userLevel, 80);
+  assert.equal(r.data.find((d) => d.name === "Backend")?.userLevel, 60);
+  assert.deepEqual(r.unmatched.map((s) => s.name), ["Privy Wallet"]);
+});
+
+test("J: kata kunci baru tiap bidang memetakan ke bidang yang benar", () => {
+  const cases: Array<[string, string]> = [
+    ...["OpenAI", "ChatGPT", "GPT-4", "Claude", "Prompt Engineering", "Generative AI", "GenAI", "NLP", "Deep Learning", "Computer Vision", "LangChain", "RAG"].map((n): [string, string] => [n, "Data/AI"]),
+    ...["Blockchain", "Solidity", "Smart Contracts", "Ethereum", "Express", "Express.js", "Django", "Laravel", "Spring", "Spring Boot"].map((n): [string, string] => [n, "Backend"]),
+    ...["Next.js", "NextJS", "Svelte", "Angular"].map((n): [string, string] => [n, "Frontend"]),
+    ...["Vercel", "Supabase", "Firebase", "Linux"].map((n): [string, string] => [n, "Cloud/DevOps"]),
+    ...["User Research", "Usability Testing"].map((n): [string, string] => [n, "UI/UX"]),
+    ...["Teamwork", "Problem Solving", "Presentation Skills", "Public Speaking", "Kerja Sama Tim"].map((n): [string, string] => [n, "Agile/Soft"]),
+  ];
+  for (const [name, axis] of cases) assert.deepEqual(axisOf({ name }), [axis], name);
+});
+
+test("J: kata kunci baru tetap kata utuh dan tidak menangkap potongan kata atau kata ambigu", () => {
+  for (const [text, kw] of [
+    ["Drag and Drop", "rag"],
+    ["Fragment", "rag"],
+    ["Springfield", "spring"],
+    ["Expressive Writing", "express"],
+    ["Gptq", "gpt"],
+    ["Linuxy", "linux"],
+    ["Angularity", "angular"],
+    ["Slagging", "ai"],
+    ["Privy Wallet", "wallet"],
+  ] as const) {
+    // "wallet" tidak ada di daftar mana pun; baris ini memastikan tidak ada kata kunci yang cocok dengan teks
+    assert.equal(AXES.some((ax) => ax.kw.some((k) => k === kw && hasKeyword(text, k))), false, `${text} / ${kw}`);
+  }
+  assert.equal(AXES.some((ax) => (ax.kw as readonly string[]).includes("wallet")), false);
+  // kata kunci baru bukan kata tunggal pendek yang ambigu
+  const added = ["gemini", "openai", "chatgpt", "gpt", "claude", "genai", "nlp", "rag", "web3", "express", "spring", "vercel", "supabase", "firebase", "linux", "svelte", "angular"];
+  for (const k of added) assert.ok(AXES.some((ax) => (ax.kw as readonly string[]).includes(k)), k);
+  // tidak ada kata kunci yang muncul di dua bidang sekaligus
+  const all = AXES.flatMap((ax) => [...ax.kw]);
+  assert.equal(new Set(all).size, all.length, "kata kunci ganda di antar bidang");
 });

@@ -20,14 +20,16 @@ export interface UserSkillRow {
 /**
  * Kata kunci tiap bidang. Dicocokkan sebagai kata utuh atau frasa (lihat hasKeyword), bukan potongan kata, jadi
  * bentuk lain yang dulu tertangkap sebagai awalan ("front", "prototyp", "tensor") ditulis eksplisit di sini.
+ * Daftar diperluas 21 November 2026: profil nyata dengan "Google Gemini", "Web3", dan "Privy Wallet" tidak masuk bidang mana pun,
+ * jadi radar tidak tampil. Kata tunggal yang ambigu sengaja tidak dipakai ("wallet", "model", "bot", "agent").
  */
 export const AXES = [
-  { name: "Frontend", market: 90, kw: ["frontend", "front end", "react", "reactjs", "vue", "vuejs", "css", "css3", "html", "html5", "javascript", "typescript", "tailwind", "tailwindcss"] },
-  { name: "Backend", market: 80, kw: ["backend", "back end", "node", "nodejs", "api", "server", "golang", "java", "python", "php", "rest", "restful", "graphql"] },
-  { name: "UI/UX", market: 70, kw: ["ux", "ui/ux", "ux/ui", "design", "designer", "figma", "wireframe", "prototype", "prototyping"] },
-  { name: "Cloud/DevOps", market: 65, kw: ["cloud", "devops", "aws", "gcp", "azure", "docker", "kubernetes", "k8s", "ci/cd", "cicd", "terraform"] },
-  { name: "Data/AI", market: 85, kw: ["data", "database", "dataset", "ai", "ml", "machine", "analytic", "analytical", "sql", "mysql", "postgresql", "nosql", "sqlite", "pandas", "tensor", "tensorflow", "llm"] },
-  { name: "Agile/Soft", market: 75, kw: ["agile", "scrum", "communication", "leadership", "soft", "management", "kolaborasi"] },
+  { name: "Frontend", market: 90, kw: ["frontend", "front end", "react", "reactjs", "vue", "vuejs", "css", "css3", "html", "html5", "javascript", "typescript", "tailwind", "tailwindcss", "next.js", "nextjs", "svelte", "angular"] },
+  { name: "Backend", market: 80, kw: ["backend", "back end", "node", "nodejs", "api", "server", "golang", "java", "python", "php", "rest", "restful", "graphql", "web3", "blockchain", "solidity", "smart contract", "ethereum", "express", "django", "laravel", "spring"] },
+  { name: "UI/UX", market: 70, kw: ["ux", "ui/ux", "ux/ui", "design", "designer", "figma", "wireframe", "prototype", "prototyping", "user research", "usability"] },
+  { name: "Cloud/DevOps", market: 65, kw: ["cloud", "devops", "aws", "gcp", "azure", "docker", "kubernetes", "k8s", "ci/cd", "cicd", "terraform", "vercel", "supabase", "firebase", "linux"] },
+  { name: "Data/AI", market: 85, kw: ["data", "database", "dataset", "ai", "ml", "machine", "analytic", "analytical", "sql", "mysql", "postgresql", "nosql", "sqlite", "pandas", "tensor", "tensorflow", "llm", "gemini", "openai", "chatgpt", "gpt", "claude", "prompt engineering", "generative ai", "genai", "nlp", "deep learning", "computer vision", "langchain", "rag"] },
+  { name: "Agile/Soft", market: 75, kw: ["agile", "scrum", "communication", "leadership", "soft", "management", "kolaborasi", "teamwork", "problem solving", "presentation", "public speaking", "kerja sama"] },
 ] as const;
 
 /** Huruf kecil; tanda hubung, garis bawah, dan spasi ganda menjadi satu spasi ("Front-End" sama dengan "front end"). */
