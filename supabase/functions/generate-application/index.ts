@@ -31,6 +31,7 @@ import {
   validateCoverLetter,
 } from "../_shared/output-guard.ts";
 import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementLines } from "../_shared/profile-context.ts";
+import { selectTailoredSkills } from "../_shared/tailored-skills.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -197,7 +198,7 @@ Return JSON exactly in this shape:
   "coverLetter": "250-400 word ${tone} cover letter, ready to send, no placeholders/brackets, only facts from the candidate data above",
   "matchScore": 0-100,
   "acceptancePotential": 0-100,
-  "tailoredSkills": ["skills from the candidate that match this job"],
+  "tailoredSkills": ["short skill names copied exactly from the candidate's Skills list above that this job asks for; never sentences or requirements taken from the job posting"],
   "skillGaps": ["required skills the candidate is missing"],
   "aiNotes": "1-3 sentence strategy in Bahasa Indonesia"
 }`;
@@ -324,10 +325,18 @@ Return JSON exactly in this shape:
     const warningText = formatWarningsText(warnings);
     const aiNotes = [parsed.aiNotes ?? "", warningText].filter(Boolean).join("\n\n");
 
+    // "Skill yang Disorot" = irisan dengan skill profil (lib _shared/tailored-skills.ts), bukan keluaran model apa adanya:
+    // model pernah mengisinya dengan kalimat persyaratan lowongan (uji klik 21 November 2026, temuan 24).
+    const tailoredSkills = selectTailoredSkills(
+      parsed.tailoredSkills,
+      profileFacts.skills,
+      `${job.title ?? ""}\n${job.description ?? ""}\n${JSON.stringify(job.requirements ?? [])}`,
+    );
+
     const result = {
       coverLetter: parsed.coverLetter ?? "",
-      optimizedCV: { summary: parsed.aiNotes ?? "", highlighted_skills: parsed.tailoredSkills ?? [] },
-      tailoredSkills: parsed.tailoredSkills ?? [],
+      optimizedCV: { summary: parsed.aiNotes ?? "", highlighted_skills: tailoredSkills },
+      tailoredSkills,
       aiNotes,
       matchScore: clamp(parsed.matchScore ?? job.match_score),
       acceptancePotential: clamp(parsed.acceptancePotential ?? job.acceptance_potential),

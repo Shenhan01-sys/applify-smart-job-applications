@@ -319,31 +319,45 @@ export function hasUsableSkills(skills: readonly string[]): boolean {
 // ---- skill yang disebut lowongan ----------------------------------------------------------------------
 
 // Dokumen lamaran (CV, portofolio, KTP, ijazah) juga bukan skill: tag Dealls "CV Terbaru" (uji klik 20 November 2026).
-const NOT_A_SKILL = /\b(tahun|years?|pengalaman|experience|minimal|maksimal|usia|umur|domisili|fresh graduate|lulusan|gaji|salary|cv|resume|portofolio|portfolio|ktp|ijazah|transkrip|sim)\b/i;
+// Frasa keterangan ("Berpengalaman diutamakan", "Minimal S1", "Nilai plus") juga bukan skill: JobStreet menaruhnya
+// di daftar tag lowongan (uji klik 21 November 2026, temuan 23).
+const NOT_A_SKILL = /\b(tahun|years?|pengalaman|berpengalaman|experienced?|experience|minimal|maksimal|usia|umur|domisili|fresh graduate|lulusan|gaji|salary|cv|resume|portofolio|portfolio|ktp|ijazah|transkrip|sim|diutamakan|diprioritaskan|dibutuhkan|diharapkan|dipertimbangkan|preferred|required|nilai plus|nilai tambah|lebih disukai|a plus)\b/i;
+// Kalimat persyaratan yang dipotong pendek ("Mampu bekerja mandiri", "Memiliki kemampuan analisa") bukan nama skill.
+const SENTENCE_START = /^(?:memiliki|mampu|dapat|bisa|bersedia|harus|wajib|mau|senang|suka|bertanggung jawab|able to|ability to|must|have|having|willing|responsible for)\b/i;
 
 function stripHtml(text: string): string {
   return text.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;|&#\d+;/gi, " ");
+}
+
+/**
+ * Istilah skill yang bersih, atau null bila teks ini bukan nama skill: kalimat, frasa keterangan, judul bagian,
+ * angka, atau daftar sifat. Dipakai untuk membaca requirements lowongan dan untuk menyaring "Skill yang Disorot".
+ */
+export function cleanSkillTerm(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw
+    .trim()
+    .replace(/^[-•*\s]+/, "")
+    .replace(/^(?:atau|dan|serta|or|and)\s+/i, "")
+    .replace(/[.;:\s]+$/, "")
+    .trim();
+  if (!t || t.length > 40 || t.split(/\s+/).length > 4) return null;
+  if (!/[a-z]/i.test(t) || /\d/.test(t) || NOT_A_SKILL.test(t) || SENTENCE_START.test(t)) return null;
+  // sisa kalimat seperti "atau bidang terkait" bukan skill
+  if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return null;
+  // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
+  if (t.includes(" ") && t === t.toUpperCase()) return null;
+  // butir berkoma seperti "Responsible, proactive, and reliable" adalah kalimat sifat, bukan satu skill
+  if (t.includes(",")) return null;
+  return t;
 }
 
 /** Skill yang ditulis eksplisit: item requirements yang pendek, dan baris "Requirements: A, B, C" di deskripsi. */
 function explicitTerms(requirements: string[], description: string): string[] {
   const out: string[] = [];
   const add = (raw: string) => {
-    const t = raw
-      .trim()
-      .replace(/^[-•*\s]+/, "")
-      .replace(/^(?:atau|dan|serta|or|and)\s+/i, "")
-      .replace(/[.;:\s]+$/, "")
-      .trim();
-    if (!t || t.length > 40 || t.split(/\s+/).length > 4) return;
-    if (!/[a-z]/i.test(t) || /\d/.test(t) || NOT_A_SKILL.test(t)) return;
-    // sisa kalimat seperti "atau bidang terkait" bukan skill
-    if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return;
-    // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
-    if (t.includes(" ") && t === t.toUpperCase()) return;
-    // butir berkoma seperti "Responsible, proactive, and reliable" adalah kalimat sifat, bukan satu skill
-    if (t.includes(",")) return;
-    out.push(t);
+    const t = cleanSkillTerm(raw);
+    if (t) out.push(t);
   };
   for (const r of requirements) add(r);
   // Daftar harus di baris yang sama dengan labelnya. "Kualifikasi:" yang diikuti baris baru berisi kalimat
@@ -374,10 +388,13 @@ export function computeMatch(job: MatchJobInput, profileSkills: readonly string[
     found.set(name.toLowerCase(), { label: name, covered: profileCanon.has(name.toLowerCase()) });
   }
 
+  const titleN = normalize(title);
   for (const term of explicitTerms(requirements, description)) {
     const n = normalize(term);
     // istilah yang sudah memuat skill kamus diwakili oleh skill kamus itu, supaya tidak dihitung dua kali
     if (!n || found.has(n) || dictionarySkills(n).length > 0) continue;
+    // potongan judul jabatan ("Staf Merchandiser" dari "Staf Merchandiser - Fullstack Developer") adalah peran, bukan skill
+    if (titleN && containsTerm(titleN, n)) continue;
     const covered = entries.some((e) => !e.canon && e.n.length >= 3 && (e.n === n || containsTerm(n, e.n) || containsTerm(e.n, n)));
     found.set(n, { label: term, covered });
   }
@@ -415,4 +432,25 @@ export function sortByMatch<T>(jobs: readonly T[], scoreOf: (job: T) => number |
     .map((job, i) => ({ job, i, s: scoreOf(job) }))
     .sort((a, b) => (b.s ?? -1) - (a.s ?? -1) || a.i - b.i)
     .map((x) => x.job);
+}
+
+/**
+ * Daftar "Skill yang Disorot" pada draf lamaran. Hanya skill dari profil pengguna yang tampil. Bila kecocokan
+ * profil dengan lowongan diketahui (`matched`, dari computeMatch), itulah isinya. Bila tidak, keluaran model
+ * disaring: kalimat persyaratan lowongan dan frasa keterangan dibuang (uji klik 21 November 2026, temuan 24:
+ * "Memiliki kemampuan analisa yang baik" tampil sebagai skill). Draf lama di database bisa memuat kalimat semacam itu.
+ */
+export function highlightedSkills(raw: unknown, matched: readonly string[] = [], max = 8): string[] {
+  const own = [...new Set(matched.map((m) => m.trim()).filter(Boolean))];
+  if (own.length > 0) return own.slice(0, max);
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    const t = cleanSkillTerm(item);
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out.slice(0, max);
 }

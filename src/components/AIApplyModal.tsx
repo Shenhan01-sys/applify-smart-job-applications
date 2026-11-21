@@ -9,7 +9,7 @@ import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
-import { matchCaption, type JobMatch } from "@/lib/matchScore";
+import { highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
 import { applicationStatusLabel } from "@/lib/statusLabels";
 import { draftProgressText, draftWaitHint } from "@/lib/draftProgress";
@@ -153,7 +153,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
         setExisting({ state: "none" });
         return;
       }
-      const view = draftToGenerated(app);
+      const view = draftToGenerated(app, match?.matched);
       setApplication(app);
       // Draf baru menyimpan modelnya; draf lama (null) tetap memakai label paket.
       if (app.model_used) setModelUsed(app.model_used);
@@ -237,7 +237,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setAiGenerated({
         coverLetter: app.cover_letter,
         optimizedCV: (app.optimized_cv as Record<string, any>) || {},
-        tailoredSkills: (app.tailored_skills as string[]) || [],
+        tailoredSkills: highlightedSkills(app.tailored_skills, match?.matched),
         aiNotes: app.ai_notes,
       });
       setEditedCoverLetter(app.cover_letter);
@@ -276,7 +276,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setAiGenerated({
         coverLetter: insights.coverLetter,
         optimizedCV: insights.optimizedCV as Record<string, any>,
-        tailoredSkills: insights.tailoredSkills,
+        tailoredSkills: highlightedSkills(insights.tailoredSkills, match?.matched),
         aiNotes: insights.aiNotes,
       });
       await aiApplicationService.updateCoverLetter(application.id, insights.coverLetter);
@@ -759,6 +759,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                             </li>
                           ))}
                         </ul>
+                        {!aiGenerated.tailoredSkills?.length && (
+                          <p className="text-xs text-muted-foreground">Belum ada skill di profilmu yang cocok dengan lowongan ini.</p>
+                        )}
                       </div>
                     </div>
                   </div>

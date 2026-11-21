@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import {
   HIGH_MATCH_THRESHOLD,
   NO_PROFILE_SKILLS_TEXT,
+  cleanSkillTerm,
   computeMatch,
+  highlightedSkills,
   matchCaption,
   profileSkillList,
   sortByMatch,
@@ -228,4 +230,70 @@ test("jumlah tailoredSkills dari AI tidak dilabeli skill cocok, supaya tidak ber
     assert.doesNotMatch(src, /tailored_skills\?\.length \|\| 0\} skill cocok/);
     assert.match(src, /skill disorot AI/i);
   }
+});
+
+// Uji klik 21 November 2026, temuan 23 dan 24.
+
+test("temuan 23: judul jabatan dan frasa keterangan di requirements bukan skill", () => {
+  const job = {
+    title: "Staf Merchandiser - Fullstack Developer",
+    description: "",
+    requirements: ["Staf Merchandiser", "Berpengalaman diutamakan", "Excel", "Komunikasi"],
+  };
+  const m = computeMatch(job, ["Excel"]);
+  assert.equal(m.status, "ok");
+  assert.deepEqual(m.matched, ["Excel"]);
+  assert.deepEqual(m.missing, ["Komunikasi"]);
+  assert.equal(m.total, 2);
+  assert.equal(m.score, 50);
+  for (const bukan of ["Staf Merchandiser", "Berpengalaman diutamakan"]) assert.ok(![...m.matched, ...m.missing].includes(bukan), bukan);
+});
+
+test("temuan 23: cleanSkillTerm menolak kalimat, frasa keterangan, dan peran; skill pendek lolos", () => {
+  for (const bukan of [
+    "Berpengalaman diutamakan",
+    "Berpengalaman minimal 2 tahun",
+    "Pengalaman di bidang sejenis",
+    "Nilai plus",
+    "Lebih disukai",
+    "Mampu bekerja mandiri",
+    "Memiliki kemampuan analisa",
+    "Memiliki kemampuan menggunakan perangkat lunak komputer",
+    "Mampu bekerja secara mandiri maupun tim",
+    "IT SYSTEM DEVELOPMENT",
+    "Responsible, proactive",
+    "",
+    "   ",
+    42,
+    null,
+  ]) assert.equal(cleanSkillTerm(bukan), null, String(bukan));
+  assert.equal(cleanSkillTerm("- Excel;"), "Excel");
+  assert.equal(cleanSkillTerm("Komunikasi"), "Komunikasi");
+  assert.equal(cleanSkillTerm("SQL"), "SQL");
+  assert.equal(cleanSkillTerm("Analisis data"), "Analisis data");
+});
+
+test("temuan 24: Skill yang Disorot memakai kecocokan profil bila ada, dan tidak pernah kalimat persyaratan", () => {
+  const kalimat = [
+    "Memiliki kemampuan menggunakan perangkat lunak komputer",
+    "Memiliki kemampuan analisa yang baik",
+    "Mampu bekerja secara mandiri maupun tim",
+  ];
+  // kecocokan profil diketahui: itulah isinya, apa pun keluaran model
+  assert.deepEqual(highlightedSkills(kalimat, ["Excel", "Komunikasi"]), ["Excel", "Komunikasi"]);
+  // tanpa kecocokan: kalimat persyaratan dibuang
+  assert.deepEqual(highlightedSkills(kalimat), []);
+  assert.deepEqual(highlightedSkills([...kalimat, "Excel", "excel", "Komunikasi"]), ["Excel", "Komunikasi"]);
+  // bentuk rusak tidak melempar
+  for (const bad of [undefined, null, "Excel", 5, {}, [1, null, ""]]) assert.deepEqual(highlightedSkills(bad), []);
+  // dibatasi 8 butir
+  assert.equal(highlightedSkills(["A1x", "B", "C", "D", "E", "F", "G", "H", "I", "J"].map((x) => `Skill ${x}`).map((x) => x.replace(/\d/g, ""))).length, 8);
+});
+
+test("temuan 24: draf lama dengan kalimat di tailored_skills disaring saat ditampilkan, dan tampilan memakai highlightedSkills", () => {
+  for (const rel of ["../src/components/AIApplyModal.tsx", "../src/routes/applications.tsx"]) {
+    assert.match(read(rel), /highlightedSkills\(/, rel);
+  }
+  assert.doesNotMatch(read("../src/routes/applications.tsx"), /selectedApp\.tailored_skills\.map/);
+  assert.match(read("../src/lib/draftApproval.ts"), /highlightedSkills\(app\.tailored_skills, matchedSkills\)/);
 });

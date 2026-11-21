@@ -5,8 +5,9 @@
  * The approval queue (backend POST /api/approvals) does not stop two pending approvals for the same draft, so the
  * client checks the pending list first.
  *
- * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
+ * Plain TypeScript with relative imports only, so it runs under `node --test` without a bundler.
  */
+import { highlightedSkills } from "./matchScore.ts";
 
 /** A draft can go to approval while it has not been sent: "draft" or "ready". */
 export function canRequestApproval(status: unknown): boolean {
@@ -92,12 +93,16 @@ export interface GeneratedView {
 }
 
 /** What the draft screen shows for a draft that is already saved. Missing or badly shaped columns become empty, not errors. */
-export function draftToGenerated(app: { cover_letter?: unknown; optimized_cv?: unknown; tailored_skills?: unknown; ai_notes?: unknown }): GeneratedView {
+export function draftToGenerated(
+  app: { cover_letter?: unknown; optimized_cv?: unknown; tailored_skills?: unknown; ai_notes?: unknown },
+  matchedSkills: readonly string[] = [],
+): GeneratedView {
   const cv = app.optimized_cv && typeof app.optimized_cv === "object" && !Array.isArray(app.optimized_cv) ? (app.optimized_cv as Record<string, any>) : {};
   return {
     coverLetter: typeof app.cover_letter === "string" ? app.cover_letter : "",
     optimizedCV: cv,
-    tailoredSkills: Array.isArray(app.tailored_skills) ? app.tailored_skills.filter((s): s is string => typeof s === "string" && s.trim() !== "") : [],
+    // Hanya skill profil: kalimat persyaratan lowongan di draf lama disaring (temuan 24, uji klik 21 November 2026).
+    tailoredSkills: highlightedSkills(app.tailored_skills, matchedSkills),
     aiNotes: typeof app.ai_notes === "string" ? app.ai_notes : "",
   };
 }
