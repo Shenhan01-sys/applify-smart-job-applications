@@ -32,6 +32,7 @@ import {
 } from "../_shared/output-guard.ts";
 import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementLines } from "../_shared/profile-context.ts";
 import { selectTailoredSkills } from "../_shared/tailored-skills.ts";
+import { letterStructureRules } from "../_shared/letter-rules.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -193,9 +194,12 @@ LANGUAGE: ${languageInstruction(language)}
 GROUNDING RULES (strict):
 ${GROUNDING_RULES.map((r) => `- ${r}`).join("\n")}${achievementRule}
 
+LETTER STRUCTURE (strict):
+${letterStructureRules(job.title, job.company).map((r) => `- ${r}`).join("\n")}
+
 Return JSON exactly in this shape:
 {
-  "coverLetter": "250-400 word ${tone} cover letter, ready to send, no placeholders/brackets, only facts from the candidate data above",
+  "coverLetter": "250-400 word ${tone} cover letter in at least 3 short paragraphs separated by \\n\\n, naming the position title and the company, ready to send, no placeholders/brackets, only facts from the candidate data above",
   "matchScore": 0-100,
   "acceptancePotential": 0-100,
   "tailoredSkills": ["short skill names copied exactly from the candidate's Skills list above that this job asks for; never sentences or requirements taken from the job posting"],
