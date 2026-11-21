@@ -415,3 +415,43 @@ test("temuan 34: jendela draf, detail Lamaran Saya, dan hitungan kartu memanggil
   const defs = [...read("../src/lib/matchScore.ts").matchAll(/export function highlightedSkills\(/g)];
   assert.equal(defs.length, 1);
 });
+
+// ---- temuan 29 (uji ulang): penyaring tidak membuang skill sungguhan, kotak hilang karena draf lama tidak menyimpan daftarnya ----
+
+const BUTIR_STAF_MERCHANDISER = [
+  "Staf Merchandiser",
+  "Pendidikan S1 semua jurusan",
+  "Pengalaman kerja merchandising",
+  "Microsoft Office",
+  "Microsoft Excel",
+  "Java",
+  "MySQL",
+  "PostgreSQL",
+  "Sistem pembelian",
+];
+
+test("temuan 29: sembilan butir nyata Staf Merchandiser, hanya skill sungguhan yang tersisa dan urutannya dijaga", () => {
+  const skill = ["Microsoft Office", "Microsoft Excel", "Java", "MySQL", "PostgreSQL", "Sistem pembelian"];
+  for (const judul of ["Staf Merchandiser - Fullstack Developer", "Staf Merchandiser", ""]) {
+    const hasil = displaySkillGaps(BUTIR_STAF_MERCHANDISER, judul);
+    assert.deepEqual(hasil.filter((x) => skill.includes(x)), skill, `skill sungguhan utuh (judul: ${judul})`);
+    // judul jabatan dibuang bila judul lowongan diketahui; syarat pendidikan dan kalimat pengalaman selalu dibuang
+    assert.equal(hasil.includes("Pendidikan S1 semua jurusan"), false);
+    assert.equal(hasil.includes("Pengalaman kerja merchandising"), false);
+    assert.equal(hasil.includes("Staf Merchandiser"), judul === "", `judul jabatan (judul: ${judul})`);
+  }
+  // masing-masing skill sungguhan lolos sendirian, tidak bergantung pada butir lain
+  for (const x of skill) assert.deepEqual(displaySkillGaps([x], "Staf Merchandiser - Fullstack Developer"), [x]);
+});
+
+test("temuan 29: daftar kesenjangan hanya ada untuk draf yang baru dibuat atau ditulis ulang, tidak untuk draf tersimpan", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  // kolom ai_applications tidak menyimpan skill yang belum ada di profil; daftar hanya datang dari analisis Edge Function
+  assert.equal([...src.matchAll(/setSkillGaps\(/g)].length, 2, "buat draf dan tulis ulang");
+  const muat = src.slice(src.indexOf("const loadExistingDraft"), src.indexOf("}, [jobId]);", src.indexOf("const loadExistingDraft")));
+  assert.doesNotMatch(muat, /setSkillGaps/);
+  // null (belum ada analisis) menyembunyikan kotak; daftar kosong tetap menampilkannya dengan keterangan
+  assert.match(src, /skillGaps === null \? null : displaySkillGaps\(skillGaps, jobTitle\)/);
+  assert.match(src, /shownSkillGaps !== null && \(/);
+  assert.match(src, /Model tidak melaporkan kesenjangan skill/);
+});
