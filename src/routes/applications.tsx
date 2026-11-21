@@ -11,7 +11,8 @@ import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
 import { groupByStatus } from "@/lib/dashboardStats";
-import { highlightedSkills } from "@/lib/matchScore";
+import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
+import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
@@ -187,7 +188,7 @@ function DroppableColumn({ status, apps, children }: {
   );
 }
 
-function AppListRow({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
+function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; profileSkills: readonly string[] | null; onOpen: () => void }) {
   const config = statusConfig[app.status] ?? statusConfig.draft;
   const job = jobOf(app);
   return (
@@ -202,7 +203,7 @@ function AppListRow({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApp
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate">{job?.title || "Posisi"}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {job?.company || "Perusahaan"} · {highlightedSkills(app.tailored_skills).length} skill disorot AI
+          {job?.company || "Perusahaan"} · {highlightedSkills(app.tailored_skills, [], 8, profileSkills).length} skill disorot AI
         </p>
         <DuplicateNote info={duplicate} className="truncate" />
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
@@ -256,6 +257,27 @@ export function AppsPage() {
   // dan teks di jendela detail. Naik satu setiap kali tugas apply selesai, supaya log baru dibaca lagi.
   const [attempts, setAttempts] = useState<Record<string, ApplyAttempt>>({});
   const [applyReloads, setApplyReloads] = useState(0);
+  // Skill profil untuk menyaring "Skill yang Disorot" saat ditampilkan: draf lama (dibuat sebelum penyaringan di
+  // Edge Function) masih memuat skill lowongan yang tidak ada di profil (temuan 30, uji klik 21 November 2026).
+  // null = belum dimuat atau gagal dimuat (hanya penyaring frasa yang berlaku); mode demo tidak memakainya.
+  const [profileSkills, setProfileSkills] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (isMockMode()) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const skills = profileSkillList(await profileService.getSkillSource(user.id));
+        if (alive) setProfileSkills(skills);
+      } catch (err) {
+        console.warn("Skill profil belum bisa dimuat untuk menyaring Skill yang Disorot:", err);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Draf yang belum dikirim: periksa apakah sudah menunggu persetujuan, supaya tidak diajukan dua kali.
   const selectedId = selectedApp?.id;
@@ -493,6 +515,7 @@ export function AppsPage() {
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
   const selectedAttempt = selectedApp ? attempts[selectedApp.job_id] : undefined;
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
+  const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, [], 8, profileSkills) : [];
 
   return (
     <AppShell>
@@ -608,12 +631,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />)}
+                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />)}
+                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
@@ -780,14 +803,14 @@ export function AppsPage() {
                   </div>
                 </div>
 
-                {highlightedSkills(selectedApp.tailored_skills).length > 0 && (
+                {selectedSkills.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                       <Zap className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
                       Skill yang Disorot
                     </h3>
                     <ul className="flex flex-wrap gap-2">
-                      {highlightedSkills(selectedApp.tailored_skills).map((skill, i) => (
+                      {selectedSkills.map((skill, i) => (
                         <li key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
                           {skill}
                         </li>

@@ -435,20 +435,43 @@ export function sortByMatch<T>(jobs: readonly T[], scoreOf: (job: T) => number |
 }
 
 /**
+ * Skill profil (ejaan profil) yang ditunjuk `term`: sama dengan, atau memuat sebagai kata utuh, sebuah skill profil
+ * (dan sebaliknya). Aturan yang sama dengan Edge Function generate-application (selectTailoredSkills): "java"
+ * tidak cocok dengan "javascript", dan skill profil dua huruf seperti "Go" hanya cocok bila sama persis.
+ */
+function profileSkillFor(term: string, entries: readonly ProfileEntry[]): string | null {
+  const n = normalize(term);
+  if (!n) return null;
+  const hit = entries.find((e) => e.n === n || (e.n.length >= 3 && containsTerm(n, e.n)) || (n.length >= 3 && containsTerm(e.n, n)));
+  return hit ? hit.raw : null;
+}
+
+/**
  * Daftar "Skill yang Disorot" pada draf lamaran. Hanya skill dari profil pengguna yang tampil. Bila kecocokan
  * profil dengan lowongan diketahui (`matched`, dari computeMatch), itulah isinya. Bila tidak, keluaran model
  * disaring: kalimat persyaratan lowongan dan frasa keterangan dibuang (uji klik 21 November 2026, temuan 24:
  * "Memiliki kemampuan analisa yang baik" tampil sebagai skill). Draf lama di database bisa memuat kalimat semacam itu.
+ *
+ * `profileSkills` (daftar skill profil, dari profileSkillList) membuat penyaringan itu juga membuang butir yang
+ * bukan skill profil, supaya draf lama tampil bersih (temuan 30: "Smart Contracts" pada profil tanpa skill itu).
+ * null = skill profil belum diketahui, jadi hanya penyaring frasa yang berlaku. Daftar kosong = profil tanpa skill,
+ * hasilnya kosong. Ejaan profil dipakai, seperti pada draf baru.
  */
-export function highlightedSkills(raw: unknown, matched: readonly string[] = [], max = 8): string[] {
+export function highlightedSkills(raw: unknown, matched: readonly string[] = [], max = 8, profileSkills: readonly string[] | null = null): string[] {
   const own = [...new Set(matched.map((m) => m.trim()).filter(Boolean))];
   if (own.length > 0) return own.slice(0, max);
+  const entries = profileSkills === null ? null : profileEntries(profileSkills);
   const list = Array.isArray(raw) ? raw : [];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of list) {
-    const t = cleanSkillTerm(item);
-    if (!t || seen.has(t.toLowerCase())) continue;
+    let t = cleanSkillTerm(item);
+    if (!t) continue;
+    if (entries) {
+      t = profileSkillFor(t, entries);
+      if (!t) continue;
+    }
+    if (seen.has(t.toLowerCase())) continue;
     seen.add(t.toLowerCase());
     out.push(t);
   }

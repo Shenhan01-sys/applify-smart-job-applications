@@ -334,3 +334,37 @@ test("temuan 29: tab Strategi AI menampilkan daftar yang sudah disaring dengan j
   assert.match(tab, /shownSkillGaps\.map\(/);
   assert.doesNotMatch(tab, /[^n]skillGaps\.map\(/);
 });
+
+test("temuan 30: draf lama disaring dengan skill profil saat ditampilkan (irisan, ejaan profil, kata utuh)", () => {
+  // butir nyata dari draf lama Web3 Developer (uji klik 21 November 2026)
+  const lama = ["React", "Decentralized Applications", "Smart Contracts", "Blockchain Technology", "TypeScript"];
+  const profil = ["react", "TypeScript", "Tailwind CSS", "Git"];
+  // hanya skill profil, ejaan profil
+  assert.deepEqual(highlightedSkills(lama, [], 8, profil), ["react", "TypeScript"]);
+  // skill profil belum diketahui (null): hanya penyaring frasa, perilaku lama
+  assert.deepEqual(highlightedSkills(lama, [], 8, null), lama);
+  assert.deepEqual(highlightedSkills(lama), lama);
+  // profil tanpa skill: tidak ada yang tampil
+  assert.deepEqual(highlightedSkills(lama, [], 8, []), []);
+  // butir model yang memuat skill profil sebagai kata utuh dipetakan ke skill profil, dan duplikat dibuang
+  assert.deepEqual(highlightedSkills(["Smart Contracts", "Smart Contracts Development", "smart contracts"], [], 8, ["Smart Contracts"]), ["Smart Contracts"]);
+  // pencocokan kata utuh: "Java" bukan skill profil "JavaScript", dan skill dua huruf ("Go") hanya cocok bila sama persis
+  assert.deepEqual(highlightedSkills(["Java", "Go", "Google Cloud"], [], 8, ["JavaScript", "Go"]), ["Go"]);
+  // kalimat persyaratan tetap dibuang walau memuat skill profil
+  assert.deepEqual(highlightedSkills(["Memiliki kemampuan React", "React"], [], 8, ["React"]), ["React"]);
+  // kecocokan dari computeMatch tetap didahulukan
+  assert.deepEqual(highlightedSkills(lama, ["Git"], 8, profil), ["Git"]);
+  // bentuk rusak tidak melempar
+  for (const bad of [undefined, null, "React", 5, {}, [1, null, ""]]) assert.deepEqual(highlightedSkills(bad, [], 8, profil), []);
+});
+
+test("temuan 30: Lamaran Saya memuat skill profil dan memakainya di jendela detail dan di daftar", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /profileSkillList\(await profileService\.getSkillSource\(user\.id\)\)/);
+  assert.match(src, /highlightedSkills\(selectedApp\.tailored_skills, \[\], 8, profileSkills\)/);
+  assert.match(src, /highlightedSkills\(app\.tailored_skills, \[\], 8, profileSkills\)/);
+  // tidak ada pemanggilan tanpa skill profil yang tersisa
+  assert.doesNotMatch(src, /highlightedSkills\((?:selectedApp|app)\.tailored_skills\)/);
+  // galat memuat profil tidak menjatuhkan halaman: hanya dicatat, daftar memakai penyaring frasa
+  assert.match(src, /catch \(err\) \{\s*console\.warn\("Skill profil belum bisa dimuat/);
+});
