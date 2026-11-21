@@ -274,17 +274,17 @@ test("temuan 23: cleanSkillTerm menolak kalimat, frasa keterangan, dan peran; sk
   assert.equal(cleanSkillTerm("Analisis data"), "Analisis data");
 });
 
-test("temuan 24: Skill yang Disorot memakai kecocokan profil bila ada, dan tidak pernah kalimat persyaratan", () => {
+test("temuan 24: Skill yang Disorot tidak pernah kalimat persyaratan, dengan atau tanpa skill profil", () => {
   const kalimat = [
     "Memiliki kemampuan menggunakan perangkat lunak komputer",
     "Memiliki kemampuan analisa yang baik",
     "Mampu bekerja secara mandiri maupun tim",
   ];
-  // kecocokan profil diketahui: itulah isinya, apa pun keluaran model
-  assert.deepEqual(highlightedSkills(kalimat, ["Excel", "Komunikasi"]), ["Excel", "Komunikasi"]);
-  // tanpa kecocokan: kalimat persyaratan dibuang
+  // skill profil belum diketahui: kalimat persyaratan dibuang, duplikat dibuang
   assert.deepEqual(highlightedSkills(kalimat), []);
   assert.deepEqual(highlightedSkills([...kalimat, "Excel", "excel", "Komunikasi"]), ["Excel", "Komunikasi"]);
+  // skill profil diketahui: kalimat tetap dibuang, dan hanya skill profil yang tampil
+  assert.deepEqual(highlightedSkills([...kalimat, "Excel", "Komunikasi", "Docker"], ["Excel", "Komunikasi"]), ["Excel", "Komunikasi"]);
   // bentuk rusak tidak melempar
   for (const bad of [undefined, null, "Excel", 5, {}, [1, null, ""]]) assert.deepEqual(highlightedSkills(bad), []);
   // dibatasi 8 butir
@@ -296,7 +296,7 @@ test("temuan 24: draf lama dengan kalimat di tailored_skills disaring saat ditam
     assert.match(read(rel), /highlightedSkills\(/, rel);
   }
   assert.doesNotMatch(read("../src/routes/applications.tsx"), /selectedApp\.tailored_skills\.map/);
-  assert.match(read("../src/lib/draftApproval.ts"), /highlightedSkills\(app\.tailored_skills, matchedSkills\)/);
+  assert.match(read("../src/lib/draftApproval.ts"), /highlightedSkills\(app\.tailored_skills, profileSkills\)/);
 });
 
 test("temuan 29: daftar skill yang belum ada di profil membuang judul jabatan, kalimat persyaratan, dan syarat pendidikan", () => {
@@ -340,31 +340,78 @@ test("temuan 30: draf lama disaring dengan skill profil saat ditampilkan (irisan
   const lama = ["React", "Decentralized Applications", "Smart Contracts", "Blockchain Technology", "TypeScript"];
   const profil = ["react", "TypeScript", "Tailwind CSS", "Git"];
   // hanya skill profil, ejaan profil
-  assert.deepEqual(highlightedSkills(lama, [], 8, profil), ["react", "TypeScript"]);
+  assert.deepEqual(highlightedSkills(lama, profil), ["react", "TypeScript"]);
   // skill profil belum diketahui (null): hanya penyaring frasa, perilaku lama
-  assert.deepEqual(highlightedSkills(lama, [], 8, null), lama);
+  assert.deepEqual(highlightedSkills(lama, null), lama);
   assert.deepEqual(highlightedSkills(lama), lama);
   // profil tanpa skill: tidak ada yang tampil
-  assert.deepEqual(highlightedSkills(lama, [], 8, []), []);
+  assert.deepEqual(highlightedSkills(lama, []), []);
   // butir model yang memuat skill profil sebagai kata utuh dipetakan ke skill profil, dan duplikat dibuang
-  assert.deepEqual(highlightedSkills(["Smart Contracts", "Smart Contracts Development", "smart contracts"], [], 8, ["Smart Contracts"]), ["Smart Contracts"]);
+  assert.deepEqual(highlightedSkills(["Smart Contracts", "Smart Contracts Development", "smart contracts"], ["Smart Contracts"]), ["Smart Contracts"]);
   // pencocokan kata utuh: "Java" bukan skill profil "JavaScript", dan skill dua huruf ("Go") hanya cocok bila sama persis
-  assert.deepEqual(highlightedSkills(["Java", "Go", "Google Cloud"], [], 8, ["JavaScript", "Go"]), ["Go"]);
+  assert.deepEqual(highlightedSkills(["Java", "Go", "Google Cloud"], ["JavaScript", "Go"]), ["Go"]);
   // kalimat persyaratan tetap dibuang walau memuat skill profil
-  assert.deepEqual(highlightedSkills(["Memiliki kemampuan React", "React"], [], 8, ["React"]), ["React"]);
-  // kecocokan dari computeMatch tetap didahulukan
-  assert.deepEqual(highlightedSkills(lama, ["Git"], 8, profil), ["Git"]);
+  assert.deepEqual(highlightedSkills(["Memiliki kemampuan React", "React"], ["React"]), ["React"]);
   // bentuk rusak tidak melempar
-  for (const bad of [undefined, null, "React", 5, {}, [1, null, ""]]) assert.deepEqual(highlightedSkills(bad, [], 8, profil), []);
+  for (const bad of [undefined, null, "React", 5, {}, [1, null, ""]]) assert.deepEqual(highlightedSkills(bad, profil), []);
 });
 
 test("temuan 30: Lamaran Saya memuat skill profil dan memakainya di jendela detail dan di daftar", () => {
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /profileSkillList\(await profileService\.getSkillSource\(user\.id\)\)/);
-  assert.match(src, /highlightedSkills\(selectedApp\.tailored_skills, \[\], 8, profileSkills\)/);
-  assert.match(src, /highlightedSkills\(app\.tailored_skills, \[\], 8, profileSkills\)/);
+  assert.match(src, /highlightedSkills\(selectedApp\.tailored_skills, profileSkills\)/);
+  assert.match(src, /highlightedSkills\(app\.tailored_skills, profileSkills\)/);
   // tidak ada pemanggilan tanpa skill profil yang tersisa
   assert.doesNotMatch(src, /highlightedSkills\((?:selectedApp|app)\.tailored_skills\)/);
   // galat memuat profil tidak menjatuhkan halaman: hanya dicatat, daftar memakai penyaring frasa
   assert.match(src, /catch \(err\) \{\s*console\.warn\("Skill profil belum bisa dimuat/);
+});
+
+// ---- temuan 34: satu jalur untuk jendela draf di Lowongan dan Lamaran Saya ----
+
+// isi tailored_skills draf lama Web3 Developer yang tersimpan, dan skill profil akun uji (uji klik 21 November 2026)
+const WEB3_TERSIMPAN = ["Privy Wallet", "Google Gemini", "Decentralized Applications", "Smart Contracts", "Blockchain Technology"];
+const WEB3_PROFIL = ["Google Gemini", "Web3", "Privy Wallet"];
+
+test("temuan 34: draf Web3 Developer menampilkan skill yang sama di mana pun, bukan hasil computeMatch", () => {
+  // tailored_skills tersimpan disaring dengan skill profil: ejaan profil, urutan draf
+  assert.deepEqual(highlightedSkills(WEB3_TERSIMPAN, WEB3_PROFIL), ["Privy Wallet", "Google Gemini"]);
+  // computeMatch untuk lowongan yang menyebut Web3 menghasilkan ["Web3"]; itu bukan isi draf dan tidak lagi dipakai
+  const m = computeMatch({ title: "Web3 Developer", description: "Membangun aplikasi Web3 dan smart contracts." }, WEB3_PROFIL);
+  assert.deepEqual(m.matched, ["Web3"]);
+  // masukan yang sama selalu keluaran yang sama, termasuk huruf besar-kecil dan duplikat
+  assert.deepEqual(highlightedSkills([...WEB3_TERSIMPAN, "privy wallet", "GOOGLE GEMINI"], WEB3_PROFIL), ["Privy Wallet", "Google Gemini"]);
+  // skill profil yang bernama berangka ("Web3") lolos bila tersimpan di draf, walau penyaring frasa menolak angka
+  assert.deepEqual(highlightedSkills(["web3", "Smart Contracts"], WEB3_PROFIL), ["Web3"]);
+  assert.deepEqual(highlightedSkills(["Web3 Development"], WEB3_PROFIL), ["Web3"]);
+  // angka tidak meloloskan butir yang bukan skill profil, dan tanpa skill profil aturan angka lama tetap berlaku
+  assert.deepEqual(highlightedSkills(["Pendidikan S1 semua jurusan", "Web3 Development"], ["Excel"]), []);
+  assert.deepEqual(highlightedSkills(["Web3", "Pendidikan S1 semua jurusan"], null), []);
+});
+
+test("temuan 34: skill dua huruf 'Go' tidak cocok dengan 'Google Gemini'", () => {
+  // butir "Go" pada draf, profil tanpa skill Go: dibuang
+  assert.deepEqual(highlightedSkills(["Go", "Google Gemini"], WEB3_PROFIL), ["Google Gemini"]);
+  assert.deepEqual(highlightedSkills(["Go"], WEB3_PROFIL), []);
+  // skill profil "Go" hanya cocok dengan "Go" yang persis, tidak dengan Google Gemini atau Google Cloud
+  assert.deepEqual(highlightedSkills(["Go", "Google Gemini", "Google Cloud"], ["Go"]), ["Go"]);
+  assert.deepEqual(highlightedSkills(["Google Gemini"], ["Go"]), []);
+  // arah sebaliknya: butir "Gemini" menunjuk skill profil "Google Gemini" (kata utuh), ejaan profil dipakai
+  assert.deepEqual(highlightedSkills(["gemini"], WEB3_PROFIL), ["Google Gemini"]);
+  // "Java" bukan "JavaScript"
+  assert.deepEqual(highlightedSkills(["Java"], ["JavaScript"]), []);
+});
+
+test("temuan 34: jendela draf, detail Lamaran Saya, dan hitungan kartu memanggil highlightedSkills dengan masukan yang sama", () => {
+  const modal = read("../src/components/AIApplyModal.tsx");
+  const apps = read("../src/routes/applications.tsx");
+  // masukan: isi mentah tailored_skills draf dan skill profil; tidak ada argumen kecocokan lowongan (computeMatch) lagi
+  assert.match(modal, /highlightedSkills\(rawSkills, profileSkills\)/);
+  assert.match(apps, /highlightedSkills\(selectedApp\.tailored_skills, profileSkills\)/);
+  assert.match(apps, /highlightedSkills\(app\.tailored_skills, profileSkills\)/);
+  assert.doesNotMatch(modal, /highlightedSkills\([^)]*match\??\.matched/);
+  assert.doesNotMatch(read("../src/lib/draftApproval.ts"), /matchedSkills/);
+  // satu definisi saja
+  const defs = [...read("../src/lib/matchScore.ts").matchAll(/export function highlightedSkills\(/g)];
+  assert.equal(defs.length, 1);
 });

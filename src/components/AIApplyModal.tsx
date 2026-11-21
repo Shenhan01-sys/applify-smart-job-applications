@@ -121,10 +121,12 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   // Isi mentah tailored_skills dari draf yang sedang tampil (kolom database atau keluaran model, belum disaring).
   // Daftar yang tampil disaring saat render, bukan saat draf dimuat: skill profil bisa baru selesai dimuat sesudah
   // draf terbuka, dan penyaringan sebelum dipotong 8 butir tidak membuang skill profil yang kebetulan di urutan akhir.
+  // Jalur yang sama dengan Lamaran Saya (highlightedSkills dengan tailored_skills dan skill profil): draf yang sama
+  // menampilkan daftar yang sama di kedua tempat (temuan 34). Kecocokan lowongan (match) tidak ikut menentukan isinya.
   const [rawSkills, setRawSkills] = useState<unknown>([]);
   const shownSkills = useMemo(
-    () => highlightedSkills(rawSkills, match?.matched, 8, profileSkills),
-    [rawSkills, match, profileSkills],
+    () => highlightedSkills(rawSkills, profileSkills),
+    [rawSkills, profileSkills],
   );
 
   // The chain of models rotates (see PLAN_MODELS), so before a draft exists the UI names the plan, not a model.
@@ -170,7 +172,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
         setExisting({ state: "none" });
         return;
       }
-      const view = draftToGenerated(app, match?.matched);
+      // Daftar skill yang tampil dihitung saat render dari rawSkills (shownSkills), bukan dari view.tailoredSkills.
+      const view = draftToGenerated(app);
       setApplication(app);
       // Draf baru menyimpan modelnya; draf lama (null) tetap memakai label paket.
       if (app.model_used) setModelUsed(app.model_used);

@@ -95,14 +95,14 @@ export interface GeneratedView {
 /** What the draft screen shows for a draft that is already saved. Missing or badly shaped columns become empty, not errors. */
 export function draftToGenerated(
   app: { cover_letter?: unknown; optimized_cv?: unknown; tailored_skills?: unknown; ai_notes?: unknown },
-  matchedSkills: readonly string[] = [],
+  profileSkills: readonly string[] | null = null,
 ): GeneratedView {
   const cv = app.optimized_cv && typeof app.optimized_cv === "object" && !Array.isArray(app.optimized_cv) ? (app.optimized_cv as Record<string, any>) : {};
   return {
     coverLetter: typeof app.cover_letter === "string" ? app.cover_letter : "",
     optimizedCV: cv,
-    // Hanya skill profil: kalimat persyaratan lowongan di draf lama disaring (temuan 24, uji klik 21 November 2026).
-    tailoredSkills: highlightedSkills(app.tailored_skills, matchedSkills),
+    // Hanya skill profil, lewat jalur yang sama dengan jendela draf dan Lamaran Saya (temuan 24 dan 34).
+    tailoredSkills: highlightedSkills(app.tailored_skills, profileSkills),
     aiNotes: typeof app.ai_notes === "string" ? app.ai_notes : "",
   };
 }

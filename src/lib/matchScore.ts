@@ -332,8 +332,10 @@ function stripHtml(text: string): string {
 /**
  * Istilah skill yang bersih, atau null bila teks ini bukan nama skill: kalimat, frasa keterangan, judul bagian,
  * angka, atau daftar sifat. Dipakai untuk membaca requirements lowongan dan untuk menyaring "Skill yang Disorot".
+ * `allowDigits` melonggarkan aturan angka, hanya untuk penyaringan yang hasil akhirnya pasti skill profil
+ * (nama skill sah bisa berangka: "Web3", "Vue3").
  */
-export function cleanSkillTerm(raw: unknown): string | null {
+export function cleanSkillTerm(raw: unknown, allowDigits = false): string | null {
   if (typeof raw !== "string") return null;
   const t = raw
     .trim()
@@ -342,7 +344,7 @@ export function cleanSkillTerm(raw: unknown): string | null {
     .replace(/[.;:\s]+$/, "")
     .trim();
   if (!t || t.length > 40 || t.split(/\s+/).length > 4) return null;
-  if (!/[a-z]/i.test(t) || /\d/.test(t) || NOT_A_SKILL.test(t) || SENTENCE_START.test(t)) return null;
+  if (!/[a-z]/i.test(t) || (!allowDigits && /\d/.test(t)) || NOT_A_SKILL.test(t) || SENTENCE_START.test(t)) return null;
   // sisa kalimat seperti "atau bidang terkait" bukan skill
   if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return null;
   // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
@@ -446,31 +448,43 @@ function profileSkillFor(term: string, entries: readonly ProfileEntry[]): string
   return hit ? hit.raw : null;
 }
 
+/** Butir yang persis sama dengan sebuah skill profil (huruf besar-kecil dan tanda baca diabaikan), ejaan profil; null bila tidak ada. */
+function exactProfileSkill(item: unknown, entries: readonly ProfileEntry[]): string | null {
+  if (typeof item !== "string") return null;
+  const n = normalize(item);
+  return n ? (entries.find((e) => e.n === n)?.raw ?? null) : null;
+}
+
 /**
- * Daftar "Skill yang Disorot" pada draf lamaran. Hanya skill dari profil pengguna yang tampil. Bila kecocokan
- * profil dengan lowongan diketahui (`matched`, dari computeMatch), itulah isinya. Bila tidak, keluaran model
- * disaring: kalimat persyaratan lowongan dan frasa keterangan dibuang (uji klik 21 November 2026, temuan 24:
- * "Memiliki kemampuan analisa yang baik" tampil sebagai skill). Draf lama di database bisa memuat kalimat semacam itu.
+ * Daftar "Skill yang Disorot" pada draf lamaran: SATU jalur untuk jendela draf di halaman Lowongan, detail dan
+ * hitungan kartu di Lamaran Saya, dan draftToGenerated. Masukannya hanya isi tailored_skills draf itu dan skill
+ * profil, jadi draf yang sama selalu menampilkan daftar yang sama di mana pun (temuan 34, uji klik 21 November
+ * 2026: jendela di Lowongan memakai hasil computeMatch, yaitu skill profil yang disebut teks lowongan, sedangkan
+ * Lamaran Saya memakai tailored_skills; hasilnya Web3 di satu tempat dan Privy Wallet dan Google Gemini di tempat lain).
  *
- * `profileSkills` (daftar skill profil, dari profileSkillList) membuat penyaringan itu juga membuang butir yang
- * bukan skill profil, supaya draf lama tampil bersih (temuan 30: "Smart Contracts" pada profil tanpa skill itu).
- * null = skill profil belum diketahui, jadi hanya penyaring frasa yang berlaku. Daftar kosong = profil tanpa skill,
- * hasilnya kosong. Ejaan profil dipakai, seperti pada draf baru.
+ * `profileSkills` (daftar skill profil, dari profileSkillList): hanya butir yang sama dengan, atau memuat sebagai
+ * kata utuh, sebuah skill profil yang lolos, dan yang tampil adalah ejaan profil tanpa duplikat. Pencocokan
+ * dua arah ("Smart Contracts Development" ke skill profil "Smart Contracts", dan "Gemini" ke "Google Gemini")
+ * sama dengan Edge Function generate-application (selectTailoredSkills), jadi draf baru dan draf lama diperlakukan
+ * sama. Skill dua huruf seperti "Go" hanya cocok bila sama persis: "Go" bukan "Google Gemini". Butir yang persis
+ * sama dengan skill profil lolos tanpa penyaring frasa, karena nama skill sah bisa memuat angka ("Web3").
+ *
+ * null = skill profil belum diketahui, jadi hanya penyaring frasa yang berlaku: kalimat persyaratan lowongan dan
+ * frasa keterangan dibuang (temuan 24: "Memiliki kemampuan analisa yang baik" tampil sebagai skill). Daftar kosong =
+ * profil tanpa skill, hasilnya kosong.
  */
-export function highlightedSkills(raw: unknown, matched: readonly string[] = [], max = 8, profileSkills: readonly string[] | null = null): string[] {
-  const own = [...new Set(matched.map((m) => m.trim()).filter(Boolean))];
-  if (own.length > 0) return own.slice(0, max);
+export function highlightedSkills(raw: unknown, profileSkills: readonly string[] | null = null, max = 8): string[] {
   const entries = profileSkills === null ? null : profileEntries(profileSkills);
   const list = Array.isArray(raw) ? raw : [];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of list) {
-    let t = cleanSkillTerm(item);
-    if (!t) continue;
-    if (entries) {
-      t = profileSkillFor(t, entries);
-      if (!t) continue;
+    let t: string | null = entries ? exactProfileSkill(item, entries) : null;
+    if (!t) {
+      t = cleanSkillTerm(item, entries !== null);
+      if (t && entries) t = profileSkillFor(t, entries);
     }
+    if (!t) continue;
     if (seen.has(t.toLowerCase())) continue;
     seen.add(t.toLowerCase());
     out.push(t);

@@ -203,7 +203,7 @@ function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate">{job?.title || "Posisi"}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {job?.company || "Perusahaan"} · {highlightedSkills(app.tailored_skills, [], 8, profileSkills).length} skill disorot AI
+          {job?.company || "Perusahaan"} · {highlightedSkills(app.tailored_skills, profileSkills).length} skill disorot AI
         </p>
         <DuplicateNote info={duplicate} className="truncate" />
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
@@ -522,7 +522,7 @@ export function AppsPage() {
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
   const selectedAttempt = selectedApp ? attemptOf(selectedApp) : undefined;
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
-  const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, [], 8, profileSkills) : [];
+  const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
     <AppShell>

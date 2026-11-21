@@ -64,7 +64,7 @@ test("temuan 30: jendela draf menyaring Skill yang Disorot dengan skill profil d
   assert.match(modal, /profileSkills\?: readonly string\[\] \| null;/);
   assert.match(modal, /match = null, profileSkills = null, onClose/);
   // daftar yang tampil dihitung saat render dari isi mentah draf, dengan skill profil
-  assert.match(modal, /highlightedSkills\(rawSkills, match\?\.matched, 8, profileSkills\)/);
+  assert.match(modal, /highlightedSkills\(rawSkills, profileSkills\)/);
   // ketiga jalur yang mengisi draf (draf lama, draf baru, tulis ulang) menyimpan isi mentahnya
   assert.equal(modal.split("setRawSkills(app.tailored_skills)").length - 1, 2, "draf lama dan draf baru");
   assert.match(modal, /setRawSkills\(insights\.tailoredSkills\)/);
