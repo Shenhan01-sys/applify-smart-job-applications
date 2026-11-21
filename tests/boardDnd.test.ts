@@ -7,9 +7,12 @@ import {
   BOARD_SCREEN_READER_INSTRUCTIONS,
   BOARD_STATUSES,
   BOARD_TOUCH_CONSTRAINT,
+  SUBMITTED_CONFIRM_TEXT,
   boardAnnouncements,
+  boardCollisionDetection,
   boardStatusOf,
   dragEndMove,
+  dropNeedsConfirmation,
 } from "../src/lib/boardDnd.ts";
 import { APPLICATION_STATUS_LABEL } from "../src/lib/statusLabels.ts";
 
@@ -82,4 +85,79 @@ test("temuan 8: kolom papan adalah droppable dengan data { status }, sehingga dr
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /useDroppable\(\{ id: status, data: \{ status \} \}\)/);
   assert.match(src, /useDraggable\(\{ id: app\.id, data: app, attributes: \{ roleDescription: BOARD_ROLE_DESCRIPTION \} \}\)/);
+});
+
+// Uji klik 21 November 2026 (temuan 21): kartu dari "Draf" yang dilepas di "Siap dikirim" mendarat di kolom lain.
+
+// Enam kolom selebar 100 piksel dengan sela 10 piksel, setinggi 400 piksel (urutan sama dengan BOARD_STATUSES).
+const columnRects = new Map(BOARD_STATUSES.map((status, i) => [status, { left: i * 110, right: i * 110 + 100, top: 0, bottom: 400 }]));
+const containers = BOARD_STATUSES.map((id) => ({ id }));
+const detect = (pointerCoordinates: { x: number; y: number } | null, collisionRect: { left: number; right: number; top: number; bottom: number } | null) =>
+  boardCollisionDetection({ droppableContainers: containers, droppableRects: columnRects, pointerCoordinates, collisionRect });
+
+test("temuan 21: kolom ditentukan dari titik penunjuk, bukan dari persegi kartu yang bisa bergeser", () => {
+  // Penunjuk di tengah "Siap dikirim" (kolom ke-2), tetapi persegi overlay terukur dua kolom lebih ke kanan.
+  const shifted = { left: 1 * 110 + 220, right: 1 * 110 + 220 + 80, top: 150, bottom: 230 };
+  assert.deepEqual(detect({ x: 160, y: 200 }, shifted), [{ id: "ready" }]);
+  // setiap kolom dikenali dari titik tengahnya
+  for (const [i, status] of BOARD_STATUSES.entries()) assert.deepEqual(detect({ x: i * 110 + 50, y: 200 }, null), [{ id: status }]);
+});
+
+test("temuan 21: penunjuk di sela kolom atau di luar papan tidak menghasilkan tujuan (kartu kembali)", () => {
+  assert.deepEqual(detect({ x: 105, y: 200 }, { left: 100, right: 180, top: 150, bottom: 230 }), []);
+  assert.deepEqual(detect({ x: 160, y: 900 }, { left: 110, right: 190, top: 800, bottom: 880 }), []);
+  assert.deepEqual(detect({ x: -5, y: 200 }, null), []);
+});
+
+test("temuan 21: keyboard (tanpa penunjuk) memakai kolom yang paling tertimpa kartu, terurut dari yang terbesar", () => {
+  // 70 piksel di "Draf" dan 20 piksel di "Siap dikirim": Draf menang
+  assert.deepEqual(detect(null, { left: 30, right: 130, top: 100, bottom: 160 }).map((c) => c.id), ["draft", "ready"]);
+  assert.deepEqual(detect(null, { left: 90, right: 190, top: 100, bottom: 160 }).map((c) => c.id), ["ready", "draft"]);
+  // tidak menimpa kolom mana pun, atau tanpa persegi sama sekali
+  assert.deepEqual(detect(null, { left: 700, right: 800, top: 100, bottom: 160 }), []);
+  assert.deepEqual(detect(null, null), []);
+});
+
+test("temuan 21: kolom nonaktif atau tanpa ukuran diabaikan", () => {
+  const args = {
+    droppableContainers: [{ id: "draft" }, { id: "ready", disabled: true }, { id: "ghost" }],
+    droppableRects: columnRects,
+    pointerCoordinates: { x: 160, y: 200 },
+    collisionRect: null,
+  };
+  assert.deepEqual(boardCollisionDetection(args), []);
+  assert.deepEqual(boardCollisionDetection({ ...args, pointerCoordinates: { x: 50, y: 200 } }), [{ id: "draft" }]);
+});
+
+test("temuan 21: overlay seret dirender lewat portal ke body dan tabrakan memakai boardCollisionDetection", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /collisionDetection=\{boardCollisionDetection\}/);
+  assert.match(src, /createPortal\(\s*<DragOverlay>/);
+  assert.match(src, /document\.body/);
+  // kartu asal tidak ikut bergeser (hanya overlay yang mengikuti penunjuk)
+  const card = src.slice(src.indexOf("function DraggableKanbanCard"), src.indexOf("function DroppableColumn"));
+  const cardCode = card.replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(cardCode, /translate3d|transform\b/);
+  // akar masalah: animasi geser menahan transform lewat fill-mode both, sehingga fixed di dalamnya ikut bergeser
+  assert.match(read("../src/styles.css"), /\.animate-slide-right \{\s*animation: slideInRight [^;]*both;/);
+});
+
+test("temuan 21: Terkirim lewat seret perlu konfirmasi; kolom lain dan pindah dari Terkirim tidak", () => {
+  for (const from of ["draft", "ready", "follow_up", "responded", "closed", undefined]) assert.equal(dropNeedsConfirmation(from, "submitted"), true, String(from));
+  assert.equal(dropNeedsConfirmation("submitted", "submitted"), false);
+  for (const to of BOARD_STATUSES.filter((s) => s !== "submitted")) assert.equal(dropNeedsConfirmation("draft", to), false, to);
+  assert.equal(dropNeedsConfirmation("submitted", "draft"), false);
+  assert.match(SUBMITTED_CONFIRM_TEXT.description, /belum mengirim/);
+  assert.match(SUBMITTED_CONFIRM_TEXT.description, /Persetujuan/);
+  assert.equal(SUBMITTED_CONFIRM_TEXT.confirm, "Ya, sudah kukirim");
+});
+
+test("temuan 21: handleDragEnd menunda perpindahan ke Terkirim sampai pengguna menekan konfirmasi", () => {
+  const src = read("../src/routes/applications.tsx");
+  const end = src.slice(src.indexOf("const handleDragEnd"), src.indexOf("const stats ="));
+  assert.match(end, /dropNeedsConfirmation\(from, move\.status\)/);
+  assert.match(end, /setPendingSubmitted\(move\.appId\);\s*return;/);
+  // moveApplication ke "submitted" hanya dipanggil dari tombol konfirmasi
+  assert.match(src, /moveApplication\(pendingSubmitted, "submitted"\)/);
+  assert.match(src, /\{SUBMITTED_CONFIRM_TEXT\.confirm\}/);
 });

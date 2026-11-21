@@ -46,6 +46,75 @@ export function dragEndMove(event: BoardDragEndInput): { appId: string; status: 
   return status ? { appId: String(event.active.id), status } : null;
 }
 
+// ---- deteksi tabrakan: kolom di bawah penunjuk, bukan kolom yang paling tertimpa kartu -----------------------
+// Temuan 21 (uji klik 21 November 2026): kartu dari "Draf" yang dilepas di "Siap dikirim" mendarat di kolom lain.
+// Penyebabnya terlihat saat diulang di mode demo: DragOverlay dirender di dalam wadah `.animate-slide-*`. Animasi itu
+// memakai fill-mode `both`, jadi `transform: translateX(0)` terakhir menetap dan membuat wadah itu menjadi
+// containing block bagi `position: fixed`. Overlay tergeser sejauh posisi wadah, dan dnd-kit mengukur tabrakan dari
+// persegi overlay (bukan dari penunjuk). Bawaan `rectIntersection` lalu memilih kolom yang salah.
+// Dua perbaikan: overlay dirender di document.body (portal), dan kolom ditentukan dari posisi penunjuk.
+
+interface RectLike { left: number; right: number; top: number; bottom: number }
+interface ContainerLike { id: string | number; disabled?: boolean }
+
+export interface BoardCollisionArgs {
+  droppableContainers: readonly ContainerLike[];
+  droppableRects: { get(id: string | number): RectLike | undefined };
+  pointerCoordinates: { x: number; y: number } | null;
+  collisionRect: RectLike | null;
+}
+
+/** Luas irisan dua persegi; 0 bila tidak bersinggungan. */
+function overlapArea(a: RectLike, b: RectLike): number {
+  const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+/**
+ * Kolom tujuan seretan. Mouse dan sentuhan: kolom yang berisi titik penunjuk; di sela kolom atau di luar papan
+ * tidak ada tujuan, jadi kartu kembali ke tempat semula. Keyboard (tanpa penunjuk): kolom yang paling tertimpa
+ * persegi kartu. Mengembalikan senarai `{ id }` terurut dari yang paling cocok, bentuk yang dipakai dnd-kit.
+ */
+export function boardCollisionDetection(args: BoardCollisionArgs): { id: string | number }[] {
+  const { droppableContainers, droppableRects, pointerCoordinates, collisionRect } = args;
+  const columns: { id: string | number; rect: RectLike }[] = [];
+  for (const c of droppableContainers) {
+    const rect = droppableRects.get(c.id);
+    if (rect && !c.disabled) columns.push({ id: c.id, rect });
+  }
+  if (pointerCoordinates) {
+    const { x, y } = pointerCoordinates;
+    return columns
+      .filter(({ rect }) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom)
+      .map(({ id }) => ({ id }));
+  }
+  if (!collisionRect) return [];
+  return columns
+    .map(({ id, rect }) => ({ id, area: overlapArea(collisionRect, rect) }))
+    .filter((c) => c.area > 0)
+    .sort((a, b) => b.area - a.area)
+    .map(({ id }) => ({ id }));
+}
+
+// ---- status "Terkirim" hanya lewat konfirmasi -------------------------------------------------------------
+
+/**
+ * Menjatuhkan kartu di "Terkirim" harus dikonfirmasi: Applify belum mengirim apa pun pada tahap ini, jadi status itu
+ * hanya benar bila pengguna sendiri sudah mengirim lamarannya. Pindah dari "Terkirim" ke kolom lain tidak perlu.
+ */
+export function dropNeedsConfirmation(fromStatus: string | undefined, toStatus: BoardStatus): boolean {
+  return toStatus === "submitted" && fromStatus !== "submitted";
+}
+
+export const SUBMITTED_CONFIRM_TEXT = {
+  title: "Tandai lamaran ini Terkirim?",
+  description:
+    "Applify belum mengirim lamaran ini. Pilih \"Ya, sudah kukirim\" hanya bila kamu sendiri sudah mengirimnya. Agen tidak mengirim apa pun sebelum kamu menyetujuinya di halaman Persetujuan.",
+  confirm: "Ya, sudah kukirim",
+  cancel: "Batal",
+} as const;
+
 // ---- teks pembaca layar (bawaan dnd-kit berbahasa Inggris) -------------------------------------------------
 
 export const BOARD_SCREEN_READER_INSTRUCTIONS =

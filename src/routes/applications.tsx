@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { aiApplicationService, APPLICATION_STATUSES, type AIApplicationData, type ApplicationStatus } from "@/services/aiApplicationService";
@@ -15,7 +16,7 @@ import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
@@ -23,8 +24,11 @@ import {
   BOARD_ROLE_DESCRIPTION,
   BOARD_SCREEN_READER_INSTRUCTIONS,
   BOARD_TOUCH_CONSTRAINT,
+  SUBMITTED_CONFIRM_TEXT,
   boardAnnouncements,
+  boardCollisionDetection,
   dragEndMove,
+  dropNeedsConfirmation,
 } from "@/lib/boardDnd";
 import {
   LayoutGrid,
@@ -104,11 +108,9 @@ function DuplicateNote({ info, className = "" }: { info?: DuplicateInfo; classNa
 }
 
 function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: app.id, data: app, attributes: { roleDescription: BOARD_ROLE_DESCRIPTION } });
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    opacity: isDragging ? 0.5 : 1,
-  } : { opacity: isDragging ? 0.5 : 1 };
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: app.id, data: app, attributes: { roleDescription: BOARD_ROLE_DESCRIPTION } });
+  // Kartu asal tetap di tempat dan memudar; yang mengikuti penunjuk hanya DragOverlay (tanpa transform di sini).
+  const style = { opacity: isDragging ? 0.5 : 1 };
   const job = jobOf(app);
 
   return (
@@ -241,6 +243,8 @@ export function AppsPage() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
+  // Id kartu yang dijatuhkan di "Terkirim" dan menunggu konfirmasi pengguna (lib/boardDnd.ts, dropNeedsConfirmation).
+  const [pendingSubmitted, setPendingSubmitted] = useState<string | null>(null);
   const [approvalUi, setApprovalUi] = useState<ApprovalUi>({ state: "idle" });
   const [approvalBusy, setApprovalBusy] = useState(false);
   // Galat pengajuan tampil di dalam jendela, tepat di atas tombolnya, dan juga lewat toast.
@@ -448,8 +452,15 @@ export function AppsPage() {
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragApp(null);
     const move = dragEndMove(event);
-    if (move) moveApplication(move.appId, move.status);
-  }, [moveApplication]);
+    if (!move) return;
+    const from = applications.find((a) => a.id === move.appId)?.status;
+    // "Terkirim" lewat seret perlu konfirmasi: Applify belum mengirim apa pun, jadi statusnya harus pilihan sadar pengguna.
+    if (dropNeedsConfirmation(from, move.status)) {
+      setPendingSubmitted(move.appId);
+      return;
+    }
+    moveApplication(move.appId, move.status);
+  }, [applications, moveApplication]);
 
   const stats = {
     total: applications.length,
@@ -560,6 +571,7 @@ export function AppsPage() {
               <>
                 <DndContext
                   sensors={sensors}
+                  collisionDetection={boardCollisionDetection}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   onDragCancel={() => setActiveDragApp(null)}
@@ -580,14 +592,18 @@ export function AppsPage() {
                       </DroppableColumn>
                     ))}
                   </div>
-                  <DragOverlay>
-                    {activeDragApp ? (
-                      <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
-                        <p className="text-sm font-semibold">{jobOf(activeDragApp)?.title || "Lowongan"}</p>
-                        <p className="text-xs text-muted-foreground">{jobOf(activeDragApp)?.company || "Perusahaan"}</p>
-                      </div>
-                    ) : null}
-                  </DragOverlay>
+                  {/* Portal ke body: di dalam wadah beranimasi (transform) `position: fixed` bergeser dari penunjuk. */}
+                  {typeof document !== "undefined" && createPortal(
+                    <DragOverlay>
+                      {activeDragApp ? (
+                        <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
+                          <p className="text-sm font-semibold">{jobOf(activeDragApp)?.title || "Lowongan"}</p>
+                          <p className="text-xs text-muted-foreground">{jobOf(activeDragApp)?.company || "Perusahaan"}</p>
+                        </div>
+                      ) : null}
+                    </DragOverlay>,
+                    document.body,
+                  )}
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
@@ -604,6 +620,34 @@ export function AppsPage() {
       )}
 
       {/* Detail lamaran: dialog Radix (Esc menutup, fokus terkunci di dalam, dibaca pembaca layar sebagai dialog) */}
+      <Dialog open={!!pendingSubmitted} onOpenChange={(open) => { if (!open) setPendingSubmitted(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{SUBMITTED_CONFIRM_TEXT.title}</DialogTitle>
+            <DialogDescription>{SUBMITTED_CONFIRM_TEXT.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setPendingSubmitted(null)}
+              className="min-h-11 rounded-xl border-2 border-[#999999] bg-white px-5 text-sm font-semibold hover:bg-black/[4%] transition"
+            >
+              {SUBMITTED_CONFIRM_TEXT.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (pendingSubmitted) moveApplication(pendingSubmitted, "submitted");
+                setPendingSubmitted(null);
+              }}
+              className="min-h-11 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition"
+            >
+              {SUBMITTED_CONFIRM_TEXT.confirm}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selectedApp} onOpenChange={(open) => { if (!open) setSelectedApp(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedApp && (
