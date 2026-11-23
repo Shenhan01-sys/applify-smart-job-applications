@@ -4,7 +4,7 @@
 // - tabel dan RLS: database/schema.sql (RLS aktif di semua tabel milik pengguna)
 // - CV: backend/services/resume-file.service.ts (bucket Storage privat `resumes`)
 // - impor PDF LinkedIn: backend/services/linkedin-import.service.ts (hanya membaca, simpan terjadi di frontend)
-// - penyedia model AI: supabase/functions/_shared/providers.ts (openrouter, gemini, anthropic) dan
+// - penyedia model AI: supabase/functions/_shared/providers.ts (openrouter, gemini, anthropic, numes) dan
 //   backend/services/ai-pipeline.service.ts (rantai Gemini, Claude, OpenRouter, lalu Groq)
 // - Gmail: backend/api/routes/oauth.ts (satu izin, gmail.send; token disimpan lewat token-crypto.ts, terenkripsi)
 // - Telegram: backend/services/notifications.service.ts (TELEGRAM_CHAT_ID tunggal milik pengelola)
@@ -67,7 +67,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     items: [
       "Supabase: database, Storage, dan login.",
       "Google dan LinkedIn: hanya bila kamu memilih masuk dengan akun mereka. Aplikasi menerima nama dan email, dan dari LinkedIn juga foto profil.",
-      "Penyedia model AI: Google (Gemini), Anthropic (Claude), OpenRouter, dan Groq. Mereka menerima bagian profil, isi PDF LinkedIn yang kamu impor, dan deskripsi lowongan yang diperlukan untuk menulis draf lamaran, menilai asesmen, atau menyusun pratinjau profil. Jangan menulis data yang tidak ingin kamu bagikan ke penyedia tersebut.",
+      "Penyedia model AI: Google (Gemini), Anthropic (Claude), Numes (pasar model yang meneruskan permintaan ke penyedia model gratis), OpenRouter, dan Groq. Mereka menerima bagian profil, isi PDF LinkedIn yang kamu impor, dan deskripsi lowongan yang diperlukan untuk menulis draf lamaran, menilai asesmen, atau menyusun pratinjau profil. Jangan menulis data yang tidak ingin kamu bagikan ke penyedia tersebut.",
       "Vercel dan Railway: menjalankan frontend dan backend aplikasi.",
       "Telegram: saat status lamaran berubah, server dapat mengirim pemberitahuan berisi judul lowongan dan nama perusahaan ke satu chat Telegram milik pengelola aplikasi, bukan ke akunmu. Ini hanya terjadi bila Telegram diatur di server.",
     ],

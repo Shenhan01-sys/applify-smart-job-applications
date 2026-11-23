@@ -27,7 +27,7 @@ test("kebijakan privasi: rute publik tanpa pemeriksaan login dan tanpa AppShell"
 
 test("kebijakan privasi: menyebut data, penyimpanan, pihak ketiga, persetujuan, saklar kirim, dan penghapusan", () => {
   for (const kata of [
-    "Supabase", "Vercel", "Railway", "Gemini", "Claude", "OpenRouter", "Groq", "Telegram",
+    "Supabase", "Vercel", "Railway", "Gemini", "Claude", "Numes", "OpenRouter", "Groq", "Telegram",
     "Google", "LinkedIn", "CV", "PDF LinkedIn", "Persetujuan", "ALLOW_REAL_SUBMIT", "skripsi", "Sistem Informasi", "Universitas Kristen Duta Wacana",
   ]) {
     assert.ok(allText.includes(kata), `kata tidak ada: ${kata}`);
@@ -44,11 +44,11 @@ test("kebijakan privasi: satu-satunya alamat email adalah kontak peneliti, dan t
 
 test("kebijakan privasi: penyedia model AI di kebijakan dan di halaman ketentuan sama-sama lengkap", () => {
   const terms = read("../src/routes/terms.tsx");
-  assert.match(terms, /Google Gemini, Anthropic Claude, OpenRouter, dan Groq/);
+  assert.match(terms, /Google Gemini, Anthropic Claude, Numes, OpenRouter, dan Groq/);
   assert.match(terms, /to="\/privacy"/);
   // Penyedia yang dipanggil di kode (Edge Function) tercantum di kebijakan.
   const providers = read("../supabase/functions/_shared/providers.ts");
-  for (const [kode, nama] of [["openrouter", "OpenRouter"], ["gemini", "Gemini"], ["anthropic", "Claude"]] as const) {
+  for (const [kode, nama] of [["openrouter", "OpenRouter"], ["gemini", "Gemini"], ["anthropic", "Claude"], ["numes", "Numes"]] as const) {
     assert.match(providers, new RegExp(`${kode}:\\s*"https://`));
     assert.ok(allText.includes(nama));
   }
