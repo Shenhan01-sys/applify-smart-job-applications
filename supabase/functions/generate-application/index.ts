@@ -9,7 +9,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
 import {
-  chatBody,
   DEFAULT_AI_CALL_TIMEOUT_MS,
   DEFAULT_AI_TOTAL_BUDGET_MS,
   DEFAULT_FREE_MODELS,
@@ -19,6 +18,19 @@ import {
   positiveMs,
   resolveChain,
 } from "../_shared/providers.ts";
+import {
+  byokChain,
+  byokEnabled,
+  byokRateDecision,
+  combinedChain,
+  DEFAULT_BYOK_RATE_LIMIT_PER_HOUR,
+  isAuthFailure,
+  loadByokKeys,
+  readCompletion,
+  redactSecrets,
+  requestBody,
+  type ChainTarget,
+} from "../_shared/byok.ts";
 import {
   GROUNDING_RULES,
   acceptCoverLetter,
@@ -64,6 +76,12 @@ const PRO_MODELS = resolveChain(
 // after about 35 seconds instead of after every model in the chain has timed out.
 const AI_CALL_TIMEOUT_MS = positiveMs(Deno.env.get("AI_CALL_TIMEOUT_MS"), DEFAULT_AI_CALL_TIMEOUT_MS);
 const AI_TOTAL_BUDGET_MS = positiveMs(Deno.env.get("AI_TOTAL_BUDGET_MS"), DEFAULT_AI_TOTAL_BUDGET_MS);
+// BYOK (rancangan NextRoadMap/19): key LLM milik pengguna, disimpan terenkripsi di tabel user_llm_keys oleh
+// backend. Mati bila secret BYOK_ENABLED bukan "true", sehingga perilaku lama tidak berubah sebelum migrasi
+// DRAFT_2026-11-23_user_llm_keys.sql dijalankan.
+const BYOK_ON = byokEnabled(Deno.env.get("BYOK_ENABLED"));
+const BYOK_SECRET = Deno.env.get("BYOK_ENCRYPTION_KEY") ?? "";
+const BYOK_RATE_LIMIT_PER_HOUR = positiveMs(Deno.env.get("BYOK_RATE_LIMIT_PER_HOUR"), DEFAULT_BYOK_RATE_LIMIT_PER_HOUR);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -88,7 +106,7 @@ Deno.serve(async (req: Request) => {
   try {
     const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
     if (!token) return json({ error: "Missing auth token" }, 401);
-    if (FREE_MODELS.length === 0 && PRO_MODELS.length === 0) {
+    if (FREE_MODELS.length === 0 && PRO_MODELS.length === 0 && !BYOK_ON) {
       return json({ error: "AI not configured (no provider key set)" }, 503);
     }
 
@@ -119,7 +137,39 @@ Deno.serve(async (req: Request) => {
     // The RPC returns an array of one row; parseQuotaStatus reads it (reading .remaining off the array
     // was always undefined, so this check never blocked anyone).
     let quota: any = parseQuotaStatus(quotaStatus);
-    if (mode !== "analyze" && quota.remaining <= 0) {
+
+    // 3b) BYOK: key milik pengguna dipakai lebih dulu dan tidak memotong kuota bulanan. Batas laju per jam
+    //     tetap berlaku; bila terlampaui, key pengguna tidak dipakai dan permintaan diproses seperti biasa.
+    //     Isi key tidak pernah dicatat; log hanya memuat nama penyedia.
+    let byokTargets: ChainTarget[] = [];
+    let byokSecrets: string[] = [];
+    let byokRateLimited = false;
+    if (BYOK_ON) {
+      const { data: keyRows } = await admin
+        .from("user_llm_keys").select("provider, key_encrypted, status, model").eq("user_id", userId);
+      if (keyRows && keyRows.length > 0) {
+        const { creds, failed } = await loadByokKeys(keyRows, BYOK_SECRET, userId);
+        if (failed.length) console.warn(`[generate-application] byok decrypt_failed ${failed.join(",")}`);
+        byokSecrets = creds.map((c) => c.key);
+        byokTargets = byokChain(creds);
+      }
+      if (byokTargets.length > 0 && mode !== "analyze") {
+        const since = new Date(Date.now() - 3600_000).toISOString();
+        const { count } = await admin
+          .from("ai_applications").select("id", { count: "exact", head: true })
+          .eq("user_id", userId).gte("created_at", since);
+        const decision = byokRateDecision({ recentCount: count, limitPerHour: BYOK_RATE_LIMIT_PER_HOUR });
+        if (!decision.allowed) {
+          byokRateLimited = true;
+          byokTargets = [];
+        }
+      }
+    }
+
+    if (mode !== "analyze" && quota.remaining <= 0 && byokTargets.length === 0) {
+      if (byokRateLimited) {
+        return json({ error: "Batas draf per jam untuk API key sendiri tercapai. Coba lagi nanti.", code: "byok_rate_limited", quota }, 429);
+      }
       return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
     }
 
@@ -205,10 +255,13 @@ Return JSON exactly in this shape:
     //    quality gate (no chain-of-thought, no stray foreign script, a plausible letter body). Otherwise the next
     //    model is tried, and if none passes the request fails explicitly: nothing is saved and no quota is used.
     let parsed: any = null;
-    if (models.length === 0) return json({ error: "AI not configured for this plan" }, 503);
-    let model = models[0].entry;
+    // Rantai BYOK dulu (bila ada), lalu rantai paket Applify hanya bila kuota masih ada (_shared/byok.ts).
+    const chain = combinedChain({ byok: byokTargets, applify: models, quotaRemaining: Number(quota.remaining ?? 0), mode });
+    if (chain.length === 0) return json({ error: "AI not configured for this plan" }, 503);
+    let model = chain[0].entry;
     let modelUsed = model;
-    let soft: { parsed: any; modelUsed: string } | null = null;
+    let keySource: "byok" | "applify" = chain[0].source;
+    let soft: { parsed: any; modelUsed: string; keySource: "byok" | "applify" } | null = null;
     let lastDetail = "";
     const rejectedReasons: string[] = [];
     // Satu baris per kandidat di log Edge Function, supaya alasan model gagal atau ditolak terlihat.
@@ -220,8 +273,11 @@ Return JSON exactly in this shape:
       console.warn(`[generate-application] ${entry.model} ${entry.outcome} ${entry.ms}ms`);
     };
     let budgetExhausted = false;
-    for (const candidate of models) {
+    const invalidatedProviders = new Set<string>();
+    for (const candidate of chain) {
       model = candidate.entry;
+      // Key pengguna yang sudah ditolak penyedia di permintaan ini tidak dicoba lagi untuk model berikutnya.
+      if (candidate.source === "byok" && invalidatedProviders.has(candidate.provider)) continue;
       const started = Date.now();
       // Total budget since the request arrived: stop the chain when too little is left for one more call.
       const callTimeoutMs = nextCallTimeoutMs({
@@ -242,7 +298,7 @@ Return JSON exactly in this shape:
           method: "POST",
           headers: candidate.headers,
           signal: AbortSignal.timeout(callTimeoutMs),
-          body: JSON.stringify(chatBody(candidate, [
+          body: JSON.stringify(requestBody(candidate, [
             { role: "system", content: sys },
             { role: "user", content: userPrompt },
           ], { temperature: 0.6, maxTokens: 1600 })),
@@ -254,8 +310,16 @@ Return JSON exactly in this shape:
         continue;
       }
       if (!aiResp.ok) {
-        lastDetail = `${model}: ${(await aiResp.text()).slice(0, 300)}`;
+        lastDetail = `${model}: ${redactSecrets((await aiResp.text()).slice(0, 300), byokSecrets)}`;
         note(`http_${aiResp.status}`, started);
+        if (candidate.source === "byok" && isAuthFailure(aiResp.status)) {
+          // Key dicabut atau kehabisan izin: tandai invalid supaya Pengaturan menampilkannya dan permintaan
+          // berikutnya langsung memakai rantai Applify.
+          invalidatedProviders.add(candidate.provider);
+          await admin.from("user_llm_keys")
+            .update({ status: "invalid", last_error: `http_${aiResp.status}`, updated_at: new Date().toISOString() })
+            .eq("user_id", userId).eq("provider", candidate.provider);
+        }
         continue;
       }
       let aiJson: any;
@@ -267,7 +331,9 @@ Return JSON exactly in this shape:
         note("bad_json", started);
         continue;
       }
-      const raw: string = aiJson?.choices?.[0]?.message?.content ?? "";
+      // Format OpenAI Chat Completions atau Anthropic Messages (BYOK), lihat _shared/byok.ts readCompletion.
+      const completion = readCompletion(candidate.format, aiJson);
+      const raw: string = completion.text;
       const cleaned = stripReasoning(raw).text;
       if (!cleaned) {
         lastDetail = `empty completion from ${model}`;
@@ -287,7 +353,8 @@ Return JSON exactly in this shape:
       const verdict = acceptCoverLetter(String(attempt.coverLetter ?? ""), { language, allowedContext });
       if (verdict.ok === true) {
         parsed = { ...attempt, coverLetter: verdict.text };
-        modelUsed = aiJson.model ? `${candidate.provider}:${aiJson.model}` : model;
+        modelUsed = completion.model ? `${candidate.provider}:${completion.model}` : model;
+        keySource = candidate.source;
         note("accepted", started);
         break;
       }
@@ -295,20 +362,22 @@ Return JSON exactly in this shape:
       rejectedReasons.push(...why);
       lastDetail = `${model}: output rejected (${why.join(", ")})`;
       // finish_reason "length" berarti jawaban terpotong oleh max_tokens.
-      note(`rejected ${why.join(",")} finish=${aiJson?.choices?.[0]?.finish_reason ?? "?"}`, started);
+      note(`rejected ${why.join(",")} finish=${completion.finish ?? "?"}`, started);
       const fallback = (verdict as { fallbackText?: string }).fallbackText;
-      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ? `${candidate.provider}:${aiJson.model}` : model };
+      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: completion.model ? `${candidate.provider}:${completion.model}` : model, keySource: candidate.source };
     }
     if (!parsed && soft) {
       parsed = soft.parsed;
       modelUsed = soft.modelUsed;
+      keySource = soft.keySource;
     }
     if (!parsed) {
-      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], budgetExhausted, elapsedMs: Date.now() - requestStarted, attempts, models: models.map((m) => m.entry), quota }, 502);
+      return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], budgetExhausted, elapsedMs: Date.now() - requestStarted, attempts, models: chain.map((m) => m.entry), quota }, 502);
     }
 
-    // 6b) Consume one monthly application only now that a draft exists
-    if (mode !== "analyze") {
+    // 6b) Consume one monthly application only now that a draft exists, and only when Applify's key wrote it.
+    //     A draft written with the user's own key (BYOK) does not use the monthly quota.
+    if (mode !== "analyze" && keySource === "applify") {
       const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
       if (qErr) return json({ error: "Quota update failed", detail: qErr.message }, 500);
       quota = parseQuotaStatus(q);
@@ -345,6 +414,7 @@ Return JSON exactly in this shape:
       language,
       modelUsed,
       tier,
+      keySource,
     };
 
     if (mode === "analyze") return json({ analysis: result, quota });

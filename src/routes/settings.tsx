@@ -7,7 +7,8 @@ import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
 import SavedAnswers from "@/components/SavedAnswers";
 import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
-import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList } from "lucide-react";
+import LlmKeysCard from "@/components/LlmKeysCard";
+import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList, KeyRound } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -70,6 +71,12 @@ function SettingsPage() {
               </div>
             )}
           </div>
+        </Card>
+
+        {/* Kunci LLM milik pengguna: dikirim hanya lewat badan permintaan, tidak disimpan di browser */}
+        <Card icon={KeyRound} title="Kunci API Sendiri (BYOK)" color="#0F766E"
+          desc="Pakai kunci API LLM milikmu sendiri untuk membuat draf lamaran. Pilih penyedia, tempel kuncinya, lalu simpan.">
+          <LlmKeysCard />
         </Card>
 
         <Card icon={ClipboardList} title="Jawaban formulir tersimpan" color="#0A5BE0"

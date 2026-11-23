@@ -118,7 +118,8 @@ test("chatBody: Claude tanpa temperature dan max_tokens minimal 8000, penyedia l
   assert.equal(gemini.temperature, 0.6);
   assert.equal(gemini.max_tokens, 1600);
   const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
-  assert.match(src, /chatBody\(candidate,/);
+  // Sejak BYOK (23 Nov 2026) badan dibuat requestBody (_shared/byok.ts), yang memanggil chatBody untuk format OpenAI.
+  assert.match(src, /requestBody\(candidate,/);
   assert.doesNotMatch(src, /temperature: 0\.6,\s*max_tokens/);
 });
 
@@ -176,7 +177,9 @@ test("Edge Function: anggaran total dihitung sejak permintaan masuk, rantai berh
   assert.match(src, /AI_TOTAL_BUDGET_MS = positiveMs\(Deno\.env\.get\("AI_TOTAL_BUDGET_MS"\), DEFAULT_AI_TOTAL_BUDGET_MS\)/);
   assert.match(src, /AI_CALL_TIMEOUT_MS = positiveMs\(Deno\.env\.get\("AI_CALL_TIMEOUT_MS"\), DEFAULT_AI_CALL_TIMEOUT_MS\)/);
   assert.match(src, /elapsedMs: started - requestStarted/);
-  const loop = src.slice(src.indexOf("for (const candidate of models)"), src.indexOf("if (!parsed && soft)"));
+  // Sejak BYOK (23 Nov 2026) loop berjalan atas `chain` (rantai BYOK lalu rantai paket), bukan `models`.
+  const loop = src.slice(src.indexOf("for (const candidate of chain)"), src.indexOf("if (!parsed && soft)"));
+  assert.ok(src.indexOf("for (const candidate of chain)") > 0);
   assert.match(loop, /if \(callTimeoutMs === 0\) \{[\s\S]{0,260}break;/);
   assert.match(loop, /note\("skipped time_budget", started\)/);
   // galat tetap 502 "AI generation failed" (describeError di klien menerjemahkannya), dengan penanda anggaran
