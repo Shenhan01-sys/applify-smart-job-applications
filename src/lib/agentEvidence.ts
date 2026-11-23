@@ -66,6 +66,13 @@ export interface AgentLogFacts {
   screenshots?: AgentScreenshots | null;
   /** application_logs.created_at */
   logged_at?: string | null;
+  /**
+   * details.manual === true: pengguna menandai sendiri bahwa lamaran sudah terkirim (POST /api/approvals/:id/mark-sent).
+   * Agen tidak menekan kirim, jadi tidak ada tangkapan layar halaman konfirmasi. Kunci ini hanya ada bila true.
+   */
+  manual?: boolean;
+  /** details.approval_request_id: persetujuan yang dipakai percobaan ini. Kunci ini hanya ada bila log memuatnya. */
+  approval_request_id?: string | null;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -162,6 +169,8 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     filled_fields: cleanFilledFields(details.filled_fields),
     screenshots: cleanScreenshots(details.screenshots),
     logged_at: typeof row.created_at === "string" && !Number.isNaN(Date.parse(row.created_at)) ? row.created_at : null,
+    ...(details.manual === true ? { manual: true } : {}),
+    ...(cleanText(details.approval_request_id, 64) ? { approval_request_id: cleanText(details.approval_request_id, 64) } : {}),
   };
 }
 

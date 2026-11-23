@@ -8,6 +8,7 @@ import EmailApplyPanel from "@/components/EmailApplyPanel";
 import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
 import AgentSecurityCode from "@/components/AgentSecurityCode";
+import AgentManualSubmit from "@/components/AgentManualSubmit";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
@@ -89,6 +90,12 @@ function ApprovalsPage() {
 
   // Sesudah backend menerima kode keamanan: baca status agen sekarang juga, tanpa menunggu putaran berikutnya.
   const handleCodeSent = () => {
+    if (isMockMode()) return;
+    loadEmailApplyData(history).then(setEmailData).catch(() => {});
+  };
+
+  // Sesudah pengguna menandai lamaran terkirim (dikirim sendiri): backend sudah mencatatnya, baca log dan status sekarang juga.
+  const handleManualMarked = () => {
     if (isMockMode()) return;
     loadEmailApplyData(history).then(setEmailData).catch(() => {});
   };
@@ -295,6 +302,16 @@ function ApprovalsPage() {
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <AgentManualSubmit
+                        approvalId={request.id}
+                        row={emailData.agent[request.id]}
+                        jobUrl={emailData.jobUrls[request.id]}
+                        coverLetter={request.cover_letter ?? null}
+                        onRerun={handleAgentRerun}
+                        onMarked={handleManualMarked}
+                      />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <EmailApplyPanel

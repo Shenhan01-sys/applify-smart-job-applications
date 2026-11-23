@@ -39,6 +39,14 @@ export const AGENT_SENT_LABEL = "Terkirim";
 export const AGENT_SENT_HINT = "Agen menekan kirim dan halaman konfirmasi terdeteksi.";
 export const AGENT_SENT_EMAIL_NOTE = "Cek juga kotak masuk emailmu: portal lowongan biasanya mengirim email konfirmasi.";
 
+/**
+ * Log success dengan details.manual: pengguna sendiri yang mengirim lamaran di situs lowongan, lalu menandainya di
+ * Applify. Agen tidak menekan kirim, jadi tidak ada halaman konfirmasi atau tangkapan layar yang bisa dijadikan bukti.
+ */
+export const AGENT_MANUAL_SENT_LABEL = "Terkirim (dikirim sendiri)";
+export const AGENT_MANUAL_SENT_HINT =
+  "Kamu menandai lamaran ini sudah terkirim setelah mengirimnya sendiri di situs lowongan. Agen tidak menekan kirim dan tidak akan mengirimnya lagi. Applify tidak punya bukti dari situs lowongan untuk lamaran ini, jadi cek emailmu atau akunmu di situs itu bila perlu.";
+
 export const AGENT_UNVERIFIED_LABEL = "Perlu dicek: kirim belum terkonfirmasi";
 export const AGENT_UNVERIFIED_HINT =
   "Agen sudah menekan tombol kirim, tetapi halaman konfirmasi tidak terlihat. Lamaranmu mungkin sudah terkirim, mungkin juga belum. Cek kotak masuk emailmu atau akunmu di situs lowongan sebelum melamar lagi. Jangan ajukan ulang tanpa mengecek, supaya lamaran tidak terkirim dua kali.";
@@ -91,6 +99,9 @@ function partialHint(remaining: readonly string[] | undefined): string {
 export function describeLogOutcome(facts: AgentLogFacts | null | undefined): AgentApplyView | null {
   if (!facts) return null;
   const { log_status: status, reason, submit_blocked: blocked } = facts;
+  if (status === "success" && facts.manual === true) {
+    return { label: AGENT_MANUAL_SENT_LABEL, hint: AGENT_MANUAL_SENT_HINT, tone: "sent", suggestEmail: false };
+  }
   if (status === "success") {
     const phrase = facts.confirmation_phrase?.trim();
     const parts = [AGENT_SENT_HINT];

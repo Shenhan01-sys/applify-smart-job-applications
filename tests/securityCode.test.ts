@@ -356,5 +356,5 @@ test("Lamaran Saya: satu baris tautan ke Persetujuan saat agen menunggu kode, te
   assert.match(src, /const selectedAwaitingCode = awaitingCodeState\(selectedFacts\)\.waiting;/);
   assert.match(src, /Agen menunggu kode keamanan dari emailmu\. Masukkan di halaman\{" "\}\s*<Link to="\/approvals"[^>]*>Persetujuan<\/Link>\./);
   assert.match(src, /\{selectedAwaitingCode && \(\s*<p data-testid="agent-code-link"/);
-  assert.match(src, /\{!selectedIssue && !selectedAwaitingCode && <p/);
+  assert.match(src, /\{!selectedIssue && !selectedAwaitingCode && !selectedManualState && <p/);
 });

@@ -18,10 +18,12 @@ import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import AgentEvidence from "@/components/AgentEvidence";
+import AgentManualSubmit from "@/components/AgentManualSubmit";
 import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { awaitingCodeState } from "@/lib/securityCode";
 import { questionsToAnswer } from "@/lib/formQuestions";
+import { isManualSent, manualSubmitState } from "@/lib/manualSubmit";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -78,7 +80,7 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
 };
 
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string; platform_source?: string | null } | undefined;
+const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string; platform_source?: string | null; external_url?: string | null } | undefined;
 
 // Persetujuan untuk draf yang dibuka di jendela detail: belum diperiksa, sedang diperiksa, belum ada, sudah menunggu,
 // atau antreannya tidak bisa diperiksa (tombol tetap ada; pengajuan memeriksa lagi dan melaporkan galatnya sendiri).
@@ -543,6 +545,11 @@ export function AppsPage() {
   const selectedQuestionCount = questionsToAnswer(selectedFacts).length;
   // Agen menahan formulir karena situs lowongan mengirim kode keamanan ke email. Kodenya dimasukkan di halaman Persetujuan.
   const selectedAwaitingCode = awaitingCodeState(selectedFacts).waiting;
+  // Agen berhenti sebelum kirim (situs belum diizinkan, dan sebagainya): pengguna bisa membuka formulir, menyalin isian,
+  // dan menandai lamaran terkirim. Pertanyaan, kode keamanan, dan hasil lain yang punya alur sendiri tidak masuk (lib/manualSubmit.ts).
+  const selectedManualState = manualSubmitState(selectedFacts);
+  // Ditandai terkirim oleh pengguna sendiri: bukan kiriman agen, jadi tidak ada bukti dari situs untuk ditampilkan.
+  const selectedManualSent = isManualSent(selectedFacts);
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
@@ -780,7 +787,20 @@ export function AppsPage() {
                             <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
                           </p>
                         )}
-                        {!selectedIssue && !selectedAwaitingCode && <p className="text-sm text-muted-foreground">
+                        {selectedManualState && (
+                          <AgentManualSubmit
+                            className="mt-0"
+                            approvalId={selectedFacts?.approval_request_id}
+                            row={selectedFacts}
+                            jobUrl={selectedJob?.external_url}
+                            loadCoverLetter
+                            onMarked={() => {
+                              toast.success("Lamaran ditandai terkirim. Kartunya pindah ke Terkirim.");
+                              reloadAfterApply();
+                            }}
+                          />
+                        )}
+                        {!selectedIssue && !selectedAwaitingCode && !selectedManualState && <p className="text-sm text-muted-foreground">
                           {selectedFillYourself
                             ? // Agen tidak mengisi satu isian pun: lamaran belum terkirim, jadi jangan menulis bahwa formulir sudah dibuka dan diisi.
                               NO_FIELDS_FILLED_TEXT
@@ -848,7 +868,7 @@ export function AppsPage() {
                   <div data-testid="agent-proof" className="rounded-xl border-2 border-[#16150F]/10 p-4 space-y-2">
                     <h3 className="text-sm font-semibold flex items-center gap-1.5">
                       <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
-                      {selectedSent ? "Bukti pengiriman" : "Bukti dari agen"}
+                      {selectedManualSent ? "Ditandai terkirim manual" : selectedSent ? "Bukti pengiriman" : "Bukti dari agen"}
                     </h3>
                     {selectedSent && selectedOutcome && <p className="text-sm text-muted-foreground">{selectedOutcome.hint}</p>}
                     <AgentEvidence screenshots={selectedFacts.screenshots} filledFields={selectedFacts.filled_fields} loggedAt={selectedFacts.logged_at} />

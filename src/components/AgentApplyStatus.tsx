@@ -1,6 +1,7 @@
 import { AlertCircle, Bot, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { describeAgentApply, type AgentApplyRow, type AgentApplyTone } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence } from "@/lib/agentEvidence";
+import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
 
 const TONE: Record<AgentApplyTone, string> = {
@@ -29,6 +30,9 @@ function ToneIcon({ tone }: { tone: AgentApplyTone }) {
  */
 export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | undefined }) {
   const view = describeAgentApply(row);
+  // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
+  // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
+  const showHint = !!view.hint && manualSubmitState(row)?.kind !== "not_allowed";
   return (
     <div className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -39,7 +43,7 @@ export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | 
           <ToneIcon tone={view.tone} /> {view.label}
         </span>
       </div>
-      {view.hint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
+      {showHint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
       {row && hasAgentEvidence(row) && (
         <AgentEvidence screenshots={row.screenshots} filledFields={row.filled_fields} loggedAt={row.logged_at} />
       )}

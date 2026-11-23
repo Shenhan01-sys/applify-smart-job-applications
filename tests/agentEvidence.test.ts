@@ -248,7 +248,7 @@ test("Lamaran Saya: bukti pengiriman untuk lamaran terkirim, bukti dari agen unt
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /import AgentEvidence from "@\/components\/AgentEvidence"/);
   assert.match(src, /const selectedSent = selectedOutcome\?\.tone === "sent";/);
-  assert.match(src, /\{selectedSent \? "Bukti pengiriman" : "Bukti dari agen"\}/);
+  assert.match(src, /\{selectedManualSent \? "Ditandai terkirim manual" : selectedSent \? "Bukti pengiriman" : "Bukti dari agen"\}/);
   assert.match(src, /<AgentEvidence screenshots=\{selectedFacts\.screenshots\} filledFields=\{selectedFacts\.filled_fields\} loggedAt=\{selectedFacts\.logged_at\} \/>/);
   // blok bukti hanya bila lamaran punya percobaan agen yang terbaca
   assert.match(src, /\{selectedFacts && \(selectedSent \|\| hasAgentEvidence\(selectedFacts\)\) && \(/);
@@ -256,7 +256,7 @@ test("Lamaran Saya: bukti pengiriman untuk lamaran terkirim, bukti dari agen unt
   const detail = src.slice(src.indexOf("{selectedIssue && ("), src.indexOf("{selectedGaps && ("));
   assert.match(detail, /\{selectedIssue\.label\}/);
   assert.match(detail, /\{selectedIssue\.hint\}/);
-  assert.match(detail, /\{!selectedIssue && !selectedAwaitingCode && <p/);
+  assert.match(detail, /\{!selectedIssue && !selectedAwaitingCode && !selectedManualState && <p/);
   assert.match(detail, /berhenti sebelum tombol kirim/);
   // log dibaca untuk semua lamaran supaya bukti pengiriman juga ada di kolom Terkirim
   assert.match(src, /setAgentFacts\(facts\)/);

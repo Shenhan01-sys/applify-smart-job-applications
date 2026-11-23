@@ -8,6 +8,7 @@ import {
 } from "@/lib/emailApply";
 import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 import { agentLogFacts } from "@/lib/agentEvidence";
+import { manualSentRow, safeJobUrl } from "@/lib/manualSubmit";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -22,9 +23,13 @@ export interface EmailApplyData {
   suggestions: Record<string, string[]>;
   /** latest apply (form-filling agent) queue row per approval id, with fields filled from its attempt log */
   agent: Record<string, AgentApplyRow>;
+  /** approval ids the user marked as sent themselves (application_logs success with details.manual) */
+  manual: Set<string>;
+  /** job posting address (jobs.external_url, http or https only), per approval id: "Buka formulir lowongan" */
+  jobUrls: Record<string, string>;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {} });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {} });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -93,14 +98,14 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
 
   const [gmail, logs, queue, jobs, agent] = await Promise.all([
     automationApi.getGmailStatus(),
-    supabase.from("application_logs").select("details").eq("status", "success").in("details->>approval_request_id", ids),
+    supabase.from("application_logs").select("details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
       .from("automation_queue")
       .select("status, error_message, created_at, payload")
       .eq("job_type", "email_apply")
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
-    jobIds.length > 0 ? supabase.from("jobs").select("id, description").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
+    jobIds.length > 0 ? supabase.from("jobs").select("id, description, external_url").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
     loadAgentApplyRows(ids).catch((err) => {
       console.warn("[agentApply] status unavailable:", err);
       return {} as Record<string, AgentApplyRow>;
@@ -113,7 +118,13 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   if (logs.error) console.warn("[emailApply] used-check skipped:", logs.error.message);
   for (const row of logs.data ?? []) {
     const id = (row as any)?.details?.approval_request_id;
-    if (typeof id === "string") data.used.add(id);
+    if (typeof id !== "string") continue;
+    data.used.add(id);
+    // Ditandai terkirim oleh pengguna sendiri: kartu menampilkannya sebagai hasil percobaan terbaru, bukan kiriman agen.
+    if ((row as any)?.details?.manual === true) {
+      data.manual.add(id);
+      data.agent[id] = manualSentRow(data.agent[id], (row as any).created_at);
+    }
   }
 
   if (queue.error) console.warn("[emailApply] queue lookup skipped:", queue.error.message);
@@ -123,10 +134,17 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   }
 
   const descriptionByJob = new Map<string, string>();
-  for (const j of jobs.data ?? []) descriptionByJob.set((j as any).id, String((j as any).description ?? ""));
+  const urlByJob = new Map<string, string>();
+  for (const j of jobs.data ?? []) {
+    descriptionByJob.set((j as any).id, String((j as any).description ?? ""));
+    const url = safeJobUrl((j as any).external_url);
+    if (url) urlByJob.set((j as any).id, url);
+  }
   for (const a of approved) {
     const found = a.job_id ? extractRecruiterEmails(descriptionByJob.get(a.job_id)) : [];
     if (found.length > 0) data.suggestions[a.id] = found;
+    const url = a.job_id ? urlByJob.get(a.job_id) : undefined;
+    if (url) data.jobUrls[a.id] = url;
   }
   return data;
 }

@@ -247,6 +247,20 @@ export const automationApi = {
   },
 
   /**
+   * Pengguna mengirim lamaran sendiri di situs lowongan dan menandainya (POST /api/approvals/:id/mark-sent).
+   * Tidak ada yang dikirim ke situs mana pun: backend mencatat log "success" bertanda manual dan memindahkan
+   * kartu lamaran ke Terkirim. 200 { success: true, already_marked? }; 404, 409 { code: not_approved |
+   * already_sent | agent_working }, 422 { code: no_job } dilempar sebagai ApiError (lihat markSentErrorMessage).
+   */
+  async markApprovalSent(id: string) {
+    return apiFetch<{ success: boolean; already_marked?: boolean }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/mark-sent`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}) },
+      () => ({ success: true }),
+    )
+  },
+
+  /**
    * Teruskan kode keamanan dari email ke agen yang menunggu (POST /api/agent/security-code).
    * 202 { accepted: true }; 400 invalid_code | invalid_job, 401, 404, 409 agent_not_waiting, 429 too_many_codes,
    * 503 feature_unavailable, 500 dilempar sebagai ApiError (lihat describeSecurityCodeError di securityCode.ts).
