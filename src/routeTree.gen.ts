@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaitinglistRouteImport } from './routes/waitinglist'
+import { Route as UjiPortalRouteImport } from './routes/uji-portal'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as SkillRadarRouteImport } from './routes/skill-radar'
@@ -36,6 +37,11 @@ import { Route as AdminWaitinglistRouteImport } from './routes/admin.waitinglist
 const WaitinglistRoute = WaitinglistRouteImport.update({
   id: '/waitinglist',
   path: '/waitinglist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UjiPortalRoute = UjiPortalRouteImport.update({
+  id: '/uji-portal',
+  path: '/uji-portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/terms': typeof TermsRoute
+  '/uji-portal': typeof UjiPortalRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/terms': typeof TermsRoute
+  '/uji-portal': typeof UjiPortalRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/skill-radar': typeof SkillRadarRoute
   '/subscription': typeof SubscriptionRoute
   '/terms': typeof TermsRoute
+  '/uji-portal': typeof UjiPortalRoute
   '/waitinglist': typeof WaitinglistRoute
   '/admin/waitinglist': typeof AdminWaitinglistRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/skill-radar'
     | '/subscription'
     | '/terms'
+    | '/uji-portal'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/skill-radar'
     | '/subscription'
     | '/terms'
+    | '/uji-portal'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -297,6 +308,7 @@ export interface FileRouteTypes {
     | '/skill-radar'
     | '/subscription'
     | '/terms'
+    | '/uji-portal'
     | '/waitinglist'
     | '/admin/waitinglist'
     | '/auth/callback'
@@ -323,6 +335,7 @@ export interface RootRouteChildren {
   SkillRadarRoute: typeof SkillRadarRoute
   SubscriptionRoute: typeof SubscriptionRoute
   TermsRoute: typeof TermsRoute
+  UjiPortalRoute: typeof UjiPortalRoute
   WaitinglistRoute: typeof WaitinglistRoute
   AdminWaitinglistRoute: typeof AdminWaitinglistRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -335,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/waitinglist'
       fullPath: '/waitinglist'
       preLoaderRoute: typeof WaitinglistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/uji-portal': {
+      id: '/uji-portal'
+      path: '/uji-portal'
+      fullPath: '/uji-portal'
+      preLoaderRoute: typeof UjiPortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -525,6 +545,7 @@ const rootRouteChildren: RootRouteChildren = {
   SkillRadarRoute: SkillRadarRoute,
   SubscriptionRoute: SubscriptionRoute,
   TermsRoute: TermsRoute,
+  UjiPortalRoute: UjiPortalRoute,
   WaitinglistRoute: WaitinglistRoute,
   AdminWaitinglistRoute: AdminWaitinglistRoute,
   AuthCallbackRoute: AuthCallbackRoute,
