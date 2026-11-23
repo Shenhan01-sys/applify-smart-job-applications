@@ -15,6 +15,23 @@ import {
 import { getApiBaseUrl, isMockMode } from '@/lib/appConfig'
 import type { EnrichJobResult, SalaryBenchmarkResult } from '@/lib/jobDetail'
 import { LINKEDIN_IMPORT_TIMEOUT_MS, parseImportPreview, type ImportPreview } from '@/lib/linkedinImport'
+import {
+  parseDeleteResponse,
+  parseLlmKeysResponse,
+  providerInfo,
+  parseSaveResponse,
+  parseTestResponse,
+  type LlmKeyRow,
+  type LlmKeysResponse,
+  type LlmProvider,
+  type LlmTestResponse,
+} from '@/lib/llmKeys'
+import { mockDeleteKey, mockLlmKeysResponse, mockSaveKey, mockTestKey } from '@/mocks/llmKeysMock'
+
+// Kunci API sendiri (BYOK) di mode demo: hanya 4 karakter terakhir yang diingat, selama halaman terbuka.
+let mockLlmKeyRows: LlmKeyRow[] = []
+
+const badResponse = () => new ApiError(502, JSON.stringify({ code: 'bad_response' }))
 
 // Alamat server dibaca saat dipanggil. Di build produksi tanpa VITE_API_URL ini melempar ApiConfigError,
 // yang dijelaskan ke pengguna oleh describeApiError(). Localhost hanya dipakai saat `vite dev`.
@@ -615,5 +632,84 @@ export const automationApi = {
       { method: 'POST', headers: await getAuthHeaders() },
       () => ({ success: true }),
     )
+  },
+
+  // Kunci API LLM milik pengguna (BYOK), lib/llmKeys.ts. Kunci utuh hanya ada di badan PUT: tidak di alamat,
+  // tidak dicatat, tidak disimpan di browser, dan tidak pernah ada di jawaban server (hanya 4 karakter terakhir).
+
+  /** Daftar kunci tersimpan dan apakah fiturnya aktif (GET /api/llm-keys). */
+  async getLlmKeys(): Promise<LlmKeysResponse> {
+    const body = await apiFetch<unknown>(
+      `${apiBase()}/api/llm-keys`,
+      { headers: await getAuthHeaders() },
+      () => mockLlmKeysResponse(mockLlmKeyRows),
+    )
+    const parsed = parseLlmKeysResponse(body)
+    if (!parsed) throw badResponse()
+    return parsed
+  },
+
+  /**
+   * Simpan dan periksa kunci (PUT /api/llm-keys/:provider { apiKey, consent: true, model? }). `consent` harus
+   * `true` (pengguna mencentang persetujuan pengiriman data); tanpa itu server menjawab 400 consent_required.
+   * Kunci yang ditolak penyedia tidak disimpan. Galat { code } dilempar sebagai ApiError (lihat describeLlmKeyApiError).
+   */
+  async saveLlmKey(
+    provider: LlmProvider,
+    apiKey: string,
+    options: { consent: true; model?: string | null },
+  ): Promise<LlmKeyRow> {
+    const model = options.model || undefined // kosong = tidak memilih model: kolomnya tidak dikirim
+    const body = await apiFetch<unknown>(
+      `${apiBase()}/api/llm-keys/${encodeURIComponent(provider)}`,
+      { method: 'PUT', headers: await getAuthHeaders(), body: JSON.stringify({ apiKey, consent: options.consent, model }) },
+      () => {
+        const info = providerInfo(provider)
+        if (!info.verified) throw new ApiError(400, JSON.stringify({ code: 'provider_unverified' }))
+        if (info.requiresModel && !model) throw new ApiError(400, JSON.stringify({ code: 'model_required' }))
+        const saved = mockSaveKey(mockLlmKeyRows, provider, apiKey, model ?? null)
+        mockLlmKeyRows = saved.rows
+        return { key: saved.key }
+      },
+      600,
+    )
+    const parsed = parseSaveResponse(body)
+    if (!parsed) throw badResponse()
+    return parsed
+  },
+
+  /** Periksa ulang kunci tersimpan ke penyedia (POST /api/llm-keys/:provider/test). */
+  async testLlmKey(provider: LlmProvider): Promise<LlmTestResponse> {
+    const body = await apiFetch<unknown>(
+      `${apiBase()}/api/llm-keys/${encodeURIComponent(provider)}/test`,
+      // Fastify menolak POST ber-Content-Type JSON tanpa isi, jadi body kosong tetap dikirim sebagai objek.
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
+      () => {
+        const tested = mockTestKey(mockLlmKeyRows, provider)
+        if (!tested) throw new ApiError(404, JSON.stringify({ code: 'not_found' }))
+        mockLlmKeyRows = tested.rows
+        return tested.response
+      },
+      600,
+    )
+    const parsed = parseTestResponse(body)
+    if (!parsed) throw badResponse()
+    return parsed
+  },
+
+  /** Hapus kunci tersimpan (DELETE /api/llm-keys/:provider). Tetap jalan walau fiturnya dimatikan. */
+  async deleteLlmKey(provider: LlmProvider): Promise<boolean> {
+    // DELETE tanpa isi: Content-Type JSON dibuang supaya Fastify tidak menolaknya sebagai body kosong.
+    const { 'Content-Type': _contentType, ...auth } = await getAuthHeaders()
+    const body = await apiFetch<unknown>(
+      `${apiBase()}/api/llm-keys/${encodeURIComponent(provider)}`,
+      { method: 'DELETE', headers: auth },
+      () => {
+        const removed = mockDeleteKey(mockLlmKeyRows, provider)
+        mockLlmKeyRows = removed.rows
+        return { deleted: removed.deleted }
+      },
+    )
+    return parseDeleteResponse(body)
   },
 }

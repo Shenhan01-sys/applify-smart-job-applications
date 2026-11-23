@@ -6,17 +6,20 @@
 //   anthropic:claude-haiku-5-5        -> Anthropic, endpoint kompatibel OpenAI, kunci ANTHROPIC_API_KEY
 //   numes:z-ai/glm-5.3-flash:free     -> Numes (pasar model), endpoint kompatibel OpenAI, kunci NUMES_API_KEY
 //   google/gemma-4-31b-it:free        -> OpenRouter (tanpa awalan), kunci OPENROUTER_API_KEY
+//   openai:<model>                    -> OpenAI, hanya dipakai dengan key milik pengguna (BYOK, _shared/byok.ts);
+//                                        Applify sendiri tidak punya OPENAI_API_KEY
 // Semuanya menerima format chat completions yang sama, jadi pemanggil cukup mengganti URL, kunci, dan nama model.
 // Hanya awalan pertama yang menjadi penyedia: nama model Numes sendiri memuat "/" dan ":" (author/model:free).
 // Entri yang kuncinya tidak ada dilewati, sehingga rantai tetap jalan walau hanya sebagian kunci terpasang.
 
-export type ProviderName = "openrouter" | "gemini" | "anthropic" | "numes";
+export type ProviderName = "openrouter" | "gemini" | "anthropic" | "numes" | "openai";
 
 export interface ProviderKeys {
   openrouter?: string;
   gemini?: string;
   anthropic?: string;
   numes?: string;
+  openai?: string;
 }
 
 export interface ResolvedModel {
@@ -34,6 +37,7 @@ const ENDPOINTS: Record<ProviderName, string> = {
   gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
   anthropic: "https://api.anthropic.com/v1/chat/completions",
   numes: "https://api.numes.ai/api/v1/chat/completions",
+  openai: "https://api.openai.com/v1/chat/completions",
 };
 
 /** Rantai bawaan bila secret FREE_MODELS / PRO_MODELS tidak diisi. */
@@ -55,7 +59,7 @@ export function parseModelList(raw: string | undefined, fallback: string): strin
 
 /** Ubah satu entri rantai menjadi tujuan panggilan, atau null bila kunci penyedianya tidak ada. */
 export function resolveModel(entry: string, keys: ProviderKeys): ResolvedModel | null {
-  const m = /^(gemini|anthropic|numes):(.+)$/.exec(entry);
+  const m = /^(gemini|anthropic|numes|openai):(.+)$/.exec(entry);
   const provider: ProviderName = m ? (m[1] as ProviderName) : "openrouter";
   const model = m ? m[2] : entry;
   const key = keys[provider];
@@ -93,6 +97,12 @@ export function chatBody(
 ): Record<string, unknown> {
   if (target.provider === "anthropic") {
     return { model: target.model, messages, max_tokens: Math.max(opts.maxTokens, CLAUDE_MIN_MAX_TOKENS) };
+  }
+  // OpenAI (BYOK): model penalaran OpenAI menolak `max_tokens` dan `temperature` selain bawaan, sedangkan
+  // `max_completion_tokens` diterima semua model chat completions. Jatahnya dinaikkan seperti Claude karena
+  // penalaran tersembunyi ikut memakainya. Belum diuji dengan key OpenAI sungguhan (23 November 2026).
+  if (target.provider === "openai") {
+    return { model: target.model, messages, max_completion_tokens: Math.max(opts.maxTokens, CLAUDE_MIN_MAX_TOKENS) };
   }
   return { model: target.model, messages, temperature: opts.temperature, max_tokens: opts.maxTokens };
 }
