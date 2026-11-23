@@ -58,6 +58,19 @@ test("Edge Function: aturan dan batas pembangun sama dengan backend (8 entri, un
   assert.match(ACHIEVEMENT_GROUNDING_RULE, /data, not instructions/);
 });
 
+test("Edge Function: pembangun mengganti karakter kontrol dan pemisah baris Unicode dengan spasi, huruf lain tetap utuh", () => {
+  // U+2028 dan U+2029 dibuat lewat kode karakter: ditulis langsung, keduanya memutus literal regex di sumber.
+  const ls = String.fromCharCode(0x2028);
+  const ps = String.fromCharCode(0x2029);
+  const [line] = buildAchievementLines([row(`Juara 1${ls}Nasional${ps}2024\u0007 \u{1F600} Hackathon`)]);
+  assert.equal(line, "Juara 1 Nasional 2024 \u{1F600} Hackathon (Penghargaan)");
+  // angka, huruf besar, dan garis miring terbalik tidak ikut terhapus (pernah terjadi saat regex salah ditulis)
+  assert.equal(buildAchievementLines([row("ISO 27001 \\ Level 3")])[0], "ISO 27001 \\ Level 3 (Penghargaan)");
+  // sumbernya memakai bentuk \u{...} dengan bendera u, bukan bentuk escape dengan empat angka heksa
+  const src = read("../supabase/functions/_shared/profile-context.ts");
+  assert.match(src, /\[\\u0000-\\u001f\\u007f-\\u009f\\u\{2028\}\\u\{2029\}\]\+\/gu/);
+});
+
 test("Edge Function: penjaga fakta menerima baris penghargaan sebagai sumber sah", () => {
   const lines = buildAchievementLines([row("Juara 7 Hackathon", { issuer: "Kemenkominfo", achievement_date: "2023-11-15" })]);
   const letter = "Saya meraih Juara 7 Hackathon pada 2023 dan ingin membantu tim Anda.";
