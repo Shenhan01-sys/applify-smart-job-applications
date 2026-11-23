@@ -34,6 +34,27 @@ test.describe("harness", () => {
     backend.unmocked.length = 0;
   });
 
+  test("endpoint ekstensi (/api/extension/*) tidak ditiru: aplikasi web tidak boleh memanggilnya, dan bila memanggil tercatat", async ({ app, backend }) => {
+    await app.goto("/approvals");
+    const statuses = await app.evaluate(() =>
+      Promise.all([
+        fetch("/mock-api/api/extension/answers", { method: "POST", body: "{}" }).then((r) => r.status),
+        fetch("/mock-api/api/extension/documents/apr-1/resume").then((r) => r.status),
+      ]),
+    );
+    expect(statuses).toEqual([501, 501]);
+    expect(backend.unmocked).toEqual(["API POST /api/extension/answers", "API GET /api/extension/documents/apr-1/resume"]);
+    backend.unmocked.length = 0;
+  });
+
+  test("bacaan PostgREST dengan operator yang belum ditiru ditolak dan dicatat, bukan dijawab kosong", async ({ app, backend }) => {
+    await app.goto("/approvals");
+    const status = await app.evaluate(() => fetch("/mock-supabase/rest/v1/application_logs?status=neq.success").then((r) => r.status));
+    expect(status).toBe(501);
+    expect(backend.unmocked).toEqual(["SUPABASE GET application_logs: Operator PostgREST belum ditiru: status=neq.success"]);
+    backend.unmocked.length = 0;
+  });
+
   test("tanpa sesi login, halaman Persetujuan mengalihkan ke /login (sesi palsu memang yang membuka halamannya)", async ({ app }) => {
     // Skrip awal dijalankan berurutan: yang ini mengosongkan sesi yang ditanam fixture.
     await app.addInitScript(() => window.localStorage.clear());

@@ -1,11 +1,13 @@
 import { expect, test, TEST_ACCESS_TOKEN } from "./helpers/test";
 import { TEST_USER_ID } from "./helpers/constants";
 import {
+  EXTENSION_QUESTIONS,
   QUESTIONS,
   applyLog,
   approvedApproval,
   approval,
   awaitingCodeLog,
+  extensionQuestionsLog,
   isoAgo,
   questionsLog,
   queueRow,
@@ -311,5 +313,159 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
 
     await expect(app.getByText("Agen pengisi formulir")).toBeVisible();
     await expect(app.getByRole("heading", { name: "Masukkan kode keamanan" })).toHaveCount(0);
+  });
+});
+
+test.describe("Persetujuan: log Ekstensi Browser", () => {
+  const APR = "apr-x";
+  const SAVED_TEXT = "Jawaban tersimpan. Kembali ke tab lowongan lalu klik Simpan jawaban dan isi ulang di panel Applify.";
+  const WHY = EXTENSION_QUESTIONS[0];
+  const SAVE_BUTTON = "Simpan jawaban";
+
+  /** Persetujuan yang hanya dikerjakan ekstensi: tidak ada tugas apply di antrean worker, hanya log ekstensi tanpa queue_job_id. */
+  function seedExtension(backend: import("./helpers/mockBackend").MockBackend, log: Record<string, any> = extensionQuestionsLog(APR)) {
+    backend.state.history = [approvedApproval(APR, { job_title: "Data Analyst", company: "PT Ekstensi" })];
+    backend.state.queue = [];
+    backend.state.logs = [log];
+  }
+
+  async function openHistory(app: import("@playwright/test").Page) {
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+  }
+
+  test("kartu menampilkan pertanyaan dari ekstensi, kolom rahasia tanpa isian, dan ringkasan berkas tanpa path", async ({ app, backend }) => {
+    seedExtension(backend);
+    await openHistory(app);
+
+    await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toBeVisible();
+    // Hanya dua pertanyaan yang bisa dijawab; kolom rahasia tidak dihitung.
+    await expect(app.getByText("2 pertanyaan")).toBeVisible();
+    await expect(app.getByLabel(WHY.label)).toBeVisible();
+    await expect(app.getByText("(wajib)").first()).toBeVisible();
+    await expect(app.getByText("(opsional)")).toBeVisible();
+    await expect(app.getByRole("button", { name: SAVE_BUTTON, exact: true })).toBeVisible();
+    await expect(app.getByRole("button", { name: "Simpan jawaban dan jalankan agen lagi" })).toHaveCount(0);
+
+    const selfFill = app.getByTestId("agent-self-fill");
+    await expect(selfFill).toContainText("Account password");
+    await expect(selfFill).toContainText("Isi sendiri di halaman lowongan");
+    await expect(selfFill.getByRole("textbox")).toHaveCount(0);
+    await expect(app.getByLabel("Account password")).toHaveCount(0);
+
+    await expect(app.getByTestId("agent-documents")).toHaveText("Ekstensi Browser memasang berkas: CV, surat lamaran.");
+    await expect(app.getByText("Agen pengisi formulir")).toBeVisible();
+  });
+
+  test("log ekstensi dibaca dengan sesi pengguna: kueri dibatasi action apply, kanal ekstensi, dan id persetujuan", async ({ app, backend }) => {
+    seedExtension(backend);
+    await openHistory(app);
+    await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toBeVisible();
+
+    const reads = backend.readsOf("application_logs");
+    const extension = reads.filter((r) => r["details->>channel"] === "eq.extension");
+    // Halaman memuat data lebih dari sekali (mode dev React): setiap panggilan harus punya filter yang sama.
+    expect(extension.length).toBeGreaterThan(0);
+    for (const r of extension) expect(r).toMatchObject({ action: "eq.apply", "details->>approval_request_id": `in.(${APR})` });
+    // Tidak ada baca log tanpa filter: setiap kueri membatasi baris yang diminta (RLS tetap penjaga utama).
+    for (const r of reads) {
+      expect(Object.keys(r).filter((k) => !["select", "order", "limit"].includes(k)).length, JSON.stringify(r)).toBeGreaterThan(0);
+    }
+    // Membuka halaman tidak menulis apa pun.
+    expect(backend.restWrites).toEqual([]);
+    expect(backend.apiCalls.filter((c) => c.method === "POST" && !c.path.endsWith("/claim-statuses"))).toEqual([]);
+  });
+
+  test("jawaban disimpan ke bank jawaban tanpa memanggil rerun worker, lalu kartu minta kembali ke tab lowongan", async ({ app, backend }) => {
+    seedExtension(backend);
+    await openHistory(app);
+
+    await app.getByLabel(WHY.label).fill("Karena produknya membantu pencari kerja.");
+    await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
+
+    await expect(app.getByText(SAVED_TEXT)).toBeVisible();
+    await expect(app.getByText("Agen berjalan lagi dengan jawabanmu.")).toHaveCount(0);
+
+    expect(backend.restWrites).toHaveLength(1);
+    const save = backend.restWrites[0];
+    expect(save.path).toBe("/rest/v1/user_form_answers");
+    const rows = (save.body as Array<Record<string, string>>).map(({ updated_at, ...rest }) => {
+      expect(Number.isNaN(Date.parse(updated_at))).toBe(false);
+      return rest;
+    });
+    // Pertanyaan opsional yang kosong dan kolom rahasia tidak ikut disimpan.
+    expect(rows).toEqual([{ user_id: TEST_USER_ID, question_key: WHY.key, question_label: WHY.label, answer: "Karena produknya membantu pencari kerja." }]);
+
+    // Tidak ada tugas worker yang diantrekan ulang dan tidak ada panggilan ke ekstensi (tidak ditiru).
+    expect(backend.callsTo("POST", `/api/approvals/${APR}/rerun`)).toHaveLength(0);
+    expect(backend.callsTo("POST", `/api/approvals/${APR}/mark-sent`)).toHaveLength(0);
+    expect(backend.apiCalls.filter((c) => c.method === "POST" && !c.path.endsWith("/claim-statuses"))).toEqual([]);
+  });
+
+  test("pertanyaan wajib yang kosong ditolak di layar, tidak menyimpan; opsional boleh kosong", async ({ app, backend }) => {
+    seedExtension(backend);
+    await openHistory(app);
+
+    await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
+    await expect(app.getByText("Lengkapi semua jawaban dulu")).toBeVisible();
+    await app.getByLabel("LinkedIn profile").fill("https://linkedin.example.test/in/penguji");
+    await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
+    await expect(app.getByText("Lengkapi semua jawaban dulu")).toBeVisible();
+    expect(backend.restWrites).toHaveLength(0);
+    expect(backend.callsTo("POST", `/api/approvals/${APR}/rerun`)).toHaveLength(0);
+  });
+
+  test("log ekstensi yang lebih baru daripada log worker dipakai: kartu ekstensi tanpa tombol jalankan agen", async ({ app, backend }) => {
+    backend.state.history = [approvedApproval("apr-m")];
+    backend.state.queue = [queueRow("queue-m", "apr-m", "completed")];
+    backend.state.logs = [
+      { ...questionsLog("queue-m", "apr-m"), created_at: isoAgo(10 * 60_000) },
+      extensionQuestionsLog("apr-m", { questions: [{ key: "expected salary", label: "Expected salary (IDR)", kind: "text", required: true }] }),
+    ];
+    await openHistory(app);
+
+    await expect(app.getByLabel("Expected salary (IDR)")).toBeVisible();
+    await expect(app.getByLabel(QUESTIONS[1].label)).toHaveCount(0);
+    await expect(app.getByRole("button", { name: SAVE_BUTTON, exact: true })).toBeVisible();
+    await expect(app.getByRole("button", { name: "Simpan jawaban dan jalankan agen lagi" })).toHaveCount(0);
+  });
+
+  test("log worker yang lebih baru daripada log ekstensi dipakai: perilaku worker lama tetap", async ({ app, backend }) => {
+    backend.state.history = [approvedApproval("apr-m")];
+    backend.state.queue = [queueRow("queue-m", "apr-m", "completed")];
+    backend.state.logs = [
+      questionsLog("queue-m", "apr-m"),
+      { ...extensionQuestionsLog("apr-m", { questions: [{ key: "expected salary", label: "Expected salary (IDR)", kind: "text", required: true }] }), created_at: isoAgo(10 * 60_000) },
+    ];
+    await openHistory(app);
+
+    await expect(app.getByLabel(QUESTIONS[1].label)).toBeVisible();
+    await expect(app.getByLabel("Expected salary (IDR)")).toHaveCount(0);
+    await expect(app.getByRole("button", { name: "Simpan jawaban dan jalankan agen lagi" })).toBeVisible();
+    await expect(app.getByTestId("agent-documents")).toHaveCount(0);
+  });
+
+  test("hanya kolom rahasia: tidak ada isian dan tidak ada tombol simpan", async ({ app, backend }) => {
+    seedExtension(
+      backend,
+      extensionQuestionsLog(APR, { questions: [EXTENSION_QUESTIONS[2]], questions_pending: 1, documents_attached: { resume: false } }),
+    );
+    await openHistory(app);
+
+    await expect(app.getByRole("heading", { name: "Isi sendiri di halaman lowongan" })).toBeVisible();
+    await expect(app.getByTestId("agent-self-fill")).toContainText("Account password");
+    await expect(app.getByRole("button", { name: /Simpan jawaban/ })).toHaveCount(0);
+    await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toHaveCount(0);
+    await expect(app.getByTestId("agent-documents")).toHaveText("Ekstensi Browser tidak memasang berkas apa pun.");
+    expect(backend.restWrites).toEqual([]);
+  });
+
+  test("ekstensi sudah mengirim (success): tidak ada kartu pertanyaan, hanya status Terkirim", async ({ app, backend }) => {
+    seedExtension(backend, extensionQuestionsLog(APR, { questions: [] }, { status: "success" }));
+    await openHistory(app);
+
+    await expect(app.getByText("Terkirim").first()).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toHaveCount(0);
+    await expect(app.getByTestId("agent-self-fill")).toHaveCount(0);
   });
 });

@@ -61,7 +61,12 @@ function columnValue(row: Row, key: string): unknown {
   return value && typeof value === "object" ? value[path] : undefined;
 }
 
-/** Hanya operator yang dipakai aplikasi: eq dan in. Operator lain dianggap kontrak berubah dan dilempar. */
+const isSupportedOperator = (expr: string): boolean => expr.startsWith("eq.") || (expr.startsWith("in.(") && expr.endsWith(")"));
+
+/**
+ * Hanya operator yang dipakai aplikasi: eq dan in. Operator lain dianggap kontrak berubah dan dilempar,
+ * juga saat tabelnya kosong (diperiksa lebih dulu di selectRows, tanpa menunggu ada baris yang dicocokkan).
+ */
 function matchesFilter(row: Row, key: string, expr: string): boolean {
   const actual = columnValue(row, key);
   if (expr.startsWith("eq.")) return String(actual) === expr.slice(3);
@@ -83,6 +88,8 @@ export class MockBackend {
   readonly apiCalls: RecordedCall[] = [];
   /** Panggilan tulis ke PostgREST (POST, PATCH, DELETE). */
   readonly restWrites: RecordedCall[] = [];
+  /** Panggilan baca ke PostgREST (GET): tabel dan filter yang dikirim aplikasi, untuk memeriksa bentuk kueri. */
+  readonly restReads: RecordedCall[] = [];
   /** Semua panggilan yang tidak dikenal. Harus kosong di akhir tes. */
   readonly unmocked: string[] = [];
   private readonly overrides = new Map<string, Override>();
@@ -105,6 +112,16 @@ export class MockBackend {
   /** Paksa jawaban untuk satu panggilan, misalnya "POST /api/approvals/apr-1/rerun" -> 409. */
   override(methodAndPath: string, response: Override): void {
     this.overrides.set(methodAndPath, response);
+  }
+
+  /**
+   * Filter kueri baca PostgREST ke satu tabel, sebagai pasangan kunci-nilai (misalnya `details->>channel` -> `eq.extension`),
+   * satu objek per panggilan. Kunci select, order, dan limit ikut dicatat apa adanya.
+   */
+  readsOf(table: string): Array<Record<string, string>> {
+    return this.restReads
+      .filter((c) => c.path === `/rest/v1/${table}`)
+      .map((c) => Object.fromEntries(new URLSearchParams(c.search).entries()));
   }
 
   /** Panggilan ke jalur tertentu, sesuai urutan terjadinya. */
@@ -202,7 +219,10 @@ export class MockBackend {
       return route.fulfill(json(501, { message: "not_mocked", path }));
     }
 
-    if (method === "GET") return this.selectRows(route, table, url);
+    if (method === "GET") {
+      this.restReads.push({ seq: ++callSeq, method, path, search: url.search, body: undefined, authorization: request.headers()["authorization"] ?? null });
+      return this.selectRows(route, table, url);
+    }
 
     if (method === "POST" && table === "user_form_answers") {
       let body: unknown = undefined;
@@ -246,6 +266,9 @@ export class MockBackend {
 
     let out: Row[];
     try {
+      for (const [key, expr] of url.searchParams.entries()) {
+        if (!NON_FILTER_PARAMS.has(key) && !isSupportedOperator(expr)) throw new Error(`Operator PostgREST belum ditiru: ${key}=${expr}`);
+      }
       out = rows.filter((row) => {
         for (const [key, expr] of url.searchParams.entries()) {
           if (NON_FILTER_PARAMS.has(key)) continue;

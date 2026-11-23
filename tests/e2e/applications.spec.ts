@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./helpers/test";
 import type { MockBackend } from "./helpers/mockBackend";
-import { applicationRow, approval, awaitingCodeLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
+import { applicationRow, approval, awaitingCodeLog, extensionQuestionsLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
 
 /**
  * Halaman Lamaran Saya (src/routes/applications.tsx), jendela detail: yang ditawarkan ke pengguna saat agen
@@ -157,6 +157,17 @@ test.describe("Lamaran: berhenti karena alasan lain tidak menawarkan jalan kelua
     await expect(link).toContainText("Agen butuh jawabanmu untuk 3 pertanyaan");
     await expect(link.getByRole("link", { name: "Persetujuan" })).toHaveAttribute("href", "/approvals");
     await expect(dialog.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: RERUN_LABEL })).toHaveCount(0);
+    expect(backend.apiCalls.filter((c) => c.method === "POST")).toEqual([]);
+  });
+
+  test("log ekstensi tanpa queue_job_id: pertanyaan yang bisa dijawab dihitung, kolom rahasia tidak", async ({ app, backend }) => {
+    seed(backend, extensionQuestionsLog(APPROVAL_ID));
+    const dialog = await openDetail(app);
+
+    const link = dialog.getByTestId("agent-questions-link");
+    await expect(link).toContainText("Agen butuh jawabanmu untuk 2 pertanyaan");
+    await expect(link.getByRole("link", { name: "Persetujuan" })).toHaveAttribute("href", "/approvals");
     await expect(dialog.getByRole("button", { name: RERUN_LABEL })).toHaveCount(0);
     expect(backend.apiCalls.filter((c) => c.method === "POST")).toEqual([]);
   });

@@ -86,6 +86,48 @@ export function questionsLog(queueJobId: string, approvalId: string, over: Row =
   });
 }
 
+/**
+ * Log Ekstensi Browser (reportExtensionRun di backend/services/extension-runner.ts): action "apply", `details.channel`
+ * "extension", `details.run_id`, dan `details.approval_request_id`. TIDAK ada `queue_job_id`: ekstensi tidak memakai
+ * antrean worker.
+ */
+export function extensionLog(approvalId: string, status: string, details: Row = {}, over: Row = {}): Row {
+  return {
+    action: "apply",
+    status,
+    job_id: `job-${approvalId}`,
+    created_at: isoAgo(1 * MIN),
+    details: { channel: "extension", run_id: `run-${approvalId}`, approval_request_id: approvalId, ...details },
+    ...over,
+  };
+}
+
+/** Pertanyaan dari ekstensi: satu wajib, satu opsional, satu kolom rahasia yang harus diisi sendiri. */
+export const EXTENSION_QUESTIONS = [
+  { key: "why do you want to work here", label: "Why do you want to work here?", kind: "textarea", required: true },
+  { key: "linkedin profile", label: "LinkedIn profile", kind: "text", required: false },
+  { key: "account password", label: "Account password", kind: "secret_skip", required: true },
+];
+
+/** Log ekstensi "ready" dengan pertanyaan dan berkas terpasang (CV dan surat lamaran; nilai berupa true, tanpa nama atau jalur). */
+export function extensionQuestionsLog(approvalId: string, over: Row = {}, logOver: Row = {}): Row {
+  return extensionLog(
+    approvalId,
+    "ready",
+    {
+      reason: null,
+      fields_filled: 4,
+      remaining_required: [EXTENSION_QUESTIONS[0].label],
+      questions: EXTENSION_QUESTIONS,
+      questions_pending: EXTENSION_QUESTIONS.length,
+      filled_fields: [{ label: "Nama lengkap", kind: "text", value: "Penguji Applify" }],
+      documents_attached: { resume: true, cover_letter: true, transcript: false, portfolio: false },
+      ...over,
+    },
+    logOver,
+  );
+}
+
 /** Log "ready" tanpa pertanyaan: agen berhenti sebelum tombol kirim. `blocked` = details.submit_blocked. */
 export function stoppedLog(queueJobId: string, approvalId: string, blocked: string | null, over: Row = {}, logOver: Row = {}): Row {
   return applyLog(queueJobId, approvalId, "ready", {
