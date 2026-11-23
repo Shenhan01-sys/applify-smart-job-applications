@@ -20,6 +20,13 @@ test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekst
   assert.equal(ks.extensionSupported, true);
   assert.equal(ks.badgeLabel, "Portal · Pakai Ekstensi");
 
+  // Domain lama Kalibrr (.id) sama dengan backend EXTENSION_LOGIN_PORTAL_DOMAINS: portal ekstensi, bukan web luar.
+  const kid = classifyJobChannel({ platform_source: "other", external_url: "https://www.kalibrr.id/c/acme/jobs/1" });
+  assert.equal(kid.channel, "auth_portal");
+  assert.equal(kid.extensionSupported, true);
+  const fake = classifyJobChannel({ platform_source: "other", external_url: "https://kalibrr.id.evil.test/jobs/1" });
+  assert.notEqual(fake.channel, "auth_portal");
+
   const em = classifyJobChannel({
     platform_source: "dealls",
     external_url: "https://dealls.com/loker/be",

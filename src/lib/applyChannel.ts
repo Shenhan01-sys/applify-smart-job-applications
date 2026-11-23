@@ -52,6 +52,7 @@ const AUTH_PORTAL_DOMAINS = [
   "jobstreet.co.id",
   "jobstreet.com",
   "kalibrr.com",
+  "kalibrr.id",
   "glints.com",
   "karir.com",
   "dealls.com",
