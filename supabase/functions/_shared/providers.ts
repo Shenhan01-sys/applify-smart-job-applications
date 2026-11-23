@@ -76,11 +76,15 @@ export function resolveChain(entries: string[], keys: ProviderKeys): ResolvedMod
   return entries.map((e) => resolveModel(e, keys)).filter((r): r is ResolvedModel => r !== null);
 }
 
+/** Batas bawah max_tokens untuk Claude, karena penalaran tersembunyinya ikut memakai jatah ini. */
+export const CLAUDE_MIN_MAX_TOKENS = 8000;
+
 /**
  * Badan permintaan chat per penyedia. Claude menolak `temperature` dengan HTTP 400
  * ("`temperature` is deprecated for this model"), dan penalaran tersembunyinya memakai jatah
  * `max_tokens`, sehingga jawaban bisa kosong bila jatahnya pas-pasan. Untuk Claude, `temperature`
- * dihilangkan dan `max_tokens` dinaikkan minimal 2.400.
+ * dihilangkan dan `max_tokens` dinaikkan minimal 8.000 (2.400 terlalu kecil: draf lowongan GoTo 23 November 2026
+ * terpotong sebelum JSON ditutup, lalu ditolak sebagai not_a_letter).
  */
 export function chatBody(
   target: Pick<ResolvedModel, "provider" | "model">,
@@ -88,7 +92,7 @@ export function chatBody(
   opts: { temperature: number; maxTokens: number },
 ): Record<string, unknown> {
   if (target.provider === "anthropic") {
-    return { model: target.model, messages, max_tokens: Math.max(opts.maxTokens, 2400) };
+    return { model: target.model, messages, max_tokens: Math.max(opts.maxTokens, CLAUDE_MIN_MAX_TOKENS) };
   }
   return { model: target.model, messages, temperature: opts.temperature, max_tokens: opts.maxTokens };
 }

@@ -138,13 +138,13 @@ test("runChain: model pertama gagal HTTP, model kedua menjawab, dan kegagalan te
   assert.match(h.logs[0], /^\[t\] model accepted anthropic:model-b \d+ms$/);
 });
 
-test("runChain: Claude tidak menerima temperature dan mendapat max_tokens minimal 2400 (chatBody bersama)", async () => {
+test("runChain: Claude tidak menerima temperature dan mendapat max_tokens minimal 8000 (chatBody bersama)", async () => {
   const h = harness([() => new Response("x", { status: 500 }), () => okBody("OK")]);
   await run(h);
   assert.equal(h.calls[0].body.temperature, 0.4);
   assert.equal(h.calls[0].body.max_tokens, 900);
   assert.equal("temperature" in h.calls[1].body, false);
-  assert.equal(h.calls[1].body.max_tokens, 2400);
+  assert.equal(h.calls[1].body.max_tokens, 8000);
 });
 
 test("runChain: jaringan, timeout, JSON rusak, jawaban kosong, dan jawaban ditolak masing-masing punya kode alasan", async () => {

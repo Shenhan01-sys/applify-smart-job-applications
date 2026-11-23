@@ -33,6 +33,7 @@ import {
 import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementLines } from "../_shared/profile-context.ts";
 import { selectTailoredSkills } from "../_shared/tailored-skills.ts";
 import { letterStructureRules } from "../_shared/letter-rules.ts";
+import { extractDraftJson } from "../_shared/json-salvage.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -71,16 +72,8 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function extractJson(s: string): any {
-  const cleaned = s.replace(/```(?:json)?/gi, "").trim();
-  try { return JSON.parse(cleaned); } catch { /* fallthrough */ }
-  const a = cleaned.indexOf("{");
-  const b = cleaned.lastIndexOf("}");
-  if (a >= 0 && b > a) {
-    try { return JSON.parse(cleaned.slice(a, b + 1)); } catch { /* fallthrough */ }
-  }
-  return null;
-}
+// JSON jawaban model: lihat _shared/json-salvage.ts (juga menyelamatkan surat dari JSON yang terpotong).
+const extractJson = (s: string): any => extractDraftJson(s);
 
 function clamp(n: unknown): number {
   const v = Math.round(Number(n) || 0);
@@ -282,13 +275,14 @@ Return JSON exactly in this shape:
         note("empty", started);
         continue;
       }
-      const attempt = extractJson(cleaned) ?? {
-        coverLetter: cleaned,
+      // Nilai bawaan dipakai untuk kunci yang tidak ada, termasuk saat hanya surat yang terselamatkan dari JSON terpotong.
+      const attempt = {
         matchScore: job.match_score ?? 70,
         acceptancePotential: job.acceptance_potential ?? 60,
         tailoredSkills: [],
         skillGaps: [],
         aiNotes: "",
+        ...(extractJson(cleaned) ?? { coverLetter: cleaned }),
       };
       const verdict = acceptCoverLetter(String(attempt.coverLetter ?? ""), { language, allowedContext });
       if (verdict.ok === true) {
@@ -300,7 +294,8 @@ Return JSON exactly in this shape:
       const why = (verdict as { reasons: string[] }).reasons;
       rejectedReasons.push(...why);
       lastDetail = `${model}: output rejected (${why.join(", ")})`;
-      note(`rejected ${why.join(",")}`, started);
+      // finish_reason "length" berarti jawaban terpotong oleh max_tokens.
+      note(`rejected ${why.join(",")} finish=${aiJson?.choices?.[0]?.finish_reason ?? "?"}`, started);
       const fallback = (verdict as { fallbackText?: string }).fallbackText;
       if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: aiJson.model ? `${candidate.provider}:${aiJson.model}` : model };
     }

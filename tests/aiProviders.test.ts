@@ -109,11 +109,11 @@ test("generate-application mencatat hasil tiap kandidat model tanpa isi surat", 
   assert.match(src, /attempts, models:/);
 });
 
-test("chatBody: Claude tanpa temperature dan max_tokens minimal 2400, penyedia lain tetap", () => {
+test("chatBody: Claude tanpa temperature dan max_tokens minimal 8000, penyedia lain tetap", () => {
   const msgs = [{ role: "user", content: "hai" }];
   const claude = chatBody({ provider: "anthropic", model: "claude-haiku-5-5" }, msgs, { temperature: 0.6, maxTokens: 1600 });
   assert.equal("temperature" in claude, false);
-  assert.equal(claude.max_tokens, 2400);
+  assert.equal(claude.max_tokens, 8000);
   const gemini = chatBody({ provider: "gemini", model: "gemini-3.5-flash-lite" }, msgs, { temperature: 0.6, maxTokens: 1600 });
   assert.equal(gemini.temperature, 0.6);
   assert.equal(gemini.max_tokens, 1600);
