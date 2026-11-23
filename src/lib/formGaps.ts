@@ -102,7 +102,7 @@ function cleanId(value: unknown): string | null {
 }
 
 /** Baris log terbaru untuk satu lowongan (kueri sudah mengurutkan terbaru dulu, jadi waktu sama: yang lebih dulu menang). */
-function newestRow(rows: unknown, jobId: string): Record<string, unknown> | null {
+export function newestRow(rows: unknown, jobId: string): Record<string, unknown> | null {
   if (!Array.isArray(rows) || typeof jobId !== "string" || !jobId) return null;
   let newest: Record<string, unknown> | null = null;
   let newestTime = -Infinity;
