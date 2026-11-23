@@ -36,6 +36,7 @@ test("tidak ada model atau klaim yang tidak dipakai kode (GPT-4, Ultimate, 90% a
   // Claude dan Gemini sekarang benar-benar dipakai Edge Function (2026-11-19), jadi boleh disebut di planInfo.
   if (/claude/i.test(allCopy)) assert.match(providers, /anthropic:claude-/);
   if (/gemini/i.test(allCopy)) assert.match(providers, /gemini:gemini-/);
+  if (/numes/i.test(allCopy)) assert.match(providers, /numes:z-ai\/glm-5\.3-flash:free/);
   const ui = ["subscription.tsx", "index.tsx", "automation-settings.tsx"].map((f) => read(`applify-smart-job-applications/src/routes/${f}`));
   for (const src of ui) {
     assert.doesNotMatch(src, /Claude Sonnet|Sonnet 4\.6|Ultimate|90% akurasi|4× lebih tinggi|Lamaran tak terbatas/);
@@ -51,15 +52,31 @@ test("model paket Free ada di kode: Claude Sonnet, Claude Haiku, lalu Gemini unt
   assert.match(backendAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(backendAi, /qwen\/qwen3\.8-27b:free/);
   assert.match(backendAi, /GROQ_MODEL_FALLBACKS/);
-  // Edge Function: rantai draf ada di _shared/providers.ts (Claude Sonnet, Claude Haiku, Gemini, lalu model gratis OpenRouter).
-  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,gemini:gemini-3\.5-flash-lite,google\/gemma-4-31b-it:free,openrouter\/free"/);
+  // Edge Function: rantai draf ada di _shared/providers.ts (Claude Sonnet, Claude Haiku, dua model gratis Numes,
+  // Gemini, lalu model gratis OpenRouter).
+  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,numes:z-ai\/glm-5\.3-flash:free,numes:deepseek\/deepseek-v4\.1-flash:free,gemini:gemini-3\.5-flash-lite,google\/gemma-4-31b-it:free,openrouter\/free"/);
   assert.match(PLAN_MODELS.free.models[0].name, /Claude Sonnet/);
   assert.match(PLAN_MODELS.free.models[1].name, /Claude Haiku/);
-  assert.match(PLAN_MODELS.free.models[2].name, /Gemini/);
+  assert.match(PLAN_MODELS.free.models[2].name, /GLM 5\.3 Flash/);
+  assert.match(PLAN_MODELS.free.models[3].name, /DeepSeek V4\.1 Flash/);
+  assert.match(PLAN_MODELS.free.models[4].name, /Gemini/);
+  assert.match(PLAN_MODELS.free.models[2].name + PLAN_MODELS.free.models[3].name, /Numes[\s\S]*Numes/);
 
   const names = PLAN_MODELS.free.models.map((m) => m.name).join(" | ");
   for (const word of ["Gemma", "Nemotron", "Qwen", "Groq"]) assert.match(names, new RegExp(word));
   assert.equal(PLAN_MODELS.free.models[0].role, "Utama");
+});
+
+test("teks fitur AI paket Free menyebut Claude Sonnet dan Haiku untuk draf, model gratis hanya sebagai cadangan", () => {
+  const ai = FREE_FEATURES.find((f) => /^AI Basic/.test(f));
+  assert.ok(ai, "ada butir fitur AI Basic");
+  assert.match(ai!, /Claude Sonnet/);
+  assert.match(ai!, /Haiku/);
+  assert.match(ai!, /cadangan/);
+  // butir lama (OpenRouter sebagai model utama) sudah tidak benar untuk draf
+  assert.doesNotMatch(ai!, /OpenRouter/);
+  // Claude yang disebut memang ada di rantai bawaan
+  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5/);
 });
 
 test("model draf paket Pro ada di kode: Gemini 4 Hydrogen (utama), Argon, lalu Claude (cadangan)", () => {

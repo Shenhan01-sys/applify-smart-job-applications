@@ -4,16 +4,19 @@
 // Setiap entri rantai model ditulis sebagai "<penyedia>:<model>" atau langsung slug OpenRouter:
 //   gemini:gemini-3.5-flash-lite      -> Google AI Studio, endpoint kompatibel OpenAI, kunci GEMINI_API_KEY
 //   anthropic:claude-haiku-5-5        -> Anthropic, endpoint kompatibel OpenAI, kunci ANTHROPIC_API_KEY
+//   numes:z-ai/glm-5.3-flash:free     -> Numes (pasar model), endpoint kompatibel OpenAI, kunci NUMES_API_KEY
 //   google/gemma-4-31b-it:free        -> OpenRouter (tanpa awalan), kunci OPENROUTER_API_KEY
-// Ketiganya menerima format chat completions yang sama, jadi pemanggil cukup mengganti URL, kunci, dan nama model.
+// Semuanya menerima format chat completions yang sama, jadi pemanggil cukup mengganti URL, kunci, dan nama model.
+// Hanya awalan pertama yang menjadi penyedia: nama model Numes sendiri memuat "/" dan ":" (author/model:free).
 // Entri yang kuncinya tidak ada dilewati, sehingga rantai tetap jalan walau hanya sebagian kunci terpasang.
 
-export type ProviderName = "openrouter" | "gemini" | "anthropic";
+export type ProviderName = "openrouter" | "gemini" | "anthropic" | "numes";
 
 export interface ProviderKeys {
   openrouter?: string;
   gemini?: string;
   anthropic?: string;
+  numes?: string;
 }
 
 export interface ResolvedModel {
@@ -30,14 +33,16 @@ const ENDPOINTS: Record<ProviderName, string> = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
   anthropic: "https://api.anthropic.com/v1/chat/completions",
+  numes: "https://api.numes.ai/api/v1/chat/completions",
 };
 
 /** Rantai bawaan bila secret FREE_MODELS / PRO_MODELS tidak diisi. */
 // Free: Claude Sonnet 5.5 dicoba lebih dulu, lalu Claude Haiku 5.5, karena Gemini gratis sering membalas 429/503
-// sehingga pengguna melihat pesan AI sibuk (keputusan Hans, 23 Nov 2026). Gemini, Gemma, dan openrouter/free
-// tetap menjadi cadangan. Entri Claude dilewati bila ANTHROPIC_API_KEY tidak ada.
+// sehingga pengguna melihat pesan AI sibuk (keputusan Hans, 23 Nov 2026). Sesudah Claude, dua model gratis Numes
+// (GLM 5.3 Flash dan DeepSeek V4.1 Flash); Gemini, Gemma, dan openrouter/free tetap menjadi cadangan terakhir.
+// Entri yang kuncinya tidak ada dilewati (ANTHROPIC_API_KEY untuk Claude, NUMES_API_KEY untuk Numes).
 export const DEFAULT_FREE_MODELS =
-  "anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,gemini:gemini-3.5-flash-lite,google/gemma-4-31b-it:free,openrouter/free";
+  "anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,numes:z-ai/glm-5.3-flash:free,numes:deepseek/deepseek-v4.1-flash:free,gemini:gemini-3.5-flash-lite,google/gemma-4-31b-it:free,openrouter/free";
 // Pro: Gemini 4 menggantikan DeepSeek V4 atas keputusan Hans (19 Nov 2026). Uji coba 19 Nov: gemini-4-argon
 // menolak dengan 429 (kuota free tier 0, butuh billing), gemini-4-hydrogen 503 karena permintaan tinggi.
 // Karena itu Claude Sonnet 5.5 dan Haiku 5.5 (sudah terbukti menjawab) tetap jadi cadangan.
@@ -50,7 +55,7 @@ export function parseModelList(raw: string | undefined, fallback: string): strin
 
 /** Ubah satu entri rantai menjadi tujuan panggilan, atau null bila kunci penyedianya tidak ada. */
 export function resolveModel(entry: string, keys: ProviderKeys): ResolvedModel | null {
-  const m = /^(gemini|anthropic):(.+)$/.exec(entry);
+  const m = /^(gemini|anthropic|numes):(.+)$/.exec(entry);
   const provider: ProviderName = m ? (m[1] as ProviderName) : "openrouter";
   const model = m ? m[2] : entry;
   const key = keys[provider];

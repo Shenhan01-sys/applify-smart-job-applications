@@ -4,7 +4,7 @@
 // Threshold ready = 70. Tidak ada vonis "ditolak": <70 dapat jalur pengembangan.
 //
 // Model AI: rantai penyedia yang sama dengan generate-application (../_shared/providers.ts). Secret: setidaknya
-// satu dari OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY; opsional FREE_MODELS (atau FREE_MODEL lama).
+// satu dari OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY; opsional FREE_MODELS (atau FREE_MODEL lama).
 // Dulu fungsi ini memanggil satu model OpenRouter gratis tanpa cadangan dan membalas 500 tanpa baris log saat model
 // itu berhenti menjawab. Kini tiap kegagalan penyedia dan galat database dicatat lewat console.error (kode alasan
 // dan nama model saja, tanpa data pengguna), dan bila semua penyedia gagal balasannya 502 dengan pesan Indonesia.
@@ -32,6 +32,7 @@ const PROVIDER_KEYS = {
   openrouter: Deno.env.get("OPENROUTER_API_KEY") ?? "",
   gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
+  numes: Deno.env.get("NUMES_API_KEY") ?? "",
 };
 const MODELS = resolveChain(
   parseModelList(Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"), DEFAULT_FREE_MODELS),

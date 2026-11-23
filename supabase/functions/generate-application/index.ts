@@ -1,8 +1,8 @@
 // Applify — generate-application Edge Function
 // Server-side AI: enforce monthly quota -> pick model by tier -> call OpenRouter -> persist draft.
-// Secrets: at least one of OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY. Optional: FREE_MODELS /
-// PRO_MODELS (comma-separated, tried in order; "gemini:<model>" and "anthropic:<model>" go to those providers,
-// anything else to OpenRouter) or the older single-model FREE_MODEL / PRO_MODEL. See ../_shared/providers.ts.
+// Secrets: at least one of OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY. Optional: FREE_MODELS /
+// PRO_MODELS (comma-separated, tried in order; "gemini:<model>", "anthropic:<model>" and "numes:<model>" go to those
+// providers, anything else to OpenRouter) or the older single-model FREE_MODEL / PRO_MODEL. See ../_shared/providers.ts.
 // Free OpenRouter slugs are retired regularly (deepseek-v4-flash:free became paid-only in 2026), so a
 // single hardcoded model breaks generation for every user. Keep a chain and update it via secrets.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
@@ -47,6 +47,7 @@ const PROVIDER_KEYS = {
   openrouter: OPENROUTER_API_KEY,
   gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
+  numes: Deno.env.get("NUMES_API_KEY") ?? "",
 };
 const FREE_MODELS = resolveChain(
   parseModelList(Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"), DEFAULT_FREE_MODELS),

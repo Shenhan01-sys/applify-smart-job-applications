@@ -34,6 +34,7 @@ test("green-career-assessment: memakai rantai penyedia bersama, bukan satu model
   assert.match(src, /resolveChain\(\s*parseModelList\(Deno\.env\.get\("FREE_MODELS"\) \?\? Deno\.env\.get\("FREE_MODEL"\), DEFAULT_FREE_MODELS\)/);
   assert.match(src, /GEMINI_API_KEY/);
   assert.match(src, /ANTHROPIC_API_KEY/);
+  assert.match(src, /numes: Deno\.env\.get\("NUMES_API_KEY"\) \?\? ""/);
   // dua mode sama-sama lewat runChain
   assert.equal([...src.matchAll(/await runChain\(MODELS/g)].length, 2);
   // tidak ada lagi panggilan langsung ke OpenRouter atau model gratis yang sudah dicabut

@@ -2,7 +2,8 @@
  * Nama model AI yang ditampilkan ke pengguna.
  *
  * Edge Function generate-application mengirim `analysis.modelUsed` dengan format `<penyedia>:<model>`
- * (misalnya `gemini:gemini-3.5-flash-lite`, `anthropic:claude-haiku-5-5`, `openrouter:google/gemma-4-31b-it:free`).
+ * (misalnya `gemini:gemini-3.5-flash-lite`, `anthropic:claude-haiku-5-5`, `openrouter:google/gemma-4-31b-it:free`,
+ * `numes:z-ai/glm-5.3-flash:free`).
  * Bila penyedia tidak menyebut nama model, isinya entri rantai apa adanya (misalnya `openrouter/free`).
  * Layar tidak boleh menampilkan slug mentah, dan sebelum ada draf layar tidak boleh mengklaim model tertentu.
  *
@@ -18,6 +19,8 @@ const KNOWN_MODELS: Array<[RegExp, string]> = [
   [/gemini-4-argon/, "Gemini 4 Argon"],
   [/claude-haiku-5[.-]5/, "Claude Haiku 5.5"],
   [/claude-sonnet-5[.-]5/, "Claude Sonnet 5.5"],
+  [/glm-5[.-]3-flash/, "GLM 5.3 Flash"],
+  [/deepseek-v4[.-]1-flash/, "DeepSeek V4.1 Flash"],
   [/deepseek-v4-pro/, "DeepSeek V4 Pro"],
   [/deepseek-v4-flash/, "DeepSeek V4 Flash"],
   [/gemma-4-26b/, "Gemma 4 26B"],
@@ -58,21 +61,24 @@ export function formatModelUsed(raw: unknown): string | null {
   const value = rawModelUsed(raw);
   if (!value) return null;
 
-  const withoutProvider = value.replace(/^(gemini|anthropic|openrouter):/i, "");
+  const provider = /^(gemini|anthropic|openrouter|numes):/i.exec(value)?.[1].toLowerCase();
+  const withoutProvider = value.replace(/^(gemini|anthropic|openrouter|numes):/i, "");
   const lower = withoutProvider.toLowerCase();
   const isFree = /:free$/.test(lower);
+  // Model Numes ditandai penyedianya; model gratis lain berasal dari OpenRouter.
+  const tag = (name: string) => (provider === "numes" ? `${name} (Numes)` : isFree ? `${name} (gratis, OpenRouter)` : name);
 
   if (OPENROUTER_ROUTER.test(lower)) return "Model gratis OpenRouter";
 
   for (const [pattern, name] of KNOWN_MODELS) {
-    if (pattern.test(lower)) return isFree ? `${name} (gratis, OpenRouter)` : name;
+    if (pattern.test(lower)) return tag(name);
   }
 
   // Slug tak dikenal: ambil nama setelah "vendor/", buang ":free" dan tanggal versi.
   const slug = lower.replace(/:free$/, "").split("/").pop()!.replace(/-\d{8}$/, "");
   if (!slug) return null;
   const pretty = prettifySlug(slug);
-  return isFree ? `${pretty} (gratis, OpenRouter)` : pretty;
+  return tag(pretty);
 }
 
 /** Label paket untuk saat model belum diketahui (sebelum draf dibuat): tidak menyebut model tertentu. */

@@ -18,6 +18,22 @@ test("modelUsed dari Edge Function menjadi nama ramah pengguna", () => {
   assert.equal(formatModelUsed("gemini:gemini-4-argon"), "Gemini 4 Argon");
 });
 
+test("model gratis Numes diberi nama ramah dengan tanda Numes, bukan slug mentah dan bukan OpenRouter", () => {
+  assert.equal(formatModelUsed("numes:z-ai/glm-5.3-flash:free"), "GLM 5.3 Flash (Numes)");
+  assert.equal(formatModelUsed("numes:deepseek/deepseek-v4.1-flash:free"), "DeepSeek V4.1 Flash (Numes)");
+  // respons Numes bisa memakai nama model tanpa :free atau dengan titik diganti garis
+  assert.equal(formatModelUsed("numes:z-ai/glm-5.3-flash"), "GLM 5.3 Flash (Numes)");
+  assert.equal(formatModelUsed("numes:deepseek/deepseek-v4-1-flash:free"), "DeepSeek V4.1 Flash (Numes)");
+  // model Numes yang belum dikenal tetap ramah dan ditandai Numes
+  assert.equal(formatModelUsed("numes:acme/foo-bar-5-5:free"), "Foo Bar 5.5 (Numes)");
+  for (const v of ["numes:z-ai/glm-5.3-flash:free", "numes:deepseek/deepseek-v4.1-flash:free", "numes:acme/foo-bar-5-5:free"]) {
+    assert.doesNotMatch(formatModelUsed(v)!, /[:/]|OpenRouter|gratis/, v);
+  }
+  // DeepSeek V4 Flash lama lewat OpenRouter tidak berubah
+  assert.equal(formatModelUsed("deepseek/deepseek-v4-flash"), "DeepSeek V4 Flash");
+  assert.equal(modelDisplay("numes:z-ai/glm-5.3-flash:free", "free"), "GLM 5.3 Flash (Numes)");
+});
+
 test("model gratis OpenRouter diberi tanda gratis; router tanpa nama model tidak diklaim sebagai model tertentu", () => {
   assert.equal(formatModelUsed("openrouter:google/gemma-4-31b-it:free"), "Gemma 4 31B (gratis, OpenRouter)");
   assert.equal(formatModelUsed("openrouter:nvidia/nemotron-3-super:free"), "NVIDIA Nemotron 3 Super (gratis, OpenRouter)");

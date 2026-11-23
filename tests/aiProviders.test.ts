@@ -17,7 +17,7 @@ import {
 
 // ---- penyedia model Edge Function: Gemini, Anthropic, dan OpenRouter dalam satu rantai ----------------
 
-const ALL = { openrouter: "or-key", gemini: "g-key", anthropic: "a-key" };
+const ALL = { openrouter: "or-key", gemini: "g-key", anthropic: "a-key", numes: "n-key" };
 
 test("penyedia: awalan gemini: dan anthropic: diarahkan ke endpoint masing-masing, sisanya ke OpenRouter", () => {
   const g = resolveModel("gemini:gemini-3.5-flash-lite", ALL)!;
@@ -37,8 +37,39 @@ test("penyedia: awalan gemini: dan anthropic: diarahkan ke endpoint masing-masin
   assert.equal(o.headers["X-Title"], "Applify");
 });
 
+test("penyedia: awalan numes: diarahkan ke Numes, nama model utuh (memuat / dan :) dan badan permintaan seperti OpenAI", () => {
+  const n = resolveModel("numes:z-ai/glm-5.3-flash:free", ALL)!;
+  assert.equal(n.provider, "numes");
+  assert.equal(n.entry, "numes:z-ai/glm-5.3-flash:free");
+  assert.equal(n.model, "z-ai/glm-5.3-flash:free");
+  assert.equal(n.url, "https://api.numes.ai/api/v1/chat/completions");
+  assert.equal(n.headers.Authorization, "Bearer n-key");
+  assert.equal(n.headers["Content-Type"], "application/json");
+  assert.equal(n.headers["X-Title"], undefined, "header khusus OpenRouter tidak ikut");
+
+  const d = resolveModel("numes:deepseek/deepseek-v4.1-flash:free", ALL)!;
+  assert.equal(d.provider, "numes");
+  assert.equal(d.model, "deepseek/deepseek-v4.1-flash:free");
+
+  // hanya awalan pertama yang menjadi penyedia; nama tanpa awalan tetap ke OpenRouter
+  assert.equal(resolveModel("numes:numes:x/y:free", ALL)!.model, "numes:x/y:free");
+  assert.equal(resolveModel("z-ai/glm-5.3-flash:free", ALL)!.provider, "openrouter");
+
+  // badan: temperature dipertahankan (tidak seperti Claude)
+  const body = chatBody(n, [{ role: "user", content: "hai" }], { temperature: 0.6, maxTokens: 1600 });
+  assert.deepEqual(body, { model: "z-ai/glm-5.3-flash:free", messages: [{ role: "user", content: "hai" }], temperature: 0.6, max_tokens: 1600 });
+});
+
+test("penyedia: entri Numes dilewati tanpa NUMES_API_KEY dan dipakai bila kuncinya ada", () => {
+  const chain = ["numes:z-ai/glm-5.3-flash:free", "gemini:gemini-3.5-flash-lite"];
+  assert.deepEqual(resolveChain(chain, { gemini: "g-key" }).map((c) => c.entry), ["gemini:gemini-3.5-flash-lite"]);
+  assert.deepEqual(resolveChain(chain, { gemini: "g-key", numes: "" }).map((c) => c.provider), ["gemini"]);
+  assert.deepEqual(resolveChain(chain, { gemini: "g-key", numes: "n-key" }).map((c) => c.provider), ["numes", "gemini"]);
+  assert.equal(resolveModel("numes:z-ai/glm-5.3-flash:free", { openrouter: "or-key" }), null);
+});
+
 test("penyedia: entri tanpa kunci dilewati dan urutan rantai dipertahankan", () => {
-  // Tanpa ANTHROPIC_API_KEY, kedua entri Claude di awal rantai Free dilewati.
+  // Tanpa ANTHROPIC_API_KEY dan NUMES_API_KEY, entri Claude dan Numes di awal rantai Free dilewati.
   const chain = resolveChain(parseModelList(undefined, DEFAULT_FREE_MODELS), { openrouter: "or-key", gemini: "g-key" });
   assert.deepEqual(chain.map((c) => c.provider), ["gemini", "openrouter", "openrouter"]);
   assert.equal(resolveChain(["anthropic:claude-haiku-5-5"], {}).length, 0);
@@ -47,10 +78,14 @@ test("penyedia: entri tanpa kunci dilewati dan urutan rantai dipertahankan", () 
 test("penyedia: rantai bawaan Free diawali Claude Sonnet 5.5 lalu Haiku 5.5, Pro diawali Gemini 4", () => {
   const free = parseModelList("", DEFAULT_FREE_MODELS);
   assert.deepEqual(free.slice(0, 2), ["anthropic:claude-sonnet-5-5", "anthropic:claude-haiku-5-5"]);
-  assert.equal(free[2], "gemini:gemini-3.5-flash-lite");
-  assert.deepEqual(free.slice(3), ["google/gemma-4-31b-it:free", "openrouter/free"]);
-  const withAll = resolveChain(free, { openrouter: "or-key", gemini: "g-key", anthropic: "a-key" });
-  assert.deepEqual(withAll.map((c) => c.provider), ["anthropic", "anthropic", "gemini", "openrouter", "openrouter"]);
+  assert.deepEqual(free.slice(2, 4), ["numes:z-ai/glm-5.3-flash:free", "numes:deepseek/deepseek-v4.1-flash:free"]);
+  assert.equal(free[4], "gemini:gemini-3.5-flash-lite");
+  assert.deepEqual(free.slice(5), ["google/gemma-4-31b-it:free", "openrouter/free"]);
+  const withAll = resolveChain(free, ALL);
+  assert.deepEqual(withAll.map((c) => c.provider), ["anthropic", "anthropic", "numes", "numes", "gemini", "openrouter", "openrouter"]);
+  // tanpa kunci Claude, rantai langsung mulai dari Numes
+  const noClaude = resolveChain(free, { openrouter: "or-key", gemini: "g-key", numes: "n-key" });
+  assert.deepEqual(noClaude.map((c) => c.provider), ["numes", "numes", "gemini", "openrouter", "openrouter"]);
   assert.equal(parseModelList(undefined, DEFAULT_PRO_MODELS)[0], "gemini:gemini-4-hydrogen");
   assert.deepEqual(parseModelList(" a , b ,, ", "x"), ["a", "b"]);
 });
@@ -61,6 +96,8 @@ test("Edge Function memakai rantai penyedia dan batas waktu per panggilan yang d
   assert.match(src, /AbortSignal\.timeout\(callTimeoutMs\)/);
   assert.doesNotMatch(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
   assert.doesNotMatch(src, /fetch\("https:\/\/openrouter\.ai/);
+  // kunci Numes dibaca dari secret yang sama dengan penyedia lain
+  assert.match(src, /numes: Deno\.env\.get\("NUMES_API_KEY"\) \?\? ""/);
 });
 
 test("generate-application mencatat hasil tiap kandidat model tanpa isi surat", () => {
