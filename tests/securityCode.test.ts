@@ -110,6 +110,8 @@ test("isCodeTimeout: hanya log ready dengan reason code_timeout", () => {
   assert.equal(isCodeTimeout({ log_status: "incomplete", reason: "code_timeout" }), false);
   assert.equal(isCodeTimeout({ log_status: "ready", reason: "timeout" }), false);
   assert.equal(isCodeTimeout({ log_status: "ready" }), false);
+  // 3 kode ditolak situs: belum terkirim, sama-sama bisa dijalankan ulang.
+  assert.equal(isCodeTimeout({ log_status: "ready", reason: "code_rejected" }), true);
   assert.equal(isCodeTimeout(null), false);
   assert.equal(isCodeTimeout(undefined), false);
 });

@@ -117,9 +117,12 @@ export function awaitingCodeState(row: AwaitingCodeRow | null | undefined, now: 
   return { waiting: true, secondsLeft: Math.min(MAX_WAIT_SECONDS, Math.ceil(ms / 1000)), codeLength: validCodeLength(row.code_length) };
 }
 
-/** Percobaan terbaru berakhir karena kode tidak dimasukkan tepat waktu (log "ready" dengan reason code_timeout). */
+/**
+ * Percobaan terbaru berakhir tanpa kode yang diterima: tidak dimasukkan tepat waktu (reason code_timeout) atau
+ * 3 kode ditolak situs (reason code_rejected). Keduanya belum terkirim dan bisa dijalankan ulang.
+ */
 export function isCodeTimeout(row: Pick<AwaitingCodeRow, "log_status" | "reason"> | null | undefined): boolean {
-  return !!row && row.log_status === "ready" && row.reason === "code_timeout";
+  return !!row && row.log_status === "ready" && (row.reason === "code_timeout" || row.reason === "code_rejected");
 }
 
 /** Jeda muat ulang status agen: 5 detik bila ada agen yang menunggu kode, selain itu 15 detik. */

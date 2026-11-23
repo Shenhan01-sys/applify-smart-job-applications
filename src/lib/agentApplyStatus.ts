@@ -59,6 +59,10 @@ export const AGENT_AWAITING_CODE_HINT =
 
 export const AGENT_CODE_TIMEOUT_LABEL = "Kode tidak dimasukkan";
 export const AGENT_CODE_TIMEOUT_HINT = "Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru.";
+/** Worker menulis reason "code_rejected" sesudah 3 kode tidak diterima situs lowongan. */
+export const AGENT_CODE_REJECTED_LABEL = "Kode ditolak";
+export const AGENT_CODE_REJECTED_HINT =
+  "Situs lowongan tidak menerima kode yang dimasukkan. Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru, lalu salin kode terbaru dari email.";
 
 const MAX_HINT_LABELS = 3;
 const MAX_HINT_LABEL_LENGTH = 70;
@@ -102,6 +106,9 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
   }
   if (status === "ready" && reason === "code_timeout") {
     return { label: AGENT_CODE_TIMEOUT_LABEL, hint: AGENT_CODE_TIMEOUT_HINT, tone: "manual", suggestEmail: false };
+  }
+  if (status === "ready" && reason === "code_rejected") {
+    return { label: AGENT_CODE_REJECTED_LABEL, hint: AGENT_CODE_REJECTED_HINT, tone: "manual", suggestEmail: false };
   }
   if (status === "ready" && blocked === "prior_unverified") {
     return { label: AGENT_PRIOR_UNVERIFIED_LABEL, hint: AGENT_PRIOR_UNVERIFIED_HINT, tone: "unverified", suggestEmail: false };

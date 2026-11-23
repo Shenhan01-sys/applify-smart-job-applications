@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  AGENT_CODE_REJECTED_LABEL,
+  AGENT_CODE_TIMEOUT_LABEL,
   AGENT_NOT_STARTED_HINT,
   AGENT_PARTIAL_LABEL,
   AGENT_PRIOR_UNVERIFIED_LABEL,
@@ -203,4 +205,12 @@ test("kartu Persetujuan menampilkan bukti dari agen hanya bila ada, dan layanan 
   // hanya membaca: tidak ada tulis ke antrean atau log
   assert.doesNotMatch(svc, /from\("application_logs"\)\s*\.(insert|update|upsert|delete)/);
   assert.doesNotMatch(svc, /from\("automation_queue"\)\s*\.(insert|update|upsert|delete)/);
+});
+
+test("kode keamanan: tidak dimasukkan (code_timeout) dan ditolak (code_rejected) sama-sama belum terkirim", () => {
+  const timeout = describeAgentApply({ status: "completed", log_status: "ready", reason: "code_timeout" } as any);
+  assert.equal(timeout.label, AGENT_CODE_TIMEOUT_LABEL);
+  const rejected = describeAgentApply({ status: "completed", log_status: "ready", reason: "code_rejected" } as any);
+  assert.equal(rejected.label, AGENT_CODE_REJECTED_LABEL);
+  assert.match(rejected.hint ?? "", /belum terkirim/);
 });
