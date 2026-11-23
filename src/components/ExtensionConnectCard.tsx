@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { automationApi } from "@/services/automationApi";
-import { getApiBaseUrl, isMockMode } from "@/lib/appConfig";
 import { describeApiError } from "@/lib/apiErrors";
 import { Check, Copy, KeyRound, Loader2, ShieldAlert } from "lucide-react";
 
@@ -24,15 +23,6 @@ export function ExtensionConnectCard() {
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<ExtensionTokenState | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
-
-  const serverUrl = isMockMode() ? "" : (() => {
-    try {
-      return getApiBaseUrl();
-    } catch {
-      return "";
-    }
-  })();
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -64,16 +54,12 @@ export function ExtensionConnectCard() {
     }
   };
 
-  const copyText = async (text: string, which: "token" | "url") => {
+  // Alamat server sudah tertanam di ekstensi, jadi pengguna hanya menyalin token.
+  const copyToken = async (text: string) => {
     if (!text) return;
     await navigator.clipboard.writeText(text);
-    if (which === "token") {
-      setCopiedToken(true);
-      setTimeout(() => setCopiedToken(false), 2000);
-    } else {
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-    }
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 2000);
   };
 
   return (
@@ -115,27 +101,15 @@ export function ExtensionConnectCard() {
             </code>
             <button
               type="button"
-              onClick={() => copyText(issued.token, "token")}
+              onClick={() => copyToken(issued.token)}
               className="min-h-10 px-3 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition"
             >
               {copiedToken ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
               {copiedToken ? "Tersalin" : "Salin Token"}
             </button>
           </div>
-          {serverUrl && (
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-1 border-t border-black/[6%]">
-              <span className="truncate">Server API: <code className="font-mono">{serverUrl}</code></span>
-              <button
-                type="button"
-                onClick={() => copyText(serverUrl, "url")}
-                className="shrink-0 underline underline-offset-4 hover:text-[#16150F]"
-              >
-                {copiedUrl ? "Tersalin" : "Salin URL"}
-              </button>
-            </div>
-          )}
           <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">
-            Tempel token ini hanya ke popup Ekstensi Browser Applify (Chrome/Edge), jangan pernah ke situs lain.
+            Tempel token ini hanya ke panel samping Ekstensi Browser Applify (Chrome/Edge), jangan pernah ke situs lain.
           </p>
         </div>
       ) : null}
