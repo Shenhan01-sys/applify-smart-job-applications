@@ -70,6 +70,8 @@ export interface ByokCredential {
   provider: string;
   key: string;
   model?: string;
+  /** Ciphertext baris asal, dipakai sebagai syarat saat menandai key invalid (hindari menimpa key pengganti). */
+  keyEncrypted?: string;
 }
 
 /**
@@ -91,7 +93,7 @@ export async function loadByokKeys(
       const key = await decryptByokKey(row.key_encrypted, secret, { userId, provider: row.provider });
       if (!key) continue;
       const model = row.model && MODEL_NAME_RE.test(row.model) ? row.model : undefined;
-      creds.push({ provider: row.provider, key, model });
+      creds.push({ provider: row.provider, key, model, keyEncrypted: row.key_encrypted });
     } catch {
       failed.push(row.provider);
     }
@@ -111,6 +113,8 @@ export interface ChainTarget {
   format: ByokFormat;
   /** "byok" bila memakai key pengguna, "applify" bila memakai key Applify (memotong kuota bulanan). */
   source: "byok" | "applify";
+  /** Hanya untuk BYOK: ciphertext baris key asal. */
+  keyEncrypted?: string;
 }
 
 /**
@@ -135,7 +139,7 @@ export function byokChain(creds: ByokCredential[]): ChainTarget[] {
         headers["HTTP-Referer"] = "https://applify.id";
         headers["X-Title"] = "Applify";
       }
-      out.push({ provider: preset.id, entry: `byok:${preset.id}:${model}`, model, url: preset.url, headers, format: preset.format, source: "byok" });
+      out.push({ provider: preset.id, entry: `byok:${preset.id}:${model}`, model, url: preset.url, headers, format: preset.format, source: "byok", keyEncrypted: c.keyEncrypted });
     }
   }
   return out;
@@ -203,9 +207,13 @@ export function byokRateDecision(input: { recentCount: number | null | undefined
   return { allowed: false, retryAfterSec: 3600 };
 }
 
-/** 401/403 dari penyedia berarti key pengguna ditolak, jadi barisnya ditandai invalid. */
+/**
+ * Hanya 401 yang berarti key pengguna ditolak, jadi barisnya ditandai invalid. 403 tidak: OpenAI dan Anthropic
+ * juga memakai 403 untuk model yang tidak boleh diakses, sehingga model pilihan yang salah tidak boleh
+ * mematikan key yang sebenarnya sah.
+ */
 export function isAuthFailure(status: number): boolean {
-  return status === 401 || status === 403;
+  return status === 401;
 }
 
 /**

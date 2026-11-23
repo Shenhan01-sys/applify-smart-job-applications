@@ -272,7 +272,7 @@ function ProviderRow({
               <input
                 id={inputId}
                 type="password"
-                autoComplete="off"
+                autoComplete="new-password"
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}

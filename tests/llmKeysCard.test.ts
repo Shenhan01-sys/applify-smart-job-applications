@@ -15,9 +15,8 @@ const apiKeysBlock = api.slice(api.indexOf("// Kunci API LLM milik pengguna (BYO
 /** Isi fungsi submit di komponen (dari "async function submit" sampai fungsi berikutnya). */
 const submit = card.slice(card.indexOf("async function submit"), card.indexOf("async function retest"));
 
-test("kolom kunci: type=password, autoComplete=off, spellCheck mati, pengelola kata sandi diminta tidak ikut", () => {
-  assert.match(card, /type="password"/);
-  assert.match(card, /autoComplete="off"/);
+test("kolom kunci: type=password, autoComplete=new-password (peramban mengabaikan off pada password), spellCheck mati, pengelola kata sandi diminta tidak ikut", () => {
+  assert.match(card, /type="password"\s*autoComplete="new-password"/);
   assert.match(card, /spellCheck=\{false\}/);
   assert.match(card, /autoCapitalize="none"/);
   assert.match(card, /data-1p-ignore/);

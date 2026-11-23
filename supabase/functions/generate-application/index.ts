@@ -145,8 +145,10 @@ Deno.serve(async (req: Request) => {
     let byokSecrets: string[] = [];
     let byokRateLimited = false;
     if (BYOK_ON) {
-      const { data: keyRows } = await admin
+      const { data: keyRows, error: keyErr } = await admin
         .from("user_llm_keys").select("provider, key_encrypted, status, model").eq("user_id", userId);
+      // Gagal tertutup: bila daftar key tidak terbaca, jangan diam-diam memakai key Applify dan memotong kuota.
+      if (keyErr) return json({ error: "Kunci API sendiri tidak bisa dibaca. Coba lagi nanti.", code: "byok_lookup_failed" }, 503);
       if (keyRows && keyRows.length > 0) {
         const { creds, failed } = await loadByokKeys(keyRows, BYOK_SECRET, userId);
         if (failed.length) console.warn(`[generate-application] byok decrypt_failed ${failed.join(",")}`);
@@ -155,10 +157,13 @@ Deno.serve(async (req: Request) => {
       }
       if (byokTargets.length > 0 && mode !== "analyze") {
         const since = new Date(Date.now() - 3600_000).toISOString();
-        const { count } = await admin
+        const { count, error: countErr } = await admin
           .from("ai_applications").select("id", { count: "exact", head: true })
           .eq("user_id", userId).gte("created_at", since);
-        const decision = byokRateDecision({ recentCount: count, limitPerHour: BYOK_RATE_LIMIT_PER_HOUR });
+        // Hitungan gagal dianggap batas tercapai (gagal tertutup), bukan 0.
+        const decision = countErr
+          ? { allowed: false }
+          : byokRateDecision({ recentCount: count, limitPerHour: BYOK_RATE_LIMIT_PER_HOUR });
         if (!decision.allowed) {
           byokRateLimited = true;
           byokTargets = [];
@@ -298,6 +303,8 @@ Return JSON exactly in this shape:
           method: "POST",
           headers: candidate.headers,
           signal: AbortSignal.timeout(callTimeoutMs),
+          // Key pengguna dan isi CV tidak boleh ikut redirect ke host lain: 3xx dianggap gagal.
+          redirect: candidate.source === "byok" ? "manual" : "follow",
           body: JSON.stringify(requestBody(candidate, [
             { role: "system", content: sys },
             { role: "user", content: userPrompt },
@@ -310,15 +317,16 @@ Return JSON exactly in this shape:
         continue;
       }
       if (!aiResp.ok) {
-        lastDetail = `${model}: ${redactSecrets((await aiResp.text()).slice(0, 300), byokSecrets)}`;
+        lastDetail = `${model}: ${redactSecrets(await aiResp.text(), byokSecrets).slice(0, 300)}`;
         note(`http_${aiResp.status}`, started);
         if (candidate.source === "byok" && isAuthFailure(aiResp.status)) {
           // Key dicabut atau kehabisan izin: tandai invalid supaya Pengaturan menampilkannya dan permintaan
           // berikutnya langsung memakai rantai Applify.
           invalidatedProviders.add(candidate.provider);
+          // Filter key_encrypted: bila pengguna baru saja mengganti key, baris baru tidak ikut ditandai invalid.
           await admin.from("user_llm_keys")
             .update({ status: "invalid", last_error: `http_${aiResp.status}`, updated_at: new Date().toISOString() })
-            .eq("user_id", userId).eq("provider", candidate.provider);
+            .eq("user_id", userId).eq("provider", candidate.provider).eq("key_encrypted", candidate.keyEncrypted ?? "");
         }
         continue;
       }

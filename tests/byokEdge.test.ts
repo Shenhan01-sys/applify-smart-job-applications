@@ -79,6 +79,7 @@ test("byok: loadByokKeys melewati status invalid, penyedia asing, dan baris rusa
   assert.deepEqual(creds.map((c) => c.provider), ["openai", "anthropic"]);
   assert.equal(creds[0].model, "model-pilihan");
   assert.equal(creds[1].key, ANTHROPIC_KEY);
+  assert.equal(creds[1].keyEncrypted, rows[0].key_encrypted);
   assert.deepEqual(failed, ["gemini"]);
   assert.deepEqual(await loadByokKeys(null, SECRET, USER), { creds: [], failed: [] });
   // Model dengan karakter aneh diabaikan, tidak dikirim ke penyedia.
@@ -182,7 +183,7 @@ test("byok: flag, status auth, dan penyamaran key di teks galat", () => {
   assert.equal(byokEnabled("1"), false);
   assert.equal(byokEnabled(undefined), false);
   assert.equal(isAuthFailure(401), true);
-  assert.equal(isAuthFailure(403), true);
+  assert.equal(isAuthFailure(403), false);
   assert.equal(isAuthFailure(429), false);
   const msg = `Incorrect API key provided: ${ANTHROPIC_KEY}. Also ${ANTHROPIC_KEY.slice(-8)} at the end.`;
   const red = redactSecrets(msg, [ANTHROPIC_KEY]);
@@ -199,7 +200,11 @@ test("generate-application: BYOK di balik flag, kuota hanya dipotong bila key Ap
   assert.match(src, /\.from\("user_llm_keys"\)\.select\("provider, key_encrypted, status, model"\)\.eq\("user_id", userId\)/);
   assert.match(src, /if \(mode !== "analyze" && keySource === "applify"\) \{\s*const \{ data: q, error: qErr \} = await admin\.rpc\("consume_monthly_apply"/);
   assert.match(src, /quota\.remaining <= 0 && byokTargets\.length === 0/);
-  assert.match(src, /redactSecrets\(\(await aiResp\.text\(\)\)\.slice\(0, 300\), byokSecrets\)/);
+  assert.match(src, /redactSecrets\(await aiResp\.text\(\), byokSecrets\)\.slice\(0, 300\)/);
+  assert.match(src, /redirect: candidate\.source === "byok" \? "manual" : "follow"/);
+  assert.match(src, /if \(keyErr\) return json\([^;]*byok_lookup_failed[^;]*503\)/);
+  assert.match(src, /const decision = countErr\s*\? \{ allowed: false \}/);
+  assert.match(src, /\.eq\("provider", candidate\.provider\)\.eq\("key_encrypted", candidate\.keyEncrypted \?\? ""\)/);
   assert.match(src, /for \(const candidate of chain\)/);
   assert.match(src, /requestBody\(candidate, \[/);
   assert.match(src, /readCompletion\(candidate\.format, aiJson\)/);
