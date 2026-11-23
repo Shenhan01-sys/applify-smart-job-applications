@@ -87,7 +87,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     id: "persetujuan",
     title: "Lamaran hanya dikirim setelah kamu menyetujui",
     paragraphs: [
-      "Agen tidak mengirim lamaran sebelum kamu menyetujuinya di halaman Persetujuan. Setiap persetujuan punya batas waktu satu jam.",
+      "Agen tidak mengirim lamaran sebelum kamu menyetujuinya di halaman Persetujuan. Setiap persetujuan punya batas waktu 24 jam.",
       "Selama masa penelitian, pengiriman sungguhan ke situs lowongan dan email dimatikan lewat saklar di server (ALLOW_REAL_SUBMIT). Agen hanya mengisi formulir sampai sebelum tombol kirim.",
     ],
   },

@@ -16,7 +16,7 @@ export const APPROVAL_STATUS_LABEL: Record<string, string> = {
  * saat masa berlaku habis. Hanya permintaan yang belum diputuskan (`pending`) dan sudah lewat `expires_at`
  * yang ditampilkan `expired`. Baris yang sudah diputuskan tetap "Disetujui" atau "Ditolak": keputusan pengguna
  * tidak hilang karena waktu (uji klik produksi 21 November 2026, temuan 22: lima dari tujuh baris riwayat,
- * termasuk yang sudah disetujui, tertulis "Kedaluwarsa"). Bahwa masa berlaku 1 jam untuk pengiriman email sudah
+ * termasuk yang sudah disetujui, tertulis "Kedaluwarsa"). Bahwa masa berlaku 24 jam untuk pengiriman email sudah
  * lewat dijelaskan terpisah oleh panel email (lib/emailApply.ts).
  */
 export function effectiveApprovalStatus(status: string, expiresAt: string | null | undefined, now: number = Date.now()): string {
