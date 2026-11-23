@@ -187,11 +187,12 @@ export const automationApi = {
     }
   },
 
-  /** Memulai alur Gmail OAuth lewat endpoint POST terautentikasi sehingga uid tidak dikirim polos di query URL. */
+  /** Memulai alur Gmail OAuth lewat endpoint POST terautentikasi dengan credentials agar cookie nonce HttpOnly tersimpan lintas origin. */
   async startGmailOAuth(): Promise<string> {
     if (isMockMode()) return `${typeof window !== 'undefined' ? window.location.origin : ''}/settings?gmail=connected`
     const res = await apiFetch<{ url: string }>(`${apiBase()}/api/oauth/google/init`, {
       method: 'POST',
+      credentials: 'include',
       headers: await getAuthHeaders(),
     })
     return res.url

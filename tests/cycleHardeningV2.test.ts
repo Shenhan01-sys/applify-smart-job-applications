@@ -49,6 +49,10 @@ test("wiring keamanan & fitur v2: Gmail OAuth aman, revokasi ekstensi, LockedCla
   assert.doesNotMatch(emailPanel, /\/api\/oauth\/google\?uid=/);
   assert.doesNotMatch(emailPanel, /getGmailConnectUrl/);
 
+  const apiClient = read("../src/services/automationApi.ts");
+  const oauthInitSlice = apiClient.slice(apiClient.indexOf("async startGmailOAuth"), apiClient.indexOf("async addToQueue"));
+  assert.match(oauthInitSlice, /credentials:\s*['"]include['"]/);
+
   const extCard = read("../src/components/ExtensionConnectCard.tsx");
   assert.match(extCard, /Putuskan semua perangkat/);
   assert.match(extCard, /revokeAllExtensionTokens/);
