@@ -20,6 +20,9 @@ export interface AgentApplyRow extends AgentLogFacts {
   error_message?: string | null;
   /** automation_queue.id tugas apply ini; dikirim ke backend bersama kode keamanan. */
   queue_job_id?: string | null;
+  /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
+  claim_state?: "none" | "in_progress" | "submitted" | "locked_stuck";
+  claim_channel?: "worker" | "extension" | null;
 }
 
 export type AgentApplyTone = "waiting" | "working" | "ready" | "sent" | "unverified" | "manual" | "failed" | "none";
@@ -167,6 +170,15 @@ function filledNothing(row: AgentApplyRow): boolean {
 }
 
 export function describeAgentApply(row: AgentApplyRow | null | undefined, now: number = Date.now()): AgentApplyView {
+  if (row?.claim_state === "locked_stuck" && row.log_status !== "success" && row.log_status !== "submit_unverified") {
+    const channelLabel = row.claim_channel === "extension" ? "Ekstensi Browser" : "Agen";
+    return {
+      label: "Pengiriman terkunci — perlu pemeriksaan manual",
+      hint: `${channelLabel} berhenti sesudah mengunci persetujuan ini sebelum hasil kirim tercatat. Periksa email konfirmasi atau portal lowongan sebelum memutuskan langkah pemulihan di bawah.`,
+      tone: "unverified",
+      suggestEmail: false,
+    };
+  }
   if (!row || !row.status) {
     return { label: "Agen belum dijalankan", hint: AGENT_NOT_STARTED_HINT, tone: "none", suggestEmail: true };
   }

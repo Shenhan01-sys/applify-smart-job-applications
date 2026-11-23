@@ -19,6 +19,8 @@ const maskToken = (token: string) =>
  */
 export function ExtensionConnectCard() {
   const [loading, setLoading] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<ExtensionTokenState | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
@@ -35,6 +37,7 @@ export function ExtensionConnectCard() {
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
+    setNotice("");
     setCopiedToken(false);
     try {
       const res = await automationApi.createExtensionToken(14400);
@@ -43,6 +46,21 @@ export function ExtensionConnectCard() {
       setError(describeApiError(err, "Gagal membuat token ekstensi."));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRevokeAll = async () => {
+    setRevoking(true);
+    setError("");
+    setNotice("");
+    try {
+      await automationApi.revokeAllExtensionTokens();
+      setIssued(null);
+      setNotice("Semua token ekstensi lama telah dicabut. Perangkat lama harus terhubung ulang dengan token baru.");
+    } catch (err) {
+      setError(describeApiError(err, "Gagal mencabut token ekstensi."));
+    } finally {
+      setRevoking(false);
     }
   };
 
@@ -69,6 +87,12 @@ export function ExtensionConnectCard() {
           dan setiap kiriman tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap manual-only.
         </p>
       </div>
+
+      {notice && (
+        <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+          {notice}
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2">
@@ -120,11 +144,20 @@ export function ExtensionConnectCard() {
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={loading}
+          disabled={loading || revoking}
           className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 inline-flex items-center gap-2"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <KeyRound className="h-4 w-4" aria-hidden="true" />}
           {issued ? "Buat Ulang Token Ekstensi Chrome/Edge" : "Hubungkan Ekstensi Chrome/Edge"}
+        </button>
+        <button
+          type="button"
+          onClick={handleRevokeAll}
+          disabled={loading || revoking}
+          className="min-h-11 px-4 rounded-lg border-2 border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50 transition disabled:opacity-60 inline-flex items-center gap-2"
+        >
+          {revoking ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+          Putuskan semua perangkat
         </button>
       </div>
     </div>

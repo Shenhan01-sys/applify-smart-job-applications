@@ -170,13 +170,14 @@ export const automationApi = {
     }
   },
 
-  /** Browser redirect that starts the Gmail OAuth flow (the backend route takes the user id as `uid`). */
-  getGmailConnectUrl(userId: string): string | null {
-    try {
-      return `${apiBase()}/api/oauth/google?uid=${encodeURIComponent(userId)}`
-    } catch {
-      return null // alamat server belum diatur di build ini: tautannya disembunyikan, halaman tidak rusak
-    }
+  /** Memulai alur Gmail OAuth lewat endpoint POST terautentikasi sehingga uid tidak dikirim polos di query URL. */
+  async startGmailOAuth(): Promise<string> {
+    if (isMockMode()) return `${typeof window !== 'undefined' ? window.location.origin : ''}/settings?gmail=connected`
+    const res = await apiFetch<{ url: string }>(`${apiBase()}/api/oauth/google/init`, {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+    })
+    return res.url
   },
 
   async addToQueue(jobType: string, payload: any, priority?: number) {
@@ -494,6 +495,109 @@ export const automationApi = {
         scope: 'extension:apply',
         ttlSeconds,
       }),
+    )
+  },
+
+  /** Cabut seluruh token ekstensi lama milik pengguna ("Putuskan semua perangkat"). */
+  async revokeAllExtensionTokens(): Promise<{ revoked: boolean; minTokenVersion: number }> {
+    return apiFetch(
+      `${apiBase()}/api/extension/revoke-all`,
+      { method: 'POST', headers: await getAuthHeaders() },
+      () => ({ revoked: true, minTokenVersion: 2 }),
+    )
+  },
+
+  /** Status klaim atomik untuk persetujuan yang disetujui (mendeteksi klaim macet). */
+  async getApprovalClaimStatuses(approvalIds: string[]): Promise<{
+    claims: Record<string, { approvalId: string; state: 'none' | 'in_progress' | 'submitted' | 'locked_stuck'; channel: 'worker' | 'extension' | null }>
+  }> {
+    return apiFetch(
+      `${apiBase()}/api/approvals/claim-statuses`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ approval_ids: approvalIds }) },
+      () => ({ claims: {} }),
+    )
+  },
+
+  /** Pemulihan aman untuk klaim persetujuan yang macet tanpa menghapus klaim lama. */
+  async resolveLockedClaim(
+    approvalId: string,
+    resolution: 'mark_sent' | 'create_fresh_approval',
+  ): Promise<{ ok: boolean; resolution: string; newApprovalId: string | null }> {
+    return apiFetch(
+      `${apiBase()}/api/approvals/${encodeURIComponent(approvalId)}/resolve-claim`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ resolution }) },
+      () => ({ ok: true, resolution, newApprovalId: null }),
+    )
+  },
+
+  async getNotificationStatus(): Promise<{ telegram: boolean; whatsappKapso?: boolean; email?: boolean }> {
+    return apiFetch(
+      `${apiBase()}/api/notifications/status`,
+      { headers: await getAuthHeaders() },
+      () => ({ telegram: false, whatsappKapso: false, email: false }),
+    )
+  },
+
+  async getNotificationPreferences() {
+    return apiFetch<{
+      userId: string
+      whatsappPhone: string | null
+      whatsappVerified: boolean
+      whatsappEnabled: boolean
+      whatsappLastInboundAt: string | null
+      emailAddress: string | null
+      emailEnabled: boolean
+      telegramChatId: string | null
+      telegramEnabled: boolean
+      notifyEvents: Record<'ready' | 'submitted' | 'awaiting_code' | 'follow_up' | 'locked_claim', boolean>
+      migrationPending?: boolean
+    }>(
+      `${apiBase()}/api/notifications/preferences`,
+      { headers: await getAuthHeaders() },
+      () => ({
+        userId: 'demo-user',
+        whatsappPhone: null,
+        whatsappVerified: false,
+        whatsappEnabled: false,
+        whatsappLastInboundAt: null,
+        emailAddress: null,
+        emailEnabled: false,
+        telegramChatId: null,
+        telegramEnabled: false,
+        notifyEvents: { ready: true, submitted: true, awaiting_code: true, follow_up: true, locked_claim: true },
+      }),
+    )
+  },
+
+  async updateNotificationPreferences(patch: Record<string, unknown>) {
+    return apiFetch(
+      `${apiBase()}/api/notifications/preferences`,
+      { method: 'PUT', headers: await getAuthHeaders(), body: JSON.stringify(patch) },
+      () => ({ ok: true }),
+    )
+  },
+
+  async requestWhatsappOtp(phone: string) {
+    return apiFetch<{ sent: boolean; phone: string }>(
+      `${apiBase()}/api/notifications/whatsapp/request-otp`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ phone }) },
+      () => ({ sent: true, phone }),
+    )
+  },
+
+  async verifyWhatsappOtp(phone: string, code: string) {
+    return apiFetch(
+      `${apiBase()}/api/notifications/whatsapp/verify-otp`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ phone, code }) },
+      () => ({ whatsappVerified: true, whatsappEnabled: true, whatsappPhone: phone }),
+    )
+  },
+
+  async testWhatsappNotification() {
+    return apiFetch<{ success: boolean }>(
+      `${apiBase()}/api/notifications/whatsapp/test`,
+      { method: 'POST', headers: await getAuthHeaders() },
+      () => ({ success: true }),
     )
   },
 }

@@ -83,7 +83,7 @@ export function normalizeAnswers(raw: unknown): ApprovalAnswer[] {
       // Older rows have no number: unknown is treated as low, so they get checked.
       confidence: Number.isFinite(c) ? Math.min(1, Math.max(0, c)) : 0,
       needs_review: (item as any).needs_review !== false,
-      source: src === "rule" || src === "ai" || src === "default" ? src : undefined,
+      source: src === "rule" || src === "profile" || src === "ai" || src === "default" ? src : undefined,
     });
   }
   return out;

@@ -8,6 +8,7 @@ import EmailApplyPanel from "@/components/EmailApplyPanel";
 import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
 import AgentSecurityCode from "@/components/AgentSecurityCode";
+import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
@@ -295,6 +296,9 @@ function ApprovalsPage() {
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={loadData} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <EmailApplyPanel
