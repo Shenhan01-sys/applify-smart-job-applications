@@ -201,7 +201,9 @@ test("kartu Persetujuan menampilkan bukti dari agen hanya bila ada, dan layanan 
   assert.match(card, /unverified: "bg-amber-100/);
   const svc = read("../src/services/emailApplyService.ts");
   assert.match(svc, /\.select\("status, details, created_at"\)\s*\.eq\("action", "apply"\)/);
-  assert.match(svc, /agentLogFacts\(row\)/);
+  // fakta log dibaca di lib/agentApplyRows.ts (log worker dan log ekstensi lewat agentLogFacts yang sama)
+  assert.match(read("../src/lib/agentApplyRows.ts"), /agentLogFacts\(worker\)/);
+  assert.match(read("../src/lib/agentApplyRows.ts"), /agentLogFacts\(ext\)/);
   // hanya membaca: tidak ada tulis ke antrean atau log
   assert.doesNotMatch(svc, /from\("application_logs"\)\s*\.(insert|update|upsert|delete)/);
   assert.doesNotMatch(svc, /from\("automation_queue"\)\s*\.(insert|update|upsert|delete)/);

@@ -16,6 +16,18 @@ export const MAX_FILLED_FIELDS = 40;
 
 export type FilledFieldKind = "text" | "select" | "check" | "upload";
 
+/** Jenis berkas yang dipasang Ekstensi Browser ke formulir lowongan. */
+export type DocumentKind = "resume" | "cover_letter" | "transcript" | "portfolio";
+export const DOCUMENT_KINDS: readonly DocumentKind[] = ["resume", "cover_letter", "transcript", "portfolio"];
+export const DOCUMENT_LABELS: Record<DocumentKind, string> = {
+  resume: "CV",
+  cover_letter: "surat lamaran",
+  transcript: "transkrip",
+  portfolio: "portofolio",
+};
+/** details.documents_attached: jenis berkas -> terpasang atau tidak. Hanya jenis yang tercatat; tanpa nama atau jalur berkas. */
+export type AgentDocumentsAttached = Partial<Record<DocumentKind, boolean>>;
+
 export interface AgentFilledField {
   label: string;
   kind: FilledFieldKind;
@@ -73,6 +85,14 @@ export interface AgentLogFacts {
   manual?: boolean;
   /** details.approval_request_id: persetujuan yang dipakai percobaan ini. Kunci ini hanya ada bila log memuatnya. */
   approval_request_id?: string | null;
+  /**
+   * details.channel === "extension": percobaan ini dikerjakan Ekstensi Browser di perangkat pengguna, bukan worker.
+   * Log ekstensi tidak punya queue_job_id, jadi jawaban atas pertanyaannya tidak menjalankan ulang tugas worker.
+   * Kunci ini hanya ada pada log ekstensi.
+   */
+  channel?: "extension";
+  /** details.documents_attached pada log ekstensi: berkas yang terpasang ke formulir. Hanya ada bila log memuatnya. */
+  documents_attached?: AgentDocumentsAttached;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -134,6 +154,31 @@ export function cleanScreenshots(value: unknown): AgentScreenshots | null {
   return filled || after ? { filled, after } : null;
 }
 
+/**
+ * `details.documents_attached` -> jenis berkas yang dikenal dan apakah terpasang. Nilai `true` atau teks tidak
+ * kosong berarti terpasang; teksnya (nama atau jalur berkas) dibuang dan tidak pernah ditampilkan. Selain itu
+ * dianggap tidak terpasang. Tanpa satu pun jenis yang dikenal: null.
+ */
+export function cleanDocumentsAttached(value: unknown): AgentDocumentsAttached | null {
+  if (!isRecord(value)) return null;
+  const out: AgentDocumentsAttached = {};
+  let any = false;
+  for (const kind of DOCUMENT_KINDS) {
+    if (!Object.prototype.hasOwnProperty.call(value, kind)) continue;
+    const v = value[kind];
+    out[kind] = v === true || (typeof v === "string" && v.trim().length > 0);
+    any = true;
+  }
+  return any ? out : null;
+}
+
+/** Ringkasan satu kalimat berkas yang dipasang ekstensi, atau null bila log tidak mencatatnya. Tanpa nama dan jalur berkas. */
+export function describeDocumentsAttached(docs: AgentDocumentsAttached | null | undefined): string | null {
+  if (!docs) return null;
+  const attached = DOCUMENT_KINDS.filter((k) => docs[k] === true).map((k) => DOCUMENT_LABELS[k]);
+  return attached.length > 0 ? `Ekstensi Browser memasang berkas: ${attached.join(", ")}.` : "Ekstensi Browser tidak memasang berkas apa pun.";
+}
+
 function cleanRemaining(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -156,6 +201,8 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
   if (!isRecord(row)) return {};
   const details = isRecord(row.details) ? row.details : {};
   const check = isRecord(details.submit_check) ? details.submit_check : null;
+  const fromExtension = details.channel === "extension";
+  const documents = fromExtension ? cleanDocumentsAttached(details.documents_attached) : null;
   return {
     log_status: cleanText(row.status, 40),
     submit_check_verdict: check ? cleanText(check.verdict, 40) : null,
@@ -171,6 +218,8 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     logged_at: typeof row.created_at === "string" && !Number.isNaN(Date.parse(row.created_at)) ? row.created_at : null,
     ...(details.manual === true ? { manual: true } : {}),
     ...(cleanText(details.approval_request_id, 64) ? { approval_request_id: cleanText(details.approval_request_id, 64) } : {}),
+    ...(fromExtension ? { channel: "extension" as const } : {}),
+    ...(documents ? { documents_attached: documents } : {}),
   };
 }
 

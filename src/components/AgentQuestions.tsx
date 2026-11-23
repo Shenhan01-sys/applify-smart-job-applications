@@ -5,11 +5,15 @@ import {
   ANSWERS_TABLE_MISSING_TEXT,
   ANSWER_NO,
   ANSWER_YES,
+  ERROR_NO_ANSWERS,
+  EXTENSION_ANSWERS_SAVED_TEXT,
   MAX_ANSWER_LENGTH,
   RERUN_STARTED_TEXT,
+  SELF_FILL_LABEL,
   answersToRows,
   initialAnswers,
   questionsToAnswer,
+  questionsToSelfFill,
   validateAnswers,
   type PendingQuestion,
 } from "@/lib/formQuestions";
@@ -25,7 +29,12 @@ import {
 
 const INTRO =
   "Agen berhenti sebelum kirim karena pertanyaan ini tidak bisa dijawab dari profilmu. Jawabanmu disimpan dan dipakai lagi untuk lowongan lain.";
+const EXTENSION_INTRO =
+  "Ekstensi Browser berhenti sebelum kirim karena pertanyaan ini tidak bisa dijawab dari profilmu. Jawabanmu disimpan dan dipakai lagi untuk lowongan lain.";
+const SELF_FILL_INTRO =
+  "Kolom ini berisi data rahasia, jadi tidak diisi otomatis dan tidak disimpan di Applify. Isi sendiri langsung di halaman lowongan.";
 const SUBMIT_LABEL = "Simpan jawaban dan jalankan agen lagi";
+const EXTENSION_SUBMIT_LABEL = "Simpan jawaban";
 const SELECT_NO_OPTIONS_HINT = "Tulis persis seperti pilihan di formulir";
 
 const INPUT_CLASS =
@@ -39,12 +48,19 @@ interface Props {
 }
 
 /**
- * "Agen butuh jawabanmu": pertanyaan wajib yang tidak bisa dijawab agen dari profil (log percobaan terbaru,
+ * "Agen butuh jawabanmu": pertanyaan yang tidak bisa dijawab agen dari profil (log percobaan terbaru,
  * details.questions). Muncul hanya bila percobaan terbaru belum terkirim dan tidak ada tugas agen yang sedang
- * berjalan. Jawaban disimpan ke bank jawaban (user_form_answers), lalu tugas apply yang sama diantrekan ulang.
+ * berjalan. Jawaban disimpan ke bank jawaban (user_form_answers).
+ *
+ * Log worker: lalu tugas apply yang sama diantrekan ulang (POST /api/approvals/:id/rerun).
+ * Log Ekstensi Browser (`row.channel === "extension"`): tidak ada tugas worker yang dijalankan ulang. Pengguna
+ * kembali ke tab lowongan dan mengisi ulang dari panel ekstensi.
+ * Kolom rahasia (`kind: "secret_skip"`) tidak punya isian: hanya ditampilkan sebagai "Isi sendiri di halaman lowongan".
  */
 export default function AgentQuestions({ approvalId, row, onRerun }: Props) {
   const questions = questionsToAnswer(row);
+  const selfFill = questionsToSelfFill(row);
+  const extension = row?.channel === "extension";
   const active = isAgentApplyActive(row);
   const [started, setStarted] = useState(false);
 
@@ -60,18 +76,57 @@ export default function AgentQuestions({ approvalId, row, onRerun }: Props) {
   }, [active]);
 
   if (active) return started ? <StartedNote /> : null;
-  if (questions.length === 0) return null;
-  const formKey = `${questions.map((q) => q.key).join("\u0001")}|${row?.logged_at ?? ""}`;
+  if (questions.length === 0 && selfFill.length === 0) return null;
+  // Hanya kolom rahasia: tidak ada yang bisa dijawab di sini, jadi tidak ada formulir dan tombol simpan.
+  if (questions.length === 0) return <SelfFillCard questions={selfFill} />;
+  const formKey = `${[...questions, ...selfFill].map((q) => q.key).join("\u0001")}|${row?.logged_at ?? ""}`;
   return (
     <QuestionForm
       key={formKey}
       approvalId={approvalId}
       questions={questions}
+      selfFill={selfFill}
+      extension={extension}
       onStarted={() => {
         setStarted(true);
         onRerun(approvalId);
       }}
     />
+  );
+}
+
+function SelfFillCard({ questions }: { questions: PendingQuestion[] }) {
+  const headingId = `${useId()}-heading`;
+  return (
+    <section aria-labelledby={headingId} className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5">
+      <h4 id={headingId} className="inline-flex items-center gap-2 text-xs font-semibold">
+        <HelpCircle className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> {SELF_FILL_LABEL}
+      </h4>
+      <SelfFillList questions={questions} />
+    </section>
+  );
+}
+
+/** Kolom rahasia (`secret_skip`): hanya label dan keterangan, tanpa kolom isian. */
+function SelfFillList({ questions }: { questions: PendingQuestion[] }) {
+  if (questions.length === 0) return null;
+  return (
+    <div data-testid="agent-self-fill" className="mt-3">
+      <p className="text-xs text-muted-foreground leading-relaxed">{SELF_FILL_INTRO}</p>
+      <ul className="mt-2 space-y-2">
+        {questions.map((q) => (
+          <li key={q.key} className="rounded-lg border-2 border-black/[8%] px-3 py-2">
+            <span className="block text-xs font-semibold leading-snug break-words">
+              {q.label}
+              {q.required === true && <span className="ml-1 font-normal text-muted-foreground">(wajib)</span>}
+            </span>
+            <span className="mt-1 inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+              {SELF_FILL_LABEL}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -83,13 +138,27 @@ function StartedNote() {
   );
 }
 
-function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string; questions: PendingQuestion[]; onStarted: () => void }) {
+function QuestionForm({
+  approvalId,
+  questions,
+  selfFill,
+  extension,
+  onStarted,
+}: {
+  approvalId: string;
+  questions: PendingQuestion[];
+  selfFill: PendingQuestion[];
+  extension: boolean;
+  onStarted: () => void;
+}) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, string>>(() => initialAnswers(questions, null));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
   const [tableMissing, setTableMissing] = useState(false);
+  // Hanya log ekstensi: jawaban sudah tersimpan dan pengguna diminta kembali ke tab lowongan.
+  const [savedForExtension, setSavedForExtension] = useState(false);
 
   // Isi lebih dulu dari jawaban tersimpan (kunci pertanyaan sama), tanpa menimpa yang sudah diketik pengguna.
   useEffect(() => {
@@ -124,6 +193,7 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
       return next;
     });
     if (formError) setFormError("");
+    if (savedForExtension) setSavedForExtension(false);
   };
 
   const fieldId = (i: number) => `${uid}-q${i}`;
@@ -140,12 +210,23 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
       if (first >= 0) document.getElementById(fieldId(first))?.focus();
       return;
     }
+    const rows = answersToRows(questions, answers);
+    if (rows.length === 0) {
+      setFormError(ERROR_NO_ANSWERS);
+      return;
+    }
     setBusy(true);
     try {
-      await saveAnswers(answersToRows(questions, answers));
+      await saveAnswers(rows);
     } catch (err) {
       if (err instanceof AnswersTableMissingError) setTableMissing(true);
       setFormError(describeAnswerError(err, "Jawabanmu belum bisa disimpan. Coba lagi."));
+      setBusy(false);
+      return;
+    }
+    // Log ekstensi tidak punya tugas worker: jangan memanggil rerun. Pengguna mengisi ulang dari panel ekstensi.
+    if (extension) {
+      setSavedForExtension(true);
       setBusy(false);
       return;
     }
@@ -170,7 +251,7 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
           {questions.length} pertanyaan
         </span>
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{INTRO}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{extension ? EXTENSION_INTRO : INTRO}</p>
 
       <form onSubmit={submit} noValidate className="mt-3 space-y-3">
         {questions.map((q, i) => {
@@ -182,12 +263,20 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
           const selectNoOptions = q.kind === "select" && !q.options;
           const describedBy = [err ? errId : "", selectNoOptions ? hintId : ""].filter(Boolean).join(" ") || undefined;
           const labelClass = "block text-xs font-semibold leading-snug break-words";
+          // Penanda dari log ekstensi (`required`); log worker tidak punya kunci ini dan semuanya wajib.
+          const labelText = (
+            <>
+              {q.label}
+              {q.required === true && <span className="ml-1 font-normal text-muted-foreground">(wajib)</span>}
+              {q.required === false && <span className="ml-1 font-normal text-muted-foreground">(opsional)</span>}
+            </>
+          );
 
           let control: React.ReactNode;
           if (q.kind === "check") {
             control = (
               <fieldset aria-describedby={describedBy} disabled={busy}>
-                <legend className={labelClass}>{q.label}</legend>
+                <legend className={labelClass}>{labelText}</legend>
                 <div className="mt-1.5 flex gap-4">
                   {[
                     { v: ANSWER_YES, text: "Ya" },
@@ -213,7 +302,7 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
           } else if ((q.kind === "select" || q.kind === "radio") && q.options) {
             control = (
               <>
-                <label htmlFor={id} className={labelClass}>{q.label}</label>
+                <label htmlFor={id} className={labelClass}>{labelText}</label>
                 <select
                   id={id}
                   value={value}
@@ -231,7 +320,7 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
           } else if (q.kind === "textarea") {
             control = (
               <>
-                <label htmlFor={id} className={labelClass}>{q.label}</label>
+                <label htmlFor={id} className={labelClass}>{labelText}</label>
                 <textarea
                   id={id}
                   value={value}
@@ -248,7 +337,7 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
           } else {
             control = (
               <>
-                <label htmlFor={id} className={labelClass}>{q.label}</label>
+                <label htmlFor={id} className={labelClass}>{labelText}</label>
                 <input
                   id={id}
                   type="text"
@@ -288,6 +377,11 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
             {formError}
           </p>
         )}
+        {savedForExtension && (
+          <p role="status" className="flex items-start gap-1.5 rounded-lg border-2 border-green-300 bg-green-50 p-2 text-xs font-semibold text-green-900">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {EXTENSION_ANSWERS_SAVED_TEXT}
+          </p>
+        )}
 
         <div>
           <button
@@ -297,11 +391,13 @@ function QuestionForm({ approvalId, questions, onStarted }: { approvalId: string
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white transition hover:bg-[#0256d3] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {busy ? "Menyimpan dan menjalankan agen..." : SUBMIT_LABEL}
+            {busy ? (extension ? "Menyimpan jawaban..." : "Menyimpan dan menjalankan agen...") : extension ? EXTENSION_SUBMIT_LABEL : SUBMIT_LABEL}
           </button>
           <p className="mt-1.5 text-xs text-muted-foreground">Jangan menulis kata sandi di sini.</p>
         </div>
       </form>
+
+      <SelfFillList questions={selfFill} />
     </section>
   );
 }

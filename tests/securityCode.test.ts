@@ -345,7 +345,9 @@ test("Persetujuan: kolom kode tampil di bawah status agen dan di atas pertanyaan
 
 test("layanan: id tugas antrean ikut di baris status agen supaya kode bisa dikirim ke tugas yang benar", () => {
   const svc = read("../src/services/emailApplyService.ts");
-  assert.match(svc, /queue_job_id: String\(\(row as any\)\.id\)/);
+  // baris status dibuat di lib/agentApplyRows.ts (satu id tugas per persetujuan); layanan memakainya
+  assert.match(read("../src/lib/agentApplyRows.ts"), /queue_job_id: String\(row\.id\)/);
+  assert.match(svc, /buildAgentApplyRows\(queueRows, workerLogs, extensionLogs\)/);
   // select log tidak berubah dan tetap hanya membaca
   assert.match(svc, /\.select\("status, details, created_at"\)\s*\.eq\("action", "apply"\)/);
 });

@@ -7,7 +7,7 @@ import {
   type EmailQueueRow,
 } from "@/lib/emailApply";
 import type { AgentApplyRow } from "@/lib/agentApplyStatus";
-import { agentLogFacts } from "@/lib/agentEvidence";
+import { buildAgentApplyRows, latestQueueJobIds } from "@/lib/agentApplyRows";
 import { manualSentRow, safeJobUrl } from "@/lib/manualSubmit";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -34,50 +34,46 @@ export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: n
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
  * and, when its attempt log exists, the outcome the worker recorded (log status, submit check, fields
- * filled, screenshots). Read with the user's own session (RLS owner policies). Best effort: an unreadable
+ * filled, screenshots). The Browser Extension writes its own attempt logs (details.channel = "extension",
+ * no queue job); when an approval has both a worker log and an extension log, the newest one wins
+ * (buildAgentApplyRows). Read with the user's own session (RLS owner policies). Best effort: an unreadable
  * log only leaves the outcome unknown. Read only: nothing here writes to automation_queue or application_logs.
  */
 async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentApplyRow>> {
-  const out: Record<string, AgentApplyRow> = {};
-  const queue = await supabase
-    .from("automation_queue")
-    .select("id, status, error_message, created_at, payload")
-    .eq("job_type", "apply")
-    .in("payload->>approval_request_id", ids)
-    .order("created_at", { ascending: false });
-  if (queue.error) {
-    console.warn("[agentApply] queue lookup skipped:", queue.error.message);
-    return out;
+  const [queue, extension] = await Promise.all([
+    supabase
+      .from("automation_queue")
+      .select("id, status, error_message, created_at, payload")
+      .eq("job_type", "apply")
+      .in("payload->>approval_request_id", ids)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("application_logs")
+      .select("status, details, created_at")
+      .eq("action", "apply")
+      .eq("details->>channel", "extension")
+      .in("details->>approval_request_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(500),
+  ]);
+  if (queue.error) console.warn("[agentApply] queue lookup skipped:", queue.error.message);
+  if (extension.error) console.warn("[agentApply] extension log lookup skipped:", extension.error.message);
+  const queueRows = queue.error ? [] : (queue.data ?? []);
+  const extensionLogs = extension.error ? [] : (extension.data ?? []);
+
+  const queueIds = latestQueueJobIds(queueRows);
+  let workerLogs: unknown[] = [];
+  if (queueIds.length > 0) {
+    const logs = await supabase
+      .from("application_logs")
+      .select("status, details, created_at")
+      .eq("action", "apply")
+      .in("details->>queue_job_id", queueIds)
+      .order("created_at", { ascending: false });
+    if (logs.error) console.warn("[agentApply] attempt log lookup skipped:", logs.error.message);
+    else workerLogs = logs.data ?? [];
   }
-  const queueIdToApproval = new Map<string, string>();
-  for (const row of queue.data ?? []) {
-    const id = (row as any)?.payload?.approval_request_id;
-    if (typeof id !== "string" || out[id]) continue;
-    out[id] = { status: (row as any).status, error_message: (row as any).error_message, fields_filled: null, queue_job_id: String((row as any).id) };
-    queueIdToApproval.set(String((row as any).id), id);
-  }
-  const queueIds = [...queueIdToApproval.keys()];
-  if (queueIds.length === 0) return out;
-  const logs = await supabase
-    .from("application_logs")
-    .select("status, details, created_at")
-    .eq("action", "apply")
-    .in("details->>queue_job_id", queueIds)
-    .order("created_at", { ascending: false });
-  if (logs.error) {
-    console.warn("[agentApply] attempt log lookup skipped:", logs.error.message);
-    return out;
-  }
-  // Rows come newest first: the first log of a queue job is its latest attempt.
-  const seen = new Set<string>();
-  for (const row of logs.data ?? []) {
-    const details = (row as any)?.details ?? {};
-    const approvalId = queueIdToApproval.get(String(details.queue_job_id));
-    if (!approvalId || seen.has(approvalId)) continue;
-    seen.add(approvalId);
-    Object.assign(out[approvalId], agentLogFacts(row));
-  }
-  return out;
+  return buildAgentApplyRows(queueRows, workerLogs, extensionLogs);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { AlertCircle, Bot, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { describeAgentApply, type AgentApplyRow, type AgentApplyTone } from "@/lib/agentApplyStatus";
-import { hasAgentEvidence } from "@/lib/agentEvidence";
+import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
 
@@ -33,6 +33,8 @@ export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | 
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
   const showHint = !!view.hint && manualSubmitState(row)?.kind !== "not_allowed";
+  // Hanya log Ekstensi Browser yang mencatat berkas terpasang (details.documents_attached). Hanya jenisnya, tanpa nama atau jalur berkas.
+  const documents = row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
   return (
     <div className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -44,6 +46,11 @@ export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | 
         </span>
       </div>
       {showHint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
+      {documents && (
+        <p data-testid="agent-documents" className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+          {documents}
+        </p>
+      )}
       {row && hasAgentEvidence(row) && (
         <AgentEvidence screenshots={row.screenshots} filledFields={row.filled_fields} loggedAt={row.logged_at} />
       )}

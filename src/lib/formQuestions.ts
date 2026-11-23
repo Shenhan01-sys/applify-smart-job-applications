@@ -12,7 +12,12 @@
  * di worker, karena kunci inilah yang mencocokkan jawaban tersimpan dengan pertanyaan di formulir lain.
  */
 
-export type QuestionKind = "text" | "textarea" | "select" | "check" | "radio";
+/**
+ * `secret_skip` hanya dilaporkan Ekstensi Browser: kolom yang berisi data rahasia (kata sandi, PIN, kode, nomor
+ * kartu). Kolom itu tidak diisi dan tidak dikirim ke AI, jadi tidak ada jawaban yang disimpan: pengguna mengisinya
+ * sendiri di halaman lowongan.
+ */
+export type QuestionKind = "text" | "textarea" | "select" | "check" | "radio" | "secret_skip";
 
 export type PendingQuestion = {
   /** Hasil questionKey(label) yang dihitung worker; kunci jawaban tersimpan. */
@@ -22,6 +27,11 @@ export type PendingQuestion = {
   kind: QuestionKind;
   /** Pilihan pada formulir untuk select dan radio; tidak ada bila formulir tidak mencantumkannya. */
   options?: string[];
+  /**
+   * Hanya pada log ekstensi: true bila isian wajib di formulir, false bila opsional. Tidak ada pada log worker
+   * (worker hanya menanyakan isian wajib), dan tanpa kunci ini pertanyaan dianggap wajib dijawab.
+   */
+  required?: boolean;
 };
 
 export const MAX_QUESTIONS = 20;
@@ -34,7 +44,7 @@ export const MAX_ANSWER_LENGTH = 2000;
 export const ANSWER_YES = "Yes";
 export const ANSWER_NO = "No";
 
-const KINDS: ReadonlySet<string> = new Set(["text", "textarea", "select", "check", "radio"]);
+const KINDS: ReadonlySet<string> = new Set(["text", "textarea", "select", "check", "radio", "secret_skip"]);
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -93,7 +103,7 @@ export function parseQuestions(details: unknown): PendingQuestion[] {
     const kind = typeof item.kind === "string" && KINDS.has(item.kind) ? (item.kind as QuestionKind) : "text";
     const options = kind === "select" || kind === "radio" ? cleanOptions(item.options) : undefined;
     seen.add(key);
-    out.push(options ? { key, label, kind, options } : { key, label, kind });
+    out.push({ key, label, kind, ...(options ? { options } : {}), ...(typeof item.required === "boolean" ? { required: item.required } : {}) });
     if (out.length >= MAX_QUESTIONS) break;
   }
   return out;
@@ -105,22 +115,36 @@ export interface QuestionFacts {
   questions?: PendingQuestion[];
 }
 
-/**
- * Pertanyaan yang masih perlu dijawab menurut percobaan terbaru. Percobaan yang sudah terkirim (success) atau
- * yang kirimnya belum terkonfirmasi (submit_unverified) tidak lagi butuh jawaban: bertanya di situ menyesatkan
- * dan bisa memicu kirim ulang.
- */
-export function questionsToAnswer(facts: QuestionFacts | null | undefined): PendingQuestion[] {
+function openQuestions(facts: QuestionFacts | null | undefined): PendingQuestion[] {
   if (!facts || !Array.isArray(facts.questions)) return [];
   if (facts.log_status === "success" || facts.log_status === "submit_unverified") return [];
   return facts.questions;
 }
+
+/**
+ * Pertanyaan yang masih perlu dijawab menurut percobaan terbaru. Percobaan yang sudah terkirim (success) atau
+ * yang kirimnya belum terkonfirmasi (submit_unverified) tidak lagi butuh jawaban: bertanya di situ menyesatkan
+ * dan bisa memicu kirim ulang. Kolom rahasia (`secret_skip`) tidak ikut: itu tidak dijawab di Applify.
+ */
+export function questionsToAnswer(facts: QuestionFacts | null | undefined): PendingQuestion[] {
+  return openQuestions(facts).filter((q) => q.kind !== "secret_skip");
+}
+
+/** Kolom rahasia yang dibiarkan kosong oleh ekstensi dan harus diisi pengguna sendiri di halaman lowongan. Aturan gerbang sama dengan questionsToAnswer. */
+export function questionsToSelfFill(facts: QuestionFacts | null | undefined): PendingQuestion[] {
+  return openQuestions(facts).filter((q) => q.kind === "secret_skip");
+}
+
+/** Pertanyaan bertanda `required: false` boleh dikosongkan. Tanpa tanda itu (log lama dan log worker) pertanyaan wajib dijawab. */
+export const isRequiredQuestion = (q: PendingQuestion): boolean => q.required !== false;
 
 /** Jawaban awal per kunci: jawaban tersimpan yang masih cocok dengan pertanyaannya, selain itu kosong. */
 export function initialAnswers(questions: readonly PendingQuestion[], saved: Record<string, string> | null | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const q of questions ?? []) {
     out[q.key] = "";
+    // Kolom rahasia tidak pernah diisi dari jawaban tersimpan.
+    if (q.kind === "secret_skip") continue;
     if (!isRecord(saved) || !hasOwn(saved, q.key)) continue;
     const value = saved[q.key];
     if (typeof value !== "string") continue;
@@ -151,15 +175,18 @@ function answerOf(answers: Record<string, string> | null | undefined, key: strin
 }
 
 /**
- * Setiap pertanyaan butuh jawaban tidak kosong, paling panjang 2000 karakter. Select dan radio dengan pilihan
- * harus dijawab dengan salah satu pilihan, dan check dengan "Yes" atau "No". Bentuk yang tidak dikenal tidak
- * melempar galat: dianggap belum dijawab.
+ * Setiap pertanyaan wajib butuh jawaban tidak kosong, paling panjang 2000 karakter. Select dan radio dengan
+ * pilihan harus dijawab dengan salah satu pilihan, dan check dengan "Yes" atau "No". Pertanyaan opsional
+ * (`required: false`) boleh kosong, tetapi bila diisi aturan yang sama berlaku. Kolom rahasia (`secret_skip`)
+ * tidak divalidasi. Bentuk yang tidak dikenal tidak melempar galat: dianggap belum dijawab.
  */
 export function validateAnswers(questions: readonly PendingQuestion[], answers: Record<string, string> | null | undefined): AnswerValidation {
   const errors: Record<string, string> = {};
   for (const q of questions ?? []) {
+    if (q.kind === "secret_skip") continue;
     const text = answerOf(answers, q.key);
     if (!text) {
+      if (!isRequiredQuestion(q)) continue;
       errors[q.key] = q.kind === "check" ? ERROR_CHOOSE_YES_NO : (q.kind === "select" || q.kind === "radio") && q.options ? ERROR_CHOOSE_OPTION : ERROR_EMPTY;
     } else if (text.length > MAX_ANSWER_LENGTH) {
       errors[q.key] = ERROR_TOO_LONG;
@@ -182,6 +209,7 @@ export interface AnswerRow {
 export function answersToRows(questions: readonly PendingQuestion[], answers: Record<string, string> | null | undefined): AnswerRow[] {
   const rows: AnswerRow[] = [];
   for (const q of questions ?? []) {
+    if (q.kind === "secret_skip") continue;
     const text = answerOf(answers, q.key).slice(0, MAX_ANSWER_LENGTH);
     if (!text) continue;
     rows.push({ question_key: q.key.slice(0, MAX_KEY_LENGTH), question_label: q.label.slice(0, MAX_LABEL_LENGTH), answer: text });
@@ -193,6 +221,11 @@ export function answersToRows(questions: readonly PendingQuestion[], answers: Re
 
 export const ANSWERS_TABLE_MISSING_TEXT = "Fitur jawaban tersimpan belum aktif di database.";
 export const RERUN_STARTED_TEXT = "Agen berjalan lagi dengan jawabanmu.";
+/** Jawaban untuk log Ekstensi Browser: tidak ada tugas worker yang dijalankan ulang, pengguna mengisi ulang dari panel ekstensi. */
+export const EXTENSION_ANSWERS_SAVED_TEXT =
+  "Jawaban tersimpan. Kembali ke tab lowongan lalu klik Simpan jawaban dan isi ulang di panel Applify.";
+export const SELF_FILL_LABEL = "Isi sendiri di halaman lowongan";
+export const ERROR_NO_ANSWERS = "Isi minimal satu jawaban dulu.";
 
 /**
  * Galat Supabase karena tabel user_form_answers belum ada (migrasi belum dijalankan): kode Postgres 42P01,
