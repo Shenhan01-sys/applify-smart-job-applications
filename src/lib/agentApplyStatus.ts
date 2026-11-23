@@ -100,6 +100,48 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
   if (status === "incomplete" && (reason === "validation_failed" || facts.submit_check_verdict === "validation_error")) {
     return { label: AGENT_VALIDATION_LABEL, hint: AGENT_VALIDATION_HINT, tone: "manual", suggestEmail: true };
   }
+  if (status === "incomplete") {
+    if (reason === "auth_required") {
+      return {
+        label: "Portal meminta masuk (login) pelamar",
+        hint: "Situs ini mewajibkan akun pelamar. Buka lowongan di Chrome/Edge, masuk ke akunmu, lalu jalankan Ekstensi Browser Applify.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "captcha_blocked") {
+      return {
+        label: "Tertahan CAPTCHA / verifikasi manusia",
+        hint: "Agen berhenti karena halaman menampilkan tantangan anti-bot. Selesaikan langsung di tab Chrome/Edge lalu pakai Ekstensi Browser atau kirim manual.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "ai_prohibited") {
+      return {
+        label: "Situs melarang penggunaan AI",
+        hint: "Formulir mewajibkan lamaran ditulis murni tanpa AI. Isi dan kirim langsung secara manual.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "closed_posting") {
+      return {
+        label: "Lowongan sudah ditutup di situs asal",
+        hint: "Halaman asal menyatakan posisi ini sudah ditutup atau tidak lagi menerima lamaran.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "external_redirect") {
+      return {
+        label: "Dialihkan ke domain eksternal tak dikenal",
+        hint: "Demi keamanan, agen berhenti sebelum melompat ke domain lain yang belum terverifikasi. Periksa tautan atau pakai Ekstensi Browser.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+  }
   if (status === "ready" && reason === "code_timeout") {
     return { label: AGENT_CODE_TIMEOUT_LABEL, hint: AGENT_CODE_TIMEOUT_HINT, tone: "manual", suggestEmail: false };
   }

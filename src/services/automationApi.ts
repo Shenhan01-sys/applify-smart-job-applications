@@ -477,4 +477,23 @@ export const automationApi = {
       () => ({ success: true, platform }),
     )
   },
+
+  /** Token singkat scoped `extension:apply` (berlaku 4 jam) untuk menghubungkan Ekstensi Chrome/Edge. */
+  async createExtensionToken(ttlSeconds: number = 14400): Promise<{
+    token: string
+    expiresAt: string
+    scope: string
+    ttlSeconds: number
+  }> {
+    return apiFetch(
+      `${apiBase()}/api/extension/token`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ ttlSeconds }) },
+      () => ({
+        token: 'ext_tok_v1.demo_preview_only.demo_signature',
+        expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+        scope: 'extension:apply',
+        ttlSeconds,
+      }),
+    )
+  },
 }

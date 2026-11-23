@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { platformLabel } from "@/lib/platforms";
+import { classifyJobChannel } from "@/lib/applyChannel";
 import { listOrEmpty, postedDate, radarFromMatches } from "@/lib/jobCardData";
 import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { JOB_LABELS, jobTypeLabel, marketPositionLabel, workplaceLabel } from "@/lib/jobLabels";
@@ -495,6 +496,15 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   const detailLoading = detail.phase === "loading";
   const thinDetail = isThinDetail(job);
   const closed = isClosedJob(job);
+  const channelInfo = classifyJobChannel(job);
+  const channelPillClass =
+    channelInfo.badgeTone === "ats"
+      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+      : channelInfo.badgeTone === "email"
+        ? "bg-blue-50 text-blue-800 border-blue-200"
+        : channelInfo.badgeTone === "manual"
+          ? "bg-amber-50 text-amber-900 border-amber-200"
+          : "bg-[#EEF4FF] text-[#0A5BE0] border-[#0A5BE0]/20";
 
   // A row from the job sources has none of the AI analysis (see lib/jobCardData.ts): show only what exists.
   // The skill chart below comes from `match` (computeMatch); skill_matches is only an extra source when present.
@@ -606,7 +616,13 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
             <DollarSign className="h-4 w-4" />
             {salary ?? JOB_LABELS.card.salaryMissing}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <span
+              className={`text-xs font-medium border px-2 py-0.5 rounded-full ${channelPillClass}`}
+              title={channelInfo.reason}
+            >
+              {channelInfo.badgeLabel}
+            </span>
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
               {JOB_LABELS.card.sourcePrefix} {platformLabel(job.platform_source)}
             </span>

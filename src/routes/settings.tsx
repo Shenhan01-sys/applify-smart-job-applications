@@ -6,6 +6,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
 import SavedAnswers from "@/components/SavedAnswers";
+import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
 import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -76,10 +77,10 @@ function SettingsPage() {
           <SavedAnswers />
         </Card>
 
-        <Card icon={Chrome} title="Ekstensi Browser" color="#0A5BE0"
-          desc="Ekstensi untuk membantu mengisi formulir lamaran langsung di browser. Belum tersedia.">
-          <div className="flex flex-wrap gap-2 mt-4">
-            <SoonButton>Pasang untuk Chrome</SoonButton>
+        <Card icon={Chrome} title="Ekstensi Browser (Chrome & Edge)" color="#0A5BE0"
+          desc="Gunakan Ekstensi Browser Applify di Chrome atau Edge untuk membantu mengisi formulir pada portal yang butuh masuk dengan akunmu sendiri.">
+          <ExtensionConnectCard />
+          <div className="mt-3">
             <SoonButton>Pasang untuk Firefox</SoonButton>
           </div>
         </Card>

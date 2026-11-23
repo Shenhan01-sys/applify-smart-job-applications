@@ -10,6 +10,7 @@ import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeError } from "@/lib/authErrors";
 import { applyBlockers } from "@/lib/onboarding";
 import { displaySkillGaps, highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
+import { classifyJobChannel } from "@/lib/applyChannel";
 import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
 import { applicationStatusLabel } from "@/lib/statusLabels";
 import { draftProgressText, draftWaitHint } from "@/lib/draftProgress";
@@ -80,6 +81,7 @@ type ProfileCheck =
   | { state: "error"; message: string };
 
 export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, profileSkills = null, onClose, onSuccess, onDraftCreated }: AIApplyModalProps) {
+  const channelInfo = useMemo(() => classifyJobChannel(jobData ?? { id: jobId }), [jobData, jobId]);
   const [generating, setGenerating] = useState(false);
   // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
@@ -612,6 +614,17 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                 }
               />
 
+              <div
+                className={`rounded-xl border p-3 text-xs ${
+                  channelInfo.manualOnly
+                    ? "border-amber-300 bg-amber-50 text-amber-900"
+                    : "border-[#0A5BE0]/20 bg-[#0A5BE0]/5 text-[#16150F]"
+                }`}
+              >
+                <span className="font-semibold">Jalur lamaran ({channelInfo.badgeLabel}): </span>
+                <span>{channelInfo.reason}</span>
+              </div>
+
               {error && (
                 <div role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
               )}
@@ -849,7 +862,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
             >
               {application ? "Tutup (draf tersimpan)" : "Tutup"}
             </button>
-            {editable && jobData?.external_url && (
+            {editable && jobData?.external_url && !channelInfo.manualOnly && (
               <button
                 type="button"
                 onClick={handleAutoApply}
