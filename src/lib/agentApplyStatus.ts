@@ -21,7 +21,7 @@ export interface AgentApplyRow extends AgentLogFacts {
   /** automation_queue.id tugas apply ini; dikirim ke backend bersama kode keamanan. */
   queue_job_id?: string | null;
   /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
-  claim_state?: "none" | "in_progress" | "submitted" | "locked_stuck";
+  claim_state?: "none" | "in_progress" | "submitted" | "abandoned" | "locked_stuck";
   claim_channel?: "worker" | "extension" | null;
 }
 
@@ -180,7 +180,14 @@ function filledNothing(row: AgentApplyRow): boolean {
   return isQueueNeedsManual(row.status, "apply", row.fields_filled) || (row.log_status === "incomplete" && row.reason === "no_fields_filled");
 }
 
+export const AGENT_ABANDONED_LABEL = "Klaim dilepas: persetujuan baru sudah dibuat";
+export const AGENT_ABANDONED_HINT =
+  "Kamu memilih membuat persetujuan baru untuk lowongan ini, jadi pengiriman lama tidak dilanjutkan. Tinjau dan setujui permintaan baru di tab Menunggu.";
+
 export function describeAgentApply(row: AgentApplyRow | null | undefined, now: number = Date.now()): AgentApplyView {
+  if (row?.claim_state === "abandoned" && row.log_status !== "success" && row.log_status !== "submit_unverified") {
+    return { label: AGENT_ABANDONED_LABEL, hint: AGENT_ABANDONED_HINT, tone: "manual", suggestEmail: false };
+  }
   if (row?.claim_state === "locked_stuck" && row.log_status !== "success" && row.log_status !== "submit_unverified") {
     const channelLabel = row.claim_channel === "extension" ? "Ekstensi Browser" : "Agen";
     return {

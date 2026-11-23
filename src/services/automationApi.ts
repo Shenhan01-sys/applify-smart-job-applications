@@ -523,7 +523,7 @@ export const automationApi = {
 
   /** Status klaim atomik untuk persetujuan yang disetujui (mendeteksi klaim macet). */
   async getApprovalClaimStatuses(approvalIds: string[]): Promise<{
-    claims: Record<string, { approvalId: string; state: 'none' | 'in_progress' | 'submitted' | 'locked_stuck'; channel: 'worker' | 'extension' | null }>
+    claims: Record<string, { approvalId: string; state: 'none' | 'in_progress' | 'submitted' | 'abandoned' | 'locked_stuck'; channel: 'worker' | 'extension' | null }>
   }> {
     return apiFetch(
       `${apiBase()}/api/approvals/claim-statuses`,
@@ -544,11 +544,11 @@ export const automationApi = {
     )
   },
 
-  async getNotificationStatus(): Promise<{ telegram: boolean; whatsappKapso?: boolean; email?: boolean }> {
+  async getNotificationStatus(): Promise<{ telegram: boolean; notificationsEnabled?: boolean; whatsappKapso?: boolean; email?: boolean }> {
     return apiFetch(
       `${apiBase()}/api/notifications/status`,
       { headers: await getAuthHeaders() },
-      () => ({ telegram: false, whatsappKapso: false, email: false }),
+      () => ({ telegram: false, notificationsEnabled: false, whatsappKapso: false, email: false }),
     )
   },
 
@@ -559,10 +559,9 @@ export const automationApi = {
       whatsappVerified: boolean
       whatsappEnabled: boolean
       whatsappLastInboundAt: string | null
+      /** Email akun (read-only, dari server); null bila belum terkonfirmasi atau tidak tersedia. */
       emailAddress: string | null
       emailEnabled: boolean
-      telegramChatId: string | null
-      telegramEnabled: boolean
       notifyEvents: Record<'ready' | 'submitted' | 'awaiting_code' | 'follow_up' | 'locked_claim', boolean>
       migrationPending?: boolean
     }>(
@@ -576,14 +575,17 @@ export const automationApi = {
         whatsappLastInboundAt: null,
         emailAddress: null,
         emailEnabled: false,
-        telegramChatId: null,
-        telegramEnabled: false,
         notifyEvents: { ready: true, submitted: true, awaiting_code: true, follow_up: true, locked_claim: true },
       }),
     )
   },
 
-  async updateNotificationPreferences(patch: Record<string, unknown>) {
+  /** Email dan Telegram tidak bisa diubah klien: penerima email selalu email akun, jadi tidak ada field-nya di sini. */
+  async updateNotificationPreferences(patch: {
+    whatsappEnabled?: boolean
+    emailEnabled?: boolean
+    notifyEvents?: Record<string, boolean>
+  }) {
     return apiFetch(
       `${apiBase()}/api/notifications/preferences`,
       { method: 'PUT', headers: await getAuthHeaders(), body: JSON.stringify(patch) },

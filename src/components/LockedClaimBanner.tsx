@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 import { automationApi } from "@/services/automationApi";
-import { describeApiError } from "@/lib/apiErrors";
+import { classifyClaimResolveError, shouldShowLockedClaimBanner } from "@/lib/claimResolution";
 
 interface Props {
   approvalId: string;
@@ -18,11 +18,14 @@ interface Props {
 export default function LockedClaimBanner({ approvalId, row, onResolved }: Props) {
   const [busy, setBusy] = useState<"mark_sent" | "create_fresh_approval" | null>(null);
   const [error, setError] = useState("");
+  // Sesudah pemulihan berhasil (atau klaim ternyata sudah selesai), banner langsung hilang tanpa menunggu muat ulang,
+  // supaya klik kedua tidak membuat persetujuan baru lagi.
+  const [done, setDone] = useState(false);
 
-  if (row?.claim_state !== "locked_stuck") return null;
-  if (row.log_status === "success" || row.log_status === "submit_unverified") return null;
+  if (done || !shouldShowLockedClaimBanner(row?.claim_state, row?.log_status)) return null;
 
   const resolve = async (resolution: "mark_sent" | "create_fresh_approval") => {
+    if (busy !== null) return;
     setBusy(resolution);
     setError("");
     try {
@@ -34,9 +37,22 @@ export default function LockedClaimBanner({ approvalId, row, onResolved }: Props
             ? "Permintaan persetujuan baru dibuat di tab Menunggu."
             : "Permintaan persetujuan baru siap ditinjau."
       );
+      setDone(true);
       await onResolved();
     } catch (err) {
-      setError(describeApiError(err, "Gagal menyelesaikan status klaim terkunci."));
+      const failure = classifyClaimResolveError(err, "Gagal menyelesaikan status klaim terkunci.");
+      if (failure.kind === "already_done") {
+        // 409: klaim sudah diselesaikan (klik ganda atau tab lain). Sembunyikan banner dan muat ulang status.
+        toast.info(failure.message);
+        setDone(true);
+        await onResolved();
+      } else if (failure.kind === "in_progress") {
+        // 409: pengiriman masih berjalan. Jangan tawarkan pemulihan; muat ulang supaya statusnya mengikuti.
+        toast.warning(failure.message);
+        await onResolved();
+      } else {
+        setError(failure.message);
+      }
     } finally {
       setBusy(null);
     }

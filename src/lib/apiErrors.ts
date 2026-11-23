@@ -12,6 +12,14 @@
  *                 422 { error, code:'session_undecryptable' }                    stored session cannot be read
  *   /api/automation/queue, /api/queue/apply
  *              -> 403 { error, code:'approval_required' }
+ *   /api/notifications/whatsapp/*
+ *              -> 429 { error, code:'otp_daily_limit' | 'otp_cooldown' | 'otp_too_many_attempts' }
+ *                 400 { error, code:'otp_mismatch' | 'otp_expired' | 'otp_not_found' | 'invalid_otp' | 'invalid_whatsapp_phone' }
+ *                 502 { error, code:'whatsapp_send_failed' }  (isi galat penyedia tidak dikirim server)
+ *                 503 { error, code:'notifications_disabled' | 'otp_not_configured' | 'otp_attempts_unavailable' | ... }
+ *   /api/approvals/:id/*
+ *              -> 400 { error, code:'invalid_id' }; 409 { code:'claim_in_progress' | 'already_resolved' | 'already_logged' }
+ *   500 jawaban server kini generik ({ error, code:'internal_error' | ... }); teks galat database tidak pernah dikirim.
  *
  * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
  */
@@ -77,6 +85,26 @@ function waitText(sec: number | undefined): string {
   return `${Math.ceil(sec / 60)} menit`;
 }
 
+/** Kode jawaban 500 generik dari server: teks galat sebenarnya hanya ada di log server. */
+const GENERIC_SERVER_CODES = new Set([
+  "internal_error",
+  "otp_request_failed",
+  "otp_verify_failed",
+  "otp_lookup_failed",
+  "otp_store_failed",
+  "otp_consume_failed",
+  "settings_lookup_failed",
+  "settings_save_failed",
+  "preferences_failed",
+  "status_notify_failed",
+  "rerun_failed",
+  "mark_failed",
+  "queue_failed",
+  "claims_lookup_failed",
+  "claim_resolve_failed",
+  "regenerate_failed",
+]);
+
 /**
  * Message for the user. `fallback` is used when the response says nothing we recognise, so each screen keeps its
  * own wording ("Gagal membuat surat") for plain failures.
@@ -105,10 +133,48 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       );
     case "session_undecryptable":
       return "Sesi yang tersimpan tidak dapat dibaca. Kunci enkripsi server mungkin berubah atau datanya rusak. Impor ulang sesi untuk menggantinya.";
+    case "otp_daily_limit":
+      return "Batas permintaan kode OTP hari ini sudah tercapai. Kode OTP dibatasi 5 permintaan per akun dan 5 per nomor dalam 24 jam. Coba lagi besok.";
+    case "otp_cooldown":
+      return "Kode OTP baru saja dikirim. Tunggu sekitar satu menit sebelum meminta kode lagi.";
+    case "otp_too_many_attempts":
+      return "Batas percobaan kode OTP tercapai atau kode sudah dipakai. Minta kode baru (tetap terhitung dalam batas harian).";
+    case "otp_mismatch":
+      return "Kode OTP salah. Periksa kode di WhatsApp, lalu coba lagi.";
+    case "otp_expired":
+      return "Kode OTP sudah kedaluwarsa. Minta kode baru.";
+    case "otp_not_found":
+      return "Belum ada kode OTP aktif untuk nomor ini. Minta kode baru.";
+    case "invalid_otp":
+      return "Kode OTP harus 6 digit angka.";
+    case "invalid_whatsapp_phone":
+      return "Nomor WhatsApp tidak valid. Gunakan format +628... atau 08...";
+    case "whatsapp_not_verified":
+      return "Verifikasi nomor WhatsApp lewat kode OTP lebih dulu sebelum mengaktifkannya.";
+    case "whatsapp_send_failed":
+      return "Kode OTP gagal dikirim ke WhatsApp. Pastikan nomor aktif dan sudah pernah chat ke nomor bot Applify, lalu coba lagi nanti.";
+    case "notifications_disabled":
+      return "Notifikasi sedang dinonaktifkan di server, jadi tidak ada pesan yang dikirim.";
+    case "otp_not_configured":
+    case "otp_attempts_unavailable":
+    case "kapso_not_configured":
+    case "notification_tables_unavailable":
+      return "Verifikasi WhatsApp belum tersedia di server. Hubungi administrator.";
+    case "account_email_unavailable":
+      return "Email akunmu belum terkonfirmasi atau tidak tersedia, jadi notifikasi email belum bisa diaktifkan.";
+    case "invalid_id":
+      return "ID tidak valid. Muat ulang halaman, lalu coba lagi.";
+    case "claim_in_progress":
+      return "Pengiriman untuk persetujuan ini masih berjalan atau statusnya belum bisa dipastikan. Tunggu beberapa menit, lalu muat ulang halaman.";
+    case "already_resolved":
+      return "Klaim ini sudah diselesaikan sebelumnya, jadi tidak ada yang diubah lagi.";
+    case "already_logged":
+      return "Lamaran ini sudah tercatat terkirim, jadi tidak perlu dipulihkan lagi.";
     case "approval_required":
       return `Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa (${e.serverMessage ?? "approval_required"}). Muat ulang halaman dan periksa statusnya.`;
   }
 
+  if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;
   if (e.status === 401) return "Sesi login berakhir atau belum masuk. Masuk lagi, lalu ulangi.";
   if (e.status === 429) return `Terlalu banyak permintaan. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
   if (e.serverMessage) return `${fallback} (${e.serverMessage})`;

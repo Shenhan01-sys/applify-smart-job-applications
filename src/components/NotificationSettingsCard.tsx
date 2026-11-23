@@ -13,12 +13,15 @@ const EVENT_LABELS: Array<{ key: "ready" | "submitted" | "awaiting_code" | "foll
 
 /**
  * Pengaturan kanal notifikasi per-user (WhatsApp via Kapso + verifikasi OTP 6 digit, dan Email transaksional).
+ *
+ * Email notifikasi selalu dikirim ke email akun login dan tidak bisa diubah di sini (server menolak alamat dari
+ * klien). Pesan galat berasal dari kode galat server lewat describeApiError; isi galat penyedia tidak pernah tampil.
  */
 export function NotificationSettingsCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [migrationPending, setMigrationPending] = useState(false);
-  const [serverChannels, setServerChannels] = useState<{ telegram?: boolean; whatsappKapso?: boolean; email?: boolean }>({});
+  const [serverChannels, setServerChannels] = useState<{ telegram?: boolean; notificationsEnabled?: boolean; whatsappKapso?: boolean; email?: boolean }>({});
 
   const [phoneInput, setPhoneInput] = useState("");
   const [otpInput, setOtpInput] = useState("");
@@ -26,7 +29,8 @@ export function NotificationSettingsCard() {
   const [waVerified, setWaVerified] = useState(false);
   const [waEnabled, setWaEnabled] = useState(false);
 
-  const [emailInput, setEmailInput] = useState("");
+  // Email akun (read-only) dari server; null bila belum terkonfirmasi atau tidak tersedia.
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [events, setEvents] = useState<Record<string, boolean>>({
     ready: true,
@@ -53,7 +57,7 @@ export function NotificationSettingsCard() {
         setPhoneInput(prefs.whatsappPhone ?? "");
         setWaVerified(Boolean(prefs.whatsappVerified));
         setWaEnabled(Boolean(prefs.whatsappEnabled));
-        setEmailInput(prefs.emailAddress ?? "");
+        setAccountEmail(prefs.emailAddress ?? null);
         setEmailEnabled(Boolean(prefs.emailEnabled));
         if (prefs.notifyEvents) setEvents(prefs.notifyEvents);
       } catch (err) {
@@ -108,8 +112,8 @@ export function NotificationSettingsCard() {
     try {
       await automationApi.updateNotificationPreferences({
         whatsappEnabled: waEnabled,
-        emailEnabled,
-        emailAddress: emailInput.trim() || null,
+        // Email hanya bisa aktif bila email akun tersedia; server menolak 400 bila tidak.
+        emailEnabled: emailEnabled && Boolean(accountEmail),
         notifyEvents: events,
       });
       setNotice("Preferensi notifikasi disimpan.");
@@ -149,6 +153,13 @@ export function NotificationSettingsCard() {
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           Skema notifikasi multi-kanal (`user_notification_settings`) belum dijalankan di database production.
           Preferensi tidak dapat disimpan sebelum migrasi SQL diterapkan.
+        </div>
+      )}
+
+      {serverChannels.notificationsEnabled === false && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Pengiriman notifikasi sedang dinonaktifkan di server. Preferensi tetap bisa disimpan, tetapi kode OTP dan pesan
+          WhatsApp atau email baru dikirim setelah administrator mengaktifkannya.
         </div>
       )}
 
@@ -198,7 +209,7 @@ export function NotificationSettingsCard() {
           <button
             type="button"
             onClick={handleRequestOtp}
-            disabled={saving || migrationPending || !phoneInput.trim()}
+            disabled={saving || migrationPending || serverChannels.notificationsEnabled === false || !phoneInput.trim()}
             className="min-h-10 px-3 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-60"
           >
             Kirim OTP WhatsApp
@@ -242,7 +253,7 @@ export function NotificationSettingsCard() {
             <button
               type="button"
               onClick={handleTestWa}
-              disabled={saving}
+              disabled={saving || serverChannels.notificationsEnabled === false}
               className="min-h-9 px-3 rounded-lg border border-black/15 bg-white text-xs font-medium hover:border-[#0A5BE0] inline-flex items-center gap-1"
             >
               <Send className="h-3.5 w-3.5" aria-hidden="true" /> Uji WhatsApp
@@ -263,23 +274,29 @@ export function NotificationSettingsCard() {
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="email"
-            value={emailInput}
-            onChange={(e) => setEmailInput(e.target.value)}
-            placeholder="email-kamu@domain.com"
-            aria-label="Email notifikasi"
-            className="flex-1 min-w-[200px] min-h-10 rounded-lg border border-[#999999] bg-white px-3 text-sm"
+            value={accountEmail ?? ""}
+            readOnly
+            tabIndex={-1}
+            placeholder="Email akun belum terkonfirmasi"
+            aria-label="Email akun (tidak bisa diubah)"
+            className="flex-1 min-w-[200px] min-h-10 rounded-lg border border-black/10 bg-[#EFEEE8] px-3 text-sm text-[#16150F] cursor-not-allowed"
           />
           <label className="inline-flex items-center gap-2 text-xs">
             <input
               type="checkbox"
-              checked={emailEnabled}
-              disabled={migrationPending}
+              checked={emailEnabled && Boolean(accountEmail)}
+              disabled={migrationPending || !accountEmail}
               onChange={(e) => setEmailEnabled(e.target.checked)}
               className="h-4 w-4"
             />
             Aktif
           </label>
         </div>
+        <p className="text-xs text-muted-foreground">
+          {accountEmail
+            ? "Notifikasi dikirim ke email akun loginmu. Alamat ini tidak bisa diganti di sini."
+            : "Email akunmu belum terkonfirmasi atau tidak tersedia, jadi notifikasi email belum bisa diaktifkan."}
+        </p>
       </div>
 
       {/* Pilihan Event */}
