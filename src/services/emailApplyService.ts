@@ -6,6 +6,7 @@ import {
   type ApprovalLike,
   type EmailQueueRow,
 } from "@/lib/emailApply";
+import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -18,9 +19,57 @@ export interface EmailApplyData {
   jobs: Record<string, EmailQueueRow>;
   /** recruiter addresses found in the job posting, per approval id (suggestions only) */
   suggestions: Record<string, string[]>;
+  /** latest apply (form-filling agent) queue row per approval id, with fields filled from its attempt log */
+  agent: Record<string, AgentApplyRow>;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {} });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {} });
+
+/**
+ * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
+ * and, when its attempt log exists, how many fields it filled. Read with the user's own session (RLS owner
+ * policies). Best effort: an unreadable log only leaves fields_filled unknown.
+ */
+async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentApplyRow>> {
+  const out: Record<string, AgentApplyRow> = {};
+  const queue = await supabase
+    .from("automation_queue")
+    .select("id, status, error_message, created_at, payload")
+    .eq("job_type", "apply")
+    .in("payload->>approval_request_id", ids)
+    .order("created_at", { ascending: false });
+  if (queue.error) {
+    console.warn("[agentApply] queue lookup skipped:", queue.error.message);
+    return out;
+  }
+  const queueIdToApproval = new Map<string, string>();
+  for (const row of queue.data ?? []) {
+    const id = (row as any)?.payload?.approval_request_id;
+    if (typeof id !== "string" || out[id]) continue;
+    out[id] = { status: (row as any).status, error_message: (row as any).error_message, fields_filled: null };
+    queueIdToApproval.set(String((row as any).id), id);
+  }
+  const queueIds = [...queueIdToApproval.keys()];
+  if (queueIds.length === 0) return out;
+  const logs = await supabase
+    .from("application_logs")
+    .select("details, created_at")
+    .eq("action", "apply")
+    .in("details->>queue_job_id", queueIds)
+    .order("created_at", { ascending: false });
+  if (logs.error) {
+    console.warn("[agentApply] attempt log lookup skipped:", logs.error.message);
+    return out;
+  }
+  for (const row of logs.data ?? []) {
+    const details = (row as any)?.details ?? {};
+    const approvalId = queueIdToApproval.get(String(details.queue_job_id));
+    if (!approvalId || out[approvalId].fields_filled != null) continue;
+    const filled = Number(details.fields_filled);
+    if (Number.isFinite(filled)) out[approvalId].fields_filled = filled;
+  }
+  return out;
+}
 
 /**
  * Everything the email action needs for a list of approvals, read with the user's own session (RLS owner
@@ -38,7 +87,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const ids = approved.map((a) => a.id);
   const jobIds = [...new Set(approved.map((a) => a.job_id).filter((x): x is string => !!x))];
 
-  const [gmail, logs, queue, jobs] = await Promise.all([
+  const [gmail, logs, queue, jobs, agent] = await Promise.all([
     automationApi.getGmailStatus(),
     supabase.from("application_logs").select("details").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
@@ -48,9 +97,14 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
     jobIds.length > 0 ? supabase.from("jobs").select("id, description").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
+    loadAgentApplyRows(ids).catch((err) => {
+      console.warn("[agentApply] status unavailable:", err);
+      return {} as Record<string, AgentApplyRow>;
+    }),
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;
+  data.agent = agent;
 
   if (logs.error) console.warn("[emailApply] used-check skipped:", logs.error.message);
   for (const row of logs.data ?? []) {

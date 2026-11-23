@@ -100,6 +100,14 @@ export function queueDisplayLabel(
  * "no_fields_filled"): lamaran tidak berubah status dan belum terkirim, pengguna perlu mengisi sendiri.
  */
 export const FILL_YOURSELF_LABEL = "Isi sendiri di situs";
+/**
+ * Tugas apply yang selesai dan mengisi formulir, tetapi tidak menekan kirim. Formulir itu ada di peramban server,
+ * jadi pengguna tidak bisa menekan kirim di sana; teks ini tidak menyuruhnya (temuan uji klik 23 November 2026).
+ * Kalimatnya tetap benar saat ALLOW_REAL_SUBMIT dinyalakan, karena host yang tidak diizinkan juga berhenti di sini.
+ */
+export const AGENT_STOPPED_BEFORE_SUBMIT_TEXT =
+  "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim karena pengiriman otomatis belum diizinkan (selama uji coba, pengiriman dimatikan). Lamaran tidak terkirim dan ada di kolom Siap dikirim. Bila pengiriman diizinkan, agen menekan kirim sendiri dan lamaran pindah ke Terkirim.";
+
 export const NO_FIELDS_FILLED_TEXT =
   "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi sendiri di situs lowongan, atau ajukan lagi.";
 
@@ -125,7 +133,7 @@ export function queueStatusHint(
     case "completed":
       if (isQueueNeedsManual(status, jobType, fieldsFilled)) return NO_FIELDS_FILLED_TEXT;
       return jobType === "apply"
-        ? "Agen sudah mencoba mengisi formulir di peramban server dan berhenti sebelum tombol kirim. Isian itu tidak tersimpan di perangkatmu, jadi kirim sendiri lewat situs lowongan bila sudah yakin."
+        ? AGENT_STOPPED_BEFORE_SUBMIT_TEXT
         : "Tugas selesai.";
     case "failed":
       return "Tugas tidak berhasil. Kamu bisa mencoba lagi dari halaman Lowongan.";

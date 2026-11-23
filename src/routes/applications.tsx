@@ -742,7 +742,7 @@ export function AppsPage() {
                             : selectedApp.status === "ready"
                               ? (selectedAttempt?.fieldsFilled ?? 0) > 0
                                 ? // Status ready ditulis worker sesudah mengisi sebagian atau seluruh formulir. Teks ini hanya untuk percobaan yang mengisi minimal satu isian (fields_filled > 0).
-                                  "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang."
+                                  "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Pengiriman otomatis belum diizinkan (selama uji coba, pengiriman dimatikan), jadi lamaran tidak terkirim dan tetap di kolom Siap dikirim. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang."
                                 : // Ready lewat Ubah status, atau percobaan agen tidak tercatat: tidak ada bukti agen mengisi formulir.
                                   "Draf ini ditandai siap dikirim, tetapi belum ada catatan bahwa agen berhasil mengisi formulirnya. Kirim sendiri di situs lowongan, atau ajukan lagi supaya agen mencoba mengisi formulir."
                               : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}

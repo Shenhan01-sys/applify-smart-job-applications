@@ -78,4 +78,7 @@ test("antrean: job apply tanpa tautan tampil Dilewati, bukan Gagal", () => {
   assert.match(queueStatusHint("failed", "apply", msg), /tidak punya tautan/);
   assert.equal(queueDisplayLabel("failed", "timeout"), "Gagal");
   assert.match(queueStatusHint("completed", "apply"), /peramban server/);
+  // Tidak menyuruh pengguna menekan kirim di formulir yang hanya ada di peramban server.
+  assert.doesNotMatch(queueStatusHint("completed", "apply"), /kirim sendiri lewat situs|kirim sendiri di situs/i);
+  assert.match(queueStatusHint("completed", "apply"), /Siap dikirim/);
 });

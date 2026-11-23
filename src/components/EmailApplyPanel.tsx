@@ -69,8 +69,9 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
         aria-expanded={open}
         className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
       >
-        <span className="inline-flex items-center gap-2 text-xs font-semibold">
-          <Mail className="h-4 w-4 text-[#0A5BE0]" /> Kirim lewat Email
+        <span className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <Mail className="h-4 w-4 text-[#0A5BE0]" /> Opsi lain: Kirim lewat Email
+          <span className="font-normal text-muted-foreground">(untuk lowongan yang meminta lamaran ke email rekruter)</span>
           {state.block === "used" && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">sudah dipakai</span>}
           {(state.block === "queued") && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">dalam antrean</span>}
         </span>

@@ -182,7 +182,9 @@ test("Lamaran Saya: jendela detail ready memuat daftar bernomor <ol> isian koson
   const src = read("../src/routes/applications.tsx");
   const box = src.slice(src.indexOf("Draf ini sudah menunggu persetujuanmu"), src.indexOf('approvalUi.state === "unknown"'));
   // teks lama dan tombol lama tetap
-  assert.match(box, /Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim\. Kirim sendiri di situs lowongan, atau lengkapi dulu data yang kurang lalu ajukan lagi supaya agen mengisi ulang\./);
+  assert.match(box, /Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim\. Pengiriman otomatis belum diizinkan \(selama uji coba, pengiriman dimatikan\), jadi lamaran tidak terkirim dan tetap di kolom Siap dikirim\. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang\./);
+  // Formulir yang diisi agen ada di peramban server: teks ini tidak boleh menyuruh pengguna mengirim sendiri.
+  assert.doesNotMatch(box.slice(0, box.indexOf("Draf ini ditandai siap dikirim")), /Kirim sendiri di situs lowongan, atau lengkapi/);
   assert.match(src, /"Ajukan lagi ke Persetujuan"/);
   // kekurangan: judul, <ol> (bukan <ul>), label sebagai teks biasa, tautan
   assert.match(src, /const selectedGaps = selectedApp && selectedApp\.status === "ready" \? formGaps\[selectedApp\.job_id\] : undefined/);

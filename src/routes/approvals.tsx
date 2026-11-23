@@ -5,6 +5,8 @@ import AppShell from "@/components/app/AppShell";
 import { automationApi } from "@/services/automationApi";
 import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import EmailApplyPanel from "@/components/EmailApplyPanel";
+import AgentApplyStatus from "@/components/AgentApplyStatus";
+import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
 import { approvalStatusLabel, effectiveApprovalStatus } from "@/lib/statusLabels";
@@ -68,6 +70,16 @@ function ApprovalsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // While the agent is still working on an approved application, refresh its status every 15 s.
+  const agentActive = Object.values(emailData.agent).some(isAgentApplyActive);
+  useEffect(() => {
+    if (!agentActive || isMockMode()) return;
+    const t = window.setInterval(() => {
+      loadEmailApplyData(history).then(setEmailData).catch(() => {});
+    }, 15_000);
+    return () => window.clearInterval(t);
+  }, [agentActive, history]);
 
   const loadData = async () => {
     setLoading(true);
@@ -256,6 +268,9 @@ function ApprovalsPage() {
                       <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg border-2 border-red-100">
                         Alasan: {request.rejection_reason}
                       </p>
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <AgentApplyStatus row={emailData.agent[request.id]} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <EmailApplyPanel
