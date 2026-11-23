@@ -48,7 +48,7 @@ async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentAp
   for (const row of queue.data ?? []) {
     const id = (row as any)?.payload?.approval_request_id;
     if (typeof id !== "string" || out[id]) continue;
-    out[id] = { status: (row as any).status, error_message: (row as any).error_message, fields_filled: null };
+    out[id] = { status: (row as any).status, error_message: (row as any).error_message, fields_filled: null, queue_job_id: String((row as any).id) };
     queueIdToApproval.set(String((row as any).id), id);
   }
   const queueIds = [...queueIdToApproval.keys()];

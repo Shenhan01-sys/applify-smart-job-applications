@@ -7,7 +7,9 @@ import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import EmailApplyPanel from "@/components/EmailApplyPanel";
 import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
+import AgentSecurityCode from "@/components/AgentSecurityCode";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
+import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
 import { approvalStatusLabel, effectiveApprovalStatus } from "@/lib/statusLabels";
@@ -72,15 +74,24 @@ function ApprovalsPage() {
     loadData();
   }, []);
 
-  // While the agent is still working on an approved application, refresh its status every 15 s.
-  const agentActive = Object.values(emailData.agent).some(isAgentApplyActive);
+  // While the agent is still working on an approved application, refresh its status every 15 s, or every 5 s
+  // while it waits for the security code (the code window is short and the next log row should show quickly).
+  const agentRows = Object.values(emailData.agent);
+  const agentActive = agentRows.some((r) => isAgentApplyActive(r));
+  const awaitingCode = pollIntervalMs(agentRows) === CODE_POLL_MS;
   useEffect(() => {
     if (!agentActive || isMockMode()) return;
     const t = window.setInterval(() => {
       loadEmailApplyData(history).then(setEmailData).catch(() => {});
-    }, 15_000);
+    }, awaitingCode ? CODE_POLL_MS : AGENT_POLL_MS);
     return () => window.clearInterval(t);
-  }, [agentActive, history]);
+  }, [agentActive, awaitingCode, history]);
+
+  // Sesudah backend menerima kode keamanan: baca status agen sekarang juga, tanpa menunggu putaran berikutnya.
+  const handleCodeSent = () => {
+    if (isMockMode()) return;
+    loadEmailApplyData(history).then(setEmailData).catch(() => {});
+  };
 
   // Sesudah pengguna menjawab pertanyaan agen dan backend menerima tugas ulang: tandai tugasnya menunggu
   // (supaya status berubah dan polling 15 detik jalan), lalu baca status sebenarnya dari database.
@@ -278,6 +289,9 @@ function ApprovalsPage() {
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentApplyStatus row={emailData.agent[request.id]} />
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />

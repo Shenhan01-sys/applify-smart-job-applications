@@ -20,6 +20,7 @@ import { getApplyState } from "@/services/formGapService";
 import AgentEvidence from "@/components/AgentEvidence";
 import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
+import { awaitingCodeState } from "@/lib/securityCode";
 import { questionsToAnswer } from "@/lib/formQuestions";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -540,6 +541,8 @@ export function AppsPage() {
   const selectedIssue = selectedOutcome && !selectedSent ? selectedOutcome : null;
   // Pertanyaan wajib yang belum bisa dijawab agen (percobaan terbaru, belum terkirim). Dijawab di halaman Persetujuan.
   const selectedQuestionCount = questionsToAnswer(selectedFacts).length;
+  // Agen menahan formulir karena situs lowongan mengirim kode keamanan ke email. Kodenya dimasukkan di halaman Persetujuan.
+  const selectedAwaitingCode = awaitingCodeState(selectedFacts).waiting;
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
@@ -771,7 +774,13 @@ export function AppsPage() {
                             <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
                           </p>
                         )}
-                        {!selectedIssue && <p className="text-sm text-muted-foreground">
+                        {selectedAwaitingCode && (
+                          <p data-testid="agent-code-link" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
+                            Agen menunggu kode keamanan dari emailmu. Masukkan di halaman{" "}
+                            <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
+                          </p>
+                        )}
+                        {!selectedIssue && !selectedAwaitingCode && <p className="text-sm text-muted-foreground">
                           {selectedFillYourself
                             ? // Agen tidak mengisi satu isian pun: lamaran belum terkirim, jadi jangan menulis bahwa formulir sudah dibuka dan diisi.
                               NO_FIELDS_FILLED_TEXT

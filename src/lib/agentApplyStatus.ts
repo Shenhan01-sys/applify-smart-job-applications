@@ -6,6 +6,7 @@ import {
   queueStatusHint,
 } from "./statusLabels.ts";
 import type { AgentLogFacts } from "./agentEvidence.ts";
+import { awaitingCodeState } from "./securityCode.ts";
 
 /**
  * Hasil tugas `apply` (agen pengisi formulir) untuk satu persetujuan, dibaca dari automation_queue
@@ -17,6 +18,8 @@ import type { AgentLogFacts } from "./agentEvidence.ts";
 export interface AgentApplyRow extends AgentLogFacts {
   status?: string | null;
   error_message?: string | null;
+  /** automation_queue.id tugas apply ini; dikirim ke backend bersama kode keamanan. */
+  queue_job_id?: string | null;
 }
 
 export type AgentApplyTone = "waiting" | "working" | "ready" | "sent" | "unverified" | "manual" | "failed" | "none";
@@ -49,6 +52,13 @@ export const AGENT_VALIDATION_HINT =
   "Formulir menolak pengiriman dan menampilkan pesan validasi. Tidak ada lamaran yang terkirim. Lengkapi data profilmu, lalu ajukan lagi.";
 
 export const AGENT_PARTIAL_LABEL = "Terisi sebagian, belum dikirim";
+
+export const AGENT_AWAITING_CODE_LABEL = "Menunggu kode keamanan";
+export const AGENT_AWAITING_CODE_HINT =
+  "Situs lowongan mengirim kode ke emailmu. Masukkan kodenya di bawah sebelum waktunya habis.";
+
+export const AGENT_CODE_TIMEOUT_LABEL = "Kode tidak dimasukkan";
+export const AGENT_CODE_TIMEOUT_HINT = "Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru.";
 
 const MAX_HINT_LABELS = 3;
 const MAX_HINT_LABEL_LENGTH = 70;
@@ -90,6 +100,9 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
   if (status === "incomplete" && (reason === "validation_failed" || facts.submit_check_verdict === "validation_error")) {
     return { label: AGENT_VALIDATION_LABEL, hint: AGENT_VALIDATION_HINT, tone: "manual", suggestEmail: true };
   }
+  if (status === "ready" && reason === "code_timeout") {
+    return { label: AGENT_CODE_TIMEOUT_LABEL, hint: AGENT_CODE_TIMEOUT_HINT, tone: "manual", suggestEmail: false };
+  }
   if (status === "ready" && blocked === "prior_unverified") {
     return { label: AGENT_PRIOR_UNVERIFIED_LABEL, hint: AGENT_PRIOR_UNVERIFIED_HINT, tone: "unverified", suggestEmail: false };
   }
@@ -104,7 +117,7 @@ function filledNothing(row: AgentApplyRow): boolean {
   return isQueueNeedsManual(row.status, "apply", row.fields_filled) || (row.log_status === "incomplete" && row.reason === "no_fields_filled");
 }
 
-export function describeAgentApply(row: AgentApplyRow | null | undefined): AgentApplyView {
+export function describeAgentApply(row: AgentApplyRow | null | undefined, now: number = Date.now()): AgentApplyView {
   if (!row || !row.status) {
     return { label: "Agen belum dijalankan", hint: AGENT_NOT_STARTED_HINT, tone: "none", suggestEmail: true };
   }
@@ -117,6 +130,10 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined): Agent
     case "pending":
       return { label: "Menunggu agen", hint: queueStatusHint(status, "apply", err, filled), tone: "waiting", suggestEmail: false };
     case "processing":
+      // Tombol kirim sudah ditekan dan situs meminta kode dari email: agen menunggu pengguna (log awaiting_code).
+      if (awaitingCodeState(row, now).waiting) {
+        return { label: AGENT_AWAITING_CODE_LABEL, hint: AGENT_AWAITING_CODE_HINT, tone: "waiting", suggestEmail: false };
+      }
       return { label: "Agen sedang mengisi formulir", hint: queueStatusHint(status, "apply", err, filled), tone: "working", suggestEmail: false };
     case "completed": {
       const outcome = describeLogOutcome(row);
@@ -146,6 +163,10 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined): Agent
   }
 }
 
-/** Tugas agen yang masih berjalan: halaman Persetujuan memuat ulang statusnya secara berkala. */
+/**
+ * Tugas agen yang masih berjalan: halaman Persetujuan memuat ulang statusnya secara berkala. Agen yang
+ * menunggu kode keamanan juga aktif (tugasnya masih processing), supaya muat ulang terus jalan sampai
+ * lamaran terkirim atau waktunya habis.
+ */
 export const isAgentApplyActive = (row: AgentApplyRow | null | undefined) =>
-  row?.status === "pending" || row?.status === "processing";
+  row?.status === "pending" || row?.status === "processing" || awaitingCodeState(row).waiting;

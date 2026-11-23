@@ -246,6 +246,20 @@ export const automationApi = {
     )
   },
 
+  /**
+   * Teruskan kode keamanan dari email ke agen yang menunggu (POST /api/agent/security-code).
+   * 202 { accepted: true }; 400 invalid_code | invalid_job, 401, 404, 409 agent_not_waiting, 429 too_many_codes,
+   * 503 feature_unavailable, 500 dilempar sebagai ApiError (lihat describeSecurityCodeError di securityCode.ts).
+   * Kode hanya ada di badan permintaan ini: tidak dicatat dan tidak disimpan.
+   */
+  async submitSecurityCode(queueJobId: string, code: string) {
+    return apiFetch<{ accepted: boolean }>(
+      `${apiBase()}/api/agent/security-code`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ queue_job_id: queueJobId, code }) },
+      () => ({ accepted: true }),
+    )
+  },
+
   async rejectApplication(id: string, reason?: string) {
     return apiFetch(
       `${apiBase()}/api/approvals/${id}/reject`,

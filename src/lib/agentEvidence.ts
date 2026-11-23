@@ -36,13 +36,13 @@ export interface AgentScreenshots {
 
 /** Fakta hasil percobaan agen yang dibaca dari log: dipakai kartu Persetujuan dan jendela detail Lamaran Saya. */
 export interface AgentLogFacts {
-  /** application_logs.status: success, ready, incomplete, submit_unverified, atau nilai lain dari worker. */
+  /** application_logs.status: success, ready, incomplete, submit_unverified, awaiting_code, atau nilai lain dari worker. */
   log_status?: string | null;
   /** details.submit_check.verdict: confirmed, validation_error, atau uncertain. */
   submit_check_verdict?: string | null;
   /** details.submit_check.confirmation_phrase: tulisan di halaman konfirmasi yang dikenali worker. */
   confirmation_phrase?: string | null;
-  /** details.reason, misalnya validation_failed atau no_fields_filled. */
+  /** details.reason, misalnya validation_failed, no_fields_filled, atau code_timeout (kode keamanan tidak dimasukkan tepat waktu). */
   reason?: string | null;
   /** details.submit_blocked: required_remaining, nothing_filled, prior_unverified, not_allowed, atau null. */
   submit_blocked?: string | null;
@@ -53,6 +53,13 @@ export interface AgentLogFacts {
    * Hanya bermakna bila percobaan itu belum terkirim; lihat questionsToAnswer di formQuestions.ts.
    */
   questions?: PendingQuestion[];
+  /**
+   * details.awaiting_until (ISO): batas waktu agen menunggu kode keamanan dari email. Hanya dibaca pada log
+   * berstatus awaiting_code; log lain tidak membawa kunci ini.
+   */
+  awaiting_until?: string | null;
+  /** details.code_length: panjang kode yang diharapkan (null bila tidak diketahui). Hanya pada log awaiting_code. */
+  code_length?: number | null;
   /** null atau undefined = log percobaan belum ada atau tidak terbaca */
   fields_filled?: number | null;
   filled_fields?: AgentFilledField[];
@@ -71,6 +78,11 @@ function cleanText(value: unknown, max: number): string | null {
 
 function cleanCount(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+}
+
+/** Waktu ISO yang terbaca Date.parse, apa adanya; selain itu null. */
+function cleanIso(value: unknown): string | null {
+  return typeof value === "string" && value.length <= 40 && !Number.isNaN(Date.parse(value)) ? value : null;
 }
 
 const KINDS: ReadonlySet<string> = new Set(["text", "select", "check", "upload"]);
@@ -142,6 +154,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     submit_check_verdict: check ? cleanText(check.verdict, 40) : null,
     confirmation_phrase: check ? cleanText(check.confirmation_phrase, 160) : null,
     reason: cleanText(details.reason, 40),
+    ...(row.status === "awaiting_code" ? { awaiting_until: cleanIso(details.awaiting_until), code_length: cleanCount(details.code_length) } : {}),
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
     questions: parseQuestions(details.questions),

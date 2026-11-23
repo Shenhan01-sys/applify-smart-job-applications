@@ -256,7 +256,7 @@ test("Lamaran Saya: bukti pengiriman untuk lamaran terkirim, bukti dari agen unt
   const detail = src.slice(src.indexOf("{selectedIssue && ("), src.indexOf("{selectedGaps && ("));
   assert.match(detail, /\{selectedIssue\.label\}/);
   assert.match(detail, /\{selectedIssue\.hint\}/);
-  assert.match(detail, /\{!selectedIssue && <p/);
+  assert.match(detail, /\{!selectedIssue && !selectedAwaitingCode && <p/);
   assert.match(detail, /berhenti sebelum tombol kirim/);
   // log dibaca untuk semua lamaran supaya bukti pengiriman juga ada di kolom Terkirim
   assert.match(src, /setAgentFacts\(facts\)/);
