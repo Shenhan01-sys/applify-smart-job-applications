@@ -35,7 +35,21 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
   const [email, setEmail] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
+  const [connectingGmail, setConnectingGmail] = useState(false);
   const [error, setError] = useState("");
+
+  const handleConnectGmail = async () => {
+    setConnectingGmail(true);
+    setError("");
+    try {
+      const url = await automationApi.startGmailOAuth();
+      if (url) window.location.assign(url);
+    } catch (e: any) {
+      setError(e?.message ?? "Gagal memulai koneksi Gmail.");
+    } finally {
+      setConnectingGmail(false);
+    }
+  };
 
   const state = getEmailApplyState(approval, { used, job, gmailConnected, applyEmail: email });
   if (!state.visible) return null;
@@ -127,7 +141,16 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
             ) : gmailConnected === false ? (
               <>
                 <span className="inline-flex items-center gap-1 text-amber-800"><AlertCircle className="h-3.5 w-3.5" /> Gmail belum terhubung.</span>
-                {user?.id && automationApi.getGmailConnectUrl(user.id) && <a href={automationApi.getGmailConnectUrl(user.id) ?? undefined} className="font-semibold text-[#0A5BE0] hover:underline">Hubungkan Gmail</a>}
+                {user?.id && (
+                  <button
+                    type="button"
+                    onClick={handleConnectGmail}
+                    disabled={connectingGmail}
+                    className="font-semibold text-[#0A5BE0] hover:underline disabled:opacity-60"
+                  >
+                    {connectingGmail ? "Membuka..." : "Hubungkan Gmail"}
+                  </button>
+                )}
               </>
             ) : (
               <span className="inline-flex items-center gap-1 text-muted-foreground"><AlertCircle className="h-3.5 w-3.5" /> Status Gmail tidak diketahui.</span>

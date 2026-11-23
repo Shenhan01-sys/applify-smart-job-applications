@@ -9,6 +9,7 @@ import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
 import AgentSecurityCode from "@/components/AgentSecurityCode";
 import AgentManualSubmit from "@/components/AgentManualSubmit";
+import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
@@ -312,6 +313,9 @@ function ApprovalsPage() {
                         onRerun={handleAgentRerun}
                         onMarked={handleManualMarked}
                       />
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={loadData} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <EmailApplyPanel

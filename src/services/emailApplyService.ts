@@ -96,7 +96,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const ids = approved.map((a) => a.id);
   const jobIds = [...new Set(approved.map((a) => a.job_id).filter((x): x is string => !!x))];
 
-  const [gmail, logs, queue, jobs, agent] = await Promise.all([
+  const [gmail, logs, queue, jobs, agent, claimRes] = await Promise.all([
     automationApi.getGmailStatus(),
     supabase.from("application_logs").select("details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
@@ -110,9 +110,15 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       console.warn("[agentApply] status unavailable:", err);
       return {} as Record<string, AgentApplyRow>;
     }),
+    automationApi.getApprovalClaimStatuses(ids).catch(() => ({ claims: {} })),
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;
+  for (const [aid, info] of Object.entries(claimRes?.claims ?? {})) {
+    if (!info || info.state === "none") continue;
+    const base = agent[aid] ?? { status: "completed", fields_filled: null };
+    agent[aid] = { ...base, claim_state: info.state, claim_channel: info.channel };
+  }
   data.agent = agent;
 
   if (logs.error) console.warn("[emailApply] used-check skipped:", logs.error.message);

@@ -7,6 +7,7 @@ import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
 import SavedAnswers from "@/components/SavedAnswers";
 import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
+import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
 import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -85,9 +86,9 @@ function SettingsPage() {
           </div>
         </Card>
 
-        <Card icon={Bell} title="Notifikasi" color="#8A9A00"
-          desc="Pengaturan notifikasi per jenis belum tersedia, jadi belum ada yang bisa diubah di sini.">
-          <div className="mt-4"><SoonButton icon={Bell}>Atur notifikasi</SoonButton></div>
+        <Card icon={Bell} title="Notifikasi (WhatsApp Kapso & Email)" color="#8A9A00"
+          desc="Terima kabar status lamaran, permintaan kode keamanan 2FA, dan pengingat follow-up lewat WhatsApp terverifikasi atau email.">
+          <NotificationSettingsCard />
         </Card>
 
         {/* Tagihan hanya tampil bila VITE_ENABLE_BILLING=true */}
