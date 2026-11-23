@@ -42,7 +42,7 @@ test("tidak ada model atau klaim yang tidak dipakai kode (GPT-4, Ultimate, 90% a
   }
 });
 
-test("model paket Free ada di kode: Gemini lalu Claude Haiku untuk draf; Gemma, Nemotron, Qwen, Groq sebagai cadangan", () => {
+test("model paket Free ada di kode: Claude Sonnet, Claude Haiku, lalu Gemini untuk draf; Gemma, Nemotron, Qwen, Groq sebagai cadangan", () => {
   assert.match(workerAi, /gemma-4-26b-a4b-it:free/);
   assert.match(workerAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(workerAi, /qwen\/qwen3\.8-27b:free/);
@@ -51,10 +51,11 @@ test("model paket Free ada di kode: Gemini lalu Claude Haiku untuk draf; Gemma, 
   assert.match(backendAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(backendAi, /qwen\/qwen3\.8-27b:free/);
   assert.match(backendAi, /GROQ_MODEL_FALLBACKS/);
-  // Edge Function: rantai draf ada di _shared/providers.ts (Gemini, lalu Claude Haiku, lalu model gratis OpenRouter).
-  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"gemini:gemini-3\.5-flash-lite,anthropic:claude-haiku-5-5,google\/gemma-4-31b-it:free/);
-  assert.match(PLAN_MODELS.free.models[0].name, /Gemini/);
+  // Edge Function: rantai draf ada di _shared/providers.ts (Claude Sonnet, Claude Haiku, Gemini, lalu model gratis OpenRouter).
+  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,gemini:gemini-3\.5-flash-lite,google\/gemma-4-31b-it:free,openrouter\/free"/);
+  assert.match(PLAN_MODELS.free.models[0].name, /Claude Sonnet/);
   assert.match(PLAN_MODELS.free.models[1].name, /Claude Haiku/);
+  assert.match(PLAN_MODELS.free.models[2].name, /Gemini/);
 
   const names = PLAN_MODELS.free.models.map((m) => m.name).join(" | ");
   for (const word of ["Gemma", "Nemotron", "Qwen", "Groq"]) assert.match(names, new RegExp(word));

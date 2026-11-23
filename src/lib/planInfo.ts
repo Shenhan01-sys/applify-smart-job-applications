@@ -39,8 +39,9 @@ export interface PlanModel {
 export const PLAN_MODELS: Record<"free" | "pro", { models: PlanModel[]; note: string }> = {
   free: {
     models: [
-      { name: "Gemini 3.5 Flash-Lite", role: "Utama", desc: "Model utama untuk draf surat lamaran (Google AI Studio)" },
-      { name: "Claude Haiku 5.5", role: "Cadangan", desc: "Dipakai untuk draf bila Gemini tidak menjawab (Anthropic)" },
+      { name: "Claude Sonnet 5.5", role: "Utama", desc: "Model utama untuk draf surat lamaran (Anthropic)" },
+      { name: "Claude Haiku 5.5", role: "Cadangan", desc: "Dipakai untuk draf bila Claude Sonnet 5.5 tidak menjawab (Anthropic)" },
+      { name: "Gemini 3.5 Flash-Lite", role: "Cadangan", desc: "Cadangan draf bila kedua model Claude tidak tersedia (Google AI Studio)" },
       { name: "Gemma 4 (26B, lalu 31B)", role: "Cadangan", desc: "Model gratis OpenRouter; utama untuk agen pengisi formulir dan backend" },
       { name: "NVIDIA Nemotron 3 Super", role: "Cadangan", desc: "Model gratis OpenRouter" },
       { name: "Qwen 3.8", role: "Cadangan", desc: "Model gratis OpenRouter untuk agen pengisi formulir dan backend" },

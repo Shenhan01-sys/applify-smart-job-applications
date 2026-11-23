@@ -38,15 +38,19 @@ test("penyedia: awalan gemini: dan anthropic: diarahkan ke endpoint masing-masin
 });
 
 test("penyedia: entri tanpa kunci dilewati dan urutan rantai dipertahankan", () => {
+  // Tanpa ANTHROPIC_API_KEY, kedua entri Claude di awal rantai Free dilewati.
   const chain = resolveChain(parseModelList(undefined, DEFAULT_FREE_MODELS), { openrouter: "or-key", gemini: "g-key" });
   assert.deepEqual(chain.map((c) => c.provider), ["gemini", "openrouter", "openrouter"]);
   assert.equal(resolveChain(["anthropic:claude-haiku-5-5"], {}).length, 0);
 });
 
-test("penyedia: rantai bawaan Free diawali Gemini lalu Claude, Pro diawali Gemini 4", () => {
+test("penyedia: rantai bawaan Free diawali Claude Sonnet 5.5 lalu Haiku 5.5, Pro diawali Gemini 4", () => {
   const free = parseModelList("", DEFAULT_FREE_MODELS);
-  assert.equal(free[0].startsWith("gemini:"), true);
-  assert.equal(free[1].startsWith("anthropic:"), true);
+  assert.deepEqual(free.slice(0, 2), ["anthropic:claude-sonnet-5-5", "anthropic:claude-haiku-5-5"]);
+  assert.equal(free[2], "gemini:gemini-3.5-flash-lite");
+  assert.deepEqual(free.slice(3), ["google/gemma-4-31b-it:free", "openrouter/free"]);
+  const withAll = resolveChain(free, { openrouter: "or-key", gemini: "g-key", anthropic: "a-key" });
+  assert.deepEqual(withAll.map((c) => c.provider), ["anthropic", "anthropic", "gemini", "openrouter", "openrouter"]);
   assert.equal(parseModelList(undefined, DEFAULT_PRO_MODELS)[0], "gemini:gemini-4-hydrogen");
   assert.deepEqual(parseModelList(" a , b ,, ", "x"), ["a", "b"]);
 });

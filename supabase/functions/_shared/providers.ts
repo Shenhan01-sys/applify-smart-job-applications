@@ -33,8 +33,11 @@ const ENDPOINTS: Record<ProviderName, string> = {
 };
 
 /** Rantai bawaan bila secret FREE_MODELS / PRO_MODELS tidak diisi. */
+// Free: Claude Sonnet 5.5 dicoba lebih dulu, lalu Claude Haiku 5.5, karena Gemini gratis sering membalas 429/503
+// sehingga pengguna melihat pesan AI sibuk (keputusan Hans, 23 Nov 2026). Gemini, Gemma, dan openrouter/free
+// tetap menjadi cadangan. Entri Claude dilewati bila ANTHROPIC_API_KEY tidak ada.
 export const DEFAULT_FREE_MODELS =
-  "gemini:gemini-3.5-flash-lite,anthropic:claude-haiku-5-5,google/gemma-4-31b-it:free,openrouter/free";
+  "anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,gemini:gemini-3.5-flash-lite,google/gemma-4-31b-it:free,openrouter/free";
 // Pro: Gemini 4 menggantikan DeepSeek V4 atas keputusan Hans (19 Nov 2026). Uji coba 19 Nov: gemini-4-argon
 // menolak dengan 429 (kuota free tier 0, butuh billing), gemini-4-hydrogen 503 karena permintaan tinggi.
 // Karena itu Claude Sonnet 5.5 dan Haiku 5.5 (sudah terbukti menjawab) tetap jadi cadangan.
