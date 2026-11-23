@@ -78,6 +78,7 @@ test("fitur tanpa handler berlabel Segera hadir di Pengaturan, bukan tombol yang
   const src = read("../src/routes/settings.tsx");
   assert.match(src, /Segera hadir/);
   assert.doesNotMatch(src, /Install untuk Chrome|Riwayat Tagihan|Golden Window/);
-  assert.match(src, /Lanjutan \(opsional\)/);
-  assert.match(src, /to="\/linkedin-session"/);
+  // Sesi LinkedIn disembunyikan (23 Nov 2026): tidak ada tautan dari Pengaturan, dan rutenya dialihkan.
+  assert.doesNotMatch(src, /to="\/linkedin-session"/);
+  assert.match(read("../src/routes/linkedin-session.tsx"), /throw redirect\(\{ to: "\/settings" \}\)/);
 });

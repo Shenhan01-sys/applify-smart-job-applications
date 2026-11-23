@@ -5,7 +5,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
-import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, Linkedin, ChevronRight, Loader2, ShieldAlert } from "lucide-react";
+import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2 } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -108,22 +108,6 @@ function SettingsPage() {
           </div>
         </Card>
 
-        {/* Fitur lanjutan: dikeluarkan dari menu utama karena berisiko dan tidak dibutuhkan untuk fitur inti */}
-        <Card icon={Linkedin} title="Lanjutan (opsional): Sesi LinkedIn" color="#0A66C2"
-          desc="Hanya untuk pengguna yang paham risikonya. Fitur inti Applify tidak membutuhkan ini.">
-          <p className="mt-3 flex items-start gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              Memasukkan cookie LinkedIn memberi agen akses ke akun LinkedIn-mu seolah-olah kamu sendiri. Cara ini bisa melanggar
-              ketentuan LinkedIn dan berisiko akunmu dibatasi. Cookie disimpan terenkripsi, tetapi tetap perlakukan seperti kata sandi.
-            </span>
-          </p>
-          <div className="mt-3">
-            <Link to="/linkedin-session" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">
-              Buka pengaturan sesi LinkedIn <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </Card>
       </div>
     </AppShell>
   );

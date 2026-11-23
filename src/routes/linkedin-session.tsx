@@ -14,10 +14,11 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/linkedin-session")({
+  // Disembunyikan sejak 23 November 2026: cookie li_at tidak dipakai pencarian maupun pengisian formulir, dan
+  // memakainya dari server berisiko akun LinkedIn pengguna dibatasi. Tautan dari Pengaturan sudah dihapus; alamat
+  // langsung dialihkan ke Pengaturan. Kodenya dibiarkan agar mudah diaktifkan lagi bila kebijakan berubah.
   beforeLoad: async () => {
-    if (isMockMode()) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    throw redirect({ to: "/settings" });
   },
   head: () => ({ meta: [{ title: "Sesi LinkedIn (Lanjutan) — Applify" }] }),
   component: LinkedInSessionPage,
