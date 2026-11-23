@@ -143,17 +143,20 @@ test("service getApplyState/getFormGaps: membaca application_logs milik pengguna
   assert.match(svc, /\.limit\(500\)/);
   assert.match(svc, /if \(error\) throw error/);
   assert.match(svc, /import \{ isMockMode \} from "@\/lib\/appConfig"/);
-  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{ gaps: \{\}, attempts: \{\} \}/);
+  // Diperluas (bukti agen): hasilnya kini juga memuat agentFacts, kosong di mode demo.
+  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{ gaps: \{\}, attempts: \{\}, agentFacts: \{\} \}/);
   // satu kueri untuk kekurangan dan percobaan terbaru
   assert.equal([...svc.matchAll(/\.from\("application_logs"\)/g)].length, 1);
   // pencocokan lewat job_id (application_id di baris log kosong), bukan application_id
   assert.doesNotMatch(svc, /\.eq\("application_id"/);
 });
 
-test("Lamaran Saya: hasil percobaan dimuat tanpa memblokir, untuk lamaran draf dan ready, gagal hanya console.warn", () => {
+test("Lamaran Saya: hasil percobaan dimuat tanpa memblokir, untuk semua lamaran yang punya lowongan, gagal hanya console.warn", () => {
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /import \{ getApplyState \} from "@\/services\/formGapService"/);
-  assert.match(src, /canRequestApproval\(a\.status\) && a\.job_id/);
+  // Diperluas (bukti pengiriman): log dibaca untuk semua lamaran, bukan hanya draf dan ready. Lencana dan daftar
+  // kekurangan tetap dijaga per status di kartu dan jendela detail.
+  assert.match(src, /applications\.filter\(\(a\) => a\.job_id\)\.map\(\(a\) => a\.job_id\)/);
   const effect = src.slice(src.indexOf("getApplyState(agentJobKey"), src.indexOf("}, [agentJobKey, applyReloads]);"));
   assert.match(effect, /\.catch\(\(err\) => \{\s*console\.warn\(/);
   assert.doesNotMatch(effect, /toast|setLoadError/);

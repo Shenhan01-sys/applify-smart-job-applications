@@ -17,6 +17,9 @@ import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
+import AgentEvidence from "@/components/AgentEvidence";
+import { describeLogOutcome } from "@/lib/agentApplyStatus";
+import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -253,9 +256,12 @@ export function AppsPage() {
   const [approvalError, setApprovalError] = useState("");
   // Isian wajib yang masih kosong saat agen berhenti, per job_id. Hanya untuk lamaran berstatus ready.
   const [formGaps, setFormGaps] = useState<Record<string, FormGaps>>({});
-  // Percobaan agen terbaru per job_id (draf dan ready), apa pun hasilnya: dasar lencana "Isi sendiri di situs"
+  // Percobaan agen terbaru per job_id, apa pun hasilnya: dasar lencana "Isi sendiri di situs"
   // dan teks di jendela detail. Naik satu setiap kali tugas apply selesai, supaya log baru dibaca lagi.
   const [attempts, setAttempts] = useState<Record<string, ApplyAttempt>>({});
+  // Fakta percobaan agen terbaru per job_id (hasil kirim, isian yang diisi, jalur tangkapan layar) untuk blok
+  // "Bukti dari agen" di jendela detail. Dibaca dari log yang sama dengan `attempts`.
+  const [agentFacts, setAgentFacts] = useState<Record<string, AgentLogFacts>>({});
   const [applyReloads, setApplyReloads] = useState(0);
   // Skill profil untuk menyaring "Skill yang Disorot" saat ditampilkan: draf lama (dibuat sebelum penyaringan di
   // Edge Function) masih memuat skill lowongan yang tidak ada di profil (temuan 30, uji klik 21 November 2026).
@@ -384,31 +390,36 @@ export function AppsPage() {
     }
   }, []);
 
-  // Lamaran draf dan ready: ambil hasil percobaan agen dari log (kekurangan isian, dan apakah agen tidak
-  // mengisi apa pun). Tidak memblokir halaman; bila gagal, lencana dan daftar kekurangan tidak tampil dan halaman
-  // tetap berfungsi. Kuncinya berubah juga saat kartu dipindah ke atau dari kolom itu, jadi data ikut diperbarui.
+  // Semua lamaran yang punya lowongan: ambil hasil percobaan agen dari log (kekurangan isian, apakah agen tidak
+  // mengisi apa pun, dan bukti pengiriman untuk lamaran yang sudah terkirim). Tidak memblokir halaman; bila gagal,
+  // lencana, daftar kekurangan, dan bukti tidak tampil dan halaman tetap berfungsi. Lencana dan daftar kekurangan
+  // tetap hanya untuk draf dan ready (dijaga di tempat pemakaiannya). Kuncinya berubah juga saat kartu dipindah
+  // antarkolom, jadi data ikut diperbarui.
   const agentJobKey = useMemo(
-    () => [...new Set(applications.filter((a) => canRequestApproval(a.status) && a.job_id).map((a) => a.job_id))].sort().join(","),
+    () => [...new Set(applications.filter((a) => a.job_id).map((a) => a.job_id))].sort().join(","),
     [applications],
   );
   useEffect(() => {
     if (!agentJobKey) {
       setFormGaps({});
       setAttempts({});
+      setAgentFacts({});
       return;
     }
     let alive = true;
     getApplyState(agentJobKey.split(","))
-      .then(({ gaps, attempts: latest }) => {
+      .then(({ gaps, attempts: latest, agentFacts: facts }) => {
         if (!alive) return;
         setFormGaps(gaps);
         setAttempts(latest);
+        setAgentFacts(facts);
       })
       .catch((err) => {
         console.warn("Hasil percobaan agen belum bisa dimuat:", err);
         if (alive) {
           setFormGaps({});
           setAttempts({});
+          setAgentFacts({});
         }
       });
     return () => {
@@ -519,6 +530,13 @@ export function AppsPage() {
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
   const selectedAttempt = selectedApp ? attemptOf(selectedApp) : undefined;
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
+  // Hasil percobaan agen terbaru untuk lamaran ini (hanya percobaan sesudah lamaran dibuat, lihat attemptForApplication).
+  const selectedFacts = selectedApp && selectedAttempt ? agentFacts[selectedApp.job_id] : undefined;
+  const selectedOutcome = describeLogOutcome(selectedFacts);
+  // Terkirim menurut log: agen menekan kirim dan halaman konfirmasi terdeteksi. Hanya ini yang disebut "Bukti pengiriman".
+  const selectedSent = selectedOutcome?.tone === "sent";
+  // Hasil lain (kirim belum terkonfirmasi, ditolak formulir, terisi sebagian) menggantikan teks "berhenti sebelum tombol kirim".
+  const selectedIssue = selectedOutcome && !selectedSent ? selectedOutcome : null;
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
@@ -735,7 +753,16 @@ export function AppsPage() {
                       </>
                     ) : (
                       <>
-                        <p className="text-sm text-muted-foreground">
+                        {selectedIssue && (
+                          <div
+                            data-testid="agent-outcome"
+                            className={`rounded-xl p-3 text-sm space-y-1 ${selectedIssue.tone === "unverified" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#F5F5F5]"}`}
+                          >
+                            <p className="font-semibold">{selectedIssue.label}</p>
+                            <p>{selectedIssue.hint}</p>
+                          </div>
+                        )}
+                        {!selectedIssue && <p className="text-sm text-muted-foreground">
                           {selectedFillYourself
                             ? // Agen tidak mengisi satu isian pun: lamaran belum terkirim, jadi jangan menulis bahwa formulir sudah dibuka dan diisi.
                               NO_FIELDS_FILLED_TEXT
@@ -746,7 +773,7 @@ export function AppsPage() {
                                 : // Ready lewat Ubah status, atau percobaan agen tidak tercatat: tidak ada bukti agen mengisi formulir.
                                   "Draf ini ditandai siap dikirim, tetapi belum ada catatan bahwa agen berhasil mengisi formulirnya. Kirim sendiri di situs lowongan, atau ajukan lagi supaya agen mencoba mengisi formulir."
                               : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}
-                        </p>
+                        </p>}
                         {selectedGaps && (
                           <div className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E] space-y-2">
                             <p id="detail-form-gaps-heading" className="font-semibold">Isian wajib yang masih kosong saat agen berhenti:</p>
@@ -796,6 +823,17 @@ export function AppsPage() {
                         </button>
                       </>
                     )}
+                  </div>
+                )}
+
+                {selectedFacts && (selectedSent || hasAgentEvidence(selectedFacts)) && (
+                  <div data-testid="agent-proof" className="rounded-xl border-2 border-[#16150F]/10 p-4 space-y-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+                      {selectedSent ? "Bukti pengiriman" : "Bukti dari agen"}
+                    </h3>
+                    {selectedSent && selectedOutcome && <p className="text-sm text-muted-foreground">{selectedOutcome.hint}</p>}
+                    <AgentEvidence screenshots={selectedFacts.screenshots} filledFields={selectedFacts.filled_fields} loggedAt={selectedFacts.logged_at} />
                   </div>
                 )}
 
