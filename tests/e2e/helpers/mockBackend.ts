@@ -145,6 +145,8 @@ export class MockBackend {
     if (method === "GET" && path === "/api/approvals/pending") return route.fulfill(json(200, s.pending));
     if (method === "GET" && path === "/api/approvals/history") return route.fulfill(json(200, s.history));
     if (method === "GET" && path === "/api/oauth/status") return route.fulfill(json(200, { gmail: s.gmail }));
+    // v2: halaman Persetujuan menanyakan status klaim kirim untuk banner klaim macet. Tidak ada klaim macet di fixture.
+    if (method === "POST" && path === "/api/approvals/claim-statuses") return route.fulfill(json(200, { claims: {} }));
 
     const detail = path.match(/^\/api\/approvals\/([^/]+)$/);
     if (method === "GET" && detail) {
