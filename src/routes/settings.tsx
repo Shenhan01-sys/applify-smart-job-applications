@@ -5,7 +5,8 @@ import { ErrorState } from "@/components/ErrorState";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
-import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2 } from "lucide-react";
+import SavedAnswers from "@/components/SavedAnswers";
+import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -68,6 +69,11 @@ function SettingsPage() {
               </div>
             )}
           </div>
+        </Card>
+
+        <Card icon={ClipboardList} title="Jawaban formulir tersimpan" color="#0A5BE0"
+          desc="Jawaban yang kamu berikan untuk pertanyaan agen. Agen memakainya lagi saat menemui pertanyaan yang sama di lowongan lain.">
+          <SavedAnswers />
         </Card>
 
         <Card icon={Chrome} title="Ekstensi Browser" color="#0A5BE0"

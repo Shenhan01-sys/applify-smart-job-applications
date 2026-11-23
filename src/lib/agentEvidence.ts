@@ -1,4 +1,5 @@
 import { newestRow } from "./formGaps.ts";
+import { parseQuestions, type PendingQuestion } from "./formQuestions.ts";
 
 /**
  * Bukti dari agen pengisi formulir: isian yang diisi, tangkapan layar, hasil pemeriksaan tombol kirim.
@@ -47,6 +48,11 @@ export interface AgentLogFacts {
   submit_blocked?: string | null;
   /** details.remaining_required: label isian wajib yang belum terisi. */
   remaining_required?: string[];
+  /**
+   * details.questions: pertanyaan wajib yang tidak bisa dijawab agen dari profil, untuk dijawab pengguna.
+   * Hanya bermakna bila percobaan itu belum terkirim; lihat questionsToAnswer di formQuestions.ts.
+   */
+  questions?: PendingQuestion[];
   /** null atau undefined = log percobaan belum ada atau tidak terbaca */
   fields_filled?: number | null;
   filled_fields?: AgentFilledField[];
@@ -138,6 +144,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     reason: cleanText(details.reason, 40),
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
+    questions: parseQuestions(details.questions),
     fields_filled: cleanCount(details.fields_filled),
     filled_fields: cleanFilledFields(details.filled_fields),
     screenshots: cleanScreenshots(details.screenshots),

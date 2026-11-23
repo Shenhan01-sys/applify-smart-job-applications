@@ -50,6 +50,7 @@ test("agentLogFacts: baris confirmed dibaca lengkap", () => {
     reason: null,
     submit_blocked: null,
     remaining_required: [],
+    questions: [],
     fields_filled: 1,
     filled_fields: [{ label: "Email", kind: "text", value: "u1@contoh.test" }],
     screenshots: {
@@ -238,9 +239,9 @@ test("tautan tangkapan layar dibuat di peramban dengan sesi pengguna: bucket pri
     assert.doesNotMatch(src, /\.(insert|upsert|delete)\(|\.update\(\{/, `${rel} tidak boleh menulis`);
     assert.doesNotMatch(src, /\.upload\(|\.remove\(|\.move\(|\.copy\(/, `${rel} tidak boleh menulis ke Storage`);
   }
-  // lib murni: hanya mengimpor formGaps.ts (yang sendiri tanpa impor)
+  // lib murni: hanya mengimpor formGaps.ts dan formQuestions.ts (yang sendiri tanpa impor)
   const imports = [...read("../src/lib/agentEvidence.ts").matchAll(/^\s*import\s.*$/gm)].map((m) => m[0]);
-  assert.deepEqual(imports, ['import { newestRow } from "./formGaps.ts";']);
+  assert.deepEqual(imports, ['import { newestRow } from "./formGaps.ts";', 'import { parseQuestions, type PendingQuestion } from "./formQuestions.ts";']);
 });
 
 test("Lamaran Saya: bukti pengiriman untuk lamaran terkirim, bukti dari agen untuk lainnya, penjelasan hasil menggantikan teks berhenti sebelum kirim", () => {

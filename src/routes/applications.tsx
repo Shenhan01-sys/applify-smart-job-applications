@@ -20,6 +20,7 @@ import { getApplyState } from "@/services/formGapService";
 import AgentEvidence from "@/components/AgentEvidence";
 import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
+import { questionsToAnswer } from "@/lib/formQuestions";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -537,6 +538,8 @@ export function AppsPage() {
   const selectedSent = selectedOutcome?.tone === "sent";
   // Hasil lain (kirim belum terkonfirmasi, ditolak formulir, terisi sebagian) menggantikan teks "berhenti sebelum tombol kirim".
   const selectedIssue = selectedOutcome && !selectedSent ? selectedOutcome : null;
+  // Pertanyaan wajib yang belum bisa dijawab agen (percobaan terbaru, belum terkirim). Dijawab di halaman Persetujuan.
+  const selectedQuestionCount = questionsToAnswer(selectedFacts).length;
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
@@ -761,6 +764,12 @@ export function AppsPage() {
                             <p className="font-semibold">{selectedIssue.label}</p>
                             <p>{selectedIssue.hint}</p>
                           </div>
+                        )}
+                        {selectedQuestionCount > 0 && (
+                          <p data-testid="agent-questions-link" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
+                            Agen butuh jawabanmu untuk {selectedQuestionCount} pertanyaan. Jawab di halaman{" "}
+                            <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
+                          </p>
                         )}
                         {!selectedIssue && <p className="text-sm text-muted-foreground">
                           {selectedFillYourself

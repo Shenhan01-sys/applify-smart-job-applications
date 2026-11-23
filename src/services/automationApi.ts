@@ -233,6 +233,19 @@ export const automationApi = {
     )
   },
 
+  /**
+   * Re-queue the SAME approved apply job so the agent runs again with the user's saved form answers.
+   * 200 { success, queue_job_id }; 404, 409 (not approved, already sent or agent working), 410 expired,
+   * 422 no job, 429 too many reruns are thrown as ApiError (see describeRerunError).
+   */
+  async rerunApproval(id: string) {
+    return apiFetch<{ success: boolean; queue_job_id?: string }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/rerun`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}) },
+      () => ({ success: true, queue_job_id: `mock-queue-${id}` }),
+    )
+  },
+
   async rejectApplication(id: string, reason?: string) {
     return apiFetch(
       `${apiBase()}/api/approvals/${id}/reject`,

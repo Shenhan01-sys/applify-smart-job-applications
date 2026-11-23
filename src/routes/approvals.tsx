@@ -6,6 +6,7 @@ import { automationApi } from "@/services/automationApi";
 import ApprovalReviewModal from "@/components/ApprovalReviewModal";
 import EmailApplyPanel from "@/components/EmailApplyPanel";
 import AgentApplyStatus from "@/components/AgentApplyStatus";
+import AgentQuestions from "@/components/AgentQuestions";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
@@ -80,6 +81,12 @@ function ApprovalsPage() {
     }, 15_000);
     return () => window.clearInterval(t);
   }, [agentActive, history]);
+
+  // Sesudah pengguna menjawab pertanyaan agen dan backend menerima tugas ulang: tandai tugasnya menunggu
+  // (supaya status berubah dan polling 15 detik jalan), lalu baca status sebenarnya dari database.
+  const handleAgentRerun = (approvalId: string) => {
+    setEmailData((d) => ({ ...d, agent: { ...d.agent, [approvalId]: { ...d.agent[approvalId], status: 'pending', error_message: null } } }));
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -271,6 +278,9 @@ function ApprovalsPage() {
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentApplyStatus row={emailData.agent[request.id]} />
+                    )}
+                    {activeTab === 'history' && request.status === 'approved' && (
+                      <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <EmailApplyPanel
