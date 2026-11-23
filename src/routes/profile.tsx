@@ -40,6 +40,7 @@ import {
 } from "@/lib/profilePreferences";
 import { ExperienceEditor, EducationEditor, SkillsEditor, AchievementEditor } from "@/components/profile/ProfileEditors";
 import LinkedInImportCard from "@/components/profile/LinkedInImportCard";
+import ProfileDocumentsCard from "@/components/profile/ProfileDocumentsCard";
 import { applyProfilePatch, type CommitResult } from "@/lib/linkedinImport";
 import {
   achievementCategoryLabel,
@@ -621,7 +622,7 @@ function ProfilePage() {
           </div>
         </div>
 
-        {/* RIGHT: Live Preview + CV untuk dilampirkan (kartu CV tampil di semua langkah) */}
+        {/* RIGHT: Live Preview + CV untuk dilampirkan + dokumen tambahan (kartu tampil di semua langkah) */}
         <div className="space-y-6">
         <div className="glass rounded-2xl p-5 md:p-6">
           <div className="flex items-center justify-between mb-4">
@@ -763,6 +764,7 @@ function ProfilePage() {
           </div>
         </div>
         {user && <ResumeCard userId={user.id} />}
+        {user && <ProfileDocumentsCard userId={user.id} />}
         </div>
       </div>
     </AppShell>
@@ -971,7 +973,7 @@ function Step1Basic({ formData, setFormData, errors }: {
               id={`profile-${field.key}`}
               inputMode={field.type === 'number' ? 'numeric' : field.type === 'url' ? 'url' : field.type === 'email' ? 'email' : field.key === 'phone' ? 'tel' : undefined}
               aria-required={field.key === 'full_name' ? true : undefined}
-              aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : undefined}
+              aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : field.key === 'portfolio_url' ? 'profile-portfolio-hint' : undefined}
               type={field.type}
               value={formData[field.key] || ''}
               onChange={(e) => {
@@ -984,6 +986,7 @@ function Step1Basic({ formData, setFormData, errors }: {
               className="mt-1.5 w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%] aria-[invalid=true]:border-red-400 read-only:opacity-70 read-only:cursor-not-allowed"
             />
             {field.key === 'email' && <p id="profile-email-hint" className="mt-1 text-xs text-muted-foreground">Email akun login; tidak diubah dari halaman ini.</p>}
+            {field.key === 'portfolio_url' && <p id="profile-portfolio-hint" className="mt-1 text-xs text-muted-foreground">Opsional. Diisikan agen bila formulir lowongan menanyakan situs portofolio. Berkas portofolio diunggah di kartu Dokumen tambahan.</p>}
             {errors[field.key] && <p id={`profile-${field.key}-error`} className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}
           </div>
         );
