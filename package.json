@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "node --test \"tests/*.test.ts\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
+    "test:e2e": "playwright test",
+    "verify": "npm run typecheck && npm run test && npm run test:e2e && npm run build",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -72,6 +75,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
