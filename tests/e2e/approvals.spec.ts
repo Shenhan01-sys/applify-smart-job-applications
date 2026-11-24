@@ -656,6 +656,62 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
   });
 });
 
+test.describe("Persetujuan: ekstensi menunggu", () => {
+  const DEALLS_URL = "https://dealls.com/loker/backend-engineer~acme";
+
+  function seedDealls(backend: import("./helpers/mockBackend").MockBackend, queueOver: Record<string, unknown>) {
+    backend.state.history = [approvedApproval("apr-dl", { platform: "dealls", job_title: "Backend Engineer", company: "PT Dealls Mitra" })];
+    backend.state.jobs = [jobRow("job-apr-dl", { platform_source: "dealls", external_url: DEALLS_URL })];
+    backend.state.queue = [queueRow("queue-dl", "apr-dl", "pending", { job_type: "extension_apply", ...queueOver })];
+  }
+
+  test("tugas tertahan izin situs: kartu menyebut host dan langkahnya, bukan teks menunggu umum", async ({ app, backend }) => {
+    seedDealls(backend, {
+      error_message: "permission_required:dealls.com — Izin situs ATS belum diberikan di ekstensi.",
+      scheduled_at: new Date(Date.now() + 30_000).toISOString(),
+    });
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
+    const hint = app.getByTestId("extension-wait-hint");
+    await expect(hint).toHaveAttribute("data-wait-reason", "permission_required");
+    await expect(hint).toHaveText("Ekstensi perlu izin untuk membuka dealls.com. Buka panel ekstensi Applify lalu klik Izinkan dealls.com.");
+    await expect(app.getByText(/akan membuka tab latar belakang/)).toHaveCount(0);
+  });
+
+  test("baris lama dengan pesan tanpa kode tetap terbaca sebagai butuh izin, tanpa menyebut host", async ({ app, backend }) => {
+    seedDealls(backend, { error_message: "Izin situs ATS belum diberikan di ekstensi.", scheduled_at: new Date(Date.now() + 60_000).toISOString() });
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const hint = app.getByTestId("extension-wait-hint");
+    await expect(hint).toContainText("Ekstensi perlu izin untuk membuka situs lowongan ini.");
+    await expect(hint).toContainText("klik tombol Izinkan");
+  });
+
+  test("tugas jatuh tempo lebih dari lima menit tanpa disentuh: ekstensi belum aktif", async ({ app, backend }) => {
+    seedDealls(backend, { error_message: null, scheduled_at: isoAgo(12 * 60_000) });
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const hint = app.getByTestId("extension-wait-hint");
+    await expect(hint).toHaveAttribute("data-wait-reason", "no_extension_seen");
+    await expect(hint).toContainText("Belum ada ekstensi Applify yang aktif");
+    await expect(hint).toContainText("Isi otomatis di latar");
+  });
+
+  test("menunggu biasa (baru masuk antrean): teks lama dipertahankan tanpa sorotan", async ({ app, backend }) => {
+    seedDealls(backend, { error_message: null, scheduled_at: isoAgo(30_000) });
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
+    await expect(app.getByText(/Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif/)).toBeVisible();
+    await expect(app.getByTestId("extension-wait-hint")).toHaveCount(0);
+  });
+});
+
 test.describe("Persetujuan: email yang tidak dikirim karena mode uji", () => {
   function seedEmail(backend: import("./helpers/mockBackend").MockBackend, logs: Array<Record<string, any>>) {
     backend.state.history = [approvedApproval("apr-mail", { job_title: "Staf Admin", company: "PT Surat" })];

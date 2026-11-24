@@ -86,6 +86,7 @@ export function buildAgentApplyRows(queueRows: unknown, workerLogs: unknown, ext
       fields_filled: null,
       queue_job_id: String(row.id),
       ...(jobType ? { job_type: jobType } : {}),
+      ...(stringOrNull(row.scheduled_at) ? { scheduled_at: stringOrNull(row.scheduled_at) } : {}),
     };
     queueIdToApproval.set(String(row.id), approvalId);
   }

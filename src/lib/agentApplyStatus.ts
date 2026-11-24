@@ -6,6 +6,7 @@ import {
   queueStatusHint,
 } from "./statusLabels.ts";
 import type { AgentLogFacts } from "./agentEvidence.ts";
+import { describeExtensionWait, type ExtensionWaitReason } from "./extensionWaitReason.ts";
 import { safeJobUrl } from "./manualSubmit.ts";
 import { awaitingCodeState } from "./securityCode.ts";
 
@@ -36,6 +37,8 @@ export interface AgentApplyRow extends AgentLogFacts {
   job_type?: string | null;
   /** automation_queue.id tugas apply ini; dikirim ke backend bersama kode keamanan. */
   queue_job_id?: string | null;
+  /** automation_queue.scheduled_at: jatuh tempo yang terlewat jauh pada tugas ekstensi berarti tidak ada ekstensi aktif. */
+  scheduled_at?: string | null;
   /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
   claim_state?: "none" | "in_progress" | "submitted" | "abandoned" | "locked_stuck";
   claim_channel?: "worker" | "extension" | null;
@@ -49,6 +52,8 @@ export interface AgentApplyView {
   tone: AgentApplyTone;
   /** Agen tidak berhasil (gagal, dilewati, atau tanpa isian): jalur email layak ditawarkan sebagai cadangan. */
   suggestEmail: boolean;
+  /** Alasan tugas ekstensi tertahan (izin situs belum diberikan, atau tidak ada ekstensi aktif); kartu memberi hint-nya sorotan. */
+  waitReason?: ExtensionWaitReason;
 }
 
 export const AGENT_NOT_STARTED_HINT =
@@ -271,13 +276,16 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined, now: n
     return { label: "Dilewati", hint: queueStatusHint(status, jobType, err, filled), tone: "manual", suggestEmail: true };
   }
   switch (status) {
-    case "pending":
+    case "pending": {
+      const wait = describeExtensionWait({ ...row, job_type: jobType, status, error_message: err }, now);
       return {
         label: jobType === "extension_apply" ? "Menunggu Ekstensi Browser" : "Menunggu agen",
-        hint: queueStatusHint(status, jobType, err, filled),
+        hint: queueStatusHint(status, jobType, err, filled, null, { scheduledAt: row.scheduled_at, now }),
         tone: "waiting",
         suggestEmail: false,
+        ...(wait.extension_wait_reason ? { waitReason: wait.extension_wait_reason } : {}),
       };
+    }
     case "processing":
       if (row.log_status === "awaiting_login") {
         if (awaitingLoginState(row, now).waiting) {

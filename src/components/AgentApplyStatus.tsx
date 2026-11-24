@@ -61,7 +61,16 @@ export default function AgentApplyStatus({
           <ToneIcon tone={view.tone} /> {view.label}
         </span>
       </div>
-      {showHint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
+      {showHint && view.waitReason && (
+        <p
+          data-testid="extension-wait-hint"
+          data-wait-reason={view.waitReason}
+          className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+        >
+          {view.hint}
+        </p>
+      )}
+      {showHint && !view.waitReason && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
       {awaitingLoginState(row).waiting && (
         <div className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2" data-testid="login-tab-guide">
           <p className="text-xs leading-relaxed text-amber-900">{LOGIN_TAB_INSTRUCTION}</p>

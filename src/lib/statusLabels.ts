@@ -5,6 +5,7 @@
  */
 
 import { EMAIL_TEST_MODE_HINT, EMAIL_TEST_MODE_LABEL } from "./emailTestMode.ts";
+import { describeExtensionWait, extensionWaitHint } from "./extensionWaitReason.ts";
 
 /** approval_requests.status */
 export const APPROVAL_STATUS_LABEL: Record<string, string> = {
@@ -139,6 +140,8 @@ export function queueStatusHint(
   errorMessage?: string | null,
   fieldsFilled?: number | null,
   emailTestMode?: boolean | null,
+  /** `scheduled_at` baris antrean dan jam sekarang: hanya dipakai untuk mengenali ekstensi yang tidak aktif. */
+  wait?: { scheduledAt?: string | null; now?: number },
 ): string {
   if (isEmailTestMode(status, jobType, emailTestMode)) return EMAIL_TEST_MODE_HINT;
   if (isQueueSkipped(status, errorMessage)) {
@@ -146,10 +149,18 @@ export function queueStatusHint(
   }
   const isExt = jobType === "extension_apply";
   switch (status) {
-    case "pending":
+    case "pending": {
+      if (isExt) {
+        // Ekstensi sudah mencoba tetapi tertahan (izin situs), atau tidak ada ekstensi aktif: sebut penyebabnya.
+        const reason = extensionWaitHint(
+          describeExtensionWait({ job_type: jobType, status, error_message: errorMessage, scheduled_at: wait?.scheduledAt }, wait?.now),
+        );
+        if (reason) return reason;
+      }
       return isExt
         ? "Tugas sudah masuk antrean Ekstensi Browser. Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif."
         : "Tugas sudah masuk antrean. Agen akan mengerjakannya begitu gilirannya tiba; kamu tidak perlu melakukan apa-apa.";
+    }
     case "processing":
       return isExt
         ? "Ekstensi Browser sedang membuka atau mengisi formulir lamaran di tab perambanmu."
