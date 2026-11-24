@@ -308,7 +308,7 @@ test("isMissingAnswersTable: kode 42P01 dan PGRST205 atau pesan yang menyebut ta
   assert.equal(isMissingAnswersTable(null), false);
   assert.equal(isMissingAnswersTable(undefined), false);
   assert.equal(isMissingAnswersTable(500), false);
-  assert.equal(ANSWERS_TABLE_MISSING_TEXT, "Fitur jawaban tersimpan belum aktif di database.");
+  assert.equal(ANSWERS_TABLE_MISSING_TEXT, "Jawaban tersimpan belum tersedia.");
 });
 
 test("rerunStatusMessage: 404, 409, 410, 422, 429 punya pesan sendiri; status lain undefined", () => {

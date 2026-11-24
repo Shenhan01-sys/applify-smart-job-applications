@@ -41,7 +41,7 @@ const DOCUMENT_NOUN: Record<DocumentKind, string> = {
 };
 
 /** Pesan saat kolom baru belum ada di database (migrasi belum dijalankan). */
-export const DOCUMENTS_UNAVAILABLE = "Fitur dokumen tambahan belum aktif di database.";
+export const DOCUMENTS_UNAVAILABLE = "Dokumen tambahan belum tersedia.";
 
 const FILE_EXT = /\.(pdf|doc|docx)$/;
 

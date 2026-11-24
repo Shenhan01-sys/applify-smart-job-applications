@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Mail, MessageSquare, Send, ShieldAlert } from "lucide-react";
 import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
+import {
+  NOTIFICATIONS_UNAVAILABLE_TEXT,
+  NOTIFICATIONS_UNAVAILABLE_TITLE,
+  notificationsUnavailable,
+  whatsappStatusLabel,
+  whatsappUnavailable,
+} from "@/lib/notificationCard";
 
 const EVENT_LABELS: Array<{ key: "ready" | "submitted" | "awaiting_code" | "follow_up" | "locked_claim"; label: string }> = [
   { key: "ready", label: "Formulir terisi & siap ditinjau" },
@@ -12,7 +19,7 @@ const EVENT_LABELS: Array<{ key: "ready" | "submitted" | "awaiting_code" | "foll
 ];
 
 /**
- * Pengaturan kanal notifikasi per-user (WhatsApp via Kapso + verifikasi OTP 6 digit, dan Email transaksional).
+ * Pengaturan kanal notifikasi per-user (WhatsApp dengan verifikasi OTP 6 digit, dan email).
  *
  * Email notifikasi selalu dikirim ke email akun login dan tidak bisa diubah di sini (server menolak alamat dari
  * klien). Pesan galat berasal dari kode galat server lewat describeApiError; isi galat penyedia tidak pernah tampil.
@@ -20,6 +27,7 @@ const EVENT_LABELS: Array<{ key: "ready" | "submitted" | "awaiting_code" | "foll
 export function NotificationSettingsCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Fitur mati di sisi server (tabel belum siap): kartu hanya berkata "Belum tersedia".
   const [migrationPending, setMigrationPending] = useState(false);
   const [serverChannels, setServerChannels] = useState<{ telegram?: boolean; notificationsEnabled?: boolean; whatsappKapso?: boolean; email?: boolean }>({});
 
@@ -130,7 +138,7 @@ export function NotificationSettingsCard() {
     setNotice("");
     try {
       await automationApi.testWhatsappNotification();
-      setNotice("Pesan uji WhatsApp terkirim melalui Kapso.");
+      setNotice("Pesan uji WhatsApp terkirim. Cek WhatsApp-mu.");
     } catch (err) {
       setError(describeApiError(err, "Gagal mengirim pesan uji WhatsApp."));
     } finally {
@@ -142,26 +150,25 @@ export function NotificationSettingsCard() {
     return (
       <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        Memuat pengaturan kanal notifikasi...
+        Memuat pengaturan notifikasi...
       </div>
     );
   }
 
+  // Server mematikan fiturnya (saklar mati atau tabel belum siap): tidak ada formulir yang pasti gagal.
+  if (notificationsUnavailable({ migrationPending, notificationsEnabled: serverChannels.notificationsEnabled })) {
+    return (
+      <div role="status" data-testid="notifications-unavailable" className="mt-4 rounded-xl border border-black/[8%] bg-[#F7F6F2] p-3.5">
+        <p className="text-xs font-semibold text-[#16150F]">{NOTIFICATIONS_UNAVAILABLE_TITLE}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{NOTIFICATIONS_UNAVAILABLE_TEXT}</p>
+      </div>
+    );
+  }
+
+  const waUnavailable = whatsappUnavailable({ whatsappKapso: serverChannels.whatsappKapso });
+
   return (
     <div className="mt-4 space-y-4">
-      {migrationPending && (
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          Skema notifikasi multi-kanal (`user_notification_settings`) belum dijalankan di database production.
-          Preferensi tidak dapat disimpan sebelum migrasi SQL diterapkan.
-        </div>
-      )}
-
-      {serverChannels.notificationsEnabled === false && (
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          Pengiriman notifikasi sedang dinonaktifkan di server. Preferensi tetap bisa disimpan, tetapi kode OTP dan pesan
-          WhatsApp atau email baru dikirim setelah administrator mengaktifkannya.
-        </div>
-      )}
 
       {notice && (
         <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
@@ -176,12 +183,12 @@ export function NotificationSettingsCard() {
         </div>
       )}
 
-      {/* WhatsApp via Kapso */}
+      {/* WhatsApp */}
       <div className="rounded-xl border border-black/[8%] bg-[#F7F6F2] p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#16150F]">
             <MessageSquare className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-            WhatsApp (Kapso Cloud API)
+            WhatsApp
           </span>
           {waVerified ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -189,7 +196,7 @@ export function NotificationSettingsCard() {
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">
-              {serverChannels.whatsappKapso ? "Menunggu verifikasi nomor" : "Server Kapso opsional belum aktif"}
+              {whatsappStatusLabel({ whatsappKapso: serverChannels.whatsappKapso })}
             </span>
           )}
         </div>
@@ -202,6 +209,7 @@ export function NotificationSettingsCard() {
               setPhoneInput(e.target.value);
               setWaVerified(false);
             }}
+            disabled={waUnavailable}
             placeholder="+62812xxxxxxxx"
             aria-label="Nomor WhatsApp"
             className="flex-1 min-w-[180px] min-h-10 rounded-lg border border-[#999999] bg-white px-3 text-sm"
@@ -209,7 +217,7 @@ export function NotificationSettingsCard() {
           <button
             type="button"
             onClick={handleRequestOtp}
-            disabled={saving || migrationPending || serverChannels.notificationsEnabled === false || !phoneInput.trim()}
+            disabled={saving || waUnavailable || !phoneInput.trim()}
             className="min-h-10 px-3 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-60"
           >
             Kirim OTP WhatsApp
@@ -243,7 +251,7 @@ export function NotificationSettingsCard() {
             <input
               type="checkbox"
               checked={waEnabled}
-              disabled={!waVerified || migrationPending}
+              disabled={!waVerified || waUnavailable}
               onChange={(e) => setWaEnabled(e.target.checked)}
               className="h-4 w-4"
             />
@@ -253,7 +261,7 @@ export function NotificationSettingsCard() {
             <button
               type="button"
               onClick={handleTestWa}
-              disabled={saving || serverChannels.notificationsEnabled === false}
+              disabled={saving || waUnavailable}
               className="min-h-9 px-3 rounded-lg border border-black/15 bg-white text-xs font-medium hover:border-[#0A5BE0] inline-flex items-center gap-1"
             >
               <Send className="h-3.5 w-3.5" aria-hidden="true" /> Uji WhatsApp
@@ -269,7 +277,7 @@ export function NotificationSettingsCard() {
             <Mail className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
             Email Notifikasi Sistem
           </span>
-          <span className="text-xs text-muted-foreground">Terpisah dari OAuth Gmail kirim lamaran</span>
+          <span className="text-xs text-muted-foreground">Terpisah dari Gmail untuk kirim lamaran</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -285,7 +293,7 @@ export function NotificationSettingsCard() {
             <input
               type="checkbox"
               checked={emailEnabled && Boolean(accountEmail)}
-              disabled={migrationPending || !accountEmail}
+              disabled={!accountEmail}
               onChange={(e) => setEmailEnabled(e.target.checked)}
               className="h-4 w-4"
             />
@@ -308,7 +316,6 @@ export function NotificationSettingsCard() {
               <input
                 type="checkbox"
                 checked={Boolean(events[ev.key])}
-                disabled={migrationPending}
                 onChange={(e) => setEvents((prev) => ({ ...prev, [ev.key]: e.target.checked }))}
                 className="h-4 w-4"
               />
@@ -321,7 +328,7 @@ export function NotificationSettingsCard() {
       <button
         type="button"
         onClick={handleSavePrefs}
-        disabled={saving || migrationPending}
+        disabled={saving}
         className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 inline-flex items-center gap-2"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

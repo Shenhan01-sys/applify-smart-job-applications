@@ -31,7 +31,7 @@ test("batas, tipe, kolom, dan nama slot sama dengan migrasi dan bucket resumes",
   assert.deepEqual(DOCUMENT_COLUMN, { transcript: "transcript_url", portfolio: "portfolio_file_url" });
   assert.deepEqual(DOCUMENT_LABEL, { transcript: "Transkrip nilai", portfolio: "Portofolio (berkas)" });
   for (const ext of [".pdf", ".doc", ".docx"]) assert.ok(DOCUMENT_ACCEPT.includes(ext));
-  assert.equal(DOCUMENTS_UNAVAILABLE, "Fitur dokumen tambahan belum aktif di database.");
+  assert.equal(DOCUMENTS_UNAVAILABLE, "Dokumen tambahan belum tersedia.");
 });
 
 test("path objek: <user_id>/<jenis>-<waktu>.<ext>, ekstensi huruf kecil", () => {

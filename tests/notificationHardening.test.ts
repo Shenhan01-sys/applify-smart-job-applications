@@ -93,7 +93,7 @@ test("wiring: kartu notifikasi tidak mengirim emailAddress/Telegram dan menampil
   assert.doesNotMatch(card, /telegramChatId|telegramEnabled/);
   assert.match(card, /readOnly/);
   assert.match(card, /tidak bisa diubah/i);
-  assert.match(card, /notificationsEnabled === false/);
+  assert.match(card, /notificationsUnavailable\(/);
 
   const api = read("../src/services/automationApi.ts");
   assert.doesNotMatch(api, /telegramChatId|telegramEnabled/);

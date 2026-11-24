@@ -219,7 +219,7 @@ export function answersToRows(questions: readonly PendingQuestion[], answers: Re
 
 // ---- Pesan untuk pengguna ----
 
-export const ANSWERS_TABLE_MISSING_TEXT = "Fitur jawaban tersimpan belum aktif di database.";
+export const ANSWERS_TABLE_MISSING_TEXT = "Jawaban tersimpan belum tersedia.";
 export const RERUN_STARTED_TEXT = "Agen berjalan lagi dengan jawabanmu.";
 /** Jawaban untuk log Ekstensi Browser: tidak ada tugas worker yang dijalankan ulang, pengguna mengisi ulang dari panel ekstensi. */
 export const EXTENSION_ANSWERS_SAVED_TEXT =

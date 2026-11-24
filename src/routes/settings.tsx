@@ -93,8 +93,8 @@ function SettingsPage() {
           </div>
         </Card>
 
-        <Card icon={Bell} title="Notifikasi (WhatsApp Kapso & Email)" color="#8A9A00"
-          desc="Terima kabar status lamaran, permintaan kode keamanan 2FA, dan pengingat follow-up lewat WhatsApp terverifikasi atau email.">
+        <Card icon={Bell} title="Notifikasi WhatsApp" color="#8A9A00"
+          desc="Terima kabar status lamaran, permintaan kode keamanan, dan pengingat tindak lanjut lewat WhatsApp terverifikasi atau email.">
           <NotificationSettingsCard />
         </Card>
 
