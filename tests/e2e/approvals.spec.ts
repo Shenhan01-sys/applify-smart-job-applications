@@ -472,7 +472,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
 });
 
 test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
-  test("extension_apply awaiting_login menampilkan lencana Menunggu login dan tombol Buka tab login ke halaman lowongan (bukan host OAuth terpisah)", async ({ app, backend }) => {
+  test("extension_apply awaiting_login menampilkan lencana Menunggu login, petunjuk pindah ke tab ekstensi, dan tautan cadangan ke halaman lowongan (bukan host OAuth terpisah)", async ({ app, backend }) => {
     const jobUrl = "https://id.jobstreet.com/id/job/96011760";
     backend.state.history = [
       approvedApproval("apr-login", {
@@ -513,7 +513,11 @@ test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
     await expect(app.getByText("Menunggu login di tab browser").first()).toBeVisible();
     const openBtn = app.getByTestId("open-login-tab");
     await expect(openBtn).toBeVisible();
-    await expect(openBtn).toHaveText(/Buka tab login/);
+    // Petunjuk utama: pindah ke tab yang dibuka ekstensi. Tautan hanya cadangan.
+    await expect(app.getByTestId("login-tab-guide")).toContainText("Pindah ke tab itu");
+    await expect(app.getByTestId("login-tab-guide")).toContainText("tab latar belakang");
+    await expect(openBtn).toHaveText(/Buka halaman lowongan/);
+    await expect(openBtn).not.toHaveText(/Buka tab login/);
     await expect(openBtn).toHaveAttribute("href", jobUrl);
   });
 });

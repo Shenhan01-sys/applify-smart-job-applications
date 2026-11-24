@@ -88,6 +88,12 @@ export const AGENT_AWAITING_LOGIN_LABEL = "Menunggu login di tab browser";
 export const AGENT_AWAITING_LOGIN_HINT =
   "Ekstensi Browser membuka situs lowongan dan menunggu kamu masuk ke akun pelamar (maks. 15 menit). Selesai login, ekstensi otomatis lanjut mengisi formulir tanpa mengirim otomatis.";
 
+/** Petunjuk saat ekstensi menunggu login: tab-nya dibuka ekstensi di latar belakang, bukan tab baru dari Applify. */
+export const LOGIN_TAB_INSTRUCTION =
+  "Ekstensi sudah membuka situs lowongan di tab latar belakang (judul tabnya memakai nama situs lowongan). Pindah ke tab itu, lalu masuk ke akunmu di sana.";
+export const OPEN_JOB_PAGE_HINT = "Tab itu tidak ketemu? Buka halaman lowongannya sendiri:";
+export const OPEN_JOB_PAGE_LABEL = "Buka halaman lowongan";
+
 export const AGENT_LOGIN_TIMEOUT_LABEL = "Batas waktu login habis (belum terkirim)";
 export const AGENT_LOGIN_TIMEOUT_HINT =
   "Ekstensi Browser menunggu selama 15 menit tanpa login selesai. Masuk ke akunmu di situs lowongan lalu jalankan ulang.";
@@ -102,7 +108,7 @@ export function awaitingLoginState(row: AgentApplyRow | null | undefined, now: n
 }
 
 /**
- * Tautan aman untuk tombol "Buka tab login". Bila login_url berada di host OAuth eksternal (mis. login.seek.com),
+ * Tautan aman untuk tombol cadangan "Buka halaman lowongan". Bila login_url berada di host OAuth eksternal (mis. login.seek.com),
  * utamakan halaman lowongan asal (`jobUrl`) karena membuka URL OAuth tanpa state/nonce baru akan gagal di provider.
  */
 export function resolveLoginTabUrl(row: AgentApplyRow | null | undefined, jobUrl?: string | null): string | null {

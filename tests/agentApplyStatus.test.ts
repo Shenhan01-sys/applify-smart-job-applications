@@ -10,6 +10,8 @@ import {
   AGENT_SENT_EMAIL_NOTE,
   AGENT_UNVERIFIED_LABEL,
   AGENT_VALIDATION_LABEL,
+  LOGIN_TAB_INSTRUCTION,
+  OPEN_JOB_PAGE_LABEL,
   describeAgentApply,
   describeLogOutcome,
   isAgentApplyActive,
@@ -243,7 +245,14 @@ test("antrean ekstensi Fase 2 & jeda login (awaiting_login): status aktif, resol
   // Untuk host OAuth eksternal (login.seek.com), resolveLoginTabUrl mengutamakan halaman lowongan asal (`jobUrl`).
   const card = read("../src/components/AgentApplyStatus.tsx");
   assert.match(card, /data-testid="open-login-tab"/);
-  assert.match(card, /Buka tab login/);
+  assert.match(card, /OPEN_JOB_PAGE_LABEL/);
+  assert.doesNotMatch(card, /Buka tab login/);
+  assert.equal(OPEN_JOB_PAGE_LABEL, "Buka halaman lowongan");
+  // Petunjuk utama: pindah ke tab yang dibuka ekstensi (tab latar belakang berjudul nama situs), login di sana.
+  assert.match(LOGIN_TAB_INSTRUCTION, /tab latar belakang/);
+  assert.match(LOGIN_TAB_INSTRUCTION, /judul tabnya memakai nama situs/);
+  assert.match(LOGIN_TAB_INSTRUCTION, /Pindah ke tab itu/);
+  assert.match(card, /data-testid="login-tab-guide"/);
 
   // Timeout login: dari log incomplete login_timeout maupun processing yang deadline-nya terlewati.
   const timedOutLog = describeAgentApply({ status: "completed", job_type: "extension_apply", log_status: "incomplete", reason: "login_timeout" });

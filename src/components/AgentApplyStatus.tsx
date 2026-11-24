@@ -1,5 +1,14 @@
 import { AlertCircle, Bot, CheckCircle2, Clock, ExternalLink, Loader2, XCircle } from "lucide-react";
-import { awaitingLoginState, describeAgentApply, resolveLoginTabUrl, type AgentApplyRow, type AgentApplyTone } from "@/lib/agentApplyStatus";
+import {
+  LOGIN_TAB_INSTRUCTION,
+  OPEN_JOB_PAGE_HINT,
+  OPEN_JOB_PAGE_LABEL,
+  awaitingLoginState,
+  describeAgentApply,
+  resolveLoginTabUrl,
+  type AgentApplyRow,
+  type AgentApplyTone,
+} from "@/lib/agentApplyStatus";
 import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
@@ -53,17 +62,23 @@ export default function AgentApplyStatus({
         </span>
       </div>
       {showHint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
-      {openLoginUrl && (
-        <div className="mt-2">
-          <a
-            href={openLoginUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="open-login-tab"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition-colors"
-          >
-            Buka tab login <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          </a>
+      {awaitingLoginState(row).waiting && (
+        <div className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2" data-testid="login-tab-guide">
+          <p className="text-xs leading-relaxed text-amber-900">{LOGIN_TAB_INSTRUCTION}</p>
+          {openLoginUrl && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-900">
+              <span>{OPEN_JOB_PAGE_HINT}</span>
+              <a
+                href={openLoginUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="open-login-tab"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border-2 border-amber-300 bg-white px-3 py-1.5 font-semibold hover:bg-amber-100 transition-colors"
+              >
+                {OPEN_JOB_PAGE_LABEL} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            </p>
+          )}
         </div>
       )}
       {documents && (
