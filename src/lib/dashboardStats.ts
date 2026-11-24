@@ -25,7 +25,7 @@ export interface DashStats {
   drafts: number;
   /** status ready only, the same rows as the "Siap dikirim" column of the board */
   ready: number;
-  /** submitted, follow_up, responded, or closed after it was submitted */
+  /** isApplicationSent(): submitted, follow_up, responded, or closed after it was submitted */
   sent: number;
   /** submitted and past its follow-up date (status follow_up) */
   followUp: number;
@@ -57,14 +57,56 @@ export function groupByStatus<T extends { status?: string | null }>(rows: Readon
   return groups;
 }
 
+/** Statuses that only exist after the application was sent. */
+const SENT_STATUSES: ReadonlySet<string> = new Set(["submitted", "follow_up", "responded"]);
+
+/**
+ * THE one rule for "terkirim" (sent). The counters, the board card, the list row and the detail window of
+ * Lamaran Saya, and the Dashboard all call this, so they cannot disagree.
+ *
+ * The truth is `ai_applications.status`, which the worker, the extension and the backend only move to
+ * `submitted` after a confirmed send (or after the user marked it sent). Things that are NOT a send:
+ *  - an approval with status `approved` ("Disetujui"): the user allowed the agent, nothing left yet;
+ *  - the agent filling the form and stopping before the submit button: the row stays `ready`;
+ *  - a stale `submitted_at` on a `draft` or `ready` row (the user moved the card back): the status wins.
+ * `closed` is sent only when the application was submitted before it was closed.
+ */
+export function isApplicationSent(row: { status?: string | null; submitted_at?: string | null } | null | undefined): boolean {
+  if (!row) return false;
+  if (SENT_STATUSES.has(row.status as string)) return true;
+  if (row.status === "closed") return typeof row.submitted_at === "string" && row.submitted_at.trim() !== "";
+  return false;
+}
+
+/** Whole days since `iso`, never negative; null for a missing or invalid date. */
+function daysSince(iso: string | null | undefined, now: Date): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((now.getTime() - t) / 86400000));
+}
+
+export const NOT_SENT_NOTE = "Belum dikirim";
+
+/**
+ * Footer text of a board card. Derived from `isApplicationSent`, not from `submitted_at` alone: a draft with a stale
+ * `submitted_at` says "Belum dikirim", and a sent row without a timestamp says "Terkirim" (never "Belum dikirim").
+ */
+export function applicationSentNote(row: { status?: string | null; submitted_at?: string | null } | null | undefined, now: Date = new Date()): string {
+  if (!isApplicationSent(row)) return NOT_SENT_NOTE;
+  const days = daysSince(row?.submitted_at, now);
+  if (days === null) return "Terkirim (waktu tidak tercatat)";
+  return days === 0 ? "Terkirim hari ini" : `Terkirim ${days} hari lalu`;
+}
+
 export function summarizeApplications(rows: ReadonlyArray<DashApplication> | null | undefined): DashStats {
   const g = groupByStatus(rows);
+  const known = APPLICATION_STATUS_VALUES.flatMap((s) => g[s]);
   return {
-    total: APPLICATION_STATUS_VALUES.reduce((n, s) => n + g[s].length, 0),
+    total: known.length,
     drafts: g.draft.length,
     ready: g.ready.length,
-    // closed counts as sent only when it was submitted first
-    sent: g.submitted.length + g.follow_up.length + g.responded.length + g.closed.filter((r) => r.submitted_at).length,
+    sent: known.filter((r) => isApplicationSent(r)).length,
     followUp: g.follow_up.length,
     responded: g.responded.length,
   };

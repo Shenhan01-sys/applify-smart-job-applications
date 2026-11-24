@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
-import { groupByStatus, summarizeApplications } from "@/lib/dashboardStats";
+import { applicationSentNote, groupByStatus, isApplicationSent, summarizeApplications } from "@/lib/dashboardStats";
 import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
@@ -79,7 +79,6 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
   closed: { color: "bg-[#6B6B6B] text-white", icon: X },
 };
 
-const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 const jobOf = (app: AIApplicationData) => (app as any).jobs as { title?: string; company?: string; platform_source?: string | null; external_url?: string | null } | undefined;
 
 // Persetujuan untuk draf yang dibuka di jendela detail: belum diperiksa, sedang diperiksa, belum ada, sudah menunggu,
@@ -136,7 +135,7 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
         <DuplicateNote info={duplicate} className="mt-1 leading-snug" />
         <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" aria-hidden="true" />
-          {app.submitted_at ? `${daysAgo(app.submitted_at)} hari lalu` : "Belum dikirim"}
+          {applicationSentNote(app)}
         </div>
         {app.status === "ready" && gaps && (
           <div className="mt-2">
@@ -229,12 +228,10 @@ function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen 
       </div>
       <div className="hidden md:flex items-center gap-4 text-xs">
         <span className={`px-2.5 py-1 rounded-full font-medium ${config.color}`}>{applicationStatusLabel(app.status)}</span>
-        {app.submitted_at && (
-          <span className="text-muted-foreground inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" aria-hidden="true" />
-            {daysAgo(app.submitted_at)} hari lalu
-          </span>
-        )}
+        <span className="text-muted-foreground inline-flex items-center gap-1">
+          <Clock className="h-3 w-3" aria-hidden="true" />
+          {applicationSentNote(app)}
+        </span>
       </div>
     </button>
   );
@@ -595,14 +592,16 @@ export function AppsPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
-              { l: "Total Lamaran", v: stats.total },
-              { l: "Terkirim", v: stats.sent },
-              { l: "Tindak Lanjut", v: stats.followUp },
-              { l: "Sudah Dibalas", v: stats.responded },
+              { l: "Total Lamaran", v: stats.total, hint: "" },
+              // Terkirim = isApplicationSent(): kolom Terkirim ditambah yang sudah pindah ke Tindak Lanjut, Dibalas, atau Ditutup.
+              { l: "Terkirim", v: stats.sent, hint: stats.sent > groupedApps.submitted.length ? `${groupedApps.submitted.length} di kolom Terkirim, sisanya sudah pindah kolom` : "" },
+              { l: "Tindak Lanjut", v: stats.followUp, hint: "" },
+              { l: "Sudah Dibalas", v: stats.responded, hint: "" },
             ].map((s) => (
               <div key={s.l} className="rounded-xl border-2 border-[#999999] bg-white p-4">
                 <p className="text-xs font-medium text-muted-foreground">{s.l}</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums">{s.v}</p>
+                {s.hint && <p className="mt-0.5 text-xs text-muted-foreground">{s.hint}</p>}
               </div>
             ))}
           </div>
@@ -724,7 +723,7 @@ export function AppsPage() {
                     {applicationStatusLabel(selectedApp.status)}
                   </span>
                   {selectedFillYourself && <FillYourselfBadge />}
-                  {selectedApp.submitted_at && (
+                  {isApplicationSent(selectedApp) && selectedApp.submitted_at && (
                     <span className="text-xs text-muted-foreground">
                       Dikirim {new Date(selectedApp.submitted_at).toLocaleDateString("id-ID")}
                     </span>

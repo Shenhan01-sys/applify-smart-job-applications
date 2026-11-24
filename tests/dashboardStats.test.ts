@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { groupByStatus, recentActivity, relativeTime, summarizeApplications, STATUS_LABEL, APPLICATION_STATUS_VALUES, type DashApplication } from "../src/lib/dashboardStats.ts";
+import { applicationSentNote, groupByStatus, isApplicationSent, recentActivity, relativeTime, summarizeApplications, NOT_SENT_NOTE, STATUS_LABEL, APPLICATION_STATUS_VALUES, type DashApplication } from "../src/lib/dashboardStats.ts";
 import { APPLICATION_STATUS_LABEL } from "../src/lib/statusLabels.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -36,7 +36,7 @@ test("hitungan per status: draf dan siap dihitung terpisah; submitted, follow_up
 test("Lamaran Saya memakai hitungan Beranda: kartu Terkirim = summarizeApplications().sent, bukan hanya kolom Terkirim", () => {
   const src = readFileSync(new URL("../src/routes/applications.tsx", import.meta.url), "utf8");
   assert.match(src, /const stats = summarizeApplications\(applications\)/);
-  assert.match(src, /\{ l: "Terkirim", v: stats\.sent \}/);
+  assert.match(src, /\{ l: "Terkirim", v: stats\.sent,/);
   assert.doesNotMatch(src, /stats\.submitted/);
   // Arti yang sama: follow_up dan responded ikut terkirim, closed hanya bila pernah dikirim.
   const s = summarizeApplications([
@@ -192,10 +192,66 @@ test("label status di Beranda sama dengan label kolom papan Lamaran Saya", () =>
 
 test("papan Lamaran Saya dan Beranda memakai fungsi pengelompokan yang sama", () => {
   const board = read("../src/routes/applications.tsx");
-  assert.match(board, /import \{ groupByStatus, summarizeApplications \} from "@\/lib\/dashboardStats"/);
+  assert.match(board, /import \{[^}]*\bgroupByStatus\b[^}]*\bsummarizeApplications\b[^}]*\} from "@\/lib\/dashboardStats"/);
   assert.match(board, /groupedApps[^=]*= groupByStatus\(applications\)/);
   const page = read("../src/routes/dashboard.tsx");
   assert.match(page, /summarizeApplications\(applications\)/);
   assert.match(page, /ready=\{stats\.ready\}/);
   assert.match(page, /lamaran siap dikirim/);
+});
+
+// Uji E2E 24 November 2026: penghitung "3 terkirim" tidak sejalan dengan kolom Terkirim dan lencana baris.
+// Satu aturan (isApplicationSent) sekarang dipakai penghitung, kartu, baris daftar, dan jendela detail.
+const NOW = new Date("2026-11-24T12:00:00.000Z");
+
+test("isApplicationSent: hanya status terkirim yang dihitung; draf dan siap dikirim tidak, walau submitted_at tersisa", () => {
+  for (const status of ["submitted", "follow_up", "responded"]) assert.equal(isApplicationSent({ status, submitted_at: null }), true, status);
+  for (const status of ["draft", "ready"]) {
+    assert.equal(isApplicationSent({ status, submitted_at: null }), false, status);
+    // baris produksi: draf yang pernah dikirim lalu dipindah balik masih membawa submitted_at
+    assert.equal(isApplicationSent({ status, submitted_at: "2026-11-21T06:11:52.674Z" }), false, `${status} dengan submitted_at tersisa`);
+  }
+  assert.equal(isApplicationSent({ status: "closed", submitted_at: null }), false);
+  assert.equal(isApplicationSent({ status: "closed", submitted_at: "   " }), false);
+  assert.equal(isApplicationSent({ status: "closed", submitted_at: "2026-11-11T00:00:00.000Z" }), true);
+  for (const bad of [null, undefined, {}, { status: "ATS Lolos" }, { status: "approved" }, { status: "" }]) assert.equal(isApplicationSent(bad as any), false);
+});
+
+test("penghitung terkirim = jumlah baris yang lolos isApplicationSent, apa pun campuran statusnya", () => {
+  const rows = [
+    row("draft", { submitted_at: "2026-11-21T06:11:52.674Z" }), row("draft"), row("ready"), row("ready"),
+    row("submitted", { submitted_at: "2026-11-23T10:46:57.543Z" }), row("submitted", { submitted_at: null }),
+    row("follow_up"), row("responded"), row("closed"), row("closed", { submitted_at: "2026-11-11T00:00:00.000Z" }),
+  ];
+  const s = summarizeApplications(rows);
+  assert.equal(s.sent, rows.filter((r) => isApplicationSent(r)).length);
+  assert.equal(s.sent, 5);
+  // tiga yang berstatus submitted/ready/draft tidak bisa "terkirim" hanya karena submitted_at ada
+  assert.equal(summarizeApplications([row("draft", { submitted_at: "2026-11-21T06:11:52.674Z" })]).sent, 0);
+});
+
+test("teks kartu: terkirim -> 'Terkirim N hari lalu'; belum terkirim -> 'Belum dikirim'; tidak pernah 'Belum dikirim' untuk baris terkirim", () => {
+  assert.equal(applicationSentNote({ status: "submitted", submitted_at: "2026-11-24T08:12:13.712Z" }, NOW), "Terkirim hari ini");
+  assert.equal(applicationSentNote({ status: "submitted", submitted_at: "2026-11-23T10:46:57.543Z" }, NOW), "Terkirim 1 hari lalu");
+  assert.equal(applicationSentNote({ status: "follow_up", submitted_at: "2026-11-14T10:00:00.000Z" }, NOW), "Terkirim 10 hari lalu");
+  // status Terkirim tanpa submitted_at (diubah lewat SQL atau kode lama): tetap terkirim, hanya waktunya tidak ada
+  assert.equal(applicationSentNote({ status: "submitted", submitted_at: null }, NOW), "Terkirim (waktu tidak tercatat)");
+  assert.equal(applicationSentNote({ status: "submitted", submitted_at: "bukan tanggal" }, NOW), "Terkirim (waktu tidak tercatat)");
+  assert.equal(applicationSentNote({ status: "ready", submitted_at: null }, NOW), NOT_SENT_NOTE);
+  assert.equal(applicationSentNote({ status: "draft", submitted_at: "2026-11-21T06:11:52.674Z" }, NOW), NOT_SENT_NOTE, "submitted_at tersisa di draf tidak membuatnya tampak terkirim");
+  assert.equal(applicationSentNote({ status: "closed", submitted_at: null }, NOW), NOT_SENT_NOTE);
+  assert.equal(applicationSentNote({ status: "submitted", submitted_at: "2026-11-25T00:00:00.000Z" }, NOW), "Terkirim hari ini", "jam perangkat mundur tidak menghasilkan angka negatif");
+});
+
+test("Lamaran Saya: kartu, baris daftar, dan jendela detail memakai aturan terkirim yang sama dengan penghitung", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /import \{[^}]*\bapplicationSentNote\b[^}]*\bisApplicationSent\b[^}]*\} from "@\/lib\/dashboardStats"/);
+  assert.equal(src.split("applicationSentNote(app)").length - 1, 2, "kartu papan dan baris daftar");
+  // tidak lagi menurunkan "terkirim" dari submitted_at saja
+  assert.doesNotMatch(src, /app\.submitted_at \?/);
+  assert.doesNotMatch(src, /\{app\.submitted_at && \(/);
+  assert.doesNotMatch(src, /daysAgo/);
+  assert.match(src, /isApplicationSent\(selectedApp\) && selectedApp\.submitted_at/);
+  assert.match(src, /const stats = summarizeApplications\(applications\)/);
+  assert.match(src, /\{ l: "Terkirim", v: stats\.sent,/);
 });
