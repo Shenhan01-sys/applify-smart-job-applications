@@ -71,7 +71,7 @@ export function useJobSearch() {
     keywords?: string
     location?: string
     platforms?: string[]
-  }): Promise<{ groups: Array<{ platform: string; jobs: any[] }>; total: number; stats: JobSearchSourceStat[]; failed?: boolean }> => {
+  }): Promise<{ groups: Array<{ platform: string; jobs: any[] }>; total: number; stats: JobSearchSourceStat[]; failed?: boolean; message?: string; code?: string }> => {
     try {
       setLoading(true)
       const data: any = await automationApi.searchJobs(params)
@@ -94,9 +94,11 @@ export function useJobSearch() {
       setTotalJobs(total)
       return { groups, total, stats: sourceStats }
     } catch (error) {
-      toast.error(describeApiError(error, 'Gagal mencari lowongan.'))
-      // failed membedakan "permintaan gagal" dari "pencarian jalan tetapi hasilnya nol".
-      return { groups: [], total: 0, stats: [], failed: true }
+      const message = describeApiError(error, 'Gagal mencari lowongan.')
+      toast.error(message)
+      // failed membedakan "permintaan gagal" dari "pencarian jalan tetapi hasilnya nol". message dan code membiarkan
+      // pemanggil menampilkan penyebabnya (misalnya keywords_required) alih-alih kalimat umum tentang koneksi.
+      return { groups: [], total: 0, stats: [], failed: true, message, code: parseApiError(error).code }
     } finally {
       setLoading(false)
     }

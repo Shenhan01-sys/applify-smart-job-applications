@@ -88,6 +88,10 @@ function waitText(sec: number | undefined): string {
 /** Jalur email lewat Gmail belum bisa dipakai karena Google belum disiapkan di server. */
 export const GMAIL_UNAVAILABLE_MESSAGE = "Kirim lewat Gmail belum tersedia.";
 
+/** Pencarian lowongan tanpa kata kunci tersimpan dan tanpa jabatan di profil (400 keywords_required). */
+export const KEYWORDS_REQUIRED_MESSAGE =
+  "Pencarian belum tahu apa yang dicari. Isi kata kunci di Pengaturan Agen (tab Pencarian) atau jabatan di Profil Saya, lalu cari lagi.";
+
 /** Kode jawaban 500 generik dari server: teks galat sebenarnya hanya ada di log server. */
 const GENERIC_SERVER_CODES = new Set([
   "internal_error",
@@ -177,6 +181,8 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return "Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa. Muat ulang halaman dan periksa statusnya.";
     case "gmail_not_configured":
       return GMAIL_UNAVAILABLE_MESSAGE;
+    case "keywords_required":
+      return KEYWORDS_REQUIRED_MESSAGE;
   }
 
   if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;

@@ -1,10 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Brain, Search, Check, Loader2, Sparkles, Radar, Globe } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { AlertCircle, Brain, Search, Check, Loader2, Sparkles, Radar, Globe } from 'lucide-react'
 import { useJobSearch } from '@/hooks/useAutomation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { describeApiError } from '@/lib/apiErrors'
+import {
+  SEARCH_INPUT_HINT_PROFILE_LINK,
+  SEARCH_INPUT_HINT_SETTINGS_LINK,
+  SEARCH_INPUT_HINT_TEXT,
+  SEARCH_INPUT_HINT_TITLE,
+} from '@/lib/searchReadiness'
+import { loadSearchInputMissing } from '@/services/searchReadinessService'
 
 interface Platform {
   name: string
@@ -46,6 +54,19 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   // Yang ditampilkan adalah waktu yang sudah berjalan, bukan persentase tebakan.
   const [waitingSince, setWaitingSince] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  // Tanpa kata kunci tersimpan dan tanpa jabatan di profil, pencarian tidak punya bahan: petunjuk tampil sebelum mencari.
+  // Bernilai true juga bila backend menjawab 400 keywords_required.
+  const [inputMissing, setInputMissing] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    loadSearchInputMissing().then((missing) => {
+      if (alive) setInputMissing(missing)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (waitingSince === null) return
@@ -105,7 +126,8 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
       if (failed) {
         // Penyebab sudah ditampilkan sebagai toast oleh useJobSearch; jangan menulis "tidak ada lowongan" untuk permintaan yang gagal.
-        addStage('Pencarian gagal. Periksa koneksi lalu coba lagi.', 'error')
+        if (searched.code === 'keywords_required') setInputMissing(true)
+        addStage(searched.message ?? 'Pencarian gagal. Periksa koneksi lalu coba lagi.', 'error')
         setIsScanning(false)
         return
       }
@@ -162,6 +184,22 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
           {isScanning || loading ? 'Mencari lowongan...' : 'Cari Sekarang'}
         </Button>
       </div>
+
+      {inputMissing && (
+        <div role="status" data-testid="search-input-hint" className="mb-6 flex items-start gap-2.5 rounded-xl border-2 border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-900">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">{SEARCH_INPUT_HINT_TITLE}</p>
+            <p className="mt-0.5">
+              {SEARCH_INPUT_HINT_TEXT}{' '}
+              <Link to="/automation-settings" className="font-semibold underline">{SEARCH_INPUT_HINT_SETTINGS_LINK}</Link>
+              {' '}atau{' '}
+              <Link to="/profile" className="font-semibold underline">{SEARCH_INPUT_HINT_PROFILE_LINK}</Link>
+              , lalu cari lagi.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Platform Selection */}
       <div className="mb-6">
