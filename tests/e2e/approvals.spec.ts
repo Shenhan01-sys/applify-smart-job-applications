@@ -655,3 +655,59 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     await expect(consent.getByRole("alert")).toHaveCount(0);
   });
 });
+
+test.describe("Persetujuan: email yang tidak dikirim karena mode uji", () => {
+  function seedEmail(backend: import("./helpers/mockBackend").MockBackend, logs: Array<Record<string, any>>) {
+    backend.state.history = [approvedApproval("apr-mail", { job_title: "Staf Admin", company: "PT Surat" })];
+    backend.state.queue = [{ ...queueRow("queue-mail", "apr-mail", "completed"), job_type: "email_apply" }];
+    backend.state.logs = logs;
+  }
+  const emailLog = (status: string, details: Record<string, any>) => ({
+    action: "email_apply",
+    status,
+    job_id: "job-apr-mail",
+    created_at: isoAgo(60_000),
+    details: { to: "hrd@perusahaan.test", approval_request_id: "apr-mail", ...details },
+  });
+
+  test("log skipped real_submit_off: lencana Belum dikirim (mode uji) dan penjelasannya, bukan dianggap terkirim", async ({ app, backend }) => {
+    seedEmail(backend, [emailLog("skipped", { reason: "real_submit_off", note: "email tidak dikirim" })]);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const badge = app.getByTestId("email-test-mode");
+    await expect(badge).toHaveText("Belum dikirim (mode uji)");
+    await app.getByRole("button", { name: /Opsi lain: Kirim lewat Email/ }).click();
+    await expect(app.getByText(/tidak dikirim ke rekruter/)).toBeVisible();
+    await expect(app.getByText("sudah dipakai")).toHaveCount(0);
+    // Teks catatan pengembang tidak tampil di mana pun.
+    await expect(app.getByText(/Bila server berjalan dalam mode uji/)).toHaveCount(0);
+    await expect(app.getByText(/ALLOW_REAL_SUBMIT/)).toHaveCount(0);
+  });
+
+  test("catatan lama (ALLOW_REAL_SUBMIT=false tanpa reason) dikenali sama; skipped karena kuota bukan mode uji", async ({ app, backend }) => {
+    seedEmail(backend, [emailLog("skipped", { note: "email tidak dikirim (ALLOW_REAL_SUBMIT=false)" })]);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByTestId("email-test-mode")).toBeVisible();
+  });
+
+  test("skipped karena alasan lain atau tanpa log: tidak ada lencana mode uji", async ({ app, backend }) => {
+    seedEmail(backend, [emailLog("skipped", { note: "kuota harian habis (10/10, paket free); email tidak dikirim" })]);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByRole("heading", { name: "Staf Admin" })).toBeVisible();
+    await expect(app.getByTestId("email-test-mode")).toHaveCount(0);
+  });
+
+  test("email sudah benar-benar terkirim (log success) menghapus tanda mode uji", async ({ app, backend }) => {
+    seedEmail(backend, [
+      emailLog("skipped", { reason: "real_submit_off" }),
+      emailLog("success", { note: "terkirim" }),
+    ]);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByRole("heading", { name: "Staf Admin" })).toBeVisible();
+    await expect(app.getByTestId("email-test-mode")).toHaveCount(0);
+  });
+});

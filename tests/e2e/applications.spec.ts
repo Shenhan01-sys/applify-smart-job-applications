@@ -217,3 +217,34 @@ test.describe("Lamaran: berhenti karena alasan lain tidak menawarkan jalan kelua
     await expect(dialog.getByText(/Draf ini ditandai siap dikirim/)).toBeVisible();
   });
 });
+
+test.describe("Lamaran: Antrean Agen untuk email yang tidak dikirim (mode uji)", () => {
+  test("tugas email_apply selesai dengan log skipped tampil Belum dikirim (mode uji), bukan Selesai", async ({ app, backend }) => {
+    backend.state.applications = [applicationRow("app-m", "job-m", { jobs: jobRow("job-m", { title: "Staf Admin", company: "PT Surat" }) })];
+    backend.state.queue = [
+      {
+        id: "queue-mail",
+        job_type: "email_apply",
+        status: "completed",
+        error_message: null,
+        created_at: new Date(Date.now() - 120_000).toISOString(),
+        completed_at: new Date(Date.now() - 60_000).toISOString(),
+        payload: { job_id: "job-m", approval_request_id: "apr-m" },
+      },
+    ];
+    backend.state.logs = [
+      {
+        action: "email_apply",
+        status: "skipped",
+        job_id: "job-m",
+        created_at: new Date(Date.now() - 60_000).toISOString(),
+        details: { to: "hrd@perusahaan.test", approval_request_id: "apr-m", reason: "real_submit_off" },
+      },
+    ];
+    await app.goto("/applications");
+    const panel = app.getByRole("region", { name: "Antrean Agen" });
+    await expect(panel.getByText("Belum dikirim (mode uji)")).toBeVisible();
+    await expect(panel.getByText("Selesai", { exact: true })).toHaveCount(0);
+    await expect(panel.getByText(/tidak dikirim ke rekruter/)).toBeVisible();
+  });
+});

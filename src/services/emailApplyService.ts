@@ -9,6 +9,7 @@ import {
 import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 import { buildAgentApplyRows, latestQueueJobIds } from "@/lib/agentApplyRows";
 import { manualSentRow, safeJobUrl } from "@/lib/manualSubmit";
+import { isRealSubmitOffLog } from "@/lib/emailTestMode";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -27,11 +28,13 @@ export interface EmailApplyData {
   manual: Set<string>;
   /** job posting address (jobs.external_url, http or https only), per approval id: "Buka formulir lowongan" */
   jobUrls: Record<string, string>;
+  /** approval ids whose email job finished without sending because real sending is off (test mode, application_logs skipped) */
+  testMode: Set<string>;
   /** Status agen sudah terbaca dari database. false = belum dimuat atau gagal, jadi "tidak ada tugas" belum berarti apa-apa. */
   agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, agentKnown: false });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -96,7 +99,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const jobIds = [...new Set(approved.map((a) => a.job_id).filter((x): x is string => !!x))];
 
   let agentKnown = true;
-  const [gmail, logs, queue, jobs, agent, claimRes] = await Promise.all([
+  const [gmail, logs, queue, jobs, agent, claimRes, skippedLogs] = await Promise.all([
     automationApi.getGmailStatus(),
     supabase.from("application_logs").select("details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
@@ -117,6 +120,13 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
         return {} as Record<string, AgentApplyRow>;
       }),
     automationApi.getApprovalClaimStatuses(ids).catch(() => ({ claims: {} })),
+    // Email yang tidak dikirim karena mode uji: log email_apply berstatus skipped. Hanya pelengkap tampilan.
+    supabase
+      .from("application_logs")
+      .select("status, details")
+      .eq("action", "email_apply")
+      .eq("status", "skipped")
+      .in("details->>approval_request_id", ids),
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;
@@ -144,6 +154,13 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   for (const row of queue.data ?? []) {
     const id = (row as any)?.payload?.approval_request_id;
     if (typeof id === "string" && !data.jobs[id]) data.jobs[id] = { status: (row as any).status, error_message: (row as any).error_message };
+  }
+
+  if (skippedLogs.error) console.warn("[emailApply] test-mode check skipped:", skippedLogs.error.message);
+  for (const row of skippedLogs.data ?? []) {
+    const id = (row as any)?.details?.approval_request_id;
+    // Hanya bila tugas emailnya terakhir selesai dan belum ada kiriman sukses: kiriman nyata sesudahnya menghapus tandanya.
+    if (typeof id === "string" && isRealSubmitOffLog(row as any) && !data.used.has(id) && data.jobs[id]?.status === "completed") data.testMode.add(id);
   }
 
   const descriptionByJob = new Map<string, string>();

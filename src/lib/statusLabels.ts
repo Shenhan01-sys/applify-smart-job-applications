@@ -1,7 +1,10 @@
 /**
  * Label berbahasa Indonesia untuk status yang tersimpan sebagai kode bahasa Inggris di database.
- * Kode di database tidak diubah; hanya tampilannya. Tanpa impor, supaya bisa dites dengan `node --test`.
+ * Kode di database tidak diubah; hanya tampilannya. Hanya mengimpor berkas murni lain (dengan ekstensi .ts),
+ * supaya bisa dites dengan `node --test`.
  */
+
+import { EMAIL_TEST_MODE_HINT, EMAIL_TEST_MODE_LABEL } from "./emailTestMode.ts";
 
 /** approval_requests.status */
 export const APPROVAL_STATUS_LABEL: Record<string, string> = {
@@ -86,12 +89,22 @@ export function isQueueNeedsManual(status?: string | null, jobType?: string | nu
 /** Label untuk tugas apply yang selesai tanpa mengisi apa pun; bukan keadaan sukses, jadi tidak memakai "Selesai". */
 export const QUEUE_NEEDS_MANUAL_LABEL = "Perlu diisi sendiri";
 
+/**
+ * Tugas email_apply yang selesai tetapi log-nya `skipped` karena pengiriman nyata dimatikan (mode uji): tidak ada
+ * email yang keluar, jadi bukan "Selesai". `emailTestMode` datang dari log (lib/emailTestMode.ts), bukan dari status antrean.
+ */
+export function isEmailTestMode(status?: string | null, jobType?: string | null, emailTestMode?: boolean | null): boolean {
+  return status === "completed" && jobType === "email_apply" && emailTestMode === true;
+}
+
 export function queueDisplayLabel(
   status?: string | null,
   errorMessage?: string | null,
   jobType?: string | null,
   fieldsFilled?: number | null,
+  emailTestMode?: boolean | null,
 ): string {
+  if (isEmailTestMode(status, jobType, emailTestMode)) return EMAIL_TEST_MODE_LABEL;
   if (isQueueNeedsManual(status, jobType, fieldsFilled)) return QUEUE_NEEDS_MANUAL_LABEL;
   return isQueueSkipped(status, errorMessage) ? "Dilewati" : queueStatusLabel(status);
 }
@@ -125,7 +138,9 @@ export function queueStatusHint(
   jobType?: string | null,
   errorMessage?: string | null,
   fieldsFilled?: number | null,
+  emailTestMode?: boolean | null,
 ): string {
+  if (isEmailTestMode(status, jobType, emailTestMode)) return EMAIL_TEST_MODE_HINT;
   if (isQueueSkipped(status, errorMessage)) {
     return "Dilewati: lowongan ini tidak punya tautan untuk dilamar. Pilih lowongan lain di halaman Lowongan.";
   }

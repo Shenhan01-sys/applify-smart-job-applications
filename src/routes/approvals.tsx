@@ -368,6 +368,7 @@ function ApprovalsPage() {
                         used={emailData.used.has(request.id)}
                         job={emailData.jobs[request.id]}
                         suggestions={emailData.suggestions[request.id]}
+                        testMode={emailData.testMode.has(request.id)}
                         onQueued={(id) =>
                           setEmailData((d) => ({ ...d, jobs: { ...d.jobs, [id]: { status: 'pending', error_message: null } } }))
                         }

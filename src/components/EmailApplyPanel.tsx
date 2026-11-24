@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { EMAIL_TEST_MODE_HINT, EMAIL_TEST_MODE_LABEL } from "@/lib/emailTestMode";
 import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
 import { enqueueEmailApply } from "@/services/emailApplyService";
@@ -19,6 +20,8 @@ interface Props {
   used: boolean;
   job?: EmailQueueRow | null;
   suggestions?: string[];
+  /** Email terakhir selesai tanpa terkirim karena mode uji (log skipped): tampil "Belum dikirim (mode uji)". */
+  testMode?: boolean;
   /** Called after the backend accepted the job, so the parent can show it as queued. */
   onQueued: (approvalId: string) => void;
 }
@@ -28,7 +31,7 @@ interface Props {
  * (see getEmailApplyState). It shows the exact letter that will be sent, asks for the recruiter address,
  * and asks once more before it enqueues an email_apply job; the backend and worker enforce the rest.
  */
-export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], onQueued }: Props) {
+export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, onQueued }: Props) {
   const { user } = useAuth();
   const uid = useId();
   const [open, setOpen] = useState(false);
@@ -88,6 +91,9 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
           <span className="font-normal text-muted-foreground">(untuk lowongan yang meminta lamaran ke email rekruter)</span>
           {state.block === "used" && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">sudah dipakai</span>}
           {(state.block === "queued") && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">dalam antrean</span>}
+          {testMode && state.block !== "used" && (
+            <span data-testid="email-test-mode" className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">{EMAIL_TEST_MODE_LABEL}</span>
+          )}
         </span>
         {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
@@ -101,6 +107,10 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
               {expiresLabel && <> Persetujuan ini berlaku sampai {expiresLabel}.</>}
             </span>
           </p>
+
+          {testMode && state.block !== "used" && (
+            <p role="status" className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-2">{EMAIL_TEST_MODE_HINT}</p>
+          )}
 
           <details className="rounded-lg border-2 border-black/[8%] bg-white">
             <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium">Isi email (surat yang kamu setujui)</summary>

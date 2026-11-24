@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { isRealSubmitOffLog } from "@/lib/emailTestMode";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -11,12 +12,14 @@ export interface QueueEntry {
   error_message: string | null;
   created_at: string;
   completed_at: string | null;
-  payload: { job_id?: string } | null;
+  payload: { job_id?: string; approval_request_id?: string } | null;
 }
 
 /** Entri antrean milik pengguna, dilengkapi judul lowongan bila payload menyebut job_id. */
 export interface QueueItem extends QueueEntry {
   job: { title: string; company: string } | null;
+  /** Tugas email yang selesai tetapi emailnya tidak dikirim karena mode uji (log skipped). Hanya terisi bila log terbaca. */
+  email_test_mode?: boolean;
 }
 
 const QUEUE_COLUMNS = "id, job_type, status, error_message, created_at, completed_at, payload";
@@ -70,7 +73,32 @@ export const automationQueue = {
       const { data: jobs } = await supabase.from("jobs").select("id, title, company").in("id", jobIds);
       for (const j of (jobs ?? []) as Array<{ id: string; title: string; company: string }>) titles.set(j.id, { title: j.title, company: j.company });
     }
-    return rows.map((r) => ({ ...r, job: (r.payload?.job_id && titles.get(r.payload.job_id)) || null }));
+    // Email yang selesai tanpa terkirim (mode uji) tercatat di log, bukan di status antrean. Hanya pelengkap tampilan:
+    // bila log tidak terbaca, tugasnya tetap tampil dengan status antreannya.
+    const testMode = new Set<string>();
+    const emailApprovalIds = Array.from(new Set(
+      rows
+        .filter((r) => r.job_type === "email_apply" && r.status === "completed" && typeof r.payload?.approval_request_id === "string")
+        .map((r) => r.payload!.approval_request_id as string),
+    ));
+    if (emailApprovalIds.length > 0) {
+      const { data: logs, error: logError } = await supabase
+        .from("application_logs")
+        .select("status, details")
+        .eq("action", "email_apply")
+        .eq("status", "skipped")
+        .in("details->>approval_request_id", emailApprovalIds);
+      if (logError) console.warn("[queue] email log lookup skipped:", logError.message);
+      for (const log of (logs ?? []) as Array<{ status?: string; details?: { approval_request_id?: unknown } }>) {
+        const id = log.details?.approval_request_id;
+        if (typeof id === "string" && isRealSubmitOffLog(log)) testMode.add(id);
+      }
+    }
+    return rows.map((r) => ({
+      ...r,
+      job: (r.payload?.job_id && titles.get(r.payload.job_id)) || null,
+      ...(testMode.has(String(r.payload?.approval_request_id)) ? { email_test_mode: true } : {}),
+    }));
   },
 
   /** Latest queue entry for a given job (for showing "queued / processing / done"). */

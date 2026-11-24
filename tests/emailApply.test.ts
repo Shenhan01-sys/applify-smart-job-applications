@@ -177,7 +177,7 @@ test("panel email tidak lagi menampilkan JSON mentah dari server atau catatan 'm
   const panel = read("../src/components/EmailApplyPanel.tsx");
   assert.match(panel, /describeApiError\(e, "Gagal memulai koneksi Gmail\."\)/);
   assert.doesNotMatch(panel, /e\?\.message/);
-  assert.doesNotMatch(panel, /mode uji/i);
+  assert.doesNotMatch(panel, /Bila server berjalan dalam mode uji|EMAIL_APPLY_TEST_MODE_NOTE/);
   assert.doesNotMatch(read("../src/lib/emailApply.ts"), /Bila server berjalan dalam mode uji/);
 });
 

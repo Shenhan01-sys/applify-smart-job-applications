@@ -242,7 +242,7 @@ test("QueuePanel: memanggil onApplyFinished saat tugas apply selesai, memakai pe
   assert.match(src, /if \(finished\) finishedRef\.current\?\.\(\)/);
   assert.equal([...src.matchAll(/setInterval\(/g)].length, 1, "satu polling saja, yang lama");
   assert.match(src, /const fieldsFilled = fieldsFilledByQueue\?\.\[q\.id\];/);
-  assert.match(src, /queueStatusHint\(q\.status, q\.job_type, q\.error_message, fieldsFilled\)/);
+  assert.match(src, /queueStatusHint\(q\.status, q\.job_type, q\.error_message, fieldsFilled(, q\.email_test_mode)?\)/);
 });
 
 test("Lamaran Saya: muat ulang diam-diam setelah tugas apply selesai, daftar lama dipertahankan bila gagal, log dibaca lagi sekali", () => {
@@ -380,10 +380,10 @@ test("QueuePanel: tugas apply tanpa isian tampil kuning dengan ikon peringatan, 
   const src = read("../src/components/QueuePanel.tsx");
   assert.match(src, /needs_manual: "bg-amber-100 text-amber-900 border-amber-300"/);
   assert.match(src, /status === "needs_manual"\) return <AlertCircle/);
-  assert.match(src, /const shown = isQueueNeedsManual\(q\.status, q\.job_type, fieldsFilled\) \? "needs_manual" : q\.status;/);
+  assert.match(src, /const shown = testMode \|\| isQueueNeedsManual\(q\.status, q\.job_type, fieldsFilled\) \? "needs_manual" : q\.status;/);
   assert.match(src, /TONE\[shown\]/);
   assert.match(src, /<StatusIcon status=\{shown\} \/>/);
-  assert.match(src, /queueDisplayLabel\(q\.status, q\.error_message, q\.job_type, fieldsFilled\)/);
+  assert.match(src, /queueDisplayLabel\(q\.status, q\.error_message, q\.job_type, fieldsFilled(, q\.email_test_mode)?\)/);
   // warna hijau tetap hanya milik "completed" yang sungguh selesai
   assert.match(src, /completed: "bg-green-100 text-green-900 border-green-300"/);
 });
