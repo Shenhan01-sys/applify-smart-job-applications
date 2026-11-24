@@ -197,6 +197,8 @@ export const automationApi = {
       method: 'POST',
       credentials: 'include',
       headers: await getAuthHeaders(),
+      // Fastify menolak POST ber-Content-Type JSON tanpa isi (FST_ERR_CTP_EMPTY_JSON_BODY), jadi kirim objek kosong.
+      body: '{}',
     })
     return res.url
   },
@@ -456,7 +458,7 @@ export const automationApi = {
   async verifyLinkedInSession() {
     return apiFetch(
       `${apiBase()}/api/linkedin/verify`,
-      { method: 'POST', headers: await getAuthHeaders() },
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
       () => ({ valid: true, sessionId: "mock-session", expiresAt: new Date(Date.now() + 86400000).toISOString() }),
       800,
     )
@@ -465,7 +467,7 @@ export const automationApi = {
   async refreshLinkedInSession() {
     return apiFetch(
       `${apiBase()}/api/linkedin/refresh`,
-      { method: 'POST', headers: await getAuthHeaders() },
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
       () => ({ success: true, message: "Session refreshed (mock)" }),
       1500,
     )
@@ -554,7 +556,7 @@ export const automationApi = {
   async revokeAllExtensionTokens(): Promise<{ revoked: boolean; minTokenVersion: number }> {
     return apiFetch(
       `${apiBase()}/api/extension/revoke-all`,
-      { method: 'POST', headers: await getAuthHeaders() },
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
       () => ({ revoked: true, minTokenVersion: 2 }),
     )
   },
@@ -650,7 +652,7 @@ export const automationApi = {
   async testWhatsappNotification() {
     return apiFetch<{ success: boolean }>(
       `${apiBase()}/api/notifications/whatsapp/test`,
-      { method: 'POST', headers: await getAuthHeaders() },
+      { method: 'POST', headers: await getAuthHeaders(), body: '{}' },
       () => ({ success: true }),
     )
   },
