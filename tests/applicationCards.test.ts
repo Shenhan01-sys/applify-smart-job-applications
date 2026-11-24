@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { duplicateApplications, duplicateLabel, formatCreated } from "../src/lib/applicationCards.ts";
+import { NO_COMPANY_LABEL, NO_TITLE_LABEL, duplicateApplications, duplicateLabel, formatCreated, jobDisplay } from "../src/lib/applicationCards.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const TZ = "Asia/Jakarta";
@@ -77,4 +77,40 @@ test("temuan 18: papan dan daftar memasang baris pembeda hanya lewat duplicates,
   assert.match(src, /if \(!info\) return null;/);
   // kecil dan pudar, bukan lencana
   assert.match(src, /text-xs text-muted-foreground\/80/);
+});
+
+// Uji E2E 24 November 2026: kartu berjudul "Lowongan" dan "Perusahaan". Penyebabnya RLS tabel jobs (hanya status active):
+// lamaran untuk lowongan yang sudah closed kembali dengan jobs: null.
+test("jobDisplay: judul dan perusahaan dari join dipakai apa adanya (dirapikan), bukan teks cadangan", () => {
+  assert.deepEqual(jobDisplay({ title: "  Data Scientist Intern ", company: "GoToGroup" }), { title: "Data Scientist Intern", company: "GoToGroup", known: true });
+});
+
+test("jobDisplay: lowongan tidak terbawa join atau kolomnya kosong -> teks cadangan yang jelas, bukan 'Lowongan' atau 'Perusahaan'", () => {
+  for (const job of [null, undefined, {}, { title: "", company: "" }, { title: "   ", company: null }, { title: 5, company: {} }]) {
+    const d = jobDisplay(job as any);
+    assert.equal(d.title, NO_TITLE_LABEL);
+    assert.equal(d.company, NO_COMPANY_LABEL);
+    assert.equal(d.known, false);
+  }
+  assert.equal(NO_TITLE_LABEL, "Lowongan tanpa judul");
+  assert.notEqual(NO_TITLE_LABEL, "Lowongan");
+  assert.notEqual(NO_COMPANY_LABEL, "Perusahaan");
+  // judul ada, perusahaan kosong: judul asli tetap tampil
+  assert.deepEqual(jobDisplay({ title: "Web3 Developer", company: "" }), { title: "Web3 Developer", company: NO_COMPANY_LABEL, known: true });
+});
+
+test("Lamaran Saya: kartu, baris, seretan, pembaca layar, dan jendela detail memakai jobDisplay, tanpa teks 'Lowongan' atau 'Perusahaan' polos", () => {
+  const src = read("../src/routes/applications.tsx");
+  assert.match(src, /import \{[^}]*\bjobDisplay\b[^}]*\} from "@\/lib\/applicationCards"/);
+  assert.doesNotMatch(src, /\|\| "(Lowongan|Perusahaan|Posisi|Lamaran)"/);
+  assert.ok(src.split("jobDisplay(").length - 1 >= 9);
+});
+
+test("kembaran tetap dikenali walau lowongannya tersembunyi (jobs null): kuncinya job_id", () => {
+  const d = duplicateApplications([
+    { id: "a", created_at: "2026-11-20T15:20:00Z", job_id: "j1", title: undefined, company: undefined },
+    { id: "b", created_at: "2026-11-20T16:10:00Z", job_id: "j1", title: undefined, company: undefined },
+    { id: "c", created_at: "2026-11-20T16:10:00Z", job_id: "j2", title: undefined, company: undefined },
+  ], TZ);
+  assert.deepEqual([...d.keys()].sort(), ["a", "b"]);
 });

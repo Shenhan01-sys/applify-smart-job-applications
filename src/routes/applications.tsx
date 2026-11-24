@@ -13,7 +13,7 @@ import { canRequestApproval } from "@/lib/draftApproval";
 import { applicationSentNote, groupByStatus, isApplicationSent, summarizeApplications } from "@/lib/dashboardStats";
 import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
-import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
+import { duplicateApplications, duplicateLabel, jobDisplay, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
 import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
@@ -129,9 +129,9 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
         </div>
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
-          <p className="text-sm font-semibold truncate">{job?.title || "Lowongan"}</p>
+          <p className="text-sm font-semibold truncate">{jobDisplay(job).title}</p>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 truncate">{job?.company || "Perusahaan"}</p>
+        <p className="text-xs text-muted-foreground mt-1 truncate">{jobDisplay(job).company}</p>
         <DuplicateNote info={duplicate} className="mt-1 leading-snug" />
         <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" aria-hidden="true" />
@@ -207,9 +207,9 @@ function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen 
         <Bot className="h-5 w-5 text-[#0A5BE0]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{job?.title || "Posisi"}</p>
+        <p className="text-sm font-semibold truncate">{jobDisplay(job).title}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {job?.company || "Perusahaan"} · {highlightedSkills(app.tailored_skills, profileSkills).length} skill disorot AI
+          {jobDisplay(job).company} · {highlightedSkills(app.tailored_skills, profileSkills).length} skill disorot AI
         </p>
         <DuplicateNote info={duplicate} className="truncate" />
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
@@ -631,7 +631,7 @@ export function AppsPage() {
                     screenReaderInstructions: { draggable: BOARD_SCREEN_READER_INSTRUCTIONS },
                     announcements: boardAnnouncements((id) => {
                       const card = applications.find((a) => a.id === id);
-                      return (card && jobOf(card)?.title) || "Lowongan";
+                      return jobDisplay(card ? jobOf(card) : undefined).title;
                     }),
                   }}
                 >
@@ -649,8 +649,8 @@ export function AppsPage() {
                     <DragOverlay>
                       {activeDragApp ? (
                         <div className="rounded-xl bg-white border-2 border-[#0A5BE0] p-3 shadow-lg rotate-2">
-                          <p className="text-sm font-semibold">{jobOf(activeDragApp)?.title || "Lowongan"}</p>
-                          <p className="text-xs text-muted-foreground">{jobOf(activeDragApp)?.company || "Perusahaan"}</p>
+                          <p className="text-sm font-semibold">{jobDisplay(jobOf(activeDragApp)).title}</p>
+                          <p className="text-xs text-muted-foreground">{jobDisplay(jobOf(activeDragApp)).company}</p>
                         </div>
                       ) : null}
                     </DragOverlay>,
@@ -712,9 +712,9 @@ export function AppsPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 pr-6">
                   <Bot className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" />
-                  {selectedJob?.title || "Lamaran"}
+                  {jobDisplay(selectedJob).title}
                 </DialogTitle>
-                <DialogDescription>{selectedJob?.company || "Perusahaan"}</DialogDescription>
+                <DialogDescription>{jobDisplay(selectedJob).company}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-5">

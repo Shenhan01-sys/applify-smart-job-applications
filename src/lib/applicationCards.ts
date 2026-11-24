@@ -70,6 +70,23 @@ export function duplicateApplications(apps: readonly ApplicationCardInput[], tim
   return out;
 }
 
+/**
+ * Teks cadangan bila lowongan lamaran tidak terbawa join `jobs(*)`. Penyebab di produksi (24 November 2026): kebijakan
+ * RLS tabel `jobs` hanya membuka baris berstatus `active`, jadi lamaran untuk lowongan yang sudah `closed` kembali
+ * dengan `jobs: null` dan kartunya dulu bertuliskan "Lowongan" dan "Perusahaan", seolah itu judulnya.
+ */
+export const NO_TITLE_LABEL = "Lowongan tanpa judul";
+export const NO_COMPANY_LABEL = "Perusahaan tidak diketahui";
+
+const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+
+/** Judul dan perusahaan dari lowongan hasil join; kosong atau tidak ada -> teks cadangan yang jelas. */
+export function jobDisplay(job: { title?: unknown; company?: unknown } | null | undefined): { title: string; company: string; known: boolean } {
+  const title = clean(job?.title);
+  const company = clean(job?.company);
+  return { title: title || NO_TITLE_LABEL, company: company || NO_COMPANY_LABEL, known: !!title };
+}
+
 /** Teks kecil di kartu: "Lamaran ke-2 dari 2 · dibuat 20 Nov, 23.10". */
 export function duplicateLabel(info: DuplicateInfo): string {
   const head = `Lamaran ke-${info.position} dari ${info.total}`;
