@@ -1,6 +1,6 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, User, LogOut, Bot, ShieldCheck, Leaf, Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { MOBILE_TAB_ITEMS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
@@ -27,13 +27,19 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
   const displayName = email.split("@")[0] || "Pengguna";
   const initials = email.slice(0, 2).toUpperCase() || "AP";
 
+  // Kelas gaya aplikasi juga dipasang di <html> supaya dialog dan laci Radix (dirender di portal) ikut rapi.
+  useEffect(() => {
+    document.documentElement.classList.add("app-ui");
+    return () => document.documentElement.classList.remove("app-ui");
+  }, []);
+
   const handleSignOut = async () => {
     await signOut();
     navigate({ to: "/" });
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="app-ui min-h-screen flex">
       <a
         href="#konten-utama"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:shadow-lg"

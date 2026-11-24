@@ -34,17 +34,17 @@ function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen grid-bg flex items-center justify-center px-4 py-20">
+    <div className="app-ui min-h-screen grid-bg flex items-center justify-center px-4 py-12 sm:py-20">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white font-bold text-xl mb-4" aria-hidden="true">A</div>
+          <div className="inline-grid h-14 w-14 place-items-center rounded-2xl gradient-primary text-white font-bold text-xl mb-4" aria-hidden="true">A</div>
           <h1 className="text-2xl font-bold">Lupa Kata Sandi</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Masukkan email akunmu. Kami kirim tautan untuk membuat kata sandi baru.
           </p>
         </div>
 
-        <div className="glass rounded-3xl p-8">
+        <div className="glass rounded-3xl p-6 sm:p-8">
           {sent ? (
             <div role="status" className="space-y-4 text-sm">
               <p className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-primary">

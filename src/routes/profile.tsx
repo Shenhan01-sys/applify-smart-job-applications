@@ -456,7 +456,7 @@ function ProfilePage() {
 
       {loadError && (
         <ErrorState
-          className="mb-4 text-left"
+          className="mb-4"
           title="Profil belum bisa dimuat"
           message={`${loadError} Data yang tampil di bawah belum tentu lengkap.`}
           onRetry={() => { setLoading(true); setReloadKey((k) => k + 1); }}
@@ -512,11 +512,11 @@ function ProfilePage() {
           {/* Step Info */}
           <div className="mb-5">
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-[#0A5BE0] font-bold bg-[#0A5BE0]/10 px-2 py-1 rounded-full">
+              <span className="text-xs font-semibold text-[#0A5BE0] bg-[#0A5BE0]/10 px-2.5 py-1 rounded-full">
                 Langkah {step}/{steps.length}
               </span>
               {step === 5 && (
-                <span className="text-xs uppercase tracking-wider text-green-700 font-bold bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full flex items-center gap-1">
                   <Sparkles className="h-3 w-3" /> Selesai
                 </span>
               )}
@@ -680,7 +680,7 @@ function ProfilePage() {
 
             {/* Skills */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-[#0A5BE0] font-bold flex items-center gap-1">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Wrench className="h-3 w-3" /> Skill Utama
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -694,7 +694,7 @@ function ProfilePage() {
 
             {/* Work Experience */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-teal-700 font-bold flex items-center gap-1">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Briefcase className="h-3 w-3" /> Pengalaman Kerja
               </p>
               <div className="mt-2 space-y-3">
@@ -713,7 +713,7 @@ function ProfilePage() {
 
             {/* Education */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-amber-700 font-bold flex items-center gap-1">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <GraduationCap className="h-3 w-3" /> Pendidikan
               </p>
               <div className="mt-2 space-y-2">
@@ -730,7 +730,7 @@ function ProfilePage() {
 
             {/* Certifications */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-purple-700 font-bold flex items-center gap-1">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Award className="h-3 w-3" /> Sertifikasi
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -745,7 +745,7 @@ function ProfilePage() {
 
             {/* Achievements */}
             <div>
-              <p className="text-xs uppercase tracking-wider text-rose-700 font-bold flex items-center gap-1">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Trophy className="h-3 w-3" /> Penghargaan dan Publikasi
               </p>
               <div className="mt-2 space-y-2">
@@ -981,7 +981,7 @@ function Step1Basic({ formData, setFormData, errors }: {
             className="group"
             style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.05}s both` }}
           >
-            <label htmlFor={`profile-${field.key}`} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+            <label htmlFor={`profile-${field.key}`} className="text-sm font-medium text-foreground flex items-center gap-1.5">
               <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> {field.label}{field.key === 'full_name' && <span className="text-red-600" aria-hidden="true"> *</span>}
             </label>
             <input 
@@ -1050,7 +1050,7 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
           const id = `pref-${field.key}`;
           return (
             <div key={field.key} style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both` }}>
-              <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+              <label htmlFor={id} className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> {field.label}
               </label>
               <div className="mt-1.5 relative">
@@ -1082,7 +1082,7 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
 
       {/* Model kerja: menyaring hasil pencarian, jadi tidak ada pilihan bawaan */}
       <fieldset style={{ animation: `fadeInUp 0.4s ease-out 0.32s both` }}>
-        <legend className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+        <legend className="text-sm font-medium text-foreground flex items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Model kerja
         </legend>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -1100,7 +1100,7 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
 
       {/* Lokasi */}
       <div style={{ animation: `fadeInUp 0.4s ease-out 0.4s both` }}>
-        <label htmlFor="pref-search_location" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+        <label htmlFor="pref-search_location" className="text-sm font-medium text-foreground flex items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Lokasi pencarian
         </label>
         <input
@@ -1194,8 +1194,8 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
               style={{ animation: `fadeInUp 0.4s ease-out ${0.1 + i * 0.1}s both` }}
             >
               <Icon className={`h-5 w-5 mx-auto ${stat.color} mb-1`} />
-              <p className="text-lg font-bold font-mono">{stat.value}</p>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+              <p className="text-lg font-bold tabular-nums">{stat.value}</p>
+              <p className="text-xs text-muted-foreground">{stat.label}</p>
             </div>
           );
         })}

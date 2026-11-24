@@ -185,8 +185,8 @@ function DroppableColumn({ status, apps, children }: {
       }`}
     >
       <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${config.color}`}>
-        <span className="text-xs font-semibold uppercase tracking-wider">{applicationStatusLabel(status)}</span>
-        <span className="text-xs font-mono">{apps.length}</span>
+        <span className="text-sm font-semibold">{applicationStatusLabel(status)}</span>
+        <span className="text-xs font-semibold tabular-nums">{apps.length}</span>
       </div>
       <div className="mt-3 space-y-2">
         {children}
@@ -601,8 +601,8 @@ export function AppsPage() {
               { l: "Sudah Dibalas", v: stats.responded },
             ].map((s) => (
               <div key={s.l} className="rounded-xl border-2 border-[#999999] bg-white p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.l}</p>
-                <p className="font-mono text-xl md:text-2xl font-bold mt-1">{s.v}</p>
+                <p className="text-xs font-medium text-muted-foreground">{s.l}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums">{s.v}</p>
               </div>
             ))}
           </div>

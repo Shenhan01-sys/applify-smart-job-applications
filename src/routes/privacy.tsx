@@ -11,7 +11,7 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <div className="app-ui min-h-screen bg-background px-4 py-10">
       <main className="mx-auto w-full max-w-2xl">
         <Link to="/" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary hover:underline">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Kembali ke beranda
