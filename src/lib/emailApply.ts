@@ -20,7 +20,8 @@ export const EMAIL_APPLY_JOB_TYPE = "email_apply";
 /** Shown next to the action: what is sent and under which conditions. */
 export const EMAIL_APPLY_EXPLANATION =
   "Isi email adalah surat lamaran yang sudah kamu setujui, dikirim apa adanya tanpa diubah atau ditulis ulang AI. " +
-  "Email dikirim teks polos dari akun Gmail yang kamu hubungkan, tanpa lampiran, dengan subjek yang dibuat otomatis. " +
+  "Email dikirim dari akun Gmail yang kamu hubungkan, dengan subjek yang dibuat otomatis dan lampiran CV serta surat lamaran (PDF). " +
+  "Transkrip nilai atau portofolio dilampirkan hanya bila lowongan memintanya dan berkasnya sudah ada di Profil. " +
   "Satu persetujuan hanya berlaku untuk satu pengiriman dan hanya selama masa berlakunya.";
 
 // ---------------------------------------------------------------------------------------------
@@ -86,6 +87,8 @@ export interface ApprovalLike {
   job_id?: string | null;
   application_id?: string | null;
   cover_letter?: string | null;
+  /** Tautan CV bertanda tangan yang ditulis server saat draf diajukan (sumber CV yang sama dengan agen pengisi formulir). */
+  resume_url?: string | null;
 }
 
 export interface EmailQueueRow {

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
-import { Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, ShieldCheck, Paperclip } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { EMAIL_TEST_MODE_HINT, EMAIL_TEST_MODE_LABEL } from "@/lib/emailTestMode";
@@ -13,6 +14,7 @@ import {
   type ApprovalLike,
   type EmailQueueRow,
 } from "@/lib/emailApply";
+import { describeNotAttached, describeSentAttachments, type AttachmentPlan, type SentAttachments } from "@/lib/emailAttachments";
 
 interface Props {
   approval: ApprovalLike & { job_title?: string; company?: string };
@@ -22,6 +24,10 @@ interface Props {
   suggestions?: string[];
   /** Email terakhir selesai tanpa terkirim karena mode uji (log skipped): tampil "Belum dikirim (mode uji)". */
   testMode?: boolean;
+  /** Lampiran yang akan dikirim (pratinjau). Tidak ada: profil atau lowongan tidak terbaca, daftar tidak ditampilkan. */
+  plan?: AttachmentPlan | null;
+  /** Lampiran yang tercatat pada email yang sudah terkirim. */
+  sent?: SentAttachments | null;
   /** Called after the backend accepted the job, so the parent can show it as queued. */
   onQueued: (approvalId: string) => void;
 }
@@ -31,7 +37,7 @@ interface Props {
  * (see getEmailApplyState). It shows the exact letter that will be sent, asks for the recruiter address,
  * and asks once more before it enqueues an email_apply job; the backend and worker enforce the rest.
  */
-export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, onQueued }: Props) {
+export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, plan = null, sent = null, onQueued }: Props) {
   const { user } = useAuth();
   const uid = useId();
   const [open, setOpen] = useState(false);
@@ -61,6 +67,9 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
   const expiresLabel = expires && Number.isFinite(expires.getTime())
     ? expires.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "";
+
+  const sentText = used && sent && sent.attached.length > 0 ? describeSentAttachments(sent) : "";
+  const notSentText = used && sent ? describeNotAttached(sent) : "";
 
   const submit = async () => {
     setSending(true);
@@ -98,6 +107,16 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
         {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
 
+      {sentText && (
+        <p data-testid="email-sent-attachments" className="px-3 pb-2.5 -mt-1 text-xs text-muted-foreground flex gap-1.5">
+          <Paperclip className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Terkirim dengan lampiran: {sentText}.
+            {notSentText && <> Tidak terlampir: {notSentText}.</>}
+          </span>
+        </p>
+      )}
+
       {open && (
         <div className="px-3 pb-3 space-y-3 border-t-2 border-black/[6%] pt-3">
           <p className="text-xs text-muted-foreground leading-relaxed flex gap-1.5">
@@ -116,6 +135,28 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
             <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium">Isi email (surat yang kamu setujui)</summary>
             <pre className="px-3 pb-3 pt-1 text-xs whitespace-pre-wrap font-sans text-muted-foreground max-h-60 overflow-auto">{approval.cover_letter}</pre>
           </details>
+
+          {plan && !used && (
+            <div data-testid="email-attachments" className="rounded-lg border-2 border-black/[8%] bg-white p-3 space-y-2">
+              <p className="text-xs font-semibold flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5 text-[#0A5BE0]" /> Lampiran yang akan dikirim</p>
+              <ul className="space-y-1 text-xs">
+                {plan.items.map((item) => (
+                  <li key={item.kind} data-testid={`email-attachment-${item.kind}`} className="break-all">{item.label}</li>
+                ))}
+              </ul>
+              {plan.warnings.map((w) => (
+                <p key={w.code + w.kind} role="status" data-testid={`email-attachment-warning-${w.code}`} className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-2">
+                  {w.message}{" "}
+                  {w.code === "cv_not_on_approval" ? null : (
+                    <Link to="/profile" className="font-semibold underline underline-offset-2">
+                      {w.code === "no_cv" ? "Unggah CV di Profil" : "Buka Profil"}
+                    </Link>
+                  )}
+                </p>
+              ))}
+              <p className="text-xs text-muted-foreground">Total lampiran dibatasi 20 MB. Bila lebih, dokumen opsional dilepas lebih dulu, lalu PDF surat; CV tidak pernah dilepas.</p>
+            </div>
+          )}
 
           <div>
             <label htmlFor={`${uid}-to`} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
@@ -178,6 +219,12 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
                 Masukkan ke antrean: surat yang disetujui akan dikirim apa adanya ke <b className="break-all">{email.trim()}</b> dari akun Gmail-mu untuk lowongan
                 {" "}<b>{approval.job_title ?? "ini"}</b>{approval.company ? <> di <b>{approval.company}</b></> : null}. Email yang sudah terkirim tidak bisa ditarik kembali.
               </p>
+              {plan && (
+                <p data-testid="email-confirm-attachments" className="text-xs leading-relaxed">
+                  <b>Lampiran:</b> {plan.items.length > 0 ? plan.items.map((i) => i.label).join(", ") : "tidak ada"}
+                  {plan.noCv ? <> (tanpa CV)</> : null}.
+                </p>
+              )}
               <div className="flex gap-2">
                 <button type="button" onClick={submit} disabled={sending || !state.enabled} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
                   {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ya, masukkan ke antrean

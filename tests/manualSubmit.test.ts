@@ -344,9 +344,9 @@ test("kabel: Lamaran Saya memasang panel di jendela detail dan memuat ulang papa
 
 test("kabel: layanan membaca log manual dan alamat lowongan, dan memanggil endpoint mark-sent lewat automationApi", () => {
   const svc = read("../src/services/emailApplyService.ts");
-  assert.match(svc, /\.select\("details, created_at"\)\.eq\("status", "success"\)/);
+  assert.match(svc, /\.select\("action, details, created_at"\)\.eq\("status", "success"\)/);
   assert.match(svc, /details\?\.manual === true/);
-  assert.match(svc, /\.select\("id, description, external_url"\)/);
+  assert.match(svc, /\.select\("id, title, description, requirements, responsibilities, external_url"\)/);
   assert.match(svc, /safeJobUrl\(/);
   const api = read("../src/services/automationApi.ts");
   assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/mark-sent/);

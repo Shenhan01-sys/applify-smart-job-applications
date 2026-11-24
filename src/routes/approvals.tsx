@@ -51,6 +51,7 @@ interface ApprovalRequest {
   job_id?: string | null;
   application_id?: string | null;
   cover_letter?: string | null;
+  resume_url?: string | null;
 }
 
 function ApprovalsPage() {
@@ -369,6 +370,8 @@ function ApprovalsPage() {
                         job={emailData.jobs[request.id]}
                         suggestions={emailData.suggestions[request.id]}
                         testMode={emailData.testMode.has(request.id)}
+                        plan={emailData.attachmentPlans[request.id]}
+                        sent={emailData.sentAttachments[request.id]}
                         onQueued={(id) =>
                           setEmailData((d) => ({ ...d, jobs: { ...d.jobs, [id]: { status: 'pending', error_message: null } } }))
                         }

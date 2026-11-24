@@ -10,6 +10,9 @@ import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 import { buildAgentApplyRows, latestQueueJobIds } from "@/lib/agentApplyRows";
 import { manualSentRow, safeJobUrl } from "@/lib/manualSubmit";
 import { isRealSubmitOffLog } from "@/lib/emailTestMode";
+import { jobPostingText, parseSentAttachments, planEmailAttachments, type AttachmentPlan, type SentAttachments } from "@/lib/emailAttachments";
+import { DOCUMENT_COLUMN, DOCUMENT_KINDS, isMissingDocumentColumn, parseDocumentPath, type DocumentKind } from "@/lib/profileDocuments";
+import { parseResumePath } from "@/lib/resumeUpload";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -30,11 +33,15 @@ export interface EmailApplyData {
   jobUrls: Record<string, string>;
   /** approval ids whose email job finished without sending because real sending is off (test mode, application_logs skipped) */
   testMode: Set<string>;
+  /** Lampiran yang akan dikirim, per id persetujuan. Kosong bila profil atau lowongan tidak terbaca (pratinjau saja, bukan syarat kirim). */
+  attachmentPlans: Record<string, AttachmentPlan>;
+  /** Lampiran yang tercatat pada email yang sudah terkirim (log email_apply success), per id persetujuan. */
+  sentAttachments: Record<string, SentAttachments>;
   /** Status agen sudah terbaca dari database. false = belum dimuat atau gagal, jadi "tidak ada tugas" belum berarti apa-apa. */
   agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), agentKnown: false });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -82,6 +89,48 @@ async function loadAgentApplyRows(ids: string[]): Promise<{ rows: Record<string,
   return { rows: buildAgentApplyRows(queueRows, workerLogs, extensionLogs), complete: !queue.error };
 }
 
+interface AttachmentProfile {
+  name: string | null;
+  hasCv: boolean;
+  /** Ekstensi dokumen opsional yang tersimpan di profil, null bila tidak ada. */
+  documents: Record<DocumentKind, string | null>;
+}
+
+/**
+ * Nama, CV, dan dokumen opsional profil pengguna yang masuk, untuk pratinjau lampiran. Kolom dokumen yang belum ada di
+ * database (migrasi belum jalan) berarti tidak ada dokumen. Null bila profil tidak terbaca: pratinjau lampiran dilewati.
+ */
+async function loadAttachmentProfile(): Promise<AttachmentProfile | null> {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth?.user?.id;
+    if (!userId) return null;
+    let res: { data: unknown; error: unknown } = await supabase
+      .from("profiles")
+      .select("full_name, resume_url, transcript_url, portfolio_file_url")
+      .eq("id", userId)
+      .maybeSingle();
+    if (res.error && isMissingDocumentColumn(res.error)) {
+      res = await supabase.from("profiles").select("full_name, resume_url").eq("id", userId).maybeSingle();
+    }
+    if (res.error) return null;
+    const row = (res.data ?? {}) as Record<string, unknown>;
+    const documents = { transcript: null, portfolio: null } as Record<DocumentKind, string | null>;
+    for (const kind of DOCUMENT_KINDS) {
+      const ref = parseDocumentPath(kind, row[DOCUMENT_COLUMN[kind]], userId);
+      documents[kind] = ref ? (/\.(pdf|docx?)$/.exec(ref.fileName)?.[1] ?? null) : null;
+    }
+    return {
+      name: typeof row.full_name === "string" ? row.full_name : null,
+      hasCv: parseResumePath(row.resume_url, userId) !== null,
+      documents,
+    };
+  } catch (err) {
+    console.warn("[emailApply] attachment preview skipped:", err);
+    return null;
+  }
+}
+
 /**
  * Everything the email action needs for a list of approvals, read with the user's own session (RLS owner
  * policies on application_logs and automation_queue; jobs is readable by any signed-in user):
@@ -99,16 +148,16 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const jobIds = [...new Set(approved.map((a) => a.job_id).filter((x): x is string => !!x))];
 
   let agentKnown = true;
-  const [gmail, logs, queue, jobs, agent, claimRes, skippedLogs] = await Promise.all([
+  const [gmail, logs, queue, jobs, agent, claimRes, skippedLogs, profile] = await Promise.all([
     automationApi.getGmailStatus(),
-    supabase.from("application_logs").select("details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
+    supabase.from("application_logs").select("action, details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
       .from("automation_queue")
       .select("status, error_message, created_at, payload")
       .eq("job_type", "email_apply")
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
-    jobIds.length > 0 ? supabase.from("jobs").select("id, description, external_url").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
+    jobIds.length > 0 ? supabase.from("jobs").select("id, title, description, requirements, responsibilities, external_url").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
     loadAgentApplyRows(ids)
       .then((res) => {
         agentKnown = res.complete;
@@ -127,6 +176,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       .eq("action", "email_apply")
       .eq("status", "skipped")
       .in("details->>approval_request_id", ids),
+    loadAttachmentProfile(),
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;
@@ -143,6 +193,11 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     const id = (row as any)?.details?.approval_request_id;
     if (typeof id !== "string") continue;
     data.used.add(id);
+    // Lampiran yang tercatat worker pada email yang terkirim (baris log email_apply; email lama tidak punya daftarnya).
+    if ((row as any)?.action === "email_apply" && !data.sentAttachments[id]) {
+      const sent = parseSentAttachments((row as any)?.details);
+      if (sent) data.sentAttachments[id] = sent;
+    }
     // Ditandai terkirim oleh pengguna sendiri: kartu menampilkannya sebagai hasil percobaan terbaru, bukan kiriman agen.
     if ((row as any)?.details?.manual === true) {
       data.manual.add(id);
@@ -164,9 +219,11 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   }
 
   const descriptionByJob = new Map<string, string>();
+  const textByJob = new Map<string, string>();
   const urlByJob = new Map<string, string>();
   for (const j of jobs.data ?? []) {
     descriptionByJob.set((j as any).id, String((j as any).description ?? ""));
+    textByJob.set((j as any).id, jobPostingText(j as Record<string, unknown>));
     const url = safeJobUrl((j as any).external_url);
     if (url) urlByJob.set((j as any).id, url);
   }
@@ -175,6 +232,17 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     if (found.length > 0) data.suggestions[a.id] = found;
     const url = a.job_id ? urlByJob.get(a.job_id) : undefined;
     if (url) data.jobUrls[a.id] = url;
+    // Pratinjau lampiran: butuh profil dan teks lowongan; tanpa salah satunya, panel tidak menampilkan daftar.
+    if (profile && a.job_id && textByJob.has(a.job_id)) {
+      data.attachmentPlans[a.id] = planEmailAttachments({
+        resumeUrl: a.resume_url,
+        profileHasCv: profile.hasCv,
+        coverLetter: a.cover_letter,
+        applicantName: profile.name,
+        jobText: textByJob.get(a.job_id) ?? "",
+        documents: profile.documents,
+      });
+    }
   }
   return data;
 }
