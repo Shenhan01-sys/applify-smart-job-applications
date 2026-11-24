@@ -24,6 +24,10 @@ test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekst
   const kid = classifyJobChannel({ platform_source: "other", external_url: "https://www.kalibrr.id/c/acme/jobs/1" });
   assert.equal(kid.channel, "auth_portal");
   assert.equal(kid.extensionSupported, true);
+  // Samakan dengan backend: label platform_source ATS tidak boleh menimpa URL portal login ke worker.
+  const mismatched = classifyJobChannel({ platform_source: "greenhouse", external_url: "https://id.jobstreet.com/id/job/96011760" });
+  assert.equal(mismatched.channel, "auth_portal");
+  assert.equal(mismatched.autoWorkerSupported, false);
   const fake = classifyJobChannel({ platform_source: "other", external_url: "https://kalibrr.id.evil.test/jobs/1" });
   assert.notEqual(fake.channel, "auth_portal");
 

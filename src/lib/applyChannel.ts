@@ -35,35 +35,16 @@ export interface ChannelClassification {
   reason: string;
 }
 
-const PUBLIC_ATS_DOMAINS = [
-  "greenhouse.io",
-  "lever.co",
-  "ashbyhq.com",
-  "workable.com",
-  "smartrecruiters.com",
-  "recruitee.com",
-  "breezy.hr",
-  "bamboohr.com",
-  "jazzhr.com",
-] as const;
+import {
+  EXTENSION_LOGIN_PORTAL_DOMAINS,
+  OTHER_AUTH_PORTAL_DOMAINS,
+  PUBLIC_ATS_DOMAINS,
+} from "./domainManifest.generated.ts";
 
 const AUTH_PORTAL_DOMAINS = [
   "linkedin.com",
-  "jobstreet.co.id",
-  "jobstreet.com",
-  "kalibrr.com",
-  "kalibrr.id",
-  "glints.com",
-  "karir.com",
-  "dealls.com",
-  "techinasia.com",
-  "indeed.com",
-  "glassdoor.com",
-  "myworkdayjobs.com",
-  "workday.com",
-  "icims.com",
-  "taleo.net",
-  "successfactors.com",
+  ...EXTENSION_LOGIN_PORTAL_DOMAINS,
+  ...OTHER_AUTH_PORTAL_DOMAINS,
 ] as const;
 
 const AUTH_PORTAL_PLATFORMS = new Set([
@@ -203,7 +184,11 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     };
   }
 
-  if (resolvedAtsUrl || (platform && PUBLIC_ATS_PLATFORMS.has(platform) && primaryUrl)) {
+  // Samakan dengan backend/services/apply-channel.ts: platform ATS pada URL portal login tetap masuk kanal portal ekstensi.
+  const primaryHost = primaryUrl ? new URL(primaryUrl).hostname : "";
+  const primaryOnLoginPortal = Boolean(primaryHost) && hostMatchesDomain(primaryHost, EXTENSION_LOGIN_PORTAL_DOMAINS);
+
+  if (resolvedAtsUrl || (platform && PUBLIC_ATS_PLATFORMS.has(platform) && primaryUrl && !primaryOnLoginPortal)) {
     const targetUrl = resolvedAtsUrl ?? primaryUrl;
     return {
       channel: "public_ats",
@@ -238,7 +223,6 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     };
   }
 
-  const primaryHost = primaryUrl ? new URL(primaryUrl).hostname : "";
   const isPortal =
     (primaryHost && hostMatchesDomain(primaryHost, AUTH_PORTAL_DOMAINS)) ||
     (platform ? AUTH_PORTAL_PLATFORMS.has(platform) : false);
