@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
+import {
+  EXTENSION_COPY_FAILED_TEXT,
+  EXTENSION_INSTALL_STEPS,
+  EXTENSION_TOKEN_PASTE_WARNING,
+  copyToClipboard,
+  describeTokenExpiry,
+} from "@/lib/extensionConnect";
 import { Check, Copy, KeyRound, Loader2, ShieldAlert } from "lucide-react";
 
 interface ExtensionTokenState {
@@ -23,12 +30,15 @@ export function ExtensionConnectCard() {
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<ExtensionTokenState | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
+  // Peramban menolak menyalin otomatis (halaman non-HTTPS, izin ditolak): token tampil utuh di kotak yang bisa dipilih.
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
     setNotice("");
     setCopiedToken(false);
+    setCopyFailed(false);
     try {
       const res = await automationApi.createExtensionToken(14400);
       setIssued({ token: res.token, expiresAt: res.expiresAt, scope: res.scope });
@@ -57,9 +67,10 @@ export function ExtensionConnectCard() {
   // Alamat server sudah tertanam di ekstensi, jadi pengguna hanya menyalin token.
   const copyToken = async (text: string) => {
     if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopiedToken(true);
-    setTimeout(() => setCopiedToken(false), 2000);
+    const ok = await copyToClipboard(text, typeof navigator === "undefined" ? null : navigator);
+    setCopyFailed(!ok);
+    setCopiedToken(ok);
+    if (ok) setTimeout(() => setCopiedToken(false), 2000);
   };
 
   return (
@@ -70,8 +81,13 @@ export function ExtensionConnectCard() {
         </p>
         <p>
           Ekstensi berjalan di tab Chrome/Edge milikmu sendiri. Kata sandi dan cookie portal tetap tinggal di browser-mu,
-          dan setiap kiriman tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap manual-only.
+          dan setiap kiriman tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap harus dilamar manual.
         </p>
+        <ol data-testid="extension-install-steps" className="list-decimal space-y-0.5 pl-4 pt-0.5">
+          {EXTENSION_INSTALL_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
       </div>
 
       {notice && (
@@ -89,11 +105,9 @@ export function ExtensionConnectCard() {
 
       {issued ? (
         <div className="rounded-xl border-2 border-[#0A5BE0]/30 bg-white p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="font-semibold text-[#16150F]">Token Koneksi Aktif (scope: {issued.scope})</span>
-            <span className="text-muted-foreground">
-              Berlaku s.d. {new Date(issued.expiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-            </span>
+          <div className="space-y-0.5 text-xs">
+            <p className="font-semibold text-[#16150F]">Token koneksi aktif</p>
+            <p data-testid="extension-token-expiry" className="text-muted-foreground">{describeTokenExpiry(issued.expiresAt)}</p>
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 rounded-lg bg-[#F5F5F5] px-2.5 py-2 text-xs font-mono truncate" title="Token koneksi ekstensi">
@@ -108,9 +122,21 @@ export function ExtensionConnectCard() {
               {copiedToken ? "Tersalin" : "Salin Token"}
             </button>
           </div>
-          <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">
-            Tempel token ini hanya ke panel samping Ekstensi Browser Applify (Chrome/Edge), jangan pernah ke situs lain.
-          </p>
+          {copyFailed && (
+            <div role="status" data-testid="extension-token-fallback" className="space-y-1.5">
+              <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">{EXTENSION_COPY_FAILED_TEXT}</p>
+              <input
+                type="text"
+                readOnly
+                value={issued.token}
+                aria-label="Token koneksi ekstensi (pilih lalu salin)"
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => e.currentTarget.select()}
+                className="w-full rounded-lg border-2 border-black/[10%] bg-[#F5F5F5] px-2.5 py-2 text-xs font-mono"
+              />
+            </div>
+          )}
+          <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">{EXTENSION_TOKEN_PASTE_WARNING}</p>
         </div>
       ) : null}
 
