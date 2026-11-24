@@ -677,7 +677,7 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
     const hint = app.getByTestId("extension-wait-hint");
     await expect(hint).toHaveAttribute("data-wait-reason", "permission_required");
     await expect(hint).toHaveText("Ekstensi perlu izin untuk membuka dealls.com. Buka panel ekstensi Applify lalu klik Izinkan dealls.com.");
-    await expect(app.getByText(/akan membuka tab latar belakang/)).toHaveCount(0);
+    await expect(app.getByText(/akan membuka tab baru di browser kamu/)).toHaveCount(0);
   });
 
   test("baris lama dengan pesan tanpa kode tetap terbaca sebagai butuh izin, tanpa menyebut host", async ({ app, backend }) => {
@@ -707,7 +707,7 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
     await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
-    await expect(app.getByText(/Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif/)).toBeVisible();
+    await expect(app.getByText(/Ekstensi akan membuka tab baru di browser kamu dan mengisi formulir di sana/)).toBeVisible();
     await expect(app.getByTestId("extension-wait-hint")).toHaveCount(0);
   });
 });

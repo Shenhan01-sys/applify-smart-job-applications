@@ -91,7 +91,7 @@ test("kartu agen: pending ekstensi tertahan izin menyebut host dan diberi sorota
 test("kartu agen: menunggu biasa dan tugas worker tidak berubah", () => {
   const plain = describeAgentApply({ status: "pending", job_type: "extension_apply", scheduled_at: iso(NOW - 30_000) }, NOW);
   assert.equal(plain.waitReason, undefined);
-  assert.match(plain.hint, /Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif/);
+  assert.match(plain.hint, /Ekstensi akan membuka tab baru di browser kamu dan mengisi formulir di sana\. Kamu bisa melihat prosesnya/);
 
   // Tugas worker (bukan ekstensi) dengan pesan serupa tidak diperlakukan sebagai izin ekstensi.
   const worker = describeAgentApply({ status: "pending", job_type: "apply", error_message: PERMISSION_ERROR, scheduled_at: iso(NOW - 60 * 60_000) }, NOW);
@@ -108,7 +108,7 @@ test("queueStatusHint (panel antrean): pesan izin ikut tampil lewat error_messag
     queueStatusHint("pending", "extension_apply", PERMISSION_ERROR),
     "Ekstensi perlu izin untuk membuka dealls.com. Buka panel ekstensi Applify lalu klik Izinkan dealls.com.",
   );
-  assert.match(queueStatusHint("pending", "extension_apply", null), /Ekstensi akan membuka tab latar belakang/);
+  assert.match(queueStatusHint("pending", "extension_apply", null), /Ekstensi akan membuka tab baru di browser kamu/);
   assert.match(queueStatusHint("pending", "extension_apply", null, null, null, { scheduledAt: iso(NOW - 20 * 60_000), now: NOW }), /Belum ada ekstensi Applify yang aktif/);
   assert.match(queueStatusHint("pending", "apply", PERMISSION_ERROR), /Agen akan mengerjakannya/);
 });

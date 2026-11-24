@@ -158,7 +158,7 @@ export function queueStatusHint(
         if (reason) return reason;
       }
       return isExt
-        ? "Tugas sudah masuk antrean Ekstensi Browser. Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif."
+        ? "Tugas sudah masuk antrean Ekstensi Browser. Ekstensi akan membuka tab baru di browser kamu dan mengisi formulir di sana. Kamu bisa melihat prosesnya."
         : "Tugas sudah masuk antrean. Agen akan mengerjakannya begitu gilirannya tiba; kamu tidak perlu melakukan apa-apa.";
     }
     case "processing":
