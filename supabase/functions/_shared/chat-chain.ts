@@ -8,7 +8,7 @@
 //
 // Yang dicatat hanya nama model, kode alasan, dan lama panggilan. Isi prompt, isi jawaban, badan galat penyedia,
 // dan kunci tidak pernah dicatat.
-import { chatBody, type ResolvedModel } from "./providers.ts";
+import { chatBody, postChat, type ResolvedModel } from "./providers.ts";
 import { stripReasoning } from "./output-guard.ts";
 
 export interface ChainAttempt {
@@ -76,13 +76,15 @@ export async function runChain<T>(models: ResolvedModel[], opts: ChainOptions<T>
 
     let resp: Response;
     try {
-      resp = await doFetch(candidate.url, {
-        method: "POST",
-        headers: candidate.headers,
-        signal: AbortSignal.timeout(opts.timeoutMs),
+      // Numes memakai kolam kunci: kunci berikutnya mencoba model yang sama selama anggaran rantai belum habis.
+      resp = await postChat(candidate, {
+        fetchFn: doFetch,
+        timeoutMs: () => opts.timeoutMs,
+        canRetry: () => opts.budgetMs === undefined || now() - chainStart < opts.budgetMs,
         body: JSON.stringify(
           chatBody(candidate, opts.messages, { temperature: opts.temperature, maxTokens: opts.maxTokens }),
         ),
+        log: (line) => logger.error(`${opts.tag} ${line.replace(/^\[AI\] /, "")}`),
       });
     } catch (e) {
       fail(networkReason(e));

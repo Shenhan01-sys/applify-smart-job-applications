@@ -11,6 +11,7 @@
 // Rancangan lengkap: Applify-Obsidian/NextRoadMap/19 - Rancangan BYOK (2026-11-23).md
 
 import { chatBody, CLAUDE_MIN_MAX_TOKENS, type ResolvedModel } from "./providers.ts";
+import type { NumesKeyPool } from "./numes-keys.ts";
 import { ANTHROPIC_VERSION, BYOK_PRESETS, byokPreset, MODEL_NAME_RE, type ByokFormat } from "./byok-providers.ts";
 
 export const BYOK_MIN_SECRET_LENGTH = 32;
@@ -115,6 +116,8 @@ export interface ChainTarget {
   source: "byok" | "applify";
   /** Hanya untuk BYOK: ciphertext baris key asal. */
   keyEncrypted?: string;
+  /** Hanya key Applify untuk Numes: kolam kunci platform (postChat di providers.ts memakainya). */
+  pool?: NumesKeyPool;
 }
 
 /**

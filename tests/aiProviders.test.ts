@@ -9,11 +9,16 @@ import {
   DEFAULT_AI_TOTAL_BUDGET_MS,
   MIN_AI_CALL_MS,
   nextCallTimeoutMs,
+  numesKeysFromEnv,
   positiveMs,
   parseModelList,
+  anthropicLast,
+  platformChain,
+  postChat,
   resolveChain,
   resolveModel,
 } from "../supabase/functions/_shared/providers.ts";
+import { NUMES_COOLDOWN_RATE_MS, resetNumesPools } from "../supabase/functions/_shared/numes-keys.ts";
 
 // ---- penyedia model Edge Function: Gemini, Anthropic, dan OpenRouter dalam satu rantai ----------------
 
@@ -43,7 +48,8 @@ test("penyedia: awalan numes: diarahkan ke Numes, nama model utuh (memuat / dan 
   assert.equal(n.entry, "numes:z-ai/glm-5.3-flash:free");
   assert.equal(n.model, "z-ai/glm-5.3-flash:free");
   assert.equal(n.url, "https://api.numes.ai/api/v1/chat/completions");
-  assert.equal(n.headers.Authorization, "Bearer n-key");
+  assert.equal(n.headers.Authorization, undefined, "kunci Numes dipasang per percobaan oleh kolam kunci (postChat)");
+  assert.equal(n.pool?.size, 1);
   assert.equal(n.headers["Content-Type"], "application/json");
   assert.equal(n.headers["X-Title"], undefined, "header khusus OpenRouter tidak ikut");
 
@@ -75,29 +81,196 @@ test("penyedia: entri tanpa kunci dilewati dan urutan rantai dipertahankan", () 
   assert.equal(resolveChain(["anthropic:claude-haiku-5-5"], {}).length, 0);
 });
 
-test("penyedia: rantai bawaan Free diawali Claude Sonnet 5.5 lalu Haiku 5.5, Pro diawali Gemini 4", () => {
+test("penyedia: rantai bawaan Free diawali Numes (GLM, DeepSeek), lalu Gemini, OpenRouter gratis, dan Claude Haiku paling akhir", () => {
   const free = parseModelList("", DEFAULT_FREE_MODELS);
-  assert.deepEqual(free.slice(0, 2), ["anthropic:claude-sonnet-5-5", "anthropic:claude-haiku-5-5"]);
-  assert.deepEqual(free.slice(2, 4), ["numes:z-ai/glm-5.3-flash:free", "numes:deepseek/deepseek-v4.1-flash:free"]);
-  assert.equal(free[4], "gemini:gemini-3.5-flash-lite");
-  assert.deepEqual(free.slice(5), ["google/gemma-4-31b-it:free", "openrouter/free"]);
+  assert.deepEqual(free, [
+    "numes:z-ai/glm-5.3-flash:free",
+    "numes:deepseek/deepseek-v4.1-flash:free",
+    "gemini:gemini-3.5-flash-lite",
+    "google/gemma-4-31b-it:free",
+    "openrouter/free",
+    "anthropic:claude-haiku-5-5",
+  ]);
   const withAll = resolveChain(free, ALL);
-  assert.deepEqual(withAll.map((c) => c.provider), ["anthropic", "anthropic", "numes", "numes", "gemini", "openrouter", "openrouter"]);
-  // tanpa kunci Claude, rantai langsung mulai dari Numes
-  const noClaude = resolveChain(free, { openrouter: "or-key", gemini: "g-key", numes: "n-key" });
-  assert.deepEqual(noClaude.map((c) => c.provider), ["numes", "numes", "gemini", "openrouter", "openrouter"]);
-  assert.equal(parseModelList(undefined, DEFAULT_PRO_MODELS)[0], "gemini:gemini-4-hydrogen");
+  assert.deepEqual(withAll.map((c) => c.provider), ["numes", "numes", "gemini", "openrouter", "openrouter", "anthropic"]);
+  // tanpa kunci Numes dan Claude, rantai mulai dari Gemini
+  const noNumes = resolveChain(free, { openrouter: "or-key", gemini: "g-key" });
+  assert.deepEqual(noNumes.map((c) => c.provider), ["gemini", "openrouter", "openrouter"]);
   assert.deepEqual(parseModelList(" a , b ,, ", "x"), ["a", "b"]);
+});
+
+test("penyedia: rantai bawaan Pro diawali Numes, lalu Gemini 4, OpenRouter gratis, dan Claude Sonnet lalu Haiku paling akhir", () => {
+  const pro = parseModelList(undefined, DEFAULT_PRO_MODELS);
+  assert.deepEqual(pro, [
+    "numes:z-ai/glm-5.3-flash:free",
+    "numes:deepseek/deepseek-v4.1-flash:free",
+    "gemini:gemini-4-hydrogen",
+    "gemini:gemini-4-argon",
+    "google/gemma-4-31b-it:free",
+    "openrouter/free",
+    "anthropic:claude-sonnet-5-5",
+    "anthropic:claude-haiku-5-5",
+  ]);
+  assert.ok(!pro.some((e) => /deepseek-v4-pro/.test(e)));
+  assert.deepEqual(resolveChain(pro, ALL).map((c) => c.provider), ["numes", "numes", "gemini", "gemini", "openrouter", "openrouter", "anthropic", "anthropic"]);
+});
+
+test("penyedia: Anthropic hanya di ujung kedua rantai bawaan, dan platformChain memindahkannya ke ujung walau env menaruhnya di depan", () => {
+  for (const list of [DEFAULT_FREE_MODELS, DEFAULT_PRO_MODELS].map((l) => parseModelList(undefined, l))) {
+    const first = list.findIndex((e) => e.startsWith("anthropic:"));
+    assert.ok(first > 0);
+    assert.ok(list.slice(first).every((e) => e.startsWith("anthropic:")));
+  }
+  assert.deepEqual(anthropicLast(["anthropic:a", "numes:x/y", "gemini:g", "anthropic:b", "z/w:free"]), ["numes:x/y", "gemini:g", "z/w:free", "anthropic:a", "anthropic:b"]);
+  const keys = { openrouter: "or", gemini: "g", anthropic: "a", numes: ["n"] };
+  const chain = platformChain(["anthropic:claude-haiku-5-5", "gemini:g1", "numes:x/y:free", "vendor/m:free"], keys);
+  assert.deepEqual(chain.map((c) => c.entry), ["gemini:g1", "numes:x/y:free", "vendor/m:free", "anthropic:claude-haiku-5-5"]);
+  // resolveChain sendiri tetap mempertahankan urutan
+  assert.deepEqual(resolveChain(["anthropic:claude-haiku-5-5", "gemini:g1"], keys).map((c) => c.provider), ["anthropic", "gemini"]);
+  // tanpa kunci Numes entri Numes dilewati
+  assert.deepEqual(platformChain(["numes:x/y:free", "gemini:g1"], { gemini: "g" }).map((c) => c.provider), ["gemini"]);
+});
+
+test("numesKeysFromEnv membaca NUMES_API_KEY, _2, _3, dan NUMES_API_KEYS dari secret", () => {
+  const secrets: Record<string, string> = { NUMES_API_KEY: "k1", NUMES_API_KEY_2: " k2 ", NUMES_API_KEYS: "k2,k3,k4" };
+  assert.deepEqual(numesKeysFromEnv((name) => secrets[name]), ["k1", "k2", "k3"]);
+  assert.deepEqual(numesKeysFromEnv(() => undefined), []);
+  assert.deepEqual(numesKeysFromEnv(() => null), []);
+  assert.deepEqual(numesKeysFromEnv(() => ""), []);
+  // satu string tetap diterima sebagai kunci tunggal
+  assert.equal(resolveModel("numes:x/y:free", { numes: "solo" })!.pool!.size, 1);
+  assert.equal(resolveModel("numes:x/y:free", { numes: ["a", "b", ""] })!.pool!.size, 2);
+});
+
+// ---- postChat: satu panggilan chat dengan kolam kunci Numes ---------------------------------------------------
+
+const NK1 = "nk-one-not-real";
+const NK2 = "nk-two-not-real";
+const NK3 = "nk-three-not-real";
+const NUMES_MODEL = "numes:z-ai/glm-5.3-flash:free";
+type Step = number | Error | { status: number; headers?: Record<string, string>; body?: unknown };
+
+function numesHarness(keys: string[], script: (auth: string, call: number) => Step) {
+  resetNumesPools();
+  const target = resolveModel(NUMES_MODEL, { numes: keys })!;
+  const calls: Array<{ auth: string; signal: AbortSignal | null | undefined; redirect?: string }> = [];
+  const logs: string[] = [];
+  let n = 0;
+  const fetchFn = (async (_url: string, init: RequestInit) => {
+    const auth = String((init.headers as Record<string, string>).Authorization);
+    calls.push({ auth, signal: init.signal, redirect: init.redirect });
+    const step = script(auth, ++n);
+    if (step instanceof Error) throw step;
+    const { status, headers, body } = typeof step === "number" ? { status: step, headers: undefined, body: undefined } : step;
+    const payload = body ?? (status >= 200 && status < 300 ? { choices: [{ message: { content: "OK" } }] } : { error: { code: status, message: "x", metadata: { error_type: "rate_limited" } } });
+    return new Response(JSON.stringify(payload), { status, headers });
+  }) as unknown as typeof fetch;
+  const post = (extra: Record<string, unknown> = {}) =>
+    postChat(target, { body: "{}", timeoutMs: () => 20_000, fetchFn, log: (l) => logs.push(l), ...extra });
+  return { target, calls, logs, post };
+}
+
+test("postChat: kunci pertama berhasil, header Authorization dipasang per percobaan dan kunci berputar antarpanggilan", async () => {
+  const h = numesHarness([NK1, NK2, NK3], () => 200);
+  for (let i = 0; i < 4; i++) assert.equal((await h.post()).status, 200);
+  assert.deepEqual(h.calls.map((c) => c.auth), [NK1, NK2, NK3, NK1].map((k) => `Bearer ${k}`));
+  assert.equal(h.target.headers.Authorization, undefined);
+});
+
+for (const [name, step] of [
+  ["429", { status: 429, headers: { "retry-after": "20" } }],
+  ["402", 402],
+  ["401", 401],
+  ["403", 403],
+  ["503", 503],
+  ["batas waktu", new DOMException("t", "TimeoutError")],
+] as Array<[string, Step]>) {
+  test(`postChat: ${name} pada kunci 1 = model yang sama dengan kunci 2`, async () => {
+    const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK1}` ? step : 200));
+    const resp = await h.post();
+    assert.equal(resp.status, 200);
+    assert.deepEqual(h.calls.map((c) => c.auth), [NK1, NK2].map((k) => `Bearer ${k}`));
+  });
+}
+
+test("postChat: semua kunci gagal mengembalikan jawaban gagal terakhir (bisa dibaca), pemanggil lanjut ke model berikutnya", async () => {
+  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK1}` ? 429 : auth === `Bearer ${NK2}` ? 402 : 503));
+  const resp = await h.post();
+  assert.equal(resp.status, 503);
+  assert.equal(h.calls.length, 3);
+  assert.match(await resp.text(), /error/);
+});
+
+test("postChat: kunci yang kena 429 didinginkan 60 detik, kunci dingin dilewati, semua dingin = 503 buatan tanpa panggilan", async () => {
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  try {
+    const h = numesHarness([NK1, NK2], () => 429);
+    assert.equal((await h.post()).status, 429); // K1 429, K2 429
+    assert.equal(h.calls.length, 2);
+    h.calls.length = 0;
+    const blocked = await h.post();
+    assert.equal(blocked.status, 503);
+    assert.match(await blocked.text(), /no_numes_key_available/);
+    assert.equal(h.calls.length, 0, "tidak ada panggilan selama semua kunci dingin");
+    skew += NUMES_COOLDOWN_RATE_MS + 1;
+    await h.post();
+    assert.equal(h.calls.length, 2, "kunci kembali dipakai sesudah masa dingin");
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("postChat: anggaran waktu habis (timeoutMs 0) menghentikan percobaan tambahan", async () => {
+  resetNumesPools();
+  const target = resolveModel(NUMES_MODEL, { numes: [NK1, NK2, NK3] })!;
+  let budget = 20_000;
+  let n = 0;
+  const fetchFn = (async () => {
+    n++;
+    budget = 0; // waktu habis sesudah percobaan pertama
+    return new Response("{}", { status: 429 });
+  }) as unknown as typeof fetch;
+  const resp = await postChat(target, { body: "{}", timeoutMs: () => budget, fetchFn, log: () => {} });
+  assert.equal(resp.status, 429);
+  assert.equal(n, 1);
+});
+
+test("postChat: log hanya memuat nomor kunci, tidak pernah nilainya", async () => {
+  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK3}` ? 200 : auth === `Bearer ${NK1}` ? 429 : 503));
+  await h.post();
+  const all = h.logs.join("\n");
+  for (const key of [NK1, NK2, NK3]) assert.ok(!all.includes(key), `log memuat nilai kunci: ${all}`);
+  assert.match(all, /key 1\/3/);
+  assert.match(all, /key 2\/3/);
+});
+
+test("postChat: target biasa (bukan Numes) satu fetch dengan headers-nya, redirect manual untuk key pengguna", async () => {
+  const target = resolveModel("gemini:gemini-3.5-flash-lite", { gemini: "g-key" })!;
+  const seen: Array<{ auth: string; redirect?: string }> = [];
+  const fetchFn = (async (_u: string, init: RequestInit) => {
+    seen.push({ auth: String((init.headers as Record<string, string>).Authorization), redirect: init.redirect });
+    return new Response("{}", { status: 429 });
+  }) as unknown as typeof fetch;
+  const r = await postChat(target, { body: "{}", timeoutMs: () => 1000, fetchFn, redirect: "manual" });
+  assert.equal(r.status, 429);
+  assert.deepEqual(seen, [{ auth: "Bearer g-key", redirect: "manual" }], "tanpa kolam: tidak ada percobaan ulang");
 });
 
 test("Edge Function memakai rantai penyedia dan batas waktu per panggilan yang dibatasi sisa anggaran total", () => {
   const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
   assert.match(src, /from "\.\.\/_shared\/providers\.ts"/);
-  assert.match(src, /AbortSignal\.timeout\(callTimeoutMs\)/);
+  // Batas waktu per percobaan dihitung ulang dari sisa anggaran total dan dipasang di postChat (providers.ts).
+  assert.match(src, /postChat\(candidate, \{\s*timeoutMs: \(\) => nextCallTimeoutMs\(\{ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date\.now\(\) - requestStarted \}\)/);
   assert.doesNotMatch(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
+  const providersSrc = readFileSync(new URL("../supabase/functions/_shared/providers.ts", import.meta.url), "utf8");
+  assert.match(providersSrc, /signal: AbortSignal\.timeout\(Math\.max\(1, opts\.timeoutMs\(\)\)\)/);
   assert.doesNotMatch(src, /fetch\("https:\/\/openrouter\.ai/);
-  // kunci Numes dibaca dari secret yang sama dengan penyedia lain
-  assert.match(src, /numes: Deno\.env\.get\("NUMES_API_KEY"\) \?\? ""/);
+  // kunci Numes (NUMES_API_KEY, _2, _3, NUMES_API_KEYS) dibaca dari secret, dan rantai Applify menaruh Anthropic paling akhir
+  assert.match(src, /numes: numesKeysFromEnv\(\(name\) => Deno\.env\.get\(name\)\)/);
+  assert.match(src, /const FREE_MODELS = platformChain\(/);
+  assert.match(src, /const PRO_MODELS = platformChain\(/);
 });
 
 test("generate-application mencatat hasil tiap kandidat model tanpa isi surat", () => {

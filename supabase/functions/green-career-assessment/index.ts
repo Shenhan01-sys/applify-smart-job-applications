@@ -4,12 +4,14 @@
 // Threshold ready = 70. Tidak ada vonis "ditolak": <70 dapat jalur pengembangan.
 //
 // Model AI: rantai penyedia yang sama dengan generate-application (../_shared/providers.ts). Secret: setidaknya
-// satu dari OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY; opsional FREE_MODELS (atau FREE_MODEL lama).
+// satu dari OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY (atau NUMES_API_KEY_2, NUMES_API_KEY_3,
+// NUMES_API_KEYS untuk kolam kunci Numes); opsional FREE_MODELS (atau FREE_MODEL lama). Urutan bawaan: Numes, Gemini, OpenRouter,
+// Anthropic paling akhir.
 // Dulu fungsi ini memanggil satu model OpenRouter gratis tanpa cadangan dan membalas 500 tanpa baris log saat model
 // itu berhenti menjawab. Kini tiap kegagalan penyedia dan galat database dicatat lewat console.error (kode alasan
 // dan nama model saja, tanpa data pengguna), dan bila semua penyedia gagal balasannya 502 dengan pesan Indonesia.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
-import { DEFAULT_FREE_MODELS, parseModelList, resolveChain } from "../_shared/providers.ts";
+import { DEFAULT_FREE_MODELS, numesKeysFromEnv, parseModelList, platformChain } from "../_shared/providers.ts";
 import { runChain } from "../_shared/chat-chain.ts";
 import {
   MSG_GENERATE_FAILED,
@@ -32,9 +34,9 @@ const PROVIDER_KEYS = {
   openrouter: Deno.env.get("OPENROUTER_API_KEY") ?? "",
   gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
-  numes: Deno.env.get("NUMES_API_KEY") ?? "",
+  numes: numesKeysFromEnv((name) => Deno.env.get(name)),
 };
-const MODELS = resolveChain(
+const MODELS = platformChain(
   parseModelList(Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"), DEFAULT_FREE_MODELS),
   PROVIDER_KEYS,
 );

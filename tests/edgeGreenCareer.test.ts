@@ -29,12 +29,12 @@ const FN = "../supabase/functions/green-career-assessment/index.ts";
 
 test("green-career-assessment: memakai rantai penyedia bersama, bukan satu model OpenRouter gratis", () => {
   const src = read(FN);
-  assert.match(src, /import \{ DEFAULT_FREE_MODELS, parseModelList, resolveChain \} from "\.\.\/_shared\/providers\.ts"/);
+  assert.match(src, /import \{ DEFAULT_FREE_MODELS, numesKeysFromEnv, parseModelList, platformChain \} from "\.\.\/_shared\/providers\.ts"/);
   assert.match(src, /import \{ runChain \} from "\.\.\/_shared\/chat-chain\.ts"/);
-  assert.match(src, /resolveChain\(\s*parseModelList\(Deno\.env\.get\("FREE_MODELS"\) \?\? Deno\.env\.get\("FREE_MODEL"\), DEFAULT_FREE_MODELS\)/);
+  assert.match(src, /platformChain\(\s*parseModelList\(Deno\.env\.get\("FREE_MODELS"\) \?\? Deno\.env\.get\("FREE_MODEL"\), DEFAULT_FREE_MODELS\)/);
   assert.match(src, /GEMINI_API_KEY/);
   assert.match(src, /ANTHROPIC_API_KEY/);
-  assert.match(src, /numes: Deno\.env\.get\("NUMES_API_KEY"\) \?\? ""/);
+  assert.match(src, /numes: numesKeysFromEnv\(\(name\) => Deno\.env\.get\(name\)\)/);
   // dua mode sama-sama lewat runChain
   assert.equal([...src.matchAll(/await runChain\(MODELS/g)].length, 2);
   // tidak ada lagi panggilan langsung ke OpenRouter atau model gratis yang sudah dicabut
@@ -190,6 +190,30 @@ test("runChain: semua penyedia gagal mengembalikan ok=false dengan satu baris ga
     ["http_503", "gemini:model-a"], ["http_402", "anthropic:model-b"], ["http_404", "vendor/model-c:free"],
   ]);
   assert.equal(h.logs.length, 0);
+});
+
+test("runChain: Numes memakai kolam kunci: kunci 1 kena 429, kunci 2 menjawab model yang sama; model berikutnya tidak disentuh", async () => {
+  const K1 = "nk-one-not-real";
+  const K2 = "nk-two-not-real";
+  const chain = resolveChain(["numes:z-ai/glm-5.3-flash:free", "gemini:model-a"], { gemini: "g-secret", numes: [K1, K2] });
+  const auths: string[] = [];
+  const errors: string[] = [];
+  const logs: string[] = [];
+  const fetchFn = (async (url: string, init: RequestInit) => {
+    auths.push(`${new URL(url).hostname} ${(init.headers as Record<string, string>).Authorization}`);
+    return auths.length === 1 ? new Response("{}", { status: 429 }) : okBody("OK jawaban");
+  }) as unknown as typeof fetch;
+  const r = await runChain(chain, {
+    tag: "[t]", messages, temperature: 0.4, maxTokens: 900, timeoutMs: 1000,
+    accept: (t: string) => (t.includes("OK") ? t : null), fetchFn, logger: { error: (l) => errors.push(l), log: (l) => logs.push(l) },
+  });
+  assert.equal(r.ok, true);
+  if (r.ok) assert.equal(r.model, "numes:z-ai/glm-5.3-flash:free");
+  assert.deepEqual(auths, [`api.numes.ai Bearer ${K1}`, `api.numes.ai Bearer ${K2}`]);
+  // log pindah kunci hanya memuat nomor kunci
+  const all = [...errors, ...logs].join("\n");
+  assert.match(all, /key 1\/2 -> HTTP 429/);
+  assert.ok(!all.includes(K1) && !all.includes(K2));
 });
 
 test("runChain: rantai kosong atau batas total waktu habis berhenti tanpa memanggil model berikutnya", async () => {

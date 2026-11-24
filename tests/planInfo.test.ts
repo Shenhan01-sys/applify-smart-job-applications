@@ -43,7 +43,7 @@ test("tidak ada model atau klaim yang tidak dipakai kode (GPT-4, Ultimate, 90% a
   }
 });
 
-test("model paket Free ada di kode: Claude Sonnet, Claude Haiku, lalu Gemini untuk draf; Gemma, Nemotron, Qwen, Groq sebagai cadangan", () => {
+test("model paket Free ada di kode: Numes (GLM, DeepSeek), Gemini, Gemma, Nemotron, Qwen, Groq, dan Claude Haiku terakhir", () => {
   assert.match(workerAi, /gemma-4-26b-a4b-it:free/);
   assert.match(workerAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(workerAi, /qwen\/qwen3\.8-27b:free/);
@@ -52,44 +52,49 @@ test("model paket Free ada di kode: Claude Sonnet, Claude Haiku, lalu Gemini unt
   assert.match(backendAi, /nemotron-3-super-120b-a12b:free/);
   assert.match(backendAi, /qwen\/qwen3\.8-27b:free/);
   assert.match(backendAi, /GROQ_MODEL_FALLBACKS/);
-  // Edge Function: rantai draf ada di _shared/providers.ts (Claude Sonnet, Claude Haiku, dua model gratis Numes,
-  // Gemini, lalu model gratis OpenRouter).
-  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,numes:z-ai\/glm-5\.3-flash:free,numes:deepseek\/deepseek-v4\.1-flash:free,gemini:gemini-3\.5-flash-lite,google\/gemma-4-31b-it:free,openrouter\/free"/);
-  assert.match(PLAN_MODELS.free.models[0].name, /Claude Sonnet/);
-  assert.match(PLAN_MODELS.free.models[1].name, /Claude Haiku/);
-  assert.match(PLAN_MODELS.free.models[2].name, /GLM 5\.3 Flash/);
-  assert.match(PLAN_MODELS.free.models[3].name, /DeepSeek V4\.1 Flash/);
-  assert.match(PLAN_MODELS.free.models[4].name, /Gemini/);
-  assert.match(PLAN_MODELS.free.models[2].name + PLAN_MODELS.free.models[3].name, /Numes[\s\S]*Numes/);
-
-  const names = PLAN_MODELS.free.models.map((m) => m.name).join(" | ");
-  for (const word of ["Gemma", "Nemotron", "Qwen", "Groq"]) assert.match(names, new RegExp(word));
+  // Edge Function: rantai draf ada di _shared/providers.ts. Numes dulu, lalu Gemini, model gratis OpenRouter, dan Claude
+  // Haiku paling akhir (24 November 2026: pemilik ingin menghemat kredit Anthropic).
+  assert.match(providers, /const NUMES_MODELS = "numes:z-ai\/glm-5\.3-flash:free,numes:deepseek\/deepseek-v4\.1-flash:free"/);
+  assert.match(providers, /DEFAULT_FREE_MODELS =\s*`\$\{NUMES_MODELS\},gemini:gemini-3\.5-flash-lite,google\/gemma-4-31b-it:free,openrouter\/free,anthropic:claude-haiku-5-5`/);
+  const names = PLAN_MODELS.free.models.map((m) => m.name);
+  assert.match(names[0], /GLM 5\.3 Flash/);
+  assert.match(names[1], /DeepSeek V4\.1 Flash/);
+  assert.match(names[0] + names[1], /Numes[\s\S]*Numes/);
+  assert.match(names[2], /Gemini/);
+  assert.match(names.at(-1)!, /Claude Haiku/);
+  assert.equal(PLAN_MODELS.free.models.at(-1)!.role, "Cadangan");
+  const all = names.join(" | ");
+  for (const word of ["Gemma", "Nemotron", "Qwen", "Groq"]) assert.match(all, new RegExp(word));
   assert.equal(PLAN_MODELS.free.models[0].role, "Utama");
+  // Claude hanya di ujung daftar
+  assert.equal(names.findIndex((n) => /Claude/.test(n)), names.length - 1);
 });
 
-test("teks fitur AI paket Free menyebut Claude Sonnet dan Haiku untuk draf, model gratis hanya sebagai cadangan", () => {
+test("teks fitur AI paket Free menyebut model gratis Numes, Gemini, dan OpenRouter; Claude hanya cadangan terakhir", () => {
   const ai = FREE_FEATURES.find((f) => /^AI Basic/.test(f));
   assert.ok(ai, "ada butir fitur AI Basic");
-  assert.match(ai!, /Claude Sonnet/);
-  assert.match(ai!, /Haiku/);
-  assert.match(ai!, /cadangan/);
-  // butir lama (OpenRouter sebagai model utama) sudah tidak benar untuk draf
-  assert.doesNotMatch(ai!, /OpenRouter/);
-  // Claude yang disebut memang ada di rantai bawaan
-  assert.match(providers, /DEFAULT_FREE_MODELS =\s*"anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5/);
+  assert.match(ai!, /Numes/);
+  assert.match(ai!, /Gemini/);
+  assert.match(ai!, /Claude hanya cadangan terakhir/);
+  assert.doesNotMatch(ai!, /Claude Sonnet/);
+  // Claude yang disebut memang ada di rantai bawaan, dan paling belakang
+  assert.match(providers, /anthropic:claude-haiku-5-5`;?\s*(\/\/|\n)/);
 });
 
-test("model draf paket Pro ada di kode: Gemini 4 Hydrogen (utama), Argon, lalu Claude (cadangan)", () => {
-  assert.match(providers, /DEFAULT_PRO_MODELS =\s*"gemini:gemini-4-hydrogen,gemini:gemini-4-argon,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5"/);
-  assert.doesNotMatch(providers, /DEFAULT_PRO_MODELS =\s*"[^"]*deepseek/);
+test("model draf paket Pro ada di kode: Numes, Gemini 4 Hydrogen dan Argon, lalu Claude (cadangan terakhir)", () => {
+  assert.match(providers, /DEFAULT_PRO_MODELS =\s*`\$\{NUMES_MODELS\},gemini:gemini-4-hydrogen,gemini:gemini-4-argon,google\/gemma-4-31b-it:free,openrouter\/free,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5`/);
+  assert.doesNotMatch(providers, /DEFAULT_PRO_MODELS =\s*`[^`]*deepseek-v4-pro/);
 
-  const [first, second, third, fourth] = PLAN_MODELS.pro.models;
-  assert.match(first.name, /Gemini 4 Hydrogen/);
-  assert.equal(first.role, "Utama");
-  assert.match(second.name, /Gemini 4 Argon/);
-  assert.match(third.name, /Claude Sonnet/);
-  assert.match(fourth.name, /Claude Haiku/);
+  const names = PLAN_MODELS.pro.models.map((m) => m.name);
+  assert.match(names[0], /GLM 5\.3 Flash/);
+  assert.equal(PLAN_MODELS.pro.models[0].role, "Utama");
+  assert.match(names[1], /DeepSeek V4\.1 Flash/);
+  assert.match(names[2], /Gemini 4 Hydrogen/);
+  assert.match(names[3], /Gemini 4 Argon/);
+  assert.match(names[4], /Claude Sonnet/);
+  assert.match(names[5], /Claude Haiku/);
   assert.match(PRO_FEATURES.join(" "), /Gemini 4/);
+  assert.match(PRO_FEATURES.join(" "), /Claude hanya cadangan terakhir/);
   assert.doesNotMatch(PRO_FEATURES.join(" "), /DeepSeek/);
 });
 

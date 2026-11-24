@@ -1,6 +1,8 @@
 // Applify — generate-application Edge Function
 // Server-side AI: enforce monthly quota -> pick model by tier -> call OpenRouter -> persist draft.
-// Secrets: at least one of OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY. Optional: FREE_MODELS /
+// Secrets: at least one of OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, NUMES_API_KEY (also NUMES_API_KEY_2,
+// NUMES_API_KEY_3 or NUMES_API_KEYS: a pool of up to three Numes keys, see ../_shared/numes-keys.ts). Default order:
+// Numes, Gemini, OpenRouter free models, and Anthropic last (the owner wants to save Anthropic credits). Optional: FREE_MODELS /
 // PRO_MODELS (comma-separated, tried in order; "gemini:<model>", "anthropic:<model>" and "numes:<model>" go to those
 // providers, anything else to OpenRouter) or the older single-model FREE_MODEL / PRO_MODEL. See ../_shared/providers.ts.
 // Free OpenRouter slugs are retired regularly (deepseek-v4-flash:free became paid-only in 2026), so a
@@ -14,9 +16,11 @@ import {
   DEFAULT_FREE_MODELS,
   DEFAULT_PRO_MODELS,
   nextCallTimeoutMs,
+  numesKeysFromEnv,
   parseModelList,
   positiveMs,
-  resolveChain,
+  postChat,
+  platformChain,
 } from "../_shared/providers.ts";
 import {
   byokChain,
@@ -60,13 +64,13 @@ const PROVIDER_KEYS = {
   openrouter: OPENROUTER_API_KEY,
   gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
-  numes: Deno.env.get("NUMES_API_KEY") ?? "",
+  numes: numesKeysFromEnv((name) => Deno.env.get(name)),
 };
-const FREE_MODELS = resolveChain(
+const FREE_MODELS = platformChain(
   parseModelList(Deno.env.get("FREE_MODELS") ?? Deno.env.get("FREE_MODEL"), DEFAULT_FREE_MODELS),
   PROVIDER_KEYS,
 );
-const PRO_MODELS = resolveChain(
+const PRO_MODELS = platformChain(
   parseModelList(Deno.env.get("PRO_MODELS") ?? Deno.env.get("PRO_MODEL"), DEFAULT_PRO_MODELS),
   PROVIDER_KEYS,
 );
@@ -299,10 +303,9 @@ Return JSON exactly in this shape:
       }
       let aiResp: Response;
       try {
-        aiResp = await fetch(candidate.url, {
-          method: "POST",
-          headers: candidate.headers,
-          signal: AbortSignal.timeout(callTimeoutMs),
+        // Numes memakai kolam kunci: kunci berikutnya mencoba model yang sama, selama anggaran waktu masih ada.
+        aiResp = await postChat(candidate, {
+          timeoutMs: () => nextCallTimeoutMs({ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - requestStarted }),
           // Key pengguna dan isi CV tidak boleh ikut redirect ke host lain: 3xx dianggap gagal.
           redirect: candidate.source === "byok" ? "manual" : "follow",
           body: JSON.stringify(requestBody(candidate, [

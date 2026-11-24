@@ -4,13 +4,19 @@
 // Setiap entri rantai model ditulis sebagai "<penyedia>:<model>" atau langsung slug OpenRouter:
 //   gemini:gemini-3.5-flash-lite      -> Google AI Studio, endpoint kompatibel OpenAI, kunci GEMINI_API_KEY
 //   anthropic:claude-haiku-5-5        -> Anthropic, endpoint kompatibel OpenAI, kunci ANTHROPIC_API_KEY
-//   numes:z-ai/glm-5.3-flash:free     -> Numes (pasar model), endpoint kompatibel OpenAI, kunci NUMES_API_KEY
+//   numes:z-ai/glm-5.3-flash:free     -> Numes (pasar model), endpoint kompatibel OpenAI, kunci NUMES_API_KEY,
+//                                        NUMES_API_KEY_2, NUMES_API_KEY_3 atau NUMES_API_KEYS (kolam kunci, numes-keys.ts)
 //   google/gemma-4-31b-it:free        -> OpenRouter (tanpa awalan), kunci OPENROUTER_API_KEY
 //   openai:<model>                    -> OpenAI, hanya dipakai dengan key milik pengguna (BYOK, _shared/byok.ts);
 //                                        Applify sendiri tidak punya OPENAI_API_KEY
 // Semuanya menerima format chat completions yang sama, jadi pemanggil cukup mengganti URL, kunci, dan nama model.
 // Hanya awalan pertama yang menjadi penyedia: nama model Numes sendiri memuat "/" dan ":" (author/model:free).
 // Entri yang kuncinya tidak ada dilewati, sehingga rantai tetap jalan walau hanya sebagian kunci terpasang.
+//
+// Urutan: entri "anthropic:" selalu dijalankan paling akhir, apa pun urutan di FREE_MODELS / PRO_MODELS (platformChain).
+// Pemilik ingin menghemat kredit Anthropic, jadi Claude hanya cadangan terakhir (keputusan 24 Nov 2026). Key Anthropic
+// milik pengguna sendiri (BYOK) tidak terpengaruh: rantai BYOK dibuat terpisah di byok.ts dan tetap berjalan lebih dulu.
+import { numesErrorType, numesPoolFor, parseNumesKeys, runWithNumesKeys, type NumesKeyPool } from "./numes-keys.ts";
 
 export type ProviderName = "openrouter" | "gemini" | "anthropic" | "numes" | "openai";
 
@@ -18,8 +24,16 @@ export interface ProviderKeys {
   openrouter?: string;
   gemini?: string;
   anthropic?: string;
-  numes?: string;
+  /** Kunci platform Numes: satu string, atau daftar (satu sampai tiga) untuk kolam kunci. */
+  numes?: string | readonly string[];
   openai?: string;
+}
+
+/** Kunci platform Numes dari secret (NUMES_API_KEY, _2, _3, NUMES_API_KEYS), mis. `numesKeysFromEnv((n) => Deno.env.get(n))`. */
+export function numesKeysFromEnv(get: (name: string) => string | undefined | null): string[] {
+  const env: Record<string, string | undefined> = {};
+  for (const name of ["NUMES_API_KEY", "NUMES_API_KEY_2", "NUMES_API_KEY_3", "NUMES_API_KEYS"]) env[name] = get(name) ?? undefined;
+  return parseNumesKeys(env);
 }
 
 export interface ResolvedModel {
@@ -29,7 +43,10 @@ export interface ResolvedModel {
   /** Nama model yang dikirim ke penyedia. */
   model: string;
   url: string;
+  /** Untuk Numes tanpa Authorization: kuncinya dipasang per percobaan oleh kolam kunci (postChat). */
   headers: Record<string, string>;
+  /** Hanya Numes: kolam kunci platform. */
+  pool?: NumesKeyPool;
 }
 
 const ENDPOINTS: Record<ProviderName, string> = {
@@ -40,18 +57,25 @@ const ENDPOINTS: Record<ProviderName, string> = {
   openai: "https://api.openai.com/v1/chat/completions",
 };
 
+// Model Numes bawaan. Dokumen Numes (numes.ai/docs/models, dibaca 24 Nov 2026) tidak mendaftar id model selain contoh,
+// karena katalognya dinamis (GET /api/v1/models dengan kunci, atau numes.ai/models). Dua id ini dipilih Hans 23 Nov 2026
+// untuk preset Numes (Applify-Obsidian/NextRoadMap/19) dan sama dengan backend dan worker. Akhiran `:free` berarti hanya
+// endpoint berharga nol: tidak pernah ditagih dan tidak pernah jatuh ke endpoint berbayar. Id tanpa `:free` butuh saldo
+// (402 insufficient_credits bila kosong). Paket Pro memakai dua id yang sama karena tidak ada id yang lebih kuat yang
+// bisa diverifikasi dari dokumen; setelah mengecek katalog dan saldo, taruh id berbayar di secret PRO_MODELS.
+const NUMES_MODELS = "numes:z-ai/glm-5.3-flash:free,numes:deepseek/deepseek-v4.1-flash:free";
+
 /** Rantai bawaan bila secret FREE_MODELS / PRO_MODELS tidak diisi. */
-// Free: Claude Sonnet 5.5 dicoba lebih dulu, lalu Claude Haiku 5.5, karena Gemini gratis sering membalas 429/503
-// sehingga pengguna melihat pesan AI sibuk (keputusan Hans, 23 Nov 2026). Sesudah Claude, dua model gratis Numes
-// (GLM 5.3 Flash dan DeepSeek V4.1 Flash); Gemini, Gemma, dan openrouter/free tetap menjadi cadangan terakhir.
-// Entri yang kuncinya tidak ada dilewati (ANTHROPIC_API_KEY untuk Claude, NUMES_API_KEY untuk Numes).
+// Free: Numes dulu (GLM 5.3 Flash lalu DeepSeek V4.1 Flash, gratis), lalu Gemini, lalu model gratis OpenRouter, dan
+// Claude Haiku 5.5 paling akhir. Sebelum 24 Nov 2026 Claude Sonnet dan Haiku di depan; pemilik ingin menghemat kredit
+// Anthropic. Entri yang kuncinya tidak ada dilewati (NUMES_API_KEY..., GEMINI_API_KEY, OPENROUTER_API_KEY, ANTHROPIC_API_KEY).
 export const DEFAULT_FREE_MODELS =
-  "anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5,numes:z-ai/glm-5.3-flash:free,numes:deepseek/deepseek-v4.1-flash:free,gemini:gemini-3.5-flash-lite,google/gemma-4-31b-it:free,openrouter/free";
-// Pro: Gemini 4 menggantikan DeepSeek V4 atas keputusan Hans (19 Nov 2026). Uji coba 19 Nov: gemini-4-argon
-// menolak dengan 429 (kuota free tier 0, butuh billing), gemini-4-hydrogen 503 karena permintaan tinggi.
-// Karena itu Claude Sonnet 5.5 dan Haiku 5.5 (sudah terbukti menjawab) tetap jadi cadangan.
+  `${NUMES_MODELS},gemini:gemini-3.5-flash-lite,google/gemma-4-31b-it:free,openrouter/free,anthropic:claude-haiku-5-5`;
+// Pro: Numes dulu, lalu Gemini 4 (Gemini 4 menggantikan DeepSeek V4 atas keputusan Hans 19 Nov 2026), lalu model gratis
+// OpenRouter, dan Claude Sonnet 5.5 lalu Haiku 5.5 paling akhir. Uji coba 19 Nov: gemini-4-argon menolak dengan 429
+// (kuota free tier 0, butuh billing), gemini-4-hydrogen 503 karena permintaan tinggi.
 export const DEFAULT_PRO_MODELS =
-  "gemini:gemini-4-hydrogen,gemini:gemini-4-argon,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5";
+  `${NUMES_MODELS},gemini:gemini-4-hydrogen,gemini:gemini-4-argon,google/gemma-4-31b-it:free,openrouter/free,anthropic:claude-sonnet-5-5,anthropic:claude-haiku-5-5`;
 
 export function parseModelList(raw: string | undefined, fallback: string): string[] {
   return (raw && raw.trim() ? raw : fallback).split(",").map((m) => m.trim()).filter(Boolean);
@@ -62,6 +86,12 @@ export function resolveModel(entry: string, keys: ProviderKeys): ResolvedModel |
   const m = /^(gemini|anthropic|numes|openai):(.+)$/.exec(entry);
   const provider: ProviderName = m ? (m[1] as ProviderName) : "openrouter";
   const model = m ? m[2] : entry;
+  if (provider === "numes") {
+    const list = typeof keys.numes === "string" ? [keys.numes] : [...(keys.numes ?? [])];
+    const pool = list.map((k) => k.trim()).filter(Boolean);
+    if (pool.length === 0) return null;
+    return { provider, entry, model, url: ENDPOINTS.numes, headers: { "Content-Type": "application/json" }, pool: numesPoolFor(pool) };
+  }
   const key = keys[provider];
   if (!key) return null;
   const headers: Record<string, string> = {
@@ -78,6 +108,81 @@ export function resolveModel(entry: string, keys: ProviderKeys): ResolvedModel |
 /** Rantai yang benar-benar bisa dipanggil dengan kunci yang terpasang, urutan dipertahankan. */
 export function resolveChain(entries: string[], keys: ProviderKeys): ResolvedModel[] {
   return entries.map((e) => resolveModel(e, keys)).filter((r): r is ResolvedModel => r !== null);
+}
+
+/** Entri "anthropic:" dipindah ke belakang, urutan lainnya dipertahankan. */
+export function anthropicLast(entries: string[]): string[] {
+  return [...entries.filter((e) => !e.startsWith("anthropic:")), ...entries.filter((e) => e.startsWith("anthropic:"))];
+}
+
+/**
+ * Rantai Applify (kunci platform) untuk satu paket: resolveChain dengan Anthropic selalu paling belakang, apa pun urutan
+ * di FREE_MODELS / PRO_MODELS (cadangan terakhir, lihat catatan di atas file). Dipakai generate-application dan
+ * green-career-assessment. Rantai BYOK (key pengguna) dibuat terpisah di byok.ts.
+ */
+export function platformChain(entries: string[], keys: ProviderKeys): ResolvedModel[] {
+  return resolveChain(anthropicLast(entries), keys);
+}
+
+// ---- satu panggilan chat, dengan kolam kunci untuk Numes ------------------------------------------------------
+
+export interface PostableTarget {
+  entry: string;
+  url: string;
+  headers: Record<string, string>;
+  pool?: NumesKeyPool;
+}
+
+export interface PostChatOptions {
+  /** Badan permintaan (JSON). */
+  body: string;
+  /** Batas waktu (ms) satu percobaan, dihitung ulang tiap percobaan. 0 = waktu habis: tidak ada percobaan tambahan. */
+  timeoutMs: () => number;
+  /** Boleh mencoba kunci berikutnya? Bawaan: masih ada waktu (timeoutMs() > 0). */
+  canRetry?: () => boolean;
+  /** "manual" untuk key milik pengguna (jangan ikuti redirect ke host lain). Bawaan "follow". */
+  redirect?: "follow" | "manual";
+  fetchFn?: typeof fetch;
+  /** Bawaan: console.warn. Hanya memuat nomor kunci, tidak pernah nilainya. */
+  log?: (line: string) => void;
+}
+
+/**
+ * Kirim satu permintaan chat. Target biasa: satu fetch dengan headers-nya. Target Numes (ada `pool`): kunci dicoba
+ * berurutan lewat kolam kunci (numes-keys.ts); 401/402/403/429, 5xx, dan batas waktu berganti ke kunci berikutnya
+ * untuk model yang sama. Mengembalikan Response terakhir (2xx bila ada kunci yang berhasil) agar pemanggil
+ * memperlakukannya seperti penyedia lain, atau melempar galat jaringan terakhir.
+ */
+export async function postChat(target: PostableTarget, opts: PostChatOptions): Promise<Response> {
+  const doFetch = opts.fetchFn ?? fetch;
+  const send = (headers: Record<string, string>) =>
+    doFetch(target.url, {
+      method: "POST",
+      headers,
+      signal: AbortSignal.timeout(Math.max(1, opts.timeoutMs())),
+      redirect: opts.redirect ?? "follow",
+      body: opts.body,
+    });
+  if (!target.pool) return await send(target.headers);
+  const run = await runWithNumesKeys(
+    target.pool,
+    async (key) => {
+      const resp = await send({ ...target.headers, Authorization: `Bearer ${key}` });
+      if (resp.ok) return { status: resp.status, resp };
+      let errorType: string | null = null;
+      try {
+        errorType = numesErrorType(await resp.clone().json());
+      } catch {
+        /* badan bukan JSON */
+      }
+      return { status: resp.status, retryAfter: resp.headers.get("retry-after"), errorType, resp };
+    },
+    { label: target.entry, canContinue: opts.canRetry ?? (() => opts.timeoutMs() > 0), log: opts.log ?? ((line) => console.warn(line)) },
+  );
+  if (run.reply) return run.reply.resp;
+  if (run.error) throw run.error;
+  // Tidak ada kunci yang bisa dipakai (semua didinginkan): jawaban 503 buatan, supaya dicatat seperti galat penyedia lain.
+  return new Response(JSON.stringify({ error: "no_numes_key_available" }), { status: 503, headers: { "Content-Type": "application/json" } });
 }
 
 /** Batas bawah max_tokens untuk Claude, karena penalaran tersembunyinya ikut memakai jatah ini. */

@@ -5,7 +5,7 @@
 // - CV: backend/services/resume-file.service.ts (bucket Storage privat `resumes`)
 // - impor PDF LinkedIn: backend/services/linkedin-import.service.ts (hanya membaca, simpan terjadi di frontend)
 // - penyedia model AI: supabase/functions/_shared/providers.ts (openrouter, gemini, anthropic, numes) dan
-//   backend/services/ai-pipeline.service.ts (rantai Gemini, Claude, OpenRouter, lalu Groq)
+//   backend/services/ai-pipeline.service.ts (rantai Numes, Gemini, OpenRouter, Groq, lalu Claude)
 // - Gmail: backend/api/routes/oauth.ts (satu izin, gmail.send; token disimpan lewat token-crypto.ts, terenkripsi)
 // - Telegram: backend/services/notifications.service.ts (TELEGRAM_CHAT_ID tunggal milik pengelola)
 // - persetujuan dan saklar kirim: backend/api/routes/approval.ts, worker/src/handlers/emailApply.ts (ALLOW_REAL_SUBMIT)
