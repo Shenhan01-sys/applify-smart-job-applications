@@ -9,11 +9,13 @@ import {
   EXTENSION_ANSWERS_SAVED_TEXT,
   SELF_FILL_LABEL,
   answersToRows,
+  fileUploadInstruction,
   initialAnswers,
   isRequiredQuestion,
   parseQuestions,
   questionsToAnswer,
   questionsToSelfFill,
+  questionsToUpload,
   validateAnswers,
   type PendingQuestion,
 } from "../src/lib/formQuestions.ts";
@@ -52,6 +54,7 @@ const extLog = (approvalId: string, status: string, min: number, details: Record
 const Q_TEXT = { key: "why us", label: "Why do you want to work here?", kind: "textarea", required: true };
 const Q_OPT = { key: "linkedin profile", label: "LinkedIn profile", kind: "text", required: false };
 const Q_SECRET = { key: "account password", label: "Account password", kind: "secret_skip", required: true };
+const Q_FILE = { key: "unggah cv secara manual", label: "Unggah CV secara manual", kind: "file", required: true };
 
 // ---- pemilihan log terbaru: worker atau ekstensi ----
 
@@ -259,6 +262,47 @@ test("pertanyaan opsional boleh kosong tetapi bila diisi tetap divalidasi; tanpa
   assert.deepEqual(answersToRows(optSelect, { opt: "" }), []);
 });
 
+// ---- pertanyaan berkas (kind file): petunjuk unggah manual, bukan isian ----
+
+test("parseQuestions: kind file dipertahankan (bukan menjadi teks) dan tidak membawa pilihan", () => {
+  assert.deepEqual(parseQuestions([Q_FILE, { ...Q_FILE, key: "x", label: "Unggah surat lamaran secara manual", options: ["a.pdf"], required: false }]), [
+    Q_FILE,
+    { key: "x", label: "Unggah surat lamaran secara manual", kind: "file", required: false },
+  ]);
+});
+
+test("questionsToAnswer tidak memuat berkas; questionsToUpload hanya berkas, dengan gerbang yang sama", () => {
+  const facts = agentLogFacts(extLog("a1", "ready", 9, { questions: [Q_TEXT, Q_SECRET, Q_FILE] }));
+  assert.deepEqual(questionsToAnswer(facts).map((q) => q.key), ["why us"]);
+  assert.deepEqual(questionsToSelfFill(facts).map((q) => q.key), ["account password"]);
+  assert.deepEqual(questionsToUpload(facts).map((q) => q.key), ["unggah cv secara manual"]);
+  for (const status of ["success", "submit_unverified"]) {
+    assert.deepEqual(questionsToUpload({ ...facts, log_status: status }), []);
+  }
+  assert.deepEqual(questionsToUpload(undefined), []);
+  assert.deepEqual(questionsToUpload({ questions: "bukan daftar" as any }), []);
+});
+
+test("berkas tidak pernah diisi dari jawaban tersimpan, tidak divalidasi (walau wajib), dan tidak masuk baris simpan", () => {
+  const qs = parseQuestions([Q_TEXT, Q_FILE]) as PendingQuestion[];
+  const saved = { "why us": "Karena produknya bagus.", "unggah cv secara manual": "cv-saya.pdf" };
+  assert.deepEqual(initialAnswers(qs, saved), { "why us": "Karena produknya bagus.", "unggah cv secara manual": "" });
+  assert.deepEqual(validateAnswers(qs, { "why us": "Karena produknya bagus." }), { ok: true, errors: {} });
+  const rows = answersToRows(qs, saved);
+  assert.deepEqual(rows.map((r) => r.question_key), ["why us"]);
+  assert.equal(JSON.stringify(rows).includes("cv-saya.pdf"), false);
+});
+
+test("fileUploadInstruction: awalan Unggah dan akhiran secara manual dibuang; label lain dipakai apa adanya; kosong menjadi berkas", () => {
+  assert.equal(fileUploadInstruction("Unggah CV secara manual"), "Unggah CV sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.");
+  assert.equal(
+    fileUploadInstruction("  Unggah   surat lamaran  secara manual "),
+    "Unggah surat lamaran sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.",
+  );
+  assert.equal(fileUploadInstruction("Resume"), "Unggah Resume sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.");
+  assert.equal(fileUploadInstruction(""), "Unggah berkas sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.");
+});
+
 // ---- kabel (tanpa DOM, dijaga lewat sumbernya) ----
 
 test("teks: jawaban tersimpan untuk ekstensi dan label isi sendiri persis seperti yang dijanjikan", () => {
@@ -289,6 +333,13 @@ test("AgentQuestions: log ekstensi menyimpan jawaban lalu berhenti, tanpa memang
   assert.match(src, /data-testid="agent-self-fill"/);
   assert.doesNotMatch(src, /type="password"/);
   assert.doesNotMatch(src, /—/);
+  // berkas (`file`): petunjuk tanpa isian, dipasang di kartu hanya-isi-sendiri maupun di formulir
+  assert.match(src, /questionsToUpload\(row\)/);
+  assert.match(src, /data-testid="agent-file-upload"/);
+  assert.match(src, /fileUploadInstruction\(q\.label\)/);
+  assert.equal(src.match(/<UploadList questions=\{(?:uploads)\} \/>/g)?.length, 2);
+  const uploadList = src.slice(src.indexOf("function UploadList"), src.indexOf("function StartedNote"));
+  assert.doesNotMatch(uploadList, /<input|<textarea|<select/);
 });
 
 test("kartu status agen menampilkan ringkasan berkas hanya untuk log ekstensi", () => {

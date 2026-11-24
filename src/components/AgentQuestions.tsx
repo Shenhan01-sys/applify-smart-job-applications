@@ -11,9 +11,11 @@ import {
   RERUN_STARTED_TEXT,
   SELF_FILL_LABEL,
   answersToRows,
+  fileUploadInstruction,
   initialAnswers,
   questionsToAnswer,
   questionsToSelfFill,
+  questionsToUpload,
   validateAnswers,
   type PendingQuestion,
 } from "@/lib/formQuestions";
@@ -56,10 +58,13 @@ interface Props {
  * Log Ekstensi Browser (`row.channel === "extension"`): tidak ada tugas worker yang dijalankan ulang. Pengguna
  * kembali ke tab lowongan dan mengisi ulang dari panel ekstensi.
  * Kolom rahasia (`kind: "secret_skip"`) tidak punya isian: hanya ditampilkan sebagai "Isi sendiri di halaman lowongan".
+ * Berkas yang tidak terpasang (`kind: "file"`, mis. "Unggah CV secara manual") juga tanpa isian: ditampilkan sebagai
+ * petunjuk untuk mengunggahnya sendiri di tab lowongan.
  */
 export default function AgentQuestions({ approvalId, row, onRerun }: Props) {
   const questions = questionsToAnswer(row);
   const selfFill = questionsToSelfFill(row);
+  const uploads = questionsToUpload(row);
   const extension = row?.channel === "extension";
   const active = isAgentApplyActive(row);
   const [started, setStarted] = useState(false);
@@ -76,16 +81,17 @@ export default function AgentQuestions({ approvalId, row, onRerun }: Props) {
   }, [active]);
 
   if (active) return started ? <StartedNote /> : null;
-  if (questions.length === 0 && selfFill.length === 0) return null;
-  // Hanya kolom rahasia: tidak ada yang bisa dijawab di sini, jadi tidak ada formulir dan tombol simpan.
-  if (questions.length === 0) return <SelfFillCard questions={selfFill} />;
-  const formKey = `${[...questions, ...selfFill].map((q) => q.key).join("\u0001")}|${row?.logged_at ?? ""}`;
+  if (questions.length === 0 && selfFill.length === 0 && uploads.length === 0) return null;
+  // Hanya kolom rahasia dan berkas: tidak ada yang bisa dijawab di sini, jadi tidak ada formulir dan tombol simpan.
+  if (questions.length === 0) return <SelfFillCard questions={selfFill} uploads={uploads} />;
+  const formKey = `${[...questions, ...selfFill, ...uploads].map((q) => q.key).join("\u0001")}|${row?.logged_at ?? ""}`;
   return (
     <QuestionForm
       key={formKey}
       approvalId={approvalId}
       questions={questions}
       selfFill={selfFill}
+      uploads={uploads}
       extension={extension}
       onStarted={() => {
         setStarted(true);
@@ -95,7 +101,7 @@ export default function AgentQuestions({ approvalId, row, onRerun }: Props) {
   );
 }
 
-function SelfFillCard({ questions }: { questions: PendingQuestion[] }) {
+function SelfFillCard({ questions, uploads }: { questions: PendingQuestion[]; uploads: PendingQuestion[] }) {
   const headingId = `${useId()}-heading`;
   return (
     <section aria-labelledby={headingId} className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5">
@@ -103,6 +109,7 @@ function SelfFillCard({ questions }: { questions: PendingQuestion[] }) {
         <HelpCircle className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> {SELF_FILL_LABEL}
       </h4>
       <SelfFillList questions={questions} />
+      <UploadList questions={uploads} />
     </section>
   );
 }
@@ -130,6 +137,23 @@ function SelfFillList({ questions }: { questions: PendingQuestion[] }) {
   );
 }
 
+/** Berkas yang harus diunggah sendiri (`file`): hanya petunjuk, tanpa kolom isian. */
+function UploadList({ questions }: { questions: PendingQuestion[] }) {
+  if (questions.length === 0) return null;
+  return (
+    <div data-testid="agent-file-upload" className="mt-3">
+      <ul className="space-y-2">
+        {questions.map((q) => (
+          <li key={q.key} className="rounded-lg border-2 border-black/[8%] px-3 py-2 text-xs font-semibold leading-snug break-words">
+            {fileUploadInstruction(q.label)}
+            {q.required === true && <span className="ml-1 font-normal text-muted-foreground">(wajib)</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function StartedNote() {
   return (
     <div role="status" className="mt-3 flex items-center gap-1.5 rounded-xl border-2 border-green-300 bg-green-50 px-3 py-2.5 text-xs font-semibold text-green-900">
@@ -142,12 +166,14 @@ function QuestionForm({
   approvalId,
   questions,
   selfFill,
+  uploads,
   extension,
   onStarted,
 }: {
   approvalId: string;
   questions: PendingQuestion[];
   selfFill: PendingQuestion[];
+  uploads: PendingQuestion[];
   extension: boolean;
   onStarted: () => void;
 }) {
@@ -398,6 +424,7 @@ function QuestionForm({
       </form>
 
       <SelfFillList questions={selfFill} />
+      <UploadList questions={uploads} />
     </section>
   );
 }

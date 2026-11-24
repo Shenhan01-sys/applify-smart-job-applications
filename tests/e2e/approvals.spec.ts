@@ -472,6 +472,36 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
     expect(backend.restWrites).toEqual([]);
   });
 
+  test("berkas yang gagal terpasang (kind file) tampil sebagai petunjuk unggah manual, bukan kolom isian, dan tidak ikut disimpan", async ({ app, backend }) => {
+    const fileQuestion = { key: "unggah cv secara manual", label: "Unggah CV secara manual", kind: "file", required: true };
+    seedExtension(
+      backend,
+      extensionQuestionsLog(APR, { questions: [EXTENSION_QUESTIONS[0], fileQuestion], questions_pending: 2, documents_attached: { resume: false } }),
+    );
+    await openHistory(app);
+
+    // Hanya satu pertanyaan yang bisa dijawab; berkas tidak dihitung dan tidak punya isian.
+    await expect(app.getByText("1 pertanyaan")).toBeVisible();
+    await expect(app.getByLabel(WHY.label)).toBeVisible();
+    await expect(app.getByLabel("Unggah CV secara manual")).toHaveCount(0);
+    const upload = app.getByTestId("agent-file-upload");
+    await expect(upload).toContainText("Unggah CV sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.");
+    await expect(upload).toContainText("(wajib)");
+    await expect(upload.getByRole("textbox")).toHaveCount(0);
+  });
+
+  test("hanya berkas: kartu Isi sendiri dengan petunjuk, tanpa isian dan tanpa tombol simpan", async ({ app, backend }) => {
+    const fileQuestion = { key: "unggah cv secara manual", label: "Unggah CV secara manual", kind: "file", required: true };
+    seedExtension(backend, extensionQuestionsLog(APR, { questions: [fileQuestion], questions_pending: 1, documents_attached: { resume: false } }));
+    await openHistory(app);
+
+    await expect(app.getByRole("heading", { name: "Isi sendiri di halaman lowongan" })).toBeVisible();
+    await expect(app.getByTestId("agent-file-upload")).toContainText("Unggah CV sendiri di tab lowongan yang dibuka ekstensi");
+    await expect(app.getByRole("button", { name: /Simpan jawaban/ })).toHaveCount(0);
+    await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toHaveCount(0);
+    expect(backend.restWrites).toEqual([]);
+  });
+
   test("ekstensi sudah mengirim (success): tidak ada kartu pertanyaan, hanya status Terkirim", async ({ app, backend }) => {
     seedExtension(backend, extensionQuestionsLog(APR, { questions: [] }, { status: "success" }));
     await openHistory(app);

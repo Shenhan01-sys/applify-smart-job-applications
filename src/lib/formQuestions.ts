@@ -16,8 +16,12 @@
  * `secret_skip` hanya dilaporkan Ekstensi Browser: kolom yang berisi data rahasia (kata sandi, PIN, kode, nomor
  * kartu). Kolom itu tidak diisi dan tidak dikirim ke AI, jadi tidak ada jawaban yang disimpan: pengguna mengisinya
  * sendiri di halaman lowongan.
+ *
+ * `file` juga hanya dilaporkan Ekstensi Browser: berkas (mis. CV) yang tidak terpasang atau tidak terbukti masuk di
+ * antarmuka halaman, dengan label seperti "Unggah CV secara manual". Tidak ada yang diketik dan tidak ada jawaban
+ * yang disimpan: pengguna mengunggahnya sendiri di tab lowongan yang dibuka ekstensi.
  */
-export type QuestionKind = "text" | "textarea" | "select" | "check" | "radio" | "secret_skip";
+export type QuestionKind = "text" | "textarea" | "select" | "check" | "radio" | "file" | "secret_skip";
 
 export type PendingQuestion = {
   /** Hasil questionKey(label) yang dihitung worker; kunci jawaban tersimpan. */
@@ -44,7 +48,7 @@ export const MAX_ANSWER_LENGTH = 2000;
 export const ANSWER_YES = "Yes";
 export const ANSWER_NO = "No";
 
-const KINDS: ReadonlySet<string> = new Set(["text", "textarea", "select", "check", "radio", "secret_skip"]);
+const KINDS: ReadonlySet<string> = new Set(["text", "textarea", "select", "check", "radio", "file", "secret_skip"]);
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -124,15 +128,36 @@ function openQuestions(facts: QuestionFacts | null | undefined): PendingQuestion
 /**
  * Pertanyaan yang masih perlu dijawab menurut percobaan terbaru. Percobaan yang sudah terkirim (success) atau
  * yang kirimnya belum terkonfirmasi (submit_unverified) tidak lagi butuh jawaban: bertanya di situ menyesatkan
- * dan bisa memicu kirim ulang. Kolom rahasia (`secret_skip`) tidak ikut: itu tidak dijawab di Applify.
+ * dan bisa memicu kirim ulang. Kolom rahasia (`secret_skip`) dan berkas yang diunggah sendiri (`file`) tidak ikut:
+ * keduanya tidak dijawab di Applify.
  */
 export function questionsToAnswer(facts: QuestionFacts | null | undefined): PendingQuestion[] {
-  return openQuestions(facts).filter((q) => q.kind !== "secret_skip");
+  return openQuestions(facts).filter((q) => q.kind !== "secret_skip" && q.kind !== "file");
 }
 
 /** Kolom rahasia yang dibiarkan kosong oleh ekstensi dan harus diisi pengguna sendiri di halaman lowongan. Aturan gerbang sama dengan questionsToAnswer. */
 export function questionsToSelfFill(facts: QuestionFacts | null | undefined): PendingQuestion[] {
   return openQuestions(facts).filter((q) => q.kind === "secret_skip");
+}
+
+/** Berkas yang tidak terpasang otomatis dan harus diunggah pengguna sendiri di tab lowongan. Aturan gerbang sama dengan questionsToAnswer. */
+export function questionsToUpload(facts: QuestionFacts | null | undefined): PendingQuestion[] {
+  return openQuestions(facts).filter((q) => q.kind === "file");
+}
+
+/**
+ * Petunjuk untuk pertanyaan berkas. Label dari ekstensi berbentuk "Unggah CV secara manual": awalan "Unggah" dan akhiran
+ * "secara manual" dibuang supaya kalimatnya tidak berulang. Label lain dipakai apa adanya.
+ */
+export function fileUploadInstruction(label: string): string {
+  const target =
+    String(label ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^unggah\s+/i, "")
+      .replace(/\s+secara manual$/i, "")
+      .trim() || "berkas";
+  return `Unggah ${target} sendiri di tab lowongan yang dibuka ekstensi, lalu tekan Kirim di sana.`;
 }
 
 /** Pertanyaan bertanda `required: false` boleh dikosongkan. Tanpa tanda itu (log lama dan log worker) pertanyaan wajib dijawab. */
@@ -143,8 +168,8 @@ export function initialAnswers(questions: readonly PendingQuestion[], saved: Rec
   const out: Record<string, string> = {};
   for (const q of questions ?? []) {
     out[q.key] = "";
-    // Kolom rahasia tidak pernah diisi dari jawaban tersimpan.
-    if (q.kind === "secret_skip") continue;
+    // Kolom rahasia dan berkas tidak pernah diisi dari jawaban tersimpan.
+    if (q.kind === "secret_skip" || q.kind === "file") continue;
     if (!isRecord(saved) || !hasOwn(saved, q.key)) continue;
     const value = saved[q.key];
     if (typeof value !== "string") continue;
@@ -178,12 +203,12 @@ function answerOf(answers: Record<string, string> | null | undefined, key: strin
  * Setiap pertanyaan wajib butuh jawaban tidak kosong, paling panjang 2000 karakter. Select dan radio dengan
  * pilihan harus dijawab dengan salah satu pilihan, dan check dengan "Yes" atau "No". Pertanyaan opsional
  * (`required: false`) boleh kosong, tetapi bila diisi aturan yang sama berlaku. Kolom rahasia (`secret_skip`)
- * tidak divalidasi. Bentuk yang tidak dikenal tidak melempar galat: dianggap belum dijawab.
+ * dan berkas (`file`) tidak divalidasi. Bentuk yang tidak dikenal tidak melempar galat: dianggap belum dijawab.
  */
 export function validateAnswers(questions: readonly PendingQuestion[], answers: Record<string, string> | null | undefined): AnswerValidation {
   const errors: Record<string, string> = {};
   for (const q of questions ?? []) {
-    if (q.kind === "secret_skip") continue;
+    if (q.kind === "secret_skip" || q.kind === "file") continue;
     const text = answerOf(answers, q.key);
     if (!text) {
       if (!isRequiredQuestion(q)) continue;
@@ -209,7 +234,7 @@ export interface AnswerRow {
 export function answersToRows(questions: readonly PendingQuestion[], answers: Record<string, string> | null | undefined): AnswerRow[] {
   const rows: AnswerRow[] = [];
   for (const q of questions ?? []) {
-    if (q.kind === "secret_skip") continue;
+    if (q.kind === "secret_skip" || q.kind === "file") continue;
     const text = answerOf(answers, q.key).slice(0, MAX_ANSWER_LENGTH);
     if (!text) continue;
     rows.push({ question_key: q.key.slice(0, MAX_KEY_LENGTH), question_label: q.label.slice(0, MAX_LABEL_LENGTH), answer: text });
