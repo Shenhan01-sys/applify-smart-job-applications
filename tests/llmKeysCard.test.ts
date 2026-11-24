@@ -1,7 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { LLM_PROVIDER_IDS } from "../src/lib/llmKeys.ts";
+import { ApiError } from "../src/lib/apiErrors.ts";
+import {
+  LLM_KEYS_UNAVAILABLE_TEXT,
+  LLM_KEYS_UNAVAILABLE_TITLE,
+  LLM_PROVIDER_IDS,
+  byokUnavailable,
+  isByokUnavailableError,
+  parseLlmKeysResponse,
+} from "../src/lib/llmKeys.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const card = read("../src/components/LlmKeysCard.tsx");
@@ -276,12 +284,45 @@ test("daftar kunci diperbarui dengan pembaruan fungsional dan memuat ulang bila 
   assert.match(card, /Memuat kunci\.\.\./);
 });
 
-test("settings.tsx menampilkan kartu Kunci API Sendiri (BYOK) dengan LlmKeysCard", () => {
+test("settings.tsx menampilkan kartu Kunci API Sendiri dengan LlmKeysCard", () => {
   assert.match(settings, /import LlmKeysCard from "@\/components\/LlmKeysCard";/);
-  assert.match(settings, /title="Kunci API Sendiri \(BYOK\)"/);
-  const at = settings.indexOf('title="Kunci API Sendiri (BYOK)"');
+  assert.match(settings, /title="Kunci API Sendiri"/);
+  assert.doesNotMatch(settings, /BYOK/);
+  const at = settings.indexOf('title="Kunci API Sendiri"');
   const close = settings.indexOf("</Card>", at);
   assert.ok(at > 0 && close > at);
   assert.match(settings.slice(at, close), /<LlmKeysCard \/>/);
   assert.match(settings, /KeyRound/);
+});
+
+test("fitur mati tanpa kunci tersimpan ({ enabled:false, keys:[] }): keadaan Belum tersedia, bukan galat merah", () => {
+  const off = parseLlmKeysResponse({ enabled: false, keys: [] });
+  assert.ok(off);
+  assert.equal(byokUnavailable(off), true);
+  assert.equal(LLM_KEYS_UNAVAILABLE_TITLE, "Belum tersedia");
+  assert.doesNotMatch(LLM_KEYS_UNAVAILABLE_TEXT, /server|administrator|BYOK|env/i);
+  // Fitur mati tetapi masih ada kunci tersimpan: kartu tetap tampil supaya kunci bisa dihapus.
+  const withKey = parseLlmKeysResponse({ enabled: false, keys: [{ provider: "openai", last4: "abcd", status: "valid" }] });
+  assert.ok(withKey);
+  assert.equal(byokUnavailable(withKey), false);
+  const on = parseLlmKeysResponse({ enabled: true, keys: [] });
+  assert.ok(on);
+  assert.equal(byokUnavailable(on), false);
+  // Bagian tampilan: dicek sebelum daftar penyedia, memakai data-testid, tanpa role="alert".
+  assert.match(card, /byokUnavailable\(data\)/);
+  const at = card.indexOf("byokUnavailable(data)");
+  assert.ok(at > 0 && at < card.indexOf("visibleProviders(data.providers)"));
+  const block = card.slice(at, card.indexOf("const { enabled, keys } = data;"));
+  assert.match(block, /data-testid="llm-keys-unavailable"/);
+  assert.doesNotMatch(block, /role="alert"|text-red/);
+});
+
+test("galat memuat: rute tidak ada (404) atau byok_disabled dianggap Belum tersedia; gangguan sungguhan tetap galat dengan Coba lagi", () => {
+  assert.equal(isByokUnavailableError(new ApiError(404, "{}")), true);
+  assert.equal(isByokUnavailableError(new ApiError(403, JSON.stringify({ code: "byok_disabled" }))), true);
+  assert.equal(isByokUnavailableError(new ApiError(403, JSON.stringify({ code: "lain" }))), false);
+  assert.equal(isByokUnavailableError(new ApiError(500, JSON.stringify({ code: "internal_error" }))), false);
+  assert.equal(isByokUnavailableError(new TypeError("Failed to fetch")), false);
+  assert.match(card, /isByokUnavailableError\(err\)/);
+  assert.match(card, /LLM_KEYS_LOAD_ERROR_TEXT/);
 });

@@ -75,7 +75,7 @@ function SettingsPage() {
         </Card>
 
         {/* Kunci LLM milik pengguna: dikirim hanya lewat badan permintaan, tidak disimpan di browser */}
-        <Card icon={KeyRound} title="Kunci API Sendiri (BYOK)" color="#0F766E"
+        <Card icon={KeyRound} title="Kunci API Sendiri" color="#0F766E"
           desc="Pakai kunci API LLM milikmu sendiri untuk membuat draf lamaran. Pilih penyedia, tempel kuncinya, lalu simpan.">
           <LlmKeysCard />
         </Card>

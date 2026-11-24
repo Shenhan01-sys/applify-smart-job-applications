@@ -533,7 +533,7 @@ test("catatan di kartu: kuota tidak terpotong tetapi tetap dibatasi laju; kunci 
   assert.match(LLM_KEYS_QUOTA_NOTE, /dibatasi laju/);
   assert.match(LLM_KEYS_STORAGE_NOTE, /terenkripsi/);
   assert.match(LLM_KEYS_STORAGE_NOTE, /4 karakter terakhir/);
-  assert.match(LLM_KEYS_DISABLED_TEXT, /belum aktif/);
+  assert.match(LLM_KEYS_DISABLED_TEXT, /belum tersedia/);
 });
 
 test("mode demo: simpan hanya membawa 4 karakter terakhir dan model, uji ulang dan hapus bekerja per penyedia", () => {

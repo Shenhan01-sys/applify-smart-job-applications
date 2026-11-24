@@ -219,7 +219,11 @@ export const LLM_KEYS_STORAGE_NOTE =
 export const LLM_KEYS_QUOTA_NOTE =
   "Draf yang dibuat dengan kuncimu tidak dihitung ke kuota draf bulanan, tetapi tetap dibatasi laju permintaannya.";
 export const LLM_KEYS_DISABLED_TEXT =
-  "Fitur kunci API sendiri belum aktif di server ini, jadi kunci baru belum bisa disimpan atau diuji.";
+  "Kunci API sendiri belum tersedia untuk saat ini, jadi kunci baru belum bisa disimpan atau diuji.";
+/** Fitur mati dan belum ada kunci tersimpan: kartu hanya berkata Belum tersedia, tanpa daftar penyedia atau galat. */
+export const LLM_KEYS_UNAVAILABLE_TITLE = "Belum tersedia";
+export const LLM_KEYS_UNAVAILABLE_TEXT =
+  "Kunci API sendiri belum bisa dipakai untuk saat ini. Draf lamaran tetap dibuat dengan model Applify.";
 export const LLM_KEYS_DISABLED_DELETE_TEXT = " Kunci yang sudah tersimpan tetap bisa dihapus.";
 export const LLM_KEYS_LOAD_ERROR_TEXT = "Daftar kunci belum bisa dimuat. Coba lagi.";
 export const LLM_PROVIDER_SOON_LABEL = "Segera hadir";
@@ -461,6 +465,20 @@ export function parseLlmKeysResponse(body: unknown): LlmKeysResponse | null {
     providers: providers.length > 0 ? providers : [...LLM_PROVIDER_IDS],
     keys,
   };
+}
+
+/**
+ * Fitur kunci sendiri mati dan tidak ada kunci tersimpan (jawaban `{ enabled: false, keys: [] }`): tidak ada yang
+ * bisa dilakukan di kartu, jadi tampilkan keadaan Belum tersedia. Bila masih ada kunci, kartu tetap tampil agar bisa dihapus.
+ */
+export function byokUnavailable(data: LlmKeysResponse): boolean {
+  return !data.enabled && data.keys.length === 0;
+}
+
+/** Galat saat memuat daftar yang berarti fiturnya memang tidak ada di server (rute tidak ada atau byok_disabled), bukan gangguan. */
+export function isByokUnavailableError(err: unknown): boolean {
+  const e = parseApiError(err);
+  return e.status === 404 || (e.status === 403 && e.code === "byok_disabled");
 }
 
 /** Jawaban PUT /api/llm-keys/:provider ({ key }); null bila bentuknya tidak dikenali. */

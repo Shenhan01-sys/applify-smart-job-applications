@@ -6,16 +6,20 @@ import {
   LLM_KEYS_LOAD_ERROR_TEXT,
   LLM_KEYS_QUOTA_NOTE,
   LLM_KEYS_STORAGE_NOTE,
+  LLM_KEYS_UNAVAILABLE_TEXT,
+  LLM_KEYS_UNAVAILABLE_TITLE,
   LLM_KEY_STATUS_LABEL,
   LLM_MODEL_HINT,
   LLM_MODEL_REQUIRED_HINT,
   LLM_PROVIDER_SOON_LABEL,
   LLM_PROVIDER_SOON_TEXT,
   MODEL_MAX_LENGTH,
+  byokUnavailable,
   canSaveLlmKey,
   describeLlmKeyApiError,
   describeTestResult,
   formatKeyDate,
+  isByokUnavailableError,
   llmConsentText,
   llmKeyView,
   llmModelLabel,
@@ -73,7 +77,11 @@ export default function LlmKeysCard() {
     automationApi
       .getLlmKeys()
       .then(setData)
-      .catch(() => setLoadError(LLM_KEYS_LOAD_ERROR_TEXT));
+      .catch((err) => {
+        // Fitur tidak ada di server: keadaan "Belum tersedia", bukan galat merah. Gangguan sungguhan tetap bisa dicoba lagi.
+        if (isByokUnavailableError(err)) setData({ enabled: false, providers: [], keys: [] });
+        else setLoadError(LLM_KEYS_LOAD_ERROR_TEXT);
+      });
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
@@ -91,6 +99,15 @@ export default function LlmKeysCard() {
       <p role="status" className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Memuat kunci...
       </p>
+    );
+  }
+
+  if (byokUnavailable(data)) {
+    return (
+      <div role="status" data-testid="llm-keys-unavailable" className="mt-4 rounded-xl border border-black/[8%] bg-[#F7F6F2] p-3.5">
+        <p className="text-xs font-semibold text-[#16150F]">{LLM_KEYS_UNAVAILABLE_TITLE}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{LLM_KEYS_UNAVAILABLE_TEXT}</p>
+      </div>
     );
   }
 
