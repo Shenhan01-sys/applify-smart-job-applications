@@ -42,7 +42,7 @@ import LinkedInImportCard, { type LinkedInImportHandle } from "@/components/prof
 import ProfileDocumentsCard from "@/components/profile/ProfileDocumentsCard";
 import { RESUME_IMPORT_HINT, applyProfilePatch, cvImportEligibility, type CommitResult } from "@/lib/linkedinImport";
 import {
-  achievementCategoryLabel,
+  achievementDetails,
   buildProfileRow,
   formatMonthYear,
   profileGaps,
@@ -759,12 +759,16 @@ function ProfilePage() {
               </p>
               <div className="mt-2 space-y-2">
                 {achievements.length === 0 && <span className="text-xs text-muted-foreground">Belum ada penghargaan atau publikasi</span>}
-                {sortAchievements(achievements).map((a, i) => (
-                  <div key={a.id ?? i} className="text-xs">
-                    <p className="font-semibold">{a.title}</p>
-                    <p className="text-muted-foreground">{[achievementCategoryLabel(a.category), a.issuer, formatMonthYear(a.achievement_date)].filter(Boolean).join(" · ")}</p>
-                  </div>
-                ))}
+                {sortAchievements(achievements).map((a, i) => {
+                  const { meta, description } = achievementDetails(a);
+                  return (
+                    <div key={a.id ?? i} className="text-xs">
+                      <p className="font-semibold">{a.title}</p>
+                      <p className="text-muted-foreground">{meta}</p>
+                      {description && <p className="mt-0.5 text-muted-foreground leading-relaxed whitespace-pre-line">{description}</p>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

@@ -14,7 +14,7 @@ import {
   LOCATION_TYPES,
   PROFICIENCY_LEVELS,
   SKILL_CATEGORIES,
-  achievementCategoryLabel,
+  achievementDetails,
   achievementToForm,
   emptyAchievementForm,
   emptyEducationForm,
@@ -522,7 +522,7 @@ export function AchievementEditor({ items, onSave, onDelete, now }: {
 
       {sorted.map((a, i) => {
         if (editing === a.id) return null;
-        const meta = [achievementCategoryLabel(a.category), a.issuer, formatMonthYear(a.achievement_date)].filter(Boolean).join(" · ");
+        const { meta, description } = achievementDetails(a);
         return (
           <div key={a.id} className="rounded-xl border-2 border-black/[8%] bg-black/[2%] p-4 hover:border-[#0A5BE0]/30 transition-all duration-300" style={{ animation: `fadeInUp 0.4s ease-out ${i * 0.05}s both` }}>
             <div className="flex items-start justify-between gap-2">
@@ -538,7 +538,7 @@ export function AchievementEditor({ items, onSave, onDelete, now }: {
                 <DeleteButton onConfirm={() => remove(a.id)} busy={busyId === a.id} label={`Hapus penghargaan atau publikasi ${a.title}`} />
               </div>
             </div>
-            {a.description && <p className="mt-2 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{a.description}</p>}
+            {description && <p className="mt-2 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{description}</p>}
           </div>
         );
       })}

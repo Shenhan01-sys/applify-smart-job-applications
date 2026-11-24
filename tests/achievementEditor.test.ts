@@ -7,6 +7,7 @@ import {
   ACHIEVEMENT_ISSUER_MAX,
   ACHIEVEMENT_TITLE_MAX,
   achievementCategoryLabel,
+  achievementDetails,
   achievementToForm,
   checkAchievement,
   emptyAchievementForm,
@@ -175,13 +176,30 @@ test("Profil: editor dipasang di langkah 3 dan menyimpan lewat profileService (m
   assert.match(src, /serta penghargaan dan publikasi\. Setiap perubahan langsung tersimpan/);
 });
 
-test("Pratinjau CV: penghargaan dan publikasi tampil, terurut, dengan jenis, penyelenggara, dan bulan", () => {
+test("achievementDetails: keterangan ikut ditampilkan, NULL atau spasi saja menjadi kosong", () => {
+  const full = achievementDetails({ category: "award", issuer: " Kemendikbudristek ", achievement_date: "2025-08-01", description: "  Kategori mahasiswa.  " });
+  assert.equal(full.description, "Kategori mahasiswa.");
+  assert.match(full.meta, /^Penghargaan · Kemendikbudristek · /);
+  for (const d of [null, undefined, "", "   \n", 5]) assert.equal(achievementDetails({ category: "award", description: d }).description, "");
+  assert.equal(achievementDetails({ category: null, issuer: null, achievement_date: null, description: "x" }).meta, "Lainnya", "baris lama tanpa jenis tetap punya teks");
+});
+
+test("Pratinjau CV dan daftar langkah 3 memakai achievementDetails: keterangan tidak lagi hilang di pratinjau", () => {
+  const editor = read("../src/components/profile/ProfileEditors.tsx");
+  assert.match(editor.slice(editor.indexOf("export function AchievementEditor")), /const \{ meta, description \} = achievementDetails\(a\)/);
+  const src = read("../src/routes/profile.tsx");
+  const preview = src.slice(src.indexOf("{/* Achievements */}"), src.indexOf("{/* Blind Mode Notice */}"));
+  assert.match(preview, /const \{ meta, description \} = achievementDetails\(a\)/);
+  assert.match(preview, /\{description && <p [^>]*>\{description\}<\/p>\}/);
+});
+
+test("Pratinjau CV: penghargaan dan publikasi tampil, terurut, dengan jenis, penyelenggara, bulan, dan keterangan", () => {
   const src = read("../src/routes/profile.tsx");
   const preview = src.slice(src.indexOf("{/* Achievements */}"), src.indexOf("{/* Blind Mode Notice */}"));
   assert.match(preview, /Penghargaan dan Publikasi/);
   assert.match(preview, /Belum ada penghargaan atau publikasi/);
   assert.match(preview, /sortAchievements\(achievements\)\.map/);
-  assert.match(preview, /achievementCategoryLabel\(a\.category\), a\.issuer, formatMonthYear\(a\.achievement_date\)/);
+  assert.match(preview, /<p className="text-muted-foreground">\{meta\}<\/p>/);
   // letaknya di dalam panel Pratinjau CV, sesudah Sertifikasi
   assert.ok(src.indexOf("{/* Certifications */}") < src.indexOf("{/* Achievements */}"));
   assert.ok(src.indexOf("Pratinjau CV") < src.indexOf("{/* Achievements */}"));

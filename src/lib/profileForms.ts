@@ -657,6 +657,18 @@ export function achievementCategoryLabel(raw: unknown): string {
   return ACHIEVEMENT_CATEGORIES.find((c) => c.value === v && c.value !== "other")?.label ?? "Lainnya";
 }
 
+/**
+ * Teks yang ditampilkan untuk satu penghargaan, dipakai bersama oleh daftar di langkah 3 dan pratinjau CV
+ * supaya keduanya tidak berbeda: meta = jenis · penyelenggara · bulan tahun, description = keterangan
+ * (kosong bila NULL atau hanya spasi, sehingga pemanggil cukup memeriksa string kosong).
+ */
+export function achievementDetails(row: { category?: unknown; issuer?: unknown; achievement_date?: unknown; description?: unknown }): { meta: string; description: string } {
+  return {
+    meta: [achievementCategoryLabel(row.category), trim(row.issuer), formatMonthYear(row.achievement_date)].filter(Boolean).join(" · "),
+    description: trim(row.description),
+  };
+}
+
 /** Unggulan dulu, lalu tanggal terbaru (tanpa tanggal paling akhir), lalu judul. */
 export function sortAchievements<T extends { title?: unknown; achievement_date?: unknown; is_featured?: unknown }>(items: T[]): T[] {
   return [...items].sort((a, b) => {
