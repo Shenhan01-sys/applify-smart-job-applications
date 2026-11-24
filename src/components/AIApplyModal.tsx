@@ -8,6 +8,7 @@ import { profileService } from "@/services/profileService";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
 import { describeError } from "@/lib/authErrors";
+import { ACTIVE_APPLICATION_HINT, REUSED_DRAFT_NOTICE, canStartNewDraft } from "@/lib/activeApplication";
 import { applyBlockers } from "@/lib/onboarding";
 import { displaySkillGaps, highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { classifyJobChannel } from "@/lib/applyChannel";
@@ -253,7 +254,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     try {
       setGenerating(true);
       setError("");
-      const { application: app, analysis } = await aiApplicationService.createDraftWithAnalysis({ jobId, tone: "professional" });
+      const { application: app, analysis, reused } = await aiApplicationService.createDraftWithAnalysis({ jobId, tone: "professional" });
       setApplication(app);
       setSkillGaps(analysis.skillGaps);
       setModelUsed(analysis.modelUsed);
@@ -274,6 +275,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       // Draf terbuat berarti kuota terpakai: lencana kuota di halaman Lowongan (di belakang jendela ini) harus
       // dibaca ulang, kalau tidak ia tetap menulis angka lama (temuan 32, uji klik 21 November 2026).
       onDraftCreated?.();
+      // Lamaran aktif yang sudah ada dikembalikan server (permintaan ganda): bukan draf baru, kuota tidak terpakai.
+      if (reused) toast.info(REUSED_DRAFT_NOTICE);
       // The Edge Function reports the quota after this draft; use it so the screen is right at once.
       // Without it (older response), ask the database again.
       if (analysis.quota) {
@@ -575,7 +578,10 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                     Dibuat {new Date(application.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })},
                     status {applicationStatusLabel(application.status)}. Draf yang ada ditampilkan di sini dan kuota tidak terpakai.
                   </p>
-                  {canApply && !confirmNewDraft && (
+                  {!canStartNewDraft(application.status) && (
+                    <p className="mt-2 text-muted-foreground">{ACTIVE_APPLICATION_HINT}</p>
+                  )}
+                  {canApply && canStartNewDraft(application.status) && !confirmNewDraft && (
                     <button
                       type="button"
                       onClick={() => setConfirmNewDraft(true)}
@@ -584,7 +590,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                       Buat draf baru (pakai 1 kuota)
                     </button>
                   )}
-                  {canApply && confirmNewDraft && (
+                  {canApply && canStartNewDraft(application.status) && confirmNewDraft && (
                     <div role="alert" className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-amber-900">
                       <p>
                         Draf baru memakai 1 kuota (sisa {quotaText}). Draf yang lama tetap tersimpan di Lamaran Saya. Lanjutkan?

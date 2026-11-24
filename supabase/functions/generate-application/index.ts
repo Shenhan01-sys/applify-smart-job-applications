@@ -50,6 +50,7 @@ import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementL
 import { selectTailoredSkills } from "../_shared/tailored-skills.ts";
 import { letterStructureRules } from "../_shared/letter-rules.ts";
 import { extractDraftJson } from "../_shared/json-salvage.ts";
+import { CLOSED_STATUS, isUniqueViolation, pickActiveApplication, reusedAnalysis } from "../_shared/active-application.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -141,6 +142,19 @@ Deno.serve(async (req: Request) => {
     // The RPC returns an array of one row; parseQuotaStatus reads it (reading .remaining off the array
     // was always undefined, so this check never blocked anyone).
     let quota: any = parseQuotaStatus(quotaStatus);
+
+    // 3a) Satu lowongan, satu lamaran aktif (_shared/active-application.ts). Bila pengguna sudah punya lamaran yang
+    //     belum ditutup untuk lowongan ini, lamaran itu dikembalikan: tanpa panggilan model dan tanpa kuota terpakai.
+    //     Pemeriksaan yang gagal ditolak (gagal tertutup), bukan dianggap "belum ada".
+    if (mode !== "analyze") {
+      const { data: activeRows, error: activeErr } = await admin
+        .from("ai_applications").select("*, jobs(*)")
+        .eq("user_id", userId).eq("job_id", jobId).neq("status", CLOSED_STATUS)
+        .order("created_at", { ascending: false }).limit(10);
+      if (activeErr) return json({ error: "Lamaran yang sudah ada belum bisa diperiksa. Coba lagi nanti.", code: "active_lookup_failed" }, 503);
+      const existing = pickActiveApplication(activeRows);
+      if (existing) return json({ application: existing, reused: true, analysis: reusedAnalysis(existing), quota });
+    }
 
     // 3b) BYOK: key milik pengguna dipakai lebih dulu dan tidak memotong kuota bulanan. Batas laju per jam
     //     tetap berlaku; bila terlampaui, key pengguna tidak dipakai dan permintaan diproses seperti biasa.
@@ -447,6 +461,16 @@ Return JSON exactly in this shape:
       .select("*, jobs(*)")
       .single();
 
+    if (isUniqueViolation(insErr)) {
+      // Dua permintaan bersamaan lolos 3a; indeks unik (DRAFT_2026-11-24_ai_applications_one_active_per_job.sql) menolak
+      // yang kedua. Pemenangnya dikembalikan, bukan galat 500.
+      const { data: winners } = await admin
+        .from("ai_applications").select("*, jobs(*)")
+        .eq("user_id", userId).eq("job_id", jobId).neq("status", CLOSED_STATUS)
+        .order("created_at", { ascending: false }).limit(10);
+      const winner = pickActiveApplication(winners);
+      if (winner) return json({ application: winner, reused: true, analysis: reusedAnalysis(winner), quota });
+    }
     if (insErr) return json({ error: "Failed to save draft", detail: insErr.message, analysis: result, quota }, 500);
     return json({ application: app, analysis: result, quota });
   } catch (e: any) {

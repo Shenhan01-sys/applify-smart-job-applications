@@ -90,7 +90,9 @@ export const aiApplicationService = {
   },
 
   // Same as createDraft, plus the analysis the Edge Function returns next to the draft (skill gaps, warnings).
-  async createDraftWithAnalysis(input: AIApplicationInput): Promise<{ application: AIApplicationData; analysis: DraftAnalysis }> {
+  // `reused` = true: pengguna sudah punya lamaran aktif untuk lowongan ini, server mengembalikannya dan tidak membuat
+  // draf baru (tanpa panggilan model, tanpa kuota). Lihat lib/activeApplication.ts.
+  async createDraftWithAnalysis(input: AIApplicationInput): Promise<{ application: AIApplicationData; analysis: DraftAnalysis; reused: boolean }> {
     if (isMockMode()) {
       await new Promise(r => setTimeout(r, 1500));
       const newApp = {
@@ -112,7 +114,7 @@ export const aiApplicationService = {
         jobs: { title: "New Job", company: "Company" },
       };
       mockAppStore = [newApp as any, ...mockAppStore];
-      return { application: newApp as AIApplicationData, analysis: { skillGaps: [], warnings: [], modelUsed: null, quota: null } };
+      return { application: newApp as AIApplicationData, analysis: { skillGaps: [], warnings: [], modelUsed: null, quota: null }, reused: false };
     }
 
     const res = await invokeGenerate(input.jobId, "generate", input.tone || "professional");
@@ -125,6 +127,7 @@ export const aiApplicationService = {
         modelUsed: rawModelUsed(res.analysis?.modelUsed),
         quota: quotaFromEdgeResponse(res.quota),
       },
+      reused: res.reused === true,
     };
   },
 
