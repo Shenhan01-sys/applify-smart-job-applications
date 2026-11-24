@@ -34,7 +34,7 @@ import { RESUME_MAX_BYTES } from "./resumeUpload.ts";
 // ---------------------------------------------------------------------------------------------
 
 /** Petunjuk satu baris di kartu impor. */
-export const LINKEDIN_PDF_HINT = "Buka profil LinkedIn kamu, pilih Lainnya (More), lalu Simpan ke PDF (Save to PDF). Unggah PDF itu di sini.";
+export const LINKEDIN_PDF_HINT = "Unggah PDF profil LinkedIn (buka profilmu, pilih Lainnya (More), lalu Simpan ke PDF (Save to PDF)) atau PDF CV biasa yang berisi teks, bukan hasil pindai.";
 export const LINKEDIN_PDF_PRIVACY = "PDF tidak disimpan. Isinya dibaca AI, lalu kamu periksa dulu sebelum ada yang ditambahkan ke profil.";
 /** Nilai kolom `user_skills.source` untuk skill dari PDF (skill yang diketik di UI memakai "manual"). */
 export const IMPORTED_SKILL_SOURCE = "linkedin_pdf";
@@ -57,7 +57,7 @@ export function validateLinkedInPdfFile(file: PdfFileInfo): PdfCheck {
   const mime = String(file?.type ?? "").split(";")[0].trim().toLowerCase();
   const byName = /\.pdf$/i.test(String(file?.name ?? "").trim());
   const isPdf = mime === "application/pdf" || ((mime === "" || mime === "application/octet-stream") && byName);
-  if (!isPdf) return { ok: false, reason: "Berkas harus PDF. Pakai PDF dari LinkedIn (Lainnya, Simpan ke PDF)." };
+  if (!isPdf) return { ok: false, reason: "Berkas harus PDF. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa." };
   if (size > LINKEDIN_PDF_MAX_BYTES) return { ok: false, reason: "Ukuran PDF terlalu besar, maksimal 5 MB." };
   return { ok: true };
 }
@@ -81,7 +81,7 @@ export function describeLinkedInImportError(err: unknown, fallback = "PDF belum 
   const e = parseApiError(err);
   switch (e.code) {
     case "not_pdf":
-      return "Berkas ini bukan PDF. Pakai PDF dari LinkedIn (Lainnya, Simpan ke PDF).";
+      return "Berkas ini bukan PDF. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.";
     case "empty_file":
       return "Berkas kosong. Pilih PDF lain.";
     case "file_too_large":
@@ -89,11 +89,11 @@ export function describeLinkedInImportError(err: unknown, fallback = "PDF belum 
     case "pdf_unreadable":
       return "PDF tidak bisa dibaca. PDF yang rusak atau dikunci kata sandi tidak didukung.";
     case "pdf_too_long":
-      return "PDF terlalu panjang untuk profil LinkedIn. Pastikan itu PDF profilmu.";
+      return "PDF terlalu panjang untuk CV atau profil LinkedIn. Pastikan itu PDF CV atau profilmu.";
     case "pdf_no_text":
-      return "PDF ini tidak berisi teks yang bisa dibaca, mungkin hasil pindai. Unduh PDF langsung dari LinkedIn: Lainnya, Simpan ke PDF.";
+      return "PDF ini tidak berisi teks yang bisa dibaca, mungkin hasil pindai. Pakai PDF CV yang bisa diseleksi teksnya, atau unduh PDF dari LinkedIn: Lainnya, Simpan ke PDF.";
     case "nothing_found":
-      return "Tidak ada data profil yang bisa dibaca dari PDF ini. Pastikan PDF diunduh dari LinkedIn dan bukan hasil pindai.";
+      return "Tidak ada data profil yang bisa dibaca dari PDF ini. Pastikan itu PDF CV atau PDF profil LinkedIn, dan bukan hasil pindai.";
     case "rate_limited":
       return `Terlalu banyak impor dalam waktu singkat. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
     case "rate_limit_check_failed":

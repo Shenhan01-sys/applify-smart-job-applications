@@ -94,7 +94,7 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
       // Penanda %PDF diperiksa di browser supaya berkas yang salah ditolak tanpa menunggu server.
       if (!hasPdfMagic(await file.slice(0, 5).text())) {
         setPhase("idle");
-        return fail("Berkas ini bukan PDF yang sah. Pakai PDF dari LinkedIn (Lainnya, Simpan ke PDF).");
+        return fail("Berkas ini bukan PDF yang sah. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.");
       }
       const result = await automationApi.importLinkedInPdf(file);
       const nextPlan = buildImportPlan(result, existing);
