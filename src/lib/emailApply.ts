@@ -10,8 +10,10 @@
  * the approved cover letter verbatim through the user's Gmail. One approval is good for one sent
  * submission. The UI only shows the action for an approval that exists and is approved.
  *
- * Plain TypeScript with no imports, so it runs under `node --test` without a bundler.
+ * Plain TypeScript (only one relative import, with its extension), so it runs under `node --test` without a bundler.
  */
+
+import { describeApiError } from "./apiErrors.ts";
 
 export const EMAIL_APPLY_JOB_TYPE = "email_apply";
 
@@ -20,9 +22,6 @@ export const EMAIL_APPLY_EXPLANATION =
   "Isi email adalah surat lamaran yang sudah kamu setujui, dikirim apa adanya tanpa diubah atau ditulis ulang AI. " +
   "Email dikirim teks polos dari akun Gmail yang kamu hubungkan, tanpa lampiran, dengan subjek yang dibuat otomatis. " +
   "Satu persetujuan hanya berlaku untuk satu pengiriman dan hanya selama masa berlakunya.";
-
-export const EMAIL_APPLY_TEST_MODE_NOTE =
-  "Bila server berjalan dalam mode uji (pengiriman nyata dimatikan), pekerjaan ini dicatat sebagai dilewati dan tidak ada email yang terkirim.";
 
 // ---------------------------------------------------------------------------------------------
 // Recruiter email
@@ -155,7 +154,7 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
 
   const job = ctx.job;
   if (job && (job.status === "pending" || job.status === "processing")) {
-    return off("queued", job.status === "processing" ? "Email sedang diproses worker." : "Email sudah masuk antrean dan menunggu worker.");
+    return off("queued", job.status === "processing" ? "Email sedang diproses agen." : "Email sudah masuk antrean dan menunggu agen.");
   }
   if (job?.status === "failed" && /jangan kirim ulang/i.test(job.error_message ?? "")) {
     return off("do_not_resend", job.error_message ?? "Email sudah terkirim; jangan kirim ulang.");
@@ -200,20 +199,7 @@ export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: strin
   };
 }
 
-/** Turn what apiFetch throws (the response text, usually JSON) into a message for the user. */
+/** Turn what apiFetch throws into a message for the user (the server's own text is never shown). */
 export function describeQueueError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  let body: { error?: string; code?: string } | null = null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") body = parsed;
-  } catch {
-    /* not JSON */
-  }
-  if (body?.code === "approval_required") {
-    return `Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa (${body.error ?? "approval_required"}). Muat ulang halaman dan periksa statusnya.`;
-  }
-  if (body?.error) return `Gagal memasukkan ke antrean: ${body.error}`;
-  if (/failed to fetch|networkerror|load failed/i.test(raw)) return "Backend otomasi tidak dapat dihubungi. Coba lagi nanti.";
-  return raw ? `Gagal memasukkan ke antrean: ${raw}` : "Gagal memasukkan ke antrean.";
+  return describeApiError(err, "Gagal memasukkan ke antrean.");
 }

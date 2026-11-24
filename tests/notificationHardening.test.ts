@@ -34,9 +34,9 @@ test("galat generik: kirim gagal, sakelar mati, dan server belum siap tidak mena
   const send = describeApiError(new ApiError(502, body({ error: "Kapso 131030 token abc", code: "whatsapp_send_failed" })));
   assert.match(send, /gagal dikirim ke WhatsApp/);
   assert.doesNotMatch(send, /Kapso|131030|abc/);
-  assert.match(describeApiError(new ApiError(503, body({ error: "x", code: "notifications_disabled" }))), /dinonaktifkan di server/);
+  assert.match(describeApiError(new ApiError(503, body({ error: "x", code: "notifications_disabled" }))), /Notifikasi WhatsApp belum tersedia/);
   for (const code of ["otp_not_configured", "otp_attempts_unavailable", "kapso_not_configured", "notification_tables_unavailable"]) {
-    assert.match(describeApiError(new ApiError(503, body({ error: "x", code }))), /Verifikasi WhatsApp belum tersedia di server/, code);
+    assert.match(describeApiError(new ApiError(503, body({ error: "x", code }))), /Notifikasi WhatsApp belum tersedia/, code);
   }
 });
 

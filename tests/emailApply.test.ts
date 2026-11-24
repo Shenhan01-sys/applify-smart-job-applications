@@ -11,6 +11,7 @@ import {
   type ApprovalLike,
   type EmailApplyContext,
 } from "../src/lib/emailApply.ts";
+import { ApiError } from "../src/lib/apiErrors.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -172,13 +173,25 @@ test("permintaan antrean tidak dibuat dari masukan yang belum cukup", () => {
   assert.equal(buildEmailApplyRequest(approval({ id: "" }), "hrd@perusahaan.co.id"), null);
 });
 
+test("panel email tidak lagi menampilkan JSON mentah dari server atau catatan 'mode uji' untuk pengembang", () => {
+  const panel = read("../src/components/EmailApplyPanel.tsx");
+  assert.match(panel, /describeApiError\(e, "Gagal memulai koneksi Gmail\."\)/);
+  assert.doesNotMatch(panel, /e\?\.message/);
+  assert.doesNotMatch(panel, /mode uji/i);
+  assert.doesNotMatch(read("../src/lib/emailApply.ts"), /Bila server berjalan dalam mode uji/);
+});
+
 test("galat antrean: kode approval_required, galat server berbentuk JSON, jaringan, dan teks biasa", () => {
   const forbidden = describeQueueError(new Error(JSON.stringify({ error: "approval request has expired", code: "approval_required" })));
   assert.match(forbidden, /kedaluwarsa/);
-  assert.match(forbidden, /approval request has expired/);
-  assert.match(describeQueueError(new Error(JSON.stringify({ error: "addGenericJob failed: boom" }))), /addGenericJob failed: boom/);
+  assert.doesNotMatch(forbidden, /approval request has expired/);
+  // teks server atau teks mentah tidak pernah ditempelkan ke pesan untuk pengguna
+  const generic = describeQueueError(new Error(JSON.stringify({ error: "addGenericJob failed: boom" })));
+  assert.match(generic, /Gagal memasukkan ke antrean/);
+  assert.doesNotMatch(generic, /addGenericJob|boom/);
   assert.match(describeQueueError(new TypeError("Failed to fetch")), /tidak dapat dihubungi/);
-  assert.match(describeQueueError("kacau"), /kacau/);
+  assert.doesNotMatch(describeQueueError("kacau"), /kacau/);
+  assert.equal(describeQueueError(new ApiError(503, JSON.stringify({ error: "Gmail not configured on server" }))), "Kirim lewat Gmail belum tersedia.");
   assert.match(describeQueueError(undefined), /Gagal memasukkan ke antrean/);
 });
 

@@ -85,6 +85,9 @@ function waitText(sec: number | undefined): string {
   return `${Math.ceil(sec / 60)} menit`;
 }
 
+/** Jalur email lewat Gmail belum bisa dipakai karena Google belum disiapkan di server. */
+export const GMAIL_UNAVAILABLE_MESSAGE = "Kirim lewat Gmail belum tersedia.";
+
 /** Kode jawaban 500 generik dari server: teks galat sebenarnya hanya ada di log server. */
 const GENERIC_SERVER_CODES = new Set([
   "internal_error",
@@ -128,8 +131,8 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return "Batas permintaan AI tidak dapat diperiksa saat ini, jadi permintaan ditolak demi keamanan. Coba lagi nanti.";
     case "session_encryption_not_configured":
       return (
-        "Server belum dikonfigurasi untuk menyimpan sesi dengan aman: kunci enkripsi sesi belum diisi administrator. " +
-        "Ini masalah konfigurasi server, bukan kesalahan pada cookie yang kamu masukkan. Hubungi administrator."
+        "Penyimpanan sesi belum tersedia untuk sementara, jadi sesi yang kamu masukkan belum bisa disimpan. " +
+        "Ini bukan kesalahan pada cookie yang kamu masukkan. Coba lagi nanti."
       );
     case "session_undecryptable":
       return "Sesi yang tersimpan tidak dapat dibaca. Kunci enkripsi server mungkin berubah atau datanya rusak. Impor ulang sesi untuk menggantinya.";
@@ -154,12 +157,12 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
     case "whatsapp_send_failed":
       return "Kode OTP gagal dikirim ke WhatsApp. Pastikan nomor aktif dan sudah pernah chat ke nomor bot Applify, lalu coba lagi nanti.";
     case "notifications_disabled":
-      return "Notifikasi sedang dinonaktifkan di server, jadi tidak ada pesan yang dikirim.";
+      return "Notifikasi WhatsApp belum tersedia, jadi tidak ada pesan yang dikirim.";
     case "otp_not_configured":
     case "otp_attempts_unavailable":
     case "kapso_not_configured":
     case "notification_tables_unavailable":
-      return "Verifikasi WhatsApp belum tersedia di server. Hubungi administrator.";
+      return "Notifikasi WhatsApp belum tersedia. Coba lagi nanti.";
     case "account_email_unavailable":
       return "Email akunmu belum terkonfirmasi atau tidak tersedia, jadi notifikasi email belum bisa diaktifkan.";
     case "invalid_id":
@@ -171,13 +174,18 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
     case "already_logged":
       return "Lamaran ini sudah tercatat terkirim, jadi tidak perlu dipulihkan lagi.";
     case "approval_required":
-      return `Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa (${e.serverMessage ?? "approval_required"}). Muat ulang halaman dan periksa statusnya.`;
+      return "Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa. Muat ulang halaman dan periksa statusnya.";
+    case "gmail_not_configured":
+      return GMAIL_UNAVAILABLE_MESSAGE;
   }
 
   if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;
   if (e.status === 401) return "Sesi login berakhir atau belum masuk. Masuk lagi, lalu ulangi.";
   if (e.status === 429) return `Terlalu banyak permintaan. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
-  if (e.serverMessage) return `${fallback} (${e.serverMessage})`;
+  // Server lama belum mengirim kode untuk Gmail yang belum dikonfigurasi: kenali dari statusnya, lalu tampilkan pesan buatan sendiri.
+  if (e.status === 503 && e.serverMessage && /gmail not configured/i.test(e.serverMessage)) return GMAIL_UNAVAILABLE_MESSAGE;
+  // Teks galat server (sering berbahasa Inggris atau memuat nama pengaturan) bukan untuk pengguna: hanya ke konsol.
+  if (e.serverMessage && typeof console !== "undefined") console.debug("[api] pesan server tidak ditampilkan:", e.serverMessage);
   if (e.rawText && /failed to fetch|networkerror|load failed|network request failed/i.test(e.rawText)) {
     return "Server Applify tidak dapat dihubungi. Periksa koneksi internetmu, lalu coba lagi. Bila koneksimu normal, server sedang bermasalah; coba lagi beberapa menit lagi.";
   }

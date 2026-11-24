@@ -3,10 +3,10 @@ import { Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Shiel
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { automationApi } from "@/services/automationApi";
+import { describeApiError } from "@/lib/apiErrors";
 import { enqueueEmailApply } from "@/services/emailApplyService";
 import {
   EMAIL_APPLY_EXPLANATION,
-  EMAIL_APPLY_TEST_MODE_NOTE,
   describeQueueError,
   getEmailApplyState,
   type ApprovalLike,
@@ -45,7 +45,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
       const url = await automationApi.startGmailOAuth();
       if (url) window.location.assign(url);
     } catch (e: any) {
-      setError(e?.message ?? "Gagal memulai koneksi Gmail.");
+      setError(describeApiError(e, "Gagal memulai koneksi Gmail."));
     } finally {
       setConnectingGmail(false);
     }
@@ -185,8 +185,6 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
               <Mail className="h-3.5 w-3.5" /> Kirim lewat Email
             </button>
           )}
-
-          <p className="text-xs text-muted-foreground leading-relaxed">{EMAIL_APPLY_TEST_MODE_NOTE}</p>
         </div>
       )}
     </div>

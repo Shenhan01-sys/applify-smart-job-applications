@@ -383,7 +383,7 @@ export function describeLlmKeyError(code: unknown, retryAfterSec?: number): stri
     case "validation_unavailable":
       return "Penyedia belum bisa dihubungi untuk memeriksa kunci, jadi kunci belum disimpan. Coba lagi nanti.";
     case "encryption_unavailable":
-      return "Server belum bisa menyimpan kunci dengan aman. Hubungi administrator.";
+      return "Kunci belum bisa disimpan dengan aman saat ini, jadi belum disimpan. Coba lagi nanti.";
     case "not_found":
       return "Belum ada kunci tersimpan untuk penyedia ini.";
     case "bad_response":

@@ -49,25 +49,43 @@ test("401: meminta masuk lagi", () => {
   assert.match(msg, /masuk lagi/i);
 });
 
-test("sesi: 503 session_encryption_not_configured jujur soal konfigurasi server; 422 session_undecryptable meminta impor ulang", () => {
+test("sesi: 503 session_encryption_not_configured jujur tanpa istilah teknis; 422 session_undecryptable meminta impor ulang", () => {
   const cfg = describeApiError(new ApiError(503, body({ error: "SESSION_ENCRYPTION_KEY belum diisi", code: "session_encryption_not_configured" })), "Gagal mengimpor");
-  assert.match(cfg, /belum dikonfigurasi/);
+  assert.match(cfg, /belum tersedia untuk sementara/);
   assert.match(cfg, /bukan kesalahan pada cookie/);
-  assert.match(cfg, /administrator/);
+  assert.doesNotMatch(cfg, /administrator|SESSION_ENCRYPTION_KEY|konfigurasi/i);
   const dec = describeApiError(new ApiError(422, body({ error: "x", code: "session_undecryptable" })), "Gagal memverifikasi");
   assert.match(dec, /tidak dapat dibaca/);
   assert.match(dec, /Impor ulang/);
   assert.notEqual(cfg, dec);
 });
 
-test("approval_required (403) menyebut galat server", () => {
+test("approval_required (403) menjelaskan dengan bahasa sendiri, tanpa menempelkan teks server", () => {
   const msg = describeApiError(new ApiError(403, body({ error: "approval request has expired", code: "approval_required" })));
   assert.match(msg, /kedaluwarsa/);
-  assert.match(msg, /approval request has expired/);
+  assert.doesNotMatch(msg, /approval request has expired|approval_required/);
 });
 
-test("galat tanpa kode: memakai teks cadangan layar dan menambahkan pesan server bila ada", () => {
-  assert.equal(describeApiError(new ApiError(500, body({ error: "boom" })), "Gagal membuat surat"), "Gagal membuat surat (boom)");
+test("503 Gmail belum disiapkan: pesan 'Kirim lewat Gmail belum tersedia', dari kode maupun dari teks server lama", () => {
+  const byCode = describeApiError(new ApiError(503, body({ error: "x", code: "gmail_not_configured" })), "Gagal memulai koneksi Gmail.");
+  assert.equal(byCode, "Kirim lewat Gmail belum tersedia.");
+  const legacy = describeApiError(new ApiError(503, body({ error: "Gmail not configured (GOOGLE_CLIENT_ID missing)" })), "Gagal memulai koneksi Gmail.");
+  assert.equal(legacy, "Kirim lewat Gmail belum tersedia.");
+  assert.doesNotMatch(legacy, /GOOGLE_CLIENT_ID/);
+});
+
+test("galat tanpa kode: teks cadangan layar; pesan server (bahasa Inggris atau nama pengaturan) tidak pernah ikut tampil", () => {
+  const original = console.debug;
+  const debugged: unknown[][] = [];
+  console.debug = (...args: unknown[]) => { debugged.push(args); };
+  try {
+    assert.equal(describeApiError(new ApiError(400, body({ error: "boom GOOGLE_CLIENT_ID" })), "Gagal membuat surat"), "Gagal membuat surat");
+    assert.equal(debugged.length, 1);
+    assert.match(String(debugged[0][1]), /boom GOOGLE_CLIENT_ID/);
+  } finally {
+    console.debug = original;
+  }
+  assert.match(describeApiError(new ApiError(500, body({ error: "boom" })), "Gagal membuat surat."), /^Gagal membuat surat\. Server sedang bermasalah/);
   assert.match(describeApiError(new ApiError(500, "<html>bad gateway</html>"), "Gagal membuat surat."), /^Gagal membuat surat\. Server sedang bermasalah/);
   const offline = describeApiError(new TypeError("Failed to fetch"), "Gagal");
   assert.match(offline, /tidak dapat dihubungi/);

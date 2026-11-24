@@ -365,7 +365,8 @@ test("describeLlmKeyError: provider_unverified dan consent_required punya arahan
 test("describeLlmKeyError: key_invalid dan validation_unavailable menyebut kunci belum disimpan", () => {
   assert.match(describeLlmKeyError("key_invalid"), /tidak disimpan/);
   assert.match(describeLlmKeyError("validation_unavailable"), /belum disimpan/);
-  assert.match(describeLlmKeyError("encryption_unavailable"), /administrator/);
+  assert.doesNotMatch(describeLlmKeyError("encryption_unavailable"), /administrator/);
+  assert.match(describeLlmKeyError("encryption_unavailable"), /belum bisa disimpan dengan aman/);
 });
 
 test("describeLlmKeyError: too_many_attempts menyebut waktu tunggu bila ada", () => {
