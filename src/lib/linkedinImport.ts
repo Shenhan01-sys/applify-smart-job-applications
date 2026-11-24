@@ -143,6 +143,9 @@ export interface PreviewEducation {
   start_year: number;
   end_year: number | null;
   is_current: boolean;
+  /** IPK dan skalanya dari CV; null bila CV tidak mencantumkannya (atau server lama belum mengirim). */
+  gpa: number | null;
+  max_gpa: number | null;
   notes: string[];
 }
 
@@ -185,6 +188,7 @@ const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 const textOrNull = (v: unknown): string | null => text(v) || null;
+const numberOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const strings = (v: unknown): string[] => list(v).filter((x): x is string => typeof x === "string" && x.trim() !== "");
 
 /**
@@ -222,6 +226,9 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
   for (const item of list(p.education)) {
     const e = obj(item);
     if (!e || !text(e.institution) || !text(e.degree) || typeof e.start_year !== "number") continue;
+    // IPK dan skalanya hanya dipakai berpasangan, sama seperti kolom `education.gpa` dan `max_gpa`.
+    const gpa = numberOrNull(e.gpa);
+    const maxGpa = numberOrNull(e.max_gpa);
     education.push({
       institution: text(e.institution),
       degree: text(e.degree),
@@ -229,6 +236,8 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
       start_year: e.start_year,
       end_year: typeof e.end_year === "number" ? e.end_year : null,
       is_current: e.is_current === true,
+      gpa: gpa !== null && maxGpa !== null ? gpa : null,
+      max_gpa: gpa !== null && maxGpa !== null ? maxGpa : null,
       notes: strings(e.notes),
     });
   }
@@ -461,26 +470,31 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
   for (const [i, e] of preview.education.entries()) {
     const key = `edu:${i}`;
     const years = `${e.start_year} - ${e.is_current ? "Sekarang" : (e.end_year ?? "?")}`;
-    const base = { key, title: e.institution, detail: `${[e.degree, e.field_of_study].filter(Boolean).join(", ")} · ${years}`, notes: e.notes };
+    const hasGpa = typeof e.gpa === "number" && typeof e.max_gpa === "number";
+    const gpaText = hasGpa ? ` · IPK ${String(e.gpa).replace(".", ",")}/${String(e.max_gpa).replace(".", ",")}` : "";
+    const base = { key, title: e.institution, detail: `${[e.degree, e.field_of_study].filter(Boolean).join(", ")} · ${years}${gpaText}`, notes: e.notes };
     const k = educationKey(e.institution, e.degree);
     if (seenEdu.has(k)) {
       plan.education.push({ ...base, status: "duplicate", reason: "Jenjang ini di institusi yang sama sudah ada.", row: null });
       continue;
     }
-    const v = validateEducation(
-      {
-        institution: e.institution,
-        degree: e.degree,
-        field_of_study: e.field_of_study ?? "",
-        start_year: String(e.start_year),
-        end_year: e.is_current || e.end_year === null ? "" : String(e.end_year),
-        is_current: e.is_current,
-        gpa: "",
-        max_gpa: "4",
-        description: "",
-      },
-      now,
-    );
+    const form = {
+      institution: e.institution,
+      degree: e.degree,
+      field_of_study: e.field_of_study ?? "",
+      start_year: String(e.start_year),
+      end_year: e.is_current || e.end_year === null ? "" : String(e.end_year),
+      is_current: e.is_current,
+      gpa: hasGpa ? String(e.gpa) : "",
+      max_gpa: hasGpa ? String(e.max_gpa) : "4",
+      description: "",
+    };
+    let v = validateEducation(form, now);
+    // IPK yang tidak sah tidak boleh menghilangkan pendidikannya: ulangi tanpa IPK dan beri catatan.
+    if (!v.ok && form.gpa !== "" && (v.errors.gpa || v.errors.max_gpa) && Object.keys(v.errors).every((f) => f === "gpa" || f === "max_gpa")) {
+      v = validateEducation({ ...form, gpa: "", max_gpa: "4" }, now);
+      if (v.ok) base.notes = [...base.notes, "IPK di PDF tidak dimasukkan karena angkanya tidak sah. Tambahkan manual bila perlu."];
+    }
     if (!v.ok) {
       plan.education.push({ ...base, status: "invalid", reason: firstError(v.errors), row: null });
       continue;
