@@ -29,7 +29,6 @@ import { getResume, uploadResume, removeResume, openResume, ResumeError } from "
 import { WELCOME_STEPS } from "@/lib/onboarding";
 import {
   EMPTY_PREFERENCES,
-  JOB_TYPE_OPTIONS,
   WORK_TYPE_OPTIONS,
   preferencesFromSettings,
   preferencesToSettings,
@@ -1063,22 +1062,7 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
         })}
       </div>
 
-      {/* Tipe pekerjaan: boleh lebih dari satu, boleh kosong */}
-      <fieldset style={{ animation: `fadeInUp 0.4s ease-out 0.24s both` }}>
-        <legend className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
-          <Briefcase className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" /> Tipe pekerjaan
-        </legend>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {JOB_TYPE_OPTIONS.map((o) => {
-            const active = preferences.job_types.includes(o.value);
-            return (
-              <button key={o.value} type="button" aria-pressed={active}
-                onClick={() => setPreferences({ ...preferences, job_types: toggleInList(preferences.job_types, o.value) })}
-                className={chip(active)}>{o.label}</button>
-            );
-          })}
-        </div>
-      </fieldset>
+      {/* "Tipe pekerjaan" tidak ditampilkan: nilainya tersimpan (job_type_filter) tetapi belum ada pencarian yang menyaringnya. */}
 
       {/* Model kerja: menyaring hasil pencarian, jadi tidak ada pilihan bawaan */}
       <fieldset style={{ animation: `fadeInUp 0.4s ease-out 0.32s both` }}>
@@ -1191,11 +1175,6 @@ function Step5Review({ formData, workExps, educations, userSkills, preferences }
             <DollarSign className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="text-muted-foreground">Gaji harapan:</span>
             <span className="font-medium">{preferences.desired_salary > 0 ? `Rp ${preferences.desired_salary.toLocaleString("id-ID")}` : "-"}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground">Tipe:</span>
-            <span className="font-medium">{preferences.job_types.length ? preferences.job_types.map((v: string) => JOB_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v).join(", ") : "Semua"}</span>
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />

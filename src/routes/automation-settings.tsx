@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { VISA_OPTIONS, visaSelectValue, visaValueToStore } from "@/lib/visaChoice";
+import { listToText, numberToText, parseCommaList, parseOptionalNumber, sameList } from "@/lib/settingsForm";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -90,7 +91,7 @@ function AutomationSettingsPage() {
     }
   };
 
-  const updateField = (field: keyof AutomationSettings, value: any) => {
+  const updateField = (field: keyof AutomationSettings, value: unknown) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -198,10 +199,10 @@ function AutomationSettingsPage() {
                   onChange={(v: string) => updateField('require_visa', visaValueToStore(v))}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="number" value={settings.desired_salary?.toString() || ''} onChange={(v: string) => updateField('desired_salary', Number(v))} icon={DollarSign} />
-                  <InputField label="Gaji saat ini (Rp)" type="number" value={settings.current_ctc?.toString() || ''} onChange={(v: string) => updateField('current_ctc', Number(v))} icon={DollarSign} />
+                  <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="number" value={numberToText(settings.desired_salary)} onChange={(v: string) => updateField('desired_salary', parseOptionalNumber(v))} icon={DollarSign} />
+                  <InputField label="Gaji saat ini (Rp)" type="number" value={numberToText(settings.current_ctc)} onChange={(v: string) => updateField('current_ctc', parseOptionalNumber(v))} icon={DollarSign} />
                 </div>
-                <InputField label="Masa pemberitahuan (hari)" type="number" value={settings.notice_period?.toString() || '30'} onChange={(v: string) => updateField('notice_period', Number(v))} icon={Clock} />
+                <InputField label="Masa pemberitahuan (hari)" type="number" value={numberToText(settings.notice_period)} onChange={(v: string) => updateField('notice_period', parseOptionalNumber(v))} placeholder="Misalnya 30" icon={Clock} />
                 <InputField label="Alamat profil LinkedIn" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
                 <InputField label="Situs web atau portofolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
                 <div>
@@ -225,10 +226,10 @@ function AutomationSettingsPage() {
                 <Search className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Preferensi Pencarian
               </h2>
               <div className="space-y-4">
-                <InputField 
-                  label="Kata kunci pencarian (pisahkan dengan koma)" 
-                  value={settings.search_keywords?.join(', ') || ''} 
-                  onChange={(v: string) => updateField('search_keywords', v.split(',').map(k => k.trim()).filter(Boolean))} 
+                <CommaListField
+                  label="Kata kunci pencarian (pisahkan dengan koma)"
+                  value={settings.search_keywords}
+                  onChange={(list: string[]) => updateField('search_keywords', list)}
                   placeholder="Software Engineer, React Developer, Full Stack"
                 />
                 <InputField 
@@ -238,21 +239,16 @@ function AutomationSettingsPage() {
                   placeholder="Jakarta, Indonesia atau Remote"
                   icon={MapPin}
                 />
-                <ToggleField 
-                  label="Hanya lamaran cepat (Easy Apply)" 
-                  description="Hanya cari lowongan yang bisa dilamar dengan cepat tanpa formulir panjang"
-                  checked={settings.easy_apply_only ?? false}
-                  onChange={(v: boolean) => updateField('easy_apply_only', v)}
+                {/* Pilihan "hanya lamaran cepat" tidak ditampilkan: belum ada pencarian yang memakainya. */}
+                <CommaListField
+                  label="Perusahaan yang dihindari (pisahkan dengan koma)"
+                  value={settings.blacklist_companies}
+                  onChange={(list: string[]) => updateField('blacklist_companies', list)}
                 />
-                <InputField 
-                  label="Perusahaan yang dihindari (pisahkan dengan koma)" 
-                  value={settings.blacklist_companies?.join(', ') || ''} 
-                  onChange={(v: string) => updateField('blacklist_companies', v.split(',').map(k => k.trim()).filter(Boolean))} 
-                />
-                <InputField 
-                  label="Kata yang dihindari di lowongan (pisahkan dengan koma)" 
-                  value={settings.blacklist_words?.join(', ') || ''} 
-                  onChange={(v: string) => updateField('blacklist_words', v.split(',').map(k => k.trim()).filter(Boolean))} 
+                <CommaListField
+                  label="Kata yang dihindari di lowongan (pisahkan dengan koma)"
+                  value={settings.blacklist_words}
+                  onChange={(list: string[]) => updateField('blacklist_words', list)}
                 />
               </div>
             </div>
@@ -263,6 +259,7 @@ function AutomationSettingsPage() {
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Settings className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Perilaku Agen
               </h2>
+              {/* "Selalu pakai jawaban terbaru" tidak ditampilkan: tidak ada bagian server, agen, atau ekstensi yang membacanya. */}
               <ToggleField 
                 label="Berhenti sebelum mengirim" 
                 description="Agen berhenti sebelum menekan tombol kirim, supaya kamu bisa memeriksa dulu"
@@ -275,11 +272,11 @@ function AutomationSettingsPage() {
                 checked={settings.pause_at_failed_question ?? true}
                 onChange={(v: boolean) => updateField('pause_at_failed_question', v)}
               />
-              <ToggleField 
-                label="Selalu pakai jawaban terbaru" 
-                description="Pakai pengaturan terbaru, bukan jawaban lama yang sudah tersimpan"
-                checked={settings.overwrite_previous_answers ?? false}
-                onChange={(v: boolean) => updateField('overwrite_previous_answers', v)}
+              <ToggleField
+                label="Pakai ekstensi browser otomatis untuk situs yang perlu login"
+                description="Bila aktif, ekstensi langsung mulai mengisi formulir setelah kamu menyetujui lamaran, tanpa bertanya lagi. Ekstensi tetap berhenti sebelum kirim: kamu yang menekan Kirim."
+                checked={settings.extension_auto_use ?? false}
+                onChange={(v: boolean) => updateField('extension_auto_use', v)}
               />
             </div>
           )}
@@ -307,7 +304,7 @@ function AutomationSettingsPage() {
 }
 
 // Komponen bantu. Setiap label terhubung ke kolomnya lewat htmlFor/id (useId), dan sakelar memakai role="switch".
-function InputField({ label, value, onChange, type = 'text', placeholder = '', icon: Icon }: any) {
+function InputField({ label, value, onChange, onBlur, type = 'text', placeholder = '', icon: Icon }: any) {
   const id = useId();
   return (
     <div>
@@ -321,10 +318,33 @@ function InputField({ label, value, onChange, type = 'text', placeholder = '', i
         inputMode={type === 'number' ? 'numeric' : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder}
         className="mt-1.5 w-full h-12 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all hover:border-black/[12%]"
       />
     </div>
+  );
+}
+
+/**
+ * Kolom daftar dipisah koma. Teks mentah disimpan di kolom ini sendiri, jadi spasi dan koma yang baru diketik
+ * tidak hilang. Daftar hasil urai dikirim ke pengaturan setiap ketikan (Simpan selalu membawa isi terbaru), dan
+ * teks dirapikan ("a, b") saat kolom ditinggalkan.
+ */
+function CommaListField({ label, value, onChange, placeholder }: { label: string; value?: string[] | null; onChange: (list: string[]) => void; placeholder?: string }) {
+  const [text, setText] = useState(() => listToText(value));
+  useEffect(() => {
+    // Isi dari luar (data baru dimuat) menimpa kolom hanya bila berbeda dari yang sedang diketik.
+    setText((current) => (sameList(parseCommaList(current), value) ? current : listToText(value)));
+  }, [value]);
+  return (
+    <InputField
+      label={label}
+      value={text}
+      placeholder={placeholder}
+      onChange={(v: string) => { setText(v); onChange(parseCommaList(v)); }}
+      onBlur={() => setText(listToText(parseCommaList(text)))}
+    />
   );
 }
 

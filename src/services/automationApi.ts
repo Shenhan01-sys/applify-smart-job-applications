@@ -115,6 +115,8 @@ export interface AutomationSettings {
   overwrite_previous_answers?: boolean
   ai_provider?: string
   ai_model?: string
+  /** Pakai Ekstensi Browser langsung (tanpa bertanya) untuk situs yang perlu login. Bawaan: mati. */
+  extension_auto_use?: boolean
 }
 
 export const automationApi = {
