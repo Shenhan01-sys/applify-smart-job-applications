@@ -44,6 +44,13 @@ export interface BackendState {
   approveExtra: Row;
   /** Pengaturan agen (GET dan PUT /api/automation/settings). */
   settings: Row;
+  /** GET /api/llm-keys. Bawaan: fitur kunci sendiri mati. */
+  llmKeys: Row;
+  /** GET /api/notifications/status dan /preferences. */
+  notificationStatus: Row;
+  notificationPrefs: Row;
+  /** subscriptions (baca) dan jawaban RPC get_quota_status. */
+  subscriptions: Row[];
 }
 
 export interface Override {
@@ -111,6 +118,19 @@ export class MockBackend {
       gmail: false,
       approveExtra: {},
       settings: {},
+      llmKeys: { enabled: false, providers: [], keys: [] },
+      notificationStatus: { telegram: false, notificationsEnabled: true, whatsappKapso: true, email: true },
+      notificationPrefs: {
+        userId: "11111111-1111-4111-8111-111111111111",
+        whatsappPhone: null,
+        whatsappVerified: false,
+        whatsappEnabled: false,
+        whatsappLastInboundAt: null,
+        emailAddress: "penguji@example.test",
+        emailEnabled: false,
+        notifyEvents: { ready: true, submitted: true, awaiting_code: true, follow_up: true, locked_claim: true },
+      },
+      subscriptions: [],
       ...initial,
     };
   }
@@ -168,6 +188,12 @@ export class MockBackend {
     if (method === "GET" && path === "/api/approvals/pending") return route.fulfill(json(200, s.pending));
     if (method === "GET" && path === "/api/approvals/history") return route.fulfill(json(200, s.history));
     if (method === "GET" && path === "/api/oauth/status") return route.fulfill(json(200, { gmail: s.gmail }));
+    if (method === "GET" && path === "/api/llm-keys") return route.fulfill(json(200, s.llmKeys));
+    if (method === "GET" && path === "/api/notifications/status") return route.fulfill(json(200, s.notificationStatus));
+    if (method === "GET" && path === "/api/notifications/preferences") return route.fulfill(json(200, s.notificationPrefs));
+    if (method === "POST" && path === "/api/extension/token") {
+      return route.fulfill(json(200, { token: "ext_tok_v1.e2e-test-token-value.e2e-signature", expiresAt: new Date(Date.now() + 4 * 3600_000).toISOString(), scope: "extension:apply", ttlSeconds: 14400 }));
+    }
     if (path === "/api/automation/settings") {
       if (method === "GET") return route.fulfill(json(200, s.settings));
       if (method === "PUT") {
@@ -242,6 +268,11 @@ export class MockBackend {
       return route.fulfill(json(200, authUser()));
     }
 
+    // Kuota draf AI bulan ini (halaman Pengaturan): RPC, bukan tabel.
+    if (path === "/rest/v1/rpc/get_quota_status" && method === "POST") {
+      return route.fulfill(json(200, [{ limit_qty: 10, used: 2, remaining: 8, allowed: true }]));
+    }
+
     const table = path.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
     if (!table) {
       this.unmocked.push(`SUPABASE ${method} ${path}`);
@@ -286,6 +317,7 @@ export class MockBackend {
       // Dibaca halaman Lamaran untuk menyaring skill yang disorot; kosong cukup.
       user_skills: [],
       work_experiences: [],
+      subscriptions: s.subscriptions,
     };
     const rows = sources[table];
     if (!rows) {

@@ -1,4 +1,5 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { createFileRoute, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { ErrorState } from "@/components/ErrorState";
@@ -9,6 +10,7 @@ import SavedAnswers from "@/components/SavedAnswers";
 import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
 import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
 import LlmKeysCard from "@/components/LlmKeysCard";
+import { gmailBanner, parseGmailCallback, validateGmailSearch, type GmailBanner } from "@/lib/gmailCallback";
 import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList, KeyRound } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -20,6 +22,8 @@ export const Route = createFileRoute("/settings")({
     if (!session) throw redirect({ to: "/login" });
   },
   head: () => ({ meta: [{ title: "Pengaturan — Applify" }] }),
+  // Backend mengarahkan balik ke /settings?gmail=connected atau ?gmail=error&reason=... sesudah sambungan Gmail.
+  validateSearch: validateGmailSearch,
   component: SettingsPage,
 });
 
@@ -45,6 +49,18 @@ function SoonButton({ icon: Icon, children }: { icon?: typeof Lock; children: Re
 function SettingsPage() {
   const plan = useSubscription();
   const billing = isBillingEnabled();
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const [gmail, setGmail] = useState<GmailBanner | null>(null);
+
+  // Hasil sambungan Gmail dibaca dari alamat sekali, ditampilkan sebagai kabar di halaman, lalu alamatnya dibersihkan
+  // supaya muat ulang halaman tidak mengulang kabar yang sama.
+  useEffect(() => {
+    const callback = parseGmailCallback(search);
+    if (!callback) return;
+    setGmail(gmailBanner(callback));
+    navigate({ to: "/settings", search: {}, hash: window.location.hash.replace(/^#/, "") || undefined, replace: true });
+  }, [search, navigate]);
 
   return (
     <AppShell>
@@ -53,6 +69,23 @@ function SettingsPage() {
         <p className="text-muted-foreground text-sm mt-1">Kelola kuota, notifikasi, dan privasi akunmu</p>
       </header>
       <div className="space-y-4 max-w-3xl">
+        {gmail && (
+          <div
+            role={gmail.tone === "error" ? "alert" : "status"}
+            data-testid="gmail-banner"
+            className={`flex items-start justify-between gap-3 rounded-xl border-2 p-3 text-sm ${gmail.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-800"}`}
+          >
+            <span>
+              {gmail.text}
+              {gmail.tone === "success" && (
+                <> <Link to="/approvals" className="font-semibold underline">Buka Persetujuan</Link></>
+              )}
+            </span>
+            <button type="button" onClick={() => setGmail(null)} aria-label="Tutup kabar Gmail" className="shrink-0 min-h-8 px-2 text-xs font-semibold underline">
+              Tutup
+            </button>
+          </div>
+        )}
         {/* Kuota: dibaca dari database, bukan dari penyimpanan browser */}
         <Card icon={Gauge} title="Kuota Draf AI" color="#059669"
           desc="Berapa draf lamaran yang masih bisa dibuat AI bulan ini.">
