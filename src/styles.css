@@ -629,3 +629,12 @@
     border-color: rgba(22, 21, 15, 0.14);
   }
 }
+
+/* .glass-solid (kartu Beranda dan Karier Hijau) ditulis di luar @layer, jadi penggantinya juga di luar @layer.
+   Saat disorot, garis hover dari kelas utilitas (misalnya hover:border-blue-300) yang berlaku. */
+.app-ui .glass-solid {
+  border-width: 1px;
+}
+.app-ui .glass-solid:where(:not(:hover)) {
+  border-color: rgba(22, 21, 15, 0.12);
+}

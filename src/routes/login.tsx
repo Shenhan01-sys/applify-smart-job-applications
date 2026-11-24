@@ -171,7 +171,7 @@ function LoginPage() {
   // Tampilkan pemuat selama status masuk ditentukan (mencegah halaman kosong)
   if (authLoading) {
     return (
-      <div className="min-h-screen grid-bg flex items-center justify-center" role="status" aria-live="polite">
+      <div className="app-ui min-h-screen grid-bg flex items-center justify-center" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
         <span className="ml-3 text-muted-foreground">Memuat...</span>
       </div>
@@ -179,17 +179,17 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid-bg flex items-center justify-center px-4 py-20">
+    <div className="app-ui min-h-screen grid-bg flex items-center justify-center px-4 py-12 sm:py-20">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 rounded-2xl gradient-primary grid place-items-center text-white font-bold text-xl mb-4" aria-hidden="true">A</div>
+          <div className="inline-grid h-14 w-14 place-items-center rounded-2xl gradient-primary text-white font-bold text-xl mb-4" aria-hidden="true">A</div>
           <h1 className="text-2xl font-bold">{isSignUp ? "Buat Akun" : "Masuk ke Applify"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isSignUp ? "Daftar gratis untuk mulai memakai asisten lamaran kerja berbasis AI" : "Masuk untuk melanjutkan"}
           </p>
         </div>
 
-        <div className="glass rounded-3xl p-8">
+        <div className="glass rounded-3xl p-6 sm:p-8">
           {/* Google OAuth Button */}
           <button
             type="button"
