@@ -11,6 +11,8 @@
  * sudah terisi tidak pernah ditimpa. Tanpa impor selain berkas lib lain, supaya bisa dites dengan `node --test`.
  */
 import {
+  ACHIEVEMENT_DESCRIPTION_MAX,
+  ACHIEVEMENT_ISSUER_MAX,
   PROFICIENCY_LEVELS,
   SKILL_CATEGORIES,
   buildProfileRow,
@@ -35,7 +37,34 @@ import { RESUME_MAX_BYTES } from "./resumeUpload.ts";
 
 /** Petunjuk satu baris di kartu impor. */
 export const LINKEDIN_PDF_HINT = "Unggah PDF profil LinkedIn (buka profilmu, pilih Lainnya (More), lalu Simpan ke PDF (Save to PDF)) atau PDF CV biasa yang berisi teks, bukan hasil pindai.";
-export const LINKEDIN_PDF_PRIVACY = "PDF tidak disimpan. Isinya dibaca AI, lalu kamu periksa dulu sebelum ada yang ditambahkan ke profil.";
+export const LINKEDIN_PDF_PRIVACY = "PDF tidak disimpan di sini. Isinya dibaca AI, lalu kamu periksa dulu sebelum ada yang ditambahkan ke profil.";
+/** Satu unggahan melakukan dua hal: kartu ini menjelaskannya, supaya pengguna tidak mengunggah dua kali. */
+export const LINKEDIN_PDF_CV_NOTE = "Tidak perlu mengunggah dua kali: PDF yang kamu unggah di kartu CV untuk Dilampirkan (di bawah) otomatis dibaca juga di sini.";
+/** Tambahan petunjuk di kartu CV untuk Dilampirkan. */
+export const RESUME_IMPORT_HINT = "Bila berkasnya PDF, isinya juga dibaca AI untuk mengisi profilmu. Kamu periksa dulu hasilnya; belum ada yang masuk ke profil sebelum kamu setuju.";
+export const CV_IMPORT_DIALOG_TITLE = "Isi profil dari CV ini?";
+export const CV_IMPORT_DIALOG_HINT = "CV kamu sudah tersimpan. Centang data yang mau ditambahkan ke profil. Data yang sudah ada tidak ditimpa, dan belum ada yang tersimpan sampai kamu menekan Tambahkan ke profil.";
+export const CV_IMPORT_READING = "CV tersimpan. Isinya sedang dibaca untuk mengisi profil...";
+export const CV_IMPORT_SKIPPED_NOT_PDF = "CV tersimpan. Isi profil otomatis hanya untuk berkas PDF; isi profilmu manual atau unggah versi PDF.";
+export const CV_IMPORT_SKIPPED_BLOCKED = "CV tersimpan. Isi profil otomatis dilewati karena profilmu belum termuat penuh. Muat ulang halaman, lalu unggah PDF di kartu Impor.";
+export const CV_IMPORT_SKIPPED_BUSY = "CV tersimpan. Impor lain sedang berjalan, jadi isi profil otomatis dilewati.";
+/** Awalan pesan bila CV sudah tersimpan tetapi isinya gagal dibaca. */
+export const CV_IMPORT_FAILED_PREFIX = "CV tersimpan, tetapi isinya belum bisa dibaca untuk mengisi profil.";
+
+/** Pesan pendek untuk CV yang tersimpan tetapi impornya gagal: unggahan tidak dibatalkan, alasannya ikut ditulis. */
+export const describeCvImportFailure = (reason: string): string => `${CV_IMPORT_FAILED_PREFIX} ${reason}`.trim();
+
+/**
+ * Apakah CV yang baru diunggah boleh dibaca otomatis? Hanya PDF (aturan yang sama dengan kartu impor). DOC dan DOCX
+ * tersimpan sebagai CV lampiran tetapi tidak dibaca.
+ */
+export function cvImportEligibility(file: PdfFileInfo): { eligible: true } | { eligible: false; message: string } {
+  const mime = String(file?.type ?? "").split(";")[0].trim().toLowerCase();
+  const byName = /\.pdf$/i.test(String(file?.name ?? "").trim());
+  const isPdf = mime === "application/pdf" || ((mime === "" || mime === "application/octet-stream") && byName);
+  if (!isPdf) return { eligible: false, message: CV_IMPORT_SKIPPED_NOT_PDF };
+  return { eligible: true };
+}
 /** Nilai kolom `user_skills.source` untuk skill dari PDF (skill yang diketik di UI memakai "manual"). */
 export const IMPORTED_SKILL_SOURCE = "linkedin_pdf";
 export const LINKEDIN_PDF_MAX_BYTES = RESUME_MAX_BYTES;
@@ -164,6 +193,8 @@ export interface PreviewAchievement {
   /** `YYYY-MM-DD` (selalu tanggal 1), null bila PDF tidak mencantumkan tanggal */
   achievement_date: string | null;
   description: string | null;
+  /** tautan http(s) yang tertulis di PDF; null bila tidak ada atau server lama belum mengirim */
+  url?: string | null;
   notes: string[];
 }
 
@@ -259,6 +290,7 @@ export function parseImportPreview(raw: unknown): ImportPreview | null {
       issuer: textOrNull(a.issuer),
       achievement_date: textOrNull(a.achievement_date),
       description: textOrNull(a.description),
+      url: textOrNull(a.url),
       notes: strings(a.notes),
     });
   }
@@ -314,7 +346,31 @@ export type { AchievementRow } from "./profileForms.ts";
 
 const ACHIEVEMENT_LABELS: Record<AchievementCategory, string> = { award: "Penghargaan", publication: "Publikasi" };
 
-export type ItemStatus = "new" | "duplicate" | "invalid";
+export type ItemStatus = "new" | "update" | "duplicate" | "invalid";
+
+/**
+ * Kolom penghargaan yang masih kosong di profil dan bisa diisi dari PDF. Hanya kolom kosong yang masuk ke sini:
+ * yang sudah terisi tidak pernah ditimpa.
+ */
+export interface AchievementPatch {
+  description?: string;
+  issuer?: string;
+  achievement_date?: string;
+  url?: string;
+}
+
+/** Pembaruan satu baris `achievements` yang sudah ada (judul sama). */
+export interface AchievementFill {
+  id: string;
+  patch: AchievementPatch;
+}
+
+const ACHIEVEMENT_PATCH_LABELS: Record<keyof AchievementPatch, string> = {
+  description: "deskripsi",
+  issuer: "penyelenggara",
+  achievement_date: "tanggal",
+  url: "tautan",
+};
 
 export interface ImportItem<Row> {
   /** unik di seluruh rencana, dipakai sebagai kunci pilihan */
@@ -328,7 +384,12 @@ export interface ImportItem<Row> {
   reason: string;
   /** baris siap tulis; null bila status bukan "new" */
   row: Row | null;
+  /** hanya status "update": kolom kosong di baris yang sudah ada yang akan diisi */
+  fill?: AchievementFill;
 }
+
+/** Baris `achievements` dari impor: baris editor Profil ditambah `url` (kolom ada di database, editor tidak memakainya). */
+export type ImportedAchievementRow = AchievementRow & { url?: string };
 
 export interface BasicPatchItem {
   field: BasicField;
@@ -340,7 +401,7 @@ export interface ImportPlan {
   experiences: Array<ImportItem<ExperienceRow>>;
   education: Array<ImportItem<EducationRow>>;
   certifications: Array<ImportItem<CertificationRow>>;
-  achievements: Array<ImportItem<AchievementRow>>;
+  achievements: Array<ImportItem<ImportedAchievementRow>>;
   skills: Array<ImportItem<SkillRow>>;
 }
 
@@ -350,7 +411,8 @@ export interface ExistingProfile {
   experiences: Array<{ company_name?: unknown; role_title?: unknown }>;
   education: Array<{ institution?: unknown; degree?: unknown }>;
   certifications: Array<{ name?: unknown }>;
-  achievements: Array<{ title?: unknown }>;
+  /** `id` dan kolom isi dipakai untuk melengkapi kolom kosong (bukan menambah baris) saat judulnya sama. */
+  achievements: Array<{ id?: unknown; title?: unknown; description?: unknown; issuer?: unknown; achievement_date?: unknown; url?: unknown }>;
   skills: Array<{ name?: unknown }>;
 }
 
@@ -396,9 +458,43 @@ export function validateCertification(c: { name: unknown; issuer: unknown }): { 
   return { ok: true, row: { name, issuer, is_verified: false } };
 }
 
+const isBlank = (v: unknown): boolean => typeof v !== "string" || v.trim() === "";
+
+/**
+ * Kolom kosong di baris yang sudah ada (judul sama) yang bisa diisi dari PDF. Baris pertama yang punya kolom kosong
+ * dan belum dipakai item lain di impor ini yang dipilih; tidak ada yang punya kolom kosong untuk diisi = null (duplikat).
+ * Nilai dari PDF dicek dengan validator yang sama dengan editor Profil, jadi tanggal masa depan dan teks terlalu
+ * panjang tidak pernah ikut.
+ */
+function achievementFill(a: PreviewAchievement, rows: ExistingProfile["achievements"], used: ReadonlySet<string>, now: Date): AchievementFill | null {
+  const want: AchievementPatch = {};
+  const description = text(a.description);
+  if (description && description.length <= ACHIEVEMENT_DESCRIPTION_MAX) want.description = description;
+  const issuer = text(a.issuer);
+  if (issuer && issuer.length <= ACHIEVEMENT_ISSUER_MAX) want.issuer = issuer;
+  if (a.achievement_date) {
+    const date = validateAchievement({ title: a.title, category: a.category, issuer: null, achievement_date: a.achievement_date, description: null }, now);
+    if (date.ok && date.row.achievement_date) want.achievement_date = date.row.achievement_date;
+  }
+  const url = text(a.url);
+  if (/^https?:\/\/\S+$/i.test(url) && url.length <= 500) want.url = url;
+  for (const row of rows) {
+    const id = typeof row.id === "string" ? row.id : "";
+    if (!id || used.has(id)) continue;
+    const patch: AchievementPatch = {};
+    for (const field of Object.keys(want) as Array<keyof AchievementPatch>) {
+      if (isBlank(row[field])) patch[field] = want[field];
+    }
+    if (Object.keys(patch).length > 0) return { id, patch };
+  }
+  return null;
+}
+
 /**
  * Susun rencana impor dari pratinjau server dan isi profil yang sudah ada. Setiap item mendapat status:
  *   new       lolos validator editor Profil dan belum ada
+ *   update    penghargaan atau publikasi dengan judul yang sama sudah ada, tetapi deskripsi, penyelenggara, tanggal, atau
+ *             tautannya masih kosong dan PDF memuatnya; hanya kolom kosong itu yang diisi (tidak ada baris baru)
  *   duplicate sudah ada di profil (atau muncul dua kali di PDF); dilewati
  *   invalid   tidak lolos validator (mis. tanggal di masa depan) atau melewati batas jumlah skill; dilewati
  */
@@ -522,16 +618,37 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
     plan.certifications.push({ ...base, status: "new", reason: "", row: v.row });
   }
 
-  // --- penghargaan dan publikasi (achievements): duplikat bila judulnya sama, tanpa peduli huruf besar dan tanda baca.
+  // --- penghargaan dan publikasi (achievements): judul yang sama = sudah ada. Bila baris yang ada masih punya kolom
+  // kosong (deskripsi, penyelenggara, tanggal, tautan) yang PDF isi, statusnya "update": hanya kolom kosong itu diisi.
   // Daftar "ada" bertambah tiap item baru, jadi judul ganda di dalam PDF yang sama juga tertangkap.
-  const seenAch = new Set(existing.achievements.map((a) => normKey(a.title)));
+  const knownAch = new Map<string, ExistingProfile["achievements"]>();
+  for (const a of existing.achievements) {
+    const k = normKey(a.title);
+    knownAch.set(k, [...(knownAch.get(k) ?? []), a]);
+  }
+  const filledIds = new Set<string>();
   for (const [i, a] of preview.achievements.entries()) {
     const key = `ach:${i}`;
     const date = formatMonthYear(a.achievement_date);
     const base = { key, title: a.title, detail: [ACHIEVEMENT_LABELS[a.category], a.issuer, date].filter(Boolean).join(" · "), notes: a.notes };
     const k = normKey(a.title);
-    if (seenAch.has(k)) {
-      plan.achievements.push({ ...base, status: "duplicate", reason: "Penghargaan atau publikasi dengan judul ini sudah ada.", row: null });
+    const sameTitle = knownAch.get(k);
+    if (sameTitle) {
+      const fill = achievementFill(a, sameTitle, filledIds, now);
+      if (fill) {
+        filledIds.add(fill.id);
+        const labels = (Object.keys(fill.patch) as Array<keyof AchievementPatch>).map((f) => ACHIEVEMENT_PATCH_LABELS[f]);
+        plan.achievements.push({
+          ...base,
+          detail: `Melengkapi ${labels.join(", ")} dari PDF · ${base.detail}`,
+          status: "update",
+          reason: "",
+          row: null,
+          fill,
+        });
+      } else {
+        plan.achievements.push({ ...base, status: "duplicate", reason: "Penghargaan atau publikasi dengan judul ini sudah ada.", row: null });
+      }
       continue;
     }
     const v = validateAchievement(a, now);
@@ -539,8 +656,8 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
       plan.achievements.push({ ...base, status: "invalid", reason: v.reason, row: null });
       continue;
     }
-    seenAch.add(k);
-    plan.achievements.push({ ...base, status: "new", reason: "", row: v.row });
+    knownAch.set(k, [{ title: a.title }]);
+    plan.achievements.push({ ...base, status: "new", reason: "", row: a.url ? { ...v.row, url: a.url } : v.row });
   }
 
   // --- skill dan bahasa (user_skills). Daftar "ada" bertambah tiap item baru, jadi duplikat di PDF dan batas 50 ikut tertangkap.
@@ -571,19 +688,22 @@ export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export const allItems = (plan: ImportPlan): Array<ImportItem<unknown>> => SECTION_KEYS.flatMap((k) => plan[k] as Array<ImportItem<unknown>>);
 
-/** Item baru dicentang bawaan; duplikat dan tidak valid tidak bisa dicentang. */
+/** Item baru dan item yang melengkapi kolom kosong bisa dicentang; duplikat dan tidak valid tidak. */
+export const isSelectable = (item: ImportItem<unknown>): boolean => item.status === "new" || item.status === "update";
+
+/** Item yang bisa dicentang sudah tercentang bawaan. */
 export function defaultSelection(plan: ImportPlan): Set<string> {
-  return new Set(allItems(plan).filter((i) => i.status === "new").map((i) => i.key));
+  return new Set(allItems(plan).filter(isSelectable).map((i) => i.key));
 }
 
 export const countSelected = (plan: ImportPlan, selected: ReadonlySet<string>): number =>
-  allItems(plan).filter((i) => i.status === "new" && selected.has(i.key)).length;
+  allItems(plan).filter((i) => isSelectable(i) && selected.has(i.key)).length;
 
 /** Centang atau kosongkan semua item baru di satu seksi. */
 export function setSectionSelection(plan: ImportPlan, section: SectionKey, selected: ReadonlySet<string>, on: boolean): Set<string> {
   const next = new Set(selected);
   for (const item of plan[section] as Array<ImportItem<unknown>>) {
-    if (item.status !== "new") continue;
+    if (!isSelectable(item)) continue;
     if (on) next.add(item.key);
     else next.delete(item.key);
   }
@@ -593,7 +713,7 @@ export function setSectionSelection(plan: ImportPlan, section: SectionKey, selec
 export function toggleItem(plan: ImportPlan, key: string, selected: ReadonlySet<string>): Set<string> {
   const next = new Set(selected);
   const item = allItems(plan).find((i) => i.key === key);
-  if (!item || item.status !== "new") return next;
+  if (!item || !isSelectable(item)) return next;
   if (next.has(key)) next.delete(key);
   else next.add(key);
   return next;
@@ -609,7 +729,9 @@ export interface ImportSelection {
   experiences: ExperienceRow[];
   education: EducationRow[];
   certifications: CertificationRow[];
-  achievements: AchievementRow[];
+  achievements: ImportedAchievementRow[];
+  /** kolom kosong di penghargaan yang sudah ada yang dicentang untuk diisi (tidak menambah baris) */
+  achievementFills: AchievementFill[];
   skills: SkillRow[];
 }
 
@@ -625,12 +747,13 @@ export function selectionFromPlan(plan: ImportPlan, selected: ReadonlySet<string
     education: pick(plan.education),
     certifications: pick(plan.certifications),
     achievements: pick(plan.achievements),
+    achievementFills: plan.achievements.filter((i) => i.status === "update" && i.fill && selected.has(i.key)).map((i) => i.fill as AchievementFill),
     skills: pick(plan.skills),
   };
 }
 
 export const selectionSize = (s: ImportSelection): number =>
-  Object.keys(s.profilePatch).length + s.experiences.length + s.education.length + s.certifications.length + s.achievements.length + s.skills.length;
+  Object.keys(s.profilePatch).length + s.experiences.length + s.education.length + s.certifications.length + s.achievements.length + s.achievementFills.length + s.skills.length;
 
 /** Isi hanya kolom formulir profil yang masih kosong; yang sudah terisi (atau sedang diketik) dibiarkan. */
 export function applyProfilePatch<T extends Record<string, any>>(prev: T, patch: Partial<Record<BasicField, string>>): T {
@@ -651,7 +774,9 @@ export interface ImportWriter {
   createExperience(row: ExperienceRow): Promise<unknown>;
   createEducation(row: EducationRow): Promise<unknown>;
   createCertification(row: CertificationRow): Promise<unknown>;
-  createAchievement(row: AchievementRow): Promise<unknown>;
+  createAchievement(row: ImportedAchievementRow): Promise<unknown>;
+  /** Mengisi kolom kosong baris yang sudah ada. Hanya kolom di `patch` yang disentuh. */
+  updateAchievement(id: string, patch: AchievementPatch): Promise<unknown>;
   createSkill(row: SkillRow): Promise<unknown>;
 }
 
@@ -667,6 +792,8 @@ export interface CommitResult {
   added: { basic: number; experiences: number; education: number; certifications: number; achievements: number; skills: number };
   /** baris yang dikembalikan database, untuk mode demo atau pembaruan lokal */
   created: { experiences: unknown[]; education: unknown[]; certifications: unknown[]; achievements: unknown[]; skills: unknown[] };
+  /** penghargaan yang sudah ada dan kolom kosongnya berhasil diisi */
+  filled: { achievements: AchievementFill[] };
   failed: CommitFailure[];
 }
 
@@ -674,6 +801,7 @@ export const emptyCommit = (): CommitResult => ({
   profilePatch: {},
   added: { basic: 0, experiences: 0, education: 0, certifications: 0, achievements: 0, skills: 0 },
   created: { experiences: [], education: [], certifications: [], achievements: [], skills: [] },
+  filled: { achievements: [] },
   failed: [],
 });
 
@@ -738,11 +866,17 @@ export async function applyImport(sel: ImportSelection, writer: ImportWriter, co
   result.added.education = await run(sel.education, "pendidikan", (r) => `${r.degree} di ${r.institution}`, (r) => writer.createEducation(r), result.created.education);
   result.added.certifications = await run(sel.certifications, "sertifikasi", (r) => r.name, (r) => writer.createCertification(r), result.created.certifications);
   result.added.achievements = await run(sel.achievements, "penghargaan", (r) => r.title, (r) => writer.createAchievement(r), result.created.achievements);
+  const filled = await runLimited(sel.achievementFills, concurrency, (f) => writer.updateAchievement(f.id, f.patch));
+  filled.forEach((o, i) => {
+    const f = sel.achievementFills[i];
+    if (o.ok) result.filled.achievements.push(f);
+    else result.failed.push({ section: "penghargaan", label: `Melengkapi ${Object.keys(f.patch).map((k) => ACHIEVEMENT_PATCH_LABELS[k as keyof AchievementPatch]).join(", ")}`, message: messageOf(o.error) });
+  });
   result.added.skills = await run(sel.skills, "skill", (r) => r.name, (r) => writer.createSkill(r), result.created.skills);
   return result;
 }
 
-export const addedTotal = (r: CommitResult): number => Object.values(r.added).reduce((a, b) => a + b, 0);
+export const addedTotal = (r: CommitResult): number => Object.values(r.added).reduce((a, b) => a + b, 0) + r.filled.achievements.length;
 
 /** Ringkasan satu kalimat untuk toast sesudah menulis. */
 export function summarizeCommit(r: CommitResult): { kind: "success" | "partial" | "failed"; message: string } {
@@ -752,6 +886,7 @@ export function summarizeCommit(r: CommitResult): { kind: "success" | "partial" 
   if (r.added.education) parts.push(`${r.added.education} pendidikan`);
   if (r.added.certifications) parts.push(`${r.added.certifications} sertifikasi`);
   if (r.added.achievements) parts.push(`${r.added.achievements} penghargaan dan publikasi`);
+  if (r.filled.achievements.length) parts.push(`${r.filled.achievements.length} penghargaan dilengkapi`);
   if (r.added.skills) parts.push(`${r.added.skills} skill`);
   const added = parts.join(", ");
   if (r.failed.length === 0) return { kind: "success", message: added ? `Ditambahkan ke profil: ${added}.` : "Tidak ada yang ditambahkan." };

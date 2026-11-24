@@ -75,8 +75,8 @@ test("parseImportPreview: achievements dibaca; item tanpa judul atau dengan jeni
   assert.ok(ok);
   assert.equal(ok!.meta.dropped, 6, "semua bagian dijumlahkan, termasuk achievements");
   assert.deepEqual(ok!.achievements, [
-    { title: "Best Paper Award at Simulasi", category: "award", issuer: "KONFIK", achievement_date: "2024-01-01", description: null, notes: ["catatan"] },
-    { title: "Dashboard Design for Job Seekers", category: "publication", issuer: null, achievement_date: null, description: null, notes: [] },
+    { title: "Best Paper Award at Simulasi", category: "award", issuer: "KONFIK", achievement_date: "2024-01-01", description: null, url: null, notes: ["catatan"] },
+    { title: "Dashboard Design for Job Seekers", category: "publication", issuer: null, achievement_date: null, description: null, url: null, notes: [] },
   ]);
   // respons lama tanpa achievements tetap terbaca
   assert.deepEqual(parseImportPreview({ success: true, preview: { experiences: [] } })!.achievements, []);

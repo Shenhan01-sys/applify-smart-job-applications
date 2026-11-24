@@ -30,6 +30,8 @@ function supabaseWriter(userId: string): ImportWriter {
     createEducation: (row) => unwrap(profileService.createEducation(row)),
     createCertification: (row) => unwrap(profileService.createCertification(row)),
     createAchievement: (row) => unwrap(profileService.createAchievement(row)),
+    // Hanya kolom kosong yang masuk ke `patch` (lihat buildImportPlan), jadi pembaruan ini tidak menimpa isi yang ada.
+    updateAchievement: (id, patch) => unwrap(profileService.updateAchievement(id, patch)),
     createSkill: (row) => unwrap(profileService.createSkill(row)),
   };
 }
@@ -43,6 +45,7 @@ function demoWriter(userId: string): ImportWriter {
     createEducation: async (row) => made("edu", row),
     createCertification: async (row) => made("cert", row),
     createAchievement: async (row) => made("ach", row),
+    updateAchievement: async (id, patch) => ({ id, ...patch }),
     createSkill: async (row) => made("sk", row),
   };
 }
