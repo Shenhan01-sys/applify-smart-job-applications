@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { describeError } from "@/lib/authErrors";
 import { FILL_YOURSELF_LABEL, NO_FIELDS_FILLED_TEXT, applicationStatusLabel } from "@/lib/statusLabels";
 import { canRequestApproval } from "@/lib/draftApproval";
-import { groupByStatus } from "@/lib/dashboardStats";
+import { groupByStatus, summarizeApplications } from "@/lib/dashboardStats";
 import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, type DuplicateInfo } from "@/lib/applicationCards";
@@ -504,12 +504,9 @@ export function AppsPage() {
     moveApplication(move.appId, move.status);
   }, [applications, moveApplication]);
 
-  const stats = {
-    total: applications.length,
-    submitted: applications.filter((a) => a.status === "submitted").length,
-    followUp: applications.filter((a) => a.status === "follow_up").length,
-    responded: applications.filter((a) => a.status === "responded").length,
-  };
+  // Hitungan yang sama dengan penghitung Beranda (lib/dashboardStats.ts): "Terkirim" mencakup semua lamaran yang sudah
+  // dikirim (Terkirim, Perlu tindak lanjut, Sudah dibalas, dan Ditutup yang pernah dikirim), bukan hanya kolom Terkirim.
+  const stats = summarizeApplications(applications);
 
   // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
   const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
@@ -559,7 +556,7 @@ export function AppsPage() {
           <h1 className="text-2xl md:text-3xl font-bold">Lamaran Saya</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {stats.total > 0
-              ? `${stats.total} lamaran · ${stats.submitted} terkirim · ${stats.responded} sudah dibalas`
+              ? `${stats.total} lamaran · ${stats.sent} terkirim · ${stats.responded} sudah dibalas`
               : "Belum ada lamaran. Mulai dari halaman Lowongan."}
           </p>
         </div>
@@ -599,7 +596,7 @@ export function AppsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { l: "Total Lamaran", v: stats.total },
-              { l: "Terkirim", v: stats.submitted },
+              { l: "Terkirim", v: stats.sent },
               { l: "Tindak Lanjut", v: stats.followUp },
               { l: "Sudah Dibalas", v: stats.responded },
             ].map((s) => (

@@ -33,6 +33,19 @@ test("hitungan per status: draf dan siap dihitung terpisah; submitted, follow_up
   assert.deepEqual(s, { total: 7, drafts: 2, ready: 1, sent: 4, followUp: 1, responded: 1 });
 });
 
+test("Lamaran Saya memakai hitungan Beranda: kartu Terkirim = summarizeApplications().sent, bukan hanya kolom Terkirim", () => {
+  const src = readFileSync(new URL("../src/routes/applications.tsx", import.meta.url), "utf8");
+  assert.match(src, /const stats = summarizeApplications\(applications\)/);
+  assert.match(src, /\{ l: "Terkirim", v: stats\.sent \}/);
+  assert.doesNotMatch(src, /stats\.submitted/);
+  // Arti yang sama: follow_up dan responded ikut terkirim, closed hanya bila pernah dikirim.
+  const s = summarizeApplications([
+    row("submitted"), row("follow_up"), row("responded"),
+    row("closed"), row("closed", { submitted_at: "2026-11-24T00:00:00.000Z" }),
+  ]);
+  assert.equal(s.sent, 4);
+});
+
 test("closed dihitung terkirim hanya bila pernah dikirim (submitted_at ada)", () => {
   const s = summarizeApplications([row("closed"), row("closed", { submitted_at: "2026-11-11T00:00:00.000Z" })]);
   assert.equal(s.total, 2);
@@ -179,7 +192,7 @@ test("label status di Beranda sama dengan label kolom papan Lamaran Saya", () =>
 
 test("papan Lamaran Saya dan Beranda memakai fungsi pengelompokan yang sama", () => {
   const board = read("../src/routes/applications.tsx");
-  assert.match(board, /import \{ groupByStatus \} from "@\/lib\/dashboardStats"/);
+  assert.match(board, /import \{ groupByStatus, summarizeApplications \} from "@\/lib\/dashboardStats"/);
   assert.match(board, /groupedApps[^=]*= groupByStatus\(applications\)/);
   const page = read("../src/routes/dashboard.tsx");
   assert.match(page, /summarizeApplications\(applications\)/);
