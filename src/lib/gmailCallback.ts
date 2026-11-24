@@ -36,6 +36,8 @@ export function parseGmailCallback(search: GmailSearch | null | undefined): Gmai
 export const GMAIL_CONNECTED_TEXT = "Gmail terhubung. Kamu bisa mengirim lamaran lewat email dari persetujuan yang sudah disetujui.";
 export const GMAIL_DENIED_TEXT = "Izin Gmail tidak diberikan, jadi Gmail belum terhubung. Coba lagi dan pilih Izinkan.";
 export const GMAIL_FAILED_TEXT = "Gmail belum bisa disambungkan saat ini. Coba lagi nanti.";
+export const GMAIL_SESSION_TEXT = "Sambungan Gmail terputus di tengah jalan atau sudah lewat waktunya. Mulai lagi dari tombol Hubungkan Gmail.";
+export const GMAIL_UNAVAILABLE_TEXT = "Kirim lewat Gmail belum tersedia.";
 export const GMAIL_UNKNOWN_ERROR_TEXT = "Gmail belum terhubung. Coba hubungkan lagi dari kartu Persetujuan.";
 
 export function gmailBanner(callback: GmailCallback): GmailBanner {
@@ -46,6 +48,12 @@ export function gmailBanner(callback: GmailCallback): GmailBanner {
     case "token_exchange":
     case "storage":
       return { tone: "error", text: GMAIL_FAILED_TEXT };
+    case "invalid_state":
+    case "session_mismatch":
+    case "missing_params":
+      return { tone: "error", text: GMAIL_SESSION_TEXT };
+    case "not_configured":
+      return { tone: "error", text: GMAIL_UNAVAILABLE_TEXT };
     default:
       return { tone: "error", text: GMAIL_UNKNOWN_ERROR_TEXT };
   }
