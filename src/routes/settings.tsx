@@ -64,16 +64,18 @@ function SettingsPage() {
 
   return (
     <AppShell>
-      <header className="mb-6 max-w-3xl sm:mb-8">
+      <header className="mb-6 max-w-5xl sm:mb-8">
         <h1 className="text-2xl font-bold sm:text-3xl">Pengaturan</h1>
         <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">Kelola kuota, notifikasi, dan privasi akunmu</p>
       </header>
-      <div className="max-w-3xl space-y-4 sm:space-y-5">
+      {/* Ponsel: judul bagian lalu panelnya. Layar lebar: judul dan penjelasan di kolom kiri (ikut menempel saat
+          digulir), panel isian di kolom kanan, dipisah garis tipis antarbagian. */}
+      <div className="max-w-5xl divide-y divide-black/[7%]">
         {gmail && (
           <div
             role={gmail.tone === "error" ? "alert" : "status"}
             data-testid="gmail-banner"
-            className={`flex items-start justify-between gap-3 rounded-xl border-2 p-3 text-sm ${gmail.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-800"}`}
+            className={`mb-6 flex items-start justify-between gap-3 rounded-xl border-2 p-3 text-sm ${gmail.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-800"}`}
           >
             <span>
               {gmail.text}
@@ -163,9 +165,13 @@ function SettingsPage() {
 
 function Card({ id, icon: Icon, title, desc, children }: { id?: string; icon: typeof Lock; title: string; desc: string; children?: React.ReactNode }) {
   return (
-    <section id={id} aria-label={title} className="glass rounded-2xl p-4 sm:p-6 scroll-mt-6">
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary sm:h-10 sm:w-10" aria-hidden="true">
+    <section
+      id={id}
+      aria-label={title}
+      className="scroll-mt-6 py-6 first:pt-0 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10 lg:py-8 xl:grid-cols-[18rem_minmax(0,1fr)]"
+    >
+      <div className="flex items-start gap-3 lg:sticky lg:top-6 lg:flex-col lg:self-start">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
           <Icon className="h-[18px] w-[18px]" />
         </div>
         <div className="min-w-0 flex-1">
@@ -173,8 +179,8 @@ function Card({ id, icon: Icon, title, desc, children }: { id?: string; icon: ty
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">{desc}</p>
         </div>
       </div>
-      {/* Isi kartu sejajar dengan judul di layar lebar, memakai lebar penuh di ponsel. */}
-      {children && <div className="sm:pl-14">{children}</div>}
+      {/* Isi kartu: jarak atas bawaan komponen anak dihapus karena panel sudah punya bantalan sendiri. */}
+      {children && <div className="glass mt-4 rounded-2xl p-4 sm:p-5 lg:mt-0 lg:self-start [&>*:first-child]:mt-0">{children}</div>}
     </section>
   );
 }
