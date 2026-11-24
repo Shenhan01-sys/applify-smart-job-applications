@@ -4,7 +4,7 @@ import AppShell from "@/components/app/AppShell";
 import { 
   EyeOff, Download, FileCheck2, ChevronRight, ChevronLeft, 
   Loader2, Save, Briefcase, GraduationCap, Award, Wrench, 
-  Target, CheckCircle2, User, MapPin, Phone, Link2, Mail,
+  Target, CheckCircle2, AlertCircle, User, MapPin, Phone, Link2, Mail,
   Calendar, DollarSign, Clock,
   Layers, Sparkles, Paperclip, Eye, RefreshCw, Trash2, Upload, Trophy
 } from "lucide-react";
@@ -46,6 +46,11 @@ import {
   buildProfileRow,
   formatMonthYear,
   profileGaps,
+  FINISHED_INCOMPLETE_ACTION,
+  FINISHED_INCOMPLETE_HEADING,
+  FINISHED_INCOMPLETE_LEAD,
+  FINISHED_COMPLETE_HEADING,
+  finishedKind,
   sortAchievements,
   sortExperiences,
   sortEducation,
@@ -572,7 +577,18 @@ function ProfilePage() {
             )}
             {step === 5 && (
               <>
-                {finished && <FinishedNextSteps />}
+                {finished && (
+                  <FinishedNextSteps
+                    missing={profileGaps({
+                      full_name: formData.full_name,
+                      current_title: formData.current_title,
+                      skills: userSkills.length,
+                      experiences: workExps.length,
+                      education: educations.length,
+                    }).missing}
+                    onFix={() => changeStep(1, 'prev')}
+                  />
+                )}
                 <Step5Review formData={formData} workExps={workExps} educations={educations} userSkills={userSkills} preferences={preferences} />
               </>
             )}
@@ -1101,12 +1117,35 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
   );
 }
 
-/** Muncul setelah "Simpan & Selesai" berhasil: langkah lanjut yang jelas. */
-function FinishedNextSteps() {
+/**
+ * Muncul setelah "Simpan & Selesai" berhasil. Hijau dengan langkah lanjut hanya bila profil lengkap; bila langkah
+ * Tinjau menemukan yang kurang (misalnya jabatan), kotaknya kuning dan menyebut yang kurang.
+ */
+function FinishedNextSteps({ missing, onFix }: { missing: string[]; onFix: () => void }) {
+  if (finishedKind({ missing }) === "incomplete") {
+    return (
+      <section aria-labelledby="finished-heading" role="status" data-testid="profile-finished-incomplete" className="mb-5 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+        <h3 id="finished-heading" className="flex items-center gap-2 text-base font-bold text-amber-900">
+          <AlertCircle className="h-5 w-5" aria-hidden="true" /> {FINISHED_INCOMPLETE_HEADING}
+        </h3>
+        <p className="mt-1 text-sm text-amber-900">{FINISHED_INCOMPLETE_LEAD}</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-amber-900">
+          {missing.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+        <button
+          type="button"
+          onClick={onFix}
+          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition"
+        >
+          {FINISHED_INCOMPLETE_ACTION} <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </section>
+    );
+  }
   return (
-    <section aria-labelledby="finished-heading" role="status" className="mb-5 rounded-xl border-2 border-green-300 bg-green-50 p-4">
+    <section aria-labelledby="finished-heading" role="status" data-testid="profile-finished-complete" className="mb-5 rounded-xl border-2 border-green-300 bg-green-50 p-4">
       <h3 id="finished-heading" className="flex items-center gap-2 text-base font-bold text-green-900">
-        <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> Profilmu tersimpan
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> {FINISHED_COMPLETE_HEADING}
       </h3>
       <p className="mt-1 text-sm text-green-900">Langkah berikutnya: cari lowongan yang cocok, lalu minta AI menyiapkan draf lamarannya.</p>
       <div className="mt-3 flex flex-wrap gap-2">

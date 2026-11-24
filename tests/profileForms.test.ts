@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  FINISHED_COMPLETE_HEADING,
+  FINISHED_INCOMPLETE_HEADING,
   PROFILE_COLUMNS,
   buildProfileRow,
   educationToForm,
@@ -9,6 +11,7 @@ import {
   emptyExperienceForm,
   emptySkillForm,
   experienceToForm,
+  finishedKind,
   formatMonthYear,
   normalizeAchievements,
   parseDecimal,
@@ -336,6 +339,27 @@ test("ulasan profil: nama, jabatan, skill menghalangi; pengalaman dan pendidikan
   const freshGrad = profileGaps({ full_name: "Budi", current_title: "Staf", skills: 3, experiences: 0, education: 1 });
   assert.deepEqual(freshGrad.missing, []);
   assert.equal(freshGrad.tips.length, 1);
+});
+
+test("kotak sesudah Simpan & Selesai: hijau hanya bila ulasan tidak menemukan yang kurang (jabatan kosong = kuning)", () => {
+  const complete = profileGaps({ full_name: "Budi", current_title: "Staf", skills: 3, experiences: 0, education: 1 });
+  assert.equal(finishedKind(complete), "complete");
+  const noTitle = profileGaps({ full_name: "Budi", current_title: "  ", skills: 3, experiences: 2, education: 1 });
+  assert.deepEqual(noTitle.missing, ["Posisi atau jabatan belum diisi."]);
+  assert.equal(finishedKind(noTitle), "incomplete");
+  assert.equal(finishedKind(profileGaps({ full_name: "Budi", current_title: "Staf", skills: 0, experiences: 1, education: 1 })), "incomplete");
+  assert.notEqual(FINISHED_COMPLETE_HEADING, FINISHED_INCOMPLETE_HEADING);
+  assert.match(FINISHED_INCOMPLETE_HEADING, /belum lengkap/);
+
+  const page = read("../src/routes/profile.tsx");
+  // Kotak hijau memakai ulasan yang sama dengan langkah Tinjau, dan cabang kuning ada sebelum cabang hijau.
+  assert.match(page, /<FinishedNextSteps\s+missing=\{profileGaps\(\{/);
+  assert.match(page, /finishedKind\(\{ missing \}\) === "incomplete"/);
+  const incomplete = page.indexOf('data-testid="profile-finished-incomplete"');
+  const complete2 = page.indexOf('data-testid="profile-finished-complete"');
+  assert.ok(incomplete > 0 && complete2 > incomplete);
+  assert.match(page.slice(incomplete, complete2), /border-amber-300/);
+  assert.doesNotMatch(page.slice(incomplete, complete2), /Cari lowongan|border-green/);
 });
 
 // ---- cocok dengan schema.sql dan dengan yang dibaca Edge Function ----

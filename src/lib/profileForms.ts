@@ -711,6 +711,19 @@ export function profileGaps(p: ProfileGapsInput): { missing: string[]; tips: str
   return { missing, tips };
 }
 
+/**
+ * Kotak sesudah "Simpan & Selesai". Hijau "Profilmu tersimpan" hanya bila langkah Tinjau tidak menemukan yang kurang
+ * (nama, jabatan, skill); bila ada, kotaknya kuning dan menyebut yang kurang, bukan merayakan profil yang belum siap.
+ */
+export const FINISHED_COMPLETE_HEADING = "Profilmu tersimpan";
+export const FINISHED_INCOMPLETE_HEADING = "Profilmu tersimpan, tetapi belum lengkap";
+export const FINISHED_INCOMPLETE_LEAD = "Lengkapi dulu hal berikut supaya draf lamaran AI tidak kosong:";
+export const FINISHED_INCOMPLETE_ACTION = "Lengkapi data dasar";
+
+export function finishedKind(gaps: { missing: readonly string[] }): "complete" | "incomplete" {
+  return gaps.missing.length === 0 ? "complete" : "incomplete";
+}
+
 const isHttpUrl = (s: string) => {
   if (!/^https?:\/\/[^\s/$.?#][^\s]*$/i.test(s)) return false;
   return s.length <= 300;
