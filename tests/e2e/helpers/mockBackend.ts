@@ -53,6 +53,17 @@ export interface BackendState {
   notificationPrefs: Row;
   /** subscriptions (baca) dan jawaban RPC get_quota_status. */
   subscriptions: Row[];
+  /** Tabel profil yang dibaca dan ditulis halaman Profil. Penulisan (POST dan PATCH) mengubah isinya, seperti PostgREST. */
+  workExperiences: Row[];
+  education: Row[];
+  certifications: Row[];
+  achievements: Row[];
+  userSkills: Row[];
+  projects: Row[];
+  /** Objek Storage yang diunggah (`bucket/path`). */
+  storage: string[];
+  /** Jawaban POST /api/profile/import/linkedin-pdf. null = tidak ditiru (tercatat sebagai panggilan yang tidak ditiru). */
+  importPreview: Row | null;
 }
 
 export interface Override {
@@ -95,6 +106,9 @@ function matchesFilter(row: Row, key: string, expr: string): boolean {
 
 const NON_FILTER_PARAMS = new Set(["select", "order", "limit", "offset", "on_conflict", "columns"]);
 
+/** Tabel yang ditulis halaman Profil (tulisan dan impor PDF). */
+const PROFILE_TABLES = new Set(["profiles", "work_experiences", "education", "certifications", "achievements", "user_skills"]);
+
 export class MockBackend {
   readonly state: BackendState;
   /** Panggilan ke backend Fastify. */
@@ -134,6 +148,14 @@ export class MockBackend {
         notifyEvents: { ready: true, submitted: true, awaiting_code: true, follow_up: true, locked_claim: true },
       },
       subscriptions: [],
+      workExperiences: [],
+      education: [],
+      certifications: [],
+      achievements: [],
+      userSkills: [],
+      projects: [],
+      storage: [],
+      importPreview: null,
       ...initial,
     };
   }
@@ -241,6 +263,11 @@ export class MockBackend {
 
     if (method === "POST" && path === "/api/agent/security-code") return route.fulfill(json(202, { accepted: true }));
 
+    // Impor profil dari PDF: hanya mengembalikan pratinjau, seperti backend sungguhan (tidak menulis apa pun).
+    if (method === "POST" && path === "/api/profile/import/linkedin-pdf" && s.importPreview) {
+      return route.fulfill(json(200, { success: true, preview: s.importPreview }));
+    }
+
     this.unmocked.push(`API ${method} ${path}`);
     return route.fulfill(json(501, { error: "not_mocked", path }));
   }
@@ -283,6 +310,19 @@ export class MockBackend {
       return route.fulfill(json(200, [{ limit_qty: 10, used: 2, remaining: 8, allowed: true }]));
     }
 
+    // Storage: unggah dan hapus berkas CV. Isinya tidak disimpan; hanya jalurnya dicatat.
+    const object = path.match(/^\/storage\/v1\/object\/([a-z_]+)\/(.+)$/);
+    if (object && method === "POST") {
+      const key = `${object[1]}/${decodeURIComponent(object[2])}`;
+      this.state.storage.push(key);
+      this.restWrites.push({ seq: ++callSeq, method, path, search: url.search, body: key, authorization: request.headers()["authorization"] ?? null });
+      return route.fulfill(json(200, { Key: key, Id: `obj-${this.state.storage.length}` }));
+    }
+    if (/^\/storage\/v1\/object\/[a-z_]+$/.test(path) && method === "DELETE") {
+      this.restWrites.push({ seq: ++callSeq, method, path, search: url.search, body: this.parseBody(request.postData()), authorization: request.headers()["authorization"] ?? null });
+      return route.fulfill(json(200, []));
+    }
+
     const table = path.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
     if (!table) {
       this.unmocked.push(`SUPABASE ${method} ${path}`);
@@ -293,6 +333,8 @@ export class MockBackend {
       this.restReads.push({ seq: ++callSeq, method, path, search: url.search, body: undefined, authorization: request.headers()["authorization"] ?? null });
       return this.selectRows(route, table, url);
     }
+
+    if ((method === "POST" || method === "PATCH") && PROFILE_TABLES.has(table)) return this.writeProfileTable(route, table, url);
 
     if (method === "POST" && table === "user_form_answers") {
       let body: unknown = undefined;
@@ -316,6 +358,64 @@ export class MockBackend {
     return route.fulfill(json(501, { message: "not_mocked", path }));
   }
 
+  private parseBody(raw: string | null): unknown {
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+
+  /**
+   * POST (insert atau upsert) dan PATCH (update) ke tabel profil. Baris disimpan di state, jadi bacaan berikutnya
+   * (getFullProfile sesudah impor) melihat hasilnya. `.select().single()` menerima satu objek, `.select("id")` daftar.
+   */
+  private async writeProfileTable(route: Route, table: string, url: URL): Promise<void> {
+    const request = route.request();
+    const method = request.method();
+    const body = this.parseBody(request.postData());
+    this.restWrites.push({ seq: ++callSeq, method, path: `/rest/v1/${table}`, search: url.search, body, authorization: request.headers()["authorization"] ?? null });
+    const rows = this.profileTableRows(table);
+    const wantsObject = (request.headers()["accept"] ?? "").includes("vnd.pgrst.object+json");
+    const returnsRows = (request.headers()["prefer"] ?? "").includes("return=representation");
+
+    let touched: Row[] = [];
+    if (method === "PATCH") {
+      const filters = [...url.searchParams.entries()].filter(([k]) => !NON_FILTER_PARAMS.has(k));
+      touched = rows.filter((r) => filters.every(([k, expr]) => matchesFilter(r, k, expr)));
+      for (const r of touched) Object.assign(r, body as Row);
+    } else {
+      for (const item of Array.isArray(body) ? (body as Row[]) : [body as Row]) {
+        const existing = table === "profiles" ? rows.find((r) => r.id === item.id) : undefined;
+        if (existing) {
+          Object.assign(existing, item);
+          touched.push(existing);
+        } else {
+          const row = { id: `${table}-${rows.length + 1}`, ...item };
+          rows.unshift(row);
+          touched.push(row);
+        }
+      }
+    }
+    if (!returnsRows) return route.fulfill({ status: method === "POST" ? 201 : 204, body: "" });
+    const status = method === "POST" ? 201 : 200;
+    return route.fulfill(json(status, wantsObject ? (touched[0] ?? null) : touched));
+  }
+
+  private profileTableRows(table: string): Row[] {
+    const s = this.state;
+    const map: Record<string, Row[]> = {
+      profiles: s.profiles,
+      work_experiences: s.workExperiences,
+      education: s.education,
+      certifications: s.certifications,
+      achievements: s.achievements,
+      user_skills: s.userSkills,
+    };
+    return map[table];
+  }
+
   private async selectRows(route: Route, table: string, url: URL): Promise<void> {
     const s = this.state;
     const sources: Record<string, Row[] | undefined> = {
@@ -325,9 +425,14 @@ export class MockBackend {
       profiles: s.profiles,
       user_form_answers: s.answers,
       ai_applications: s.applications,
-      // Dibaca halaman Lamaran untuk menyaring skill yang disorot; kosong cukup.
-      user_skills: [],
-      work_experiences: [],
+      // Dibaca halaman Lamaran untuk menyaring skill yang disorot, dan halaman Profil (getFullProfile).
+      user_skills: s.userSkills,
+      work_experiences: s.workExperiences,
+      education: s.education,
+      certifications: s.certifications,
+      achievements: s.achievements,
+      projects: s.projects,
+      events_activities: [],
       subscriptions: s.subscriptions,
     };
     const rows = sources[table];
