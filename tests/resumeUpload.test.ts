@@ -192,7 +192,7 @@ test("resumeService: mode demo tidak menyentuh Supabase dan galat berbahasa Indo
 test("profile.tsx: kartu CV ada di luar stepper dan memakai layanan yang sama", () => {
   const src = read("../src/routes/profile.tsx");
   assert.match(src, /from "@\/services\/resumeService"/);
-  assert.match(src, /<ResumeCard userId=\{user\.id\} \/>/);
+  assert.match(src, /<ResumeCard userId=\{user\.id\} onUploaded=\{/);
   assert.ok(src.indexOf("<ResumeCard") < src.indexOf("// ===== STEP COMPONENTS ====="), "dipasang di halaman, bukan di dalam komponen langkah");
   assert.ok(!/step === \d && <ResumeCard/.test(src), "tidak bergantung pada langkah wizard");
   for (const fn of ["getResume(userId)", "uploadResume(userId, file)", "removeResume(userId)", "openResume(resume.path)"]) {
@@ -225,7 +225,7 @@ test("profile.tsx: input berkas memakai accept CV, label terhubung, dan galat ta
   assert.match(src, /import \{[^}]*RESUME_ACCEPT[^}]*\} from "@\/lib\/resumeUpload"/);
   assert.match(src, /id="resume-file"/);
   assert.match(src, /htmlFor="resume-file"/);
-  assert.match(src, /aria-describedby=\{error \? "resume-hint resume-error" : "resume-hint"\}/);
+  assert.match(src, /aria-describedby=\{error \? "resume-hint resume-import-hint resume-error" : "resume-hint resume-import-hint"\}/);
   assert.match(src, /id="resume-error"[^>]*role="alert"/);
   assert.doesNotMatch(src, /window\.(confirm|alert)\(/);
 });

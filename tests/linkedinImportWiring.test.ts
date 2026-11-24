@@ -12,7 +12,7 @@ const NEW_UI_FILES = [CARD, "../src/lib/linkedinImport.ts", "../src/services/lin
 
 test("Profil: kartu impor dipasang di halaman, mengisi ulang data lewat getFullProfile, dan dimatikan saat profil gagal dimuat", () => {
   const src = read("../src/routes/profile.tsx");
-  assert.match(src, /import LinkedInImportCard from "@\/components\/profile\/LinkedInImportCard"/);
+  assert.match(src, /import LinkedInImportCard(?:, \{ type LinkedInImportHandle \})? from "@\/components\/profile\/LinkedInImportCard"/);
   assert.match(src, /<LinkedInImportCard\b[\s\S]*?userId=\{user\.id\}[\s\S]*?onImported=\{handleImported\}/);
   assert.match(src, /existing=\{\{ basic: formData, experiences: workExps, education: educations, certifications: certs, achievements, skills: userSkills \}\}/);
   // profil yang gagal dimuat tidak boleh dipakai untuk mendeteksi duplikat
@@ -23,7 +23,8 @@ test("Profil: kartu impor dipasang di halaman, mengisi ulang data lewat getFullP
   assert.match(handler, /profileService\.getFullProfile\(user!\.id\)/);
   assert.match(handler, /setWorkExps\(full\.workExperiences\)/);
   assert.match(handler, /setAchievements\(full\.achievements\)/, "daftar penghargaan ikut disegarkan agar duplikat impor berikutnya terdeteksi");
-  assert.match(handler, /setAchievements\(\(prev\) => \[\.\.\.\(result\.created\.achievements as any\[\]\), \.\.\.prev\]\)/, "mode demo menambah baris di memori");
+  assert.match(handler, /setAchievements\(\(prev\) => \[\s*\.\.\.\(result\.created\.achievements as any\[\]\),\s*\.\.\.prev\.map\(/, "mode demo menambah baris di memori dan mengisi kolom kosong baris yang ada");
+  assert.match(handler, /result\.filled\.achievements\.find\(\(f\) => f\.id === a\.id\)/);
   assert.match(handler, /setUserSkills\(full\.skills\)/);
   // daftar awal dan sesudah dimuat berasal dari profileService.getFullProfile (tabel achievements), bukan dikarang di halaman
   assert.match(src, /setAchievements\(full\.achievements\)/);
@@ -52,9 +53,10 @@ test("Kartu impor: judul, petunjuk Lainnya > Simpan ke PDF, pemilih hanya PDF, d
 test("Kartu impor: tidak ada yang ditulis sebelum konfirmasi; penulisan hanya dari onConfirm dengan item yang dicentang", () => {
   const src = read(CARD);
   assert.equal(src.match(/commitLinkedInImport\(/g)?.length, 1, "satu-satunya pemanggil penulisan");
-  const pick = src.slice(src.indexOf("const onPick"), src.indexOf("const onConfirm"));
+  const pick = src.slice(src.indexOf("const runImport"), src.indexOf("const onConfirm"));
   assert.doesNotMatch(pick, /commitLinkedInImport|profileService|upsert|onImported/);
   assert.match(pick, /automationApi\.importLinkedInPdf\(file\)/);
+  assert.equal(src.match(/automationApi\.importLinkedInPdf\(/g)?.length, 1, "satu-satunya pemanggil AI: pemilih berkas dan unggahan CV memakai runImport yang sama");
   assert.match(pick, /validateLinkedInPdfFile\(file\)/);
   assert.match(pick, /hasPdfMagic\(/);
   const confirm = src.slice(src.indexOf("const onConfirm"), src.indexOf("const saving"));

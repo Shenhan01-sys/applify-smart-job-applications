@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { FileUp, Loader2, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,14 +7,24 @@ import { describeError } from "@/lib/authErrors";
 import { automationApi } from "@/services/automationApi";
 import { commitLinkedInImport } from "@/services/linkedinImportService";
 import {
+  CV_IMPORT_DIALOG_HINT,
+  CV_IMPORT_DIALOG_TITLE,
+  CV_IMPORT_READING,
+  CV_IMPORT_SKIPPED_BLOCKED,
+  CV_IMPORT_SKIPPED_BUSY,
+  CV_IMPORT_SKIPPED_NOT_PDF,
+  LINKEDIN_PDF_CV_NOTE,
   LINKEDIN_PDF_HINT,
   LINKEDIN_PDF_PRIVACY,
   addedTotal,
   buildImportPlan,
   countSelected,
+  cvImportEligibility,
   defaultSelection,
+  describeCvImportFailure,
   describeLinkedInImportError,
   hasPdfMagic,
+  isSelectable,
   selectionFromPlan,
   selectionSize,
   setSectionSelection,
@@ -40,6 +50,17 @@ interface Props {
 }
 
 type Phase = "idle" | "reading" | "review" | "saving";
+/** "card" = berkas dipilih di kartu ini; "cv" = CV yang baru diunggah di kartu CV untuk Dilampirkan (satu unggahan, satu impor). */
+type ImportSource = "card" | "cv";
+
+export interface LinkedInImportHandle {
+  /**
+   * Baca CV PDF yang baru saja diunggah dengan alur yang sama dengan kartu ini (layanan, rencana, pratinjau, centang).
+   * Tidak ada yang ditulis sebelum pengguna menekan Tambahkan ke profil. Dilewati (dengan pesan singkat) bila bukan PDF,
+   * profil belum termuat penuh, atau impor lain sedang berjalan, supaya satu unggahan tidak memanggil AI dua kali.
+   */
+  startFromCv(file: File): Promise<void>;
+}
 
 const SECTIONS: Array<{ key: SectionKey; title: string }> = [
   { key: "basic", title: "Profil dasar" },
@@ -54,13 +75,23 @@ const btnBase = "min-h-11 px-4 rounded-lg border-2 text-sm font-medium inline-fl
 
 // Kartu ini hidup di luar stepper, jadi tampil di semua langkah. PDF dikirim ke server hanya untuk dibaca; tidak
 // ada yang ditulis sebelum pengguna mencentang item di dialog pratinjau dan menekan "Tambahkan ke profil".
-export default function LinkedInImportCard({ userId, existing, disabledReason, onImported }: Props) {
+// Alur yang sama dipakai saat CV diunggah di kartu CV untuk Dilampirkan (startFromCv).
+const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function LinkedInImportCard({ userId, existing, disabledReason, onImported }, ref) {
   const [phase, setPhase] = useState<Phase>("idle");
+  const [source, setSource] = useState<ImportSource>("card");
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const heading = useRef<HTMLHeadingElement>(null);
+  // true sejak impor dimulai sampai dialog ditutup: satu impor (satu panggilan AI) pada satu waktu. Ref, bukan state,
+  // supaya dua pemicu dalam satu putaran render tidak lolos bersamaan.
+  const active = useRef(false);
+  // Isi profil terbaru saat jawaban server tiba (bukan saat berkas dipilih): duplikat dicek terhadap data yang paling baru.
+  const existingRef = useRef(existing);
+  existingRef.current = existing;
+  const blockedRef = useRef(!!disabledReason);
+  blockedRef.current = !!disabledReason;
 
   const reading = phase === "reading";
   const blocked = !!disabledReason;
@@ -68,6 +99,7 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
 
   // Pratinjau dibiarkan sampai impor berikutnya supaya isi dialog tidak mendadak kosong saat animasi tutup.
   const close = () => {
+    active.current = false;
     setPhase("idle");
     focusHeading();
   };
@@ -77,36 +109,73 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
     toast.error(message);
   };
 
-  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  const runImport = async (file: File, from: ImportSource) => {
+    active.current = true;
     setError("");
     setPreview(null);
     setPlan(null);
     setSelected(new Set());
+    setSource(from);
+    const problem = (message: string) => (from === "cv" ? describeCvImportFailure(message) : message);
+    const giveUp = (message: string) => {
+      active.current = false;
+      setPhase("idle");
+      fail(problem(message));
+    };
 
     const check = validateLinkedInPdfFile(file);
-    if (!check.ok) return fail(check.reason);
+    if (!check.ok) return giveUp(check.reason);
 
     setPhase("reading");
+    const notice = from === "cv" ? toast.loading(CV_IMPORT_READING) : undefined;
     try {
       // Penanda %PDF diperiksa di browser supaya berkas yang salah ditolak tanpa menunggu server.
       if (!hasPdfMagic(await file.slice(0, 5).text())) {
-        setPhase("idle");
-        return fail("Berkas ini bukan PDF yang sah. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.");
+        return giveUp("Berkas ini bukan PDF yang sah. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.");
       }
       const result = await automationApi.importLinkedInPdf(file);
-      const nextPlan = buildImportPlan(result, existing);
+      const nextPlan = buildImportPlan(result, existingRef.current);
       setPreview(result);
       setPlan(nextPlan);
       setSelected(defaultSelection(nextPlan));
       setPhase("review");
     } catch (err) {
-      setPhase("idle");
-      fail(describeLinkedInImportError(err));
+      giveUp(describeLinkedInImportError(err));
+    } finally {
+      if (notice !== undefined) toast.dismiss(notice);
     }
   };
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || active.current) return;
+    await runImport(file, "card");
+  };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      async startFromCv(file: File) {
+        if (!cvImportEligibility(file).eligible) {
+          toast.info(CV_IMPORT_SKIPPED_NOT_PDF);
+          return;
+        }
+        if (blockedRef.current) {
+          toast.info(CV_IMPORT_SKIPPED_BLOCKED);
+          return;
+        }
+        if (active.current) {
+          toast.info(CV_IMPORT_SKIPPED_BUSY);
+          return;
+        }
+        await runImport(file, "cv");
+      },
+    }),
+    // runImport hanya memakai ref dan setter state yang stabil
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const onConfirm = async () => {
     if (!plan) return;
@@ -153,6 +222,7 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
           </h2>
           <p id="li-import-hint" className="mt-1 text-sm text-muted-foreground">{LINKEDIN_PDF_HINT}</p>
           <p className="mt-1 text-xs text-muted-foreground">{LINKEDIN_PDF_PRIVACY}</p>
+          <p id="li-import-cv-note" className="mt-1 text-xs text-muted-foreground" data-testid="li-import-cv-note">{LINKEDIN_PDF_CV_NOTE}</p>
         </div>
 
         <div className="shrink-0" aria-busy={reading}>
@@ -200,9 +270,9 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
           onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}
         >
           <DialogHeader className="px-6 pt-6 pr-12">
-            <DialogTitle className="font-display text-xl text-[#16150F]">Periksa data dari PDF</DialogTitle>
+            <DialogTitle className="font-display text-xl text-[#16150F]">{source === "cv" ? CV_IMPORT_DIALOG_TITLE : "Periksa data dari PDF"}</DialogTitle>
             <DialogDescription className="text-sm text-[#16150F]/70">
-              Centang yang mau ditambahkan. Belum ada yang tersimpan sampai kamu menekan Tambahkan ke profil.
+              {source === "cv" ? CV_IMPORT_DIALOG_HINT : "Centang yang mau ditambahkan. Belum ada yang tersimpan sampai kamu menekan Tambahkan ke profil."}
             </DialogDescription>
           </DialogHeader>
 
@@ -243,7 +313,7 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
             <p className="text-sm text-muted-foreground" role="status">{total} item dipilih</p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <button type="button" onClick={close} disabled={saving} className={`${btnBase} border-black/[8%] bg-black/[4%] hover:bg-black/[7%]`}>
-                Batal
+                {source === "cv" ? "Lewati" : "Batal"}
               </button>
               <button
                 type="button"
@@ -260,7 +330,9 @@ export default function LinkedInImportCard({ userId, existing, disabledReason, o
       </Dialog>
     </section>
   );
-}
+});
+
+export default LinkedInImportCard;
 
 function ReviewSection({
   title,
@@ -280,7 +352,7 @@ function ReviewSection({
   onAll: (on: boolean) => void;
 }) {
   if (items.length === 0) return null;
-  const selectable = items.filter((i) => i.status === "new");
+  const selectable = items.filter(isSelectable);
   const allOn = selectable.length > 0 && selectable.every((i) => selected.has(i.key));
   const headingId = `li-import-sec-${title.replace(/\s+/g, "-").toLowerCase()}`;
   return (
@@ -303,7 +375,7 @@ function ReviewSection({
       {note && selectable.length > 0 && <p className="mb-2 text-xs text-muted-foreground">{note}</p>}
       <ul className="space-y-2">
         {items.map((item) => {
-          const selectableItem = item.status === "new";
+          const selectableItem = isSelectable(item);
           return (
             <li key={item.key}>
               <label
@@ -320,6 +392,7 @@ function ReviewSection({
                 <span className="min-w-0 flex-1 text-sm">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-medium break-words">{item.title}</span>
+                    {item.status === "update" && <span className="rounded-full bg-[#0A5BE0]/10 px-2 py-0.5 text-xs font-medium text-[#0A5BE0]">Lengkapi yang kosong</span>}
                     {item.status === "duplicate" && <span className="rounded-full bg-black/[6%] px-2 py-0.5 text-xs font-medium text-muted-foreground">Sudah ada</span>}
                     {item.status === "invalid" && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Tidak bisa ditambahkan</span>}
                   </span>

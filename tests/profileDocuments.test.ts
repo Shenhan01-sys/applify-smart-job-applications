@@ -136,7 +136,7 @@ test("isMissingDocumentColumn: 42703, PGRST204, dan pesan yang menyebut kolomnya
 test("profil dan layanan: kartu dipasang di profil, layanan membaca kolom yang benar dan menurunkan galat kolom hilang", () => {
   const profile = read("../src/routes/profile.tsx");
   assert.match(profile, /import ProfileDocumentsCard from "@\/components\/profile\/ProfileDocumentsCard"/);
-  assert.match(profile, /<ResumeCard userId=\{user\.id\} \/>\}\s*\n\s*\{user && <ProfileDocumentsCard userId=\{user\.id\} \/>\}/, "tepat di bawah kartu CV");
+  assert.match(profile, /<ResumeCard userId=\{user\.id\} onUploaded=\{[^\n]*\} \/>\}\s*\n\s*\{user && <ProfileDocumentsCard userId=\{user\.id\} \/>\}/, "tepat di bawah kartu CV");
 
   const card = read("../src/components/profile/ProfileDocumentsCard.tsx");
   assert.ok(card.includes("Dokumen tambahan (opsional)"));

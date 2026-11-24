@@ -38,9 +38,9 @@ import {
   type PreferencesForm,
 } from "@/lib/profilePreferences";
 import { ExperienceEditor, EducationEditor, SkillsEditor, AchievementEditor } from "@/components/profile/ProfileEditors";
-import LinkedInImportCard from "@/components/profile/LinkedInImportCard";
+import LinkedInImportCard, { type LinkedInImportHandle } from "@/components/profile/LinkedInImportCard";
 import ProfileDocumentsCard from "@/components/profile/ProfileDocumentsCard";
-import { applyProfilePatch, type CommitResult } from "@/lib/linkedinImport";
+import { RESUME_IMPORT_HINT, applyProfilePatch, cvImportEligibility, type CommitResult } from "@/lib/linkedinImport";
 import {
   achievementCategoryLabel,
   buildProfileRow,
@@ -115,6 +115,8 @@ function ProfilePage() {
   const { user } = useAuth();
   const { welcome } = Route.useSearch();
   const [welcomeOpen, setWelcomeOpen] = useState(true);
+  // Kartu impor dipicu juga oleh unggahan CV (PDF) di kartu CV untuk Dilampirkan: satu unggahan, satu impor.
+  const importRef = useRef<LinkedInImportHandle>(null);
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [animKey, setAnimKey] = useState(0);
@@ -305,7 +307,13 @@ function ProfilePage() {
       setWorkExps((prev) => [...(result.created.experiences as any[]), ...prev]);
       setEducations((prev) => [...(result.created.education as any[]), ...prev]);
       setCerts((prev) => [...(result.created.certifications as any[]), ...prev]);
-      setAchievements((prev) => [...(result.created.achievements as any[]), ...prev]);
+      setAchievements((prev) => [
+        ...(result.created.achievements as any[]),
+        ...prev.map((a) => {
+          const fill = result.filled.achievements.find((f) => f.id === a.id);
+          return fill ? { ...a, ...fill.patch } : a;
+        }),
+      ]);
       setUserSkills((prev) => [...(result.created.skills as any[]), ...prev]);
       return;
     }
@@ -465,6 +473,7 @@ function ProfilePage() {
 
       {user && (
         <LinkedInImportCard
+          ref={importRef}
           userId={user.id}
           existing={{ basic: formData, experiences: workExps, education: educations, certifications: certs, achievements, skills: userSkills }}
           disabledReason={loadError ? "Profilmu belum termuat penuh, jadi data yang sudah ada belum bisa dicek. Muat ulang profil dulu." : undefined}
@@ -778,7 +787,7 @@ function ProfilePage() {
             </button>
           </div>
         </div>
-        {user && <ResumeCard userId={user.id} />}
+        {user && <ResumeCard userId={user.id} onUploaded={(file) => { void importRef.current?.startFromCv(file); }} />}
         {user && <ProfileDocumentsCard userId={user.id} />}
         </div>
       </div>
@@ -792,10 +801,12 @@ type ResumeBusy = "" | "load" | "upload" | "view" | "remove";
 
 // Kartu ini hidup di luar stepper, jadi tampil di semua langkah. Berkasnya disimpan di Storage privat `resumes`
 // dan path-nya di profiles.resume_url (lihat services/resumeService.ts); agen melampirkannya saat mengisi formulir.
-function ResumeCard({ userId }: { userId: string }) {
+function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file: File) => void }) {
   const [resume, setResume] = useState<ResumeRef | null>(null);
   const [busy, setBusy] = useState<ResumeBusy>("load");
   const [error, setError] = useState("");
+  // Catatan netral (bukan galat) sesudah unggah: mis. berkas DOC tersimpan tetapi tidak dibaca otomatis.
+  const [note, setNote] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -830,15 +841,25 @@ function ResumeCard({ userId }: { userId: string }) {
     e.target.value = "";
     if (!file) return;
     setError("");
+    setNote("");
     setBusy("upload");
+    let saved = false;
     try {
       setResume(await uploadResume(userId, file));
       toast.success("CV tersimpan");
       focusHeading();
+      saved = true;
     } catch (err) {
       fail(err, "CV belum terunggah. Coba lagi.");
     } finally {
       setBusy("");
+    }
+    // CV sudah tersimpan: yang gagal sesudah ini (membaca isinya) tidak membatalkan unggahan. Hanya PDF yang dibaca,
+    // dan hanya sekali per unggahan; kartu impor yang memutuskan, menampilkan pratinjau, dan menunggu persetujuan.
+    if (saved) {
+      const eligible = cvImportEligibility(file);
+      if (eligible.eligible) onUploaded?.(file);
+      else setNote(eligible.message);
     }
   };
 
@@ -891,6 +912,9 @@ function ResumeCard({ userId }: { userId: string }) {
       <p id="resume-hint" className="mt-1 text-xs text-muted-foreground">
         Agen melampirkan berkas ini saat mengisi formulir lamaran. PDF, DOC, atau DOCX, maksimal 5 MB.
       </p>
+      <p id="resume-import-hint" className="mt-0.5 text-xs text-muted-foreground" data-testid="resume-import-hint">
+        {RESUME_IMPORT_HINT}
+      </p>
 
       <div className="mt-4" aria-busy={working}>
         <input
@@ -900,7 +924,7 @@ function ResumeCard({ userId }: { userId: string }) {
           accept={RESUME_ACCEPT}
           onChange={onPick}
           disabled={working}
-          aria-describedby={error ? "resume-hint resume-error" : "resume-hint"}
+          aria-describedby={error ? "resume-hint resume-import-hint resume-error" : "resume-hint resume-import-hint"}
           aria-label={resume ? "Pilih berkas CV pengganti" : undefined}
           className={showPicker ? "peer sr-only" : "hidden"}
         />
@@ -949,6 +973,7 @@ function ResumeCard({ userId }: { userId: string }) {
       </div>
 
       {error && <p id="resume-error" className="mt-3 text-xs text-red-600" role="alert">{error}</p>}
+      {note && !error && <p id="resume-note" className="mt-3 text-xs text-muted-foreground" role="status" data-testid="resume-note">{note}</p>}
     </section>
   );
 }
