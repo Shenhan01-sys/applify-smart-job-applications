@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { profileService } from "@/services/profileService";
-import { describeAuthError } from "@/lib/authErrors";
+import { describeAuthError, recallAuthProvider } from "@/lib/authErrors";
 import { Loader2, AlertCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -23,7 +23,7 @@ function AuthCallbackPage() {
     // Supabase mengembalikan galat OAuth atau verifikasi email lewat parameter alamat.
     if (error) {
       setStatus('error');
-      setErrorMsg(describeAuthError({ code: errorCode ?? error, message: errorDescription ?? error }, "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi."));
+      setErrorMsg(describeAuthError({ code: errorCode ?? error, message: errorDescription ?? error }, "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi.", recallAuthProvider()));
       return;
     }
 

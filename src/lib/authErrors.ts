@@ -38,9 +38,57 @@ const MSG_RATE = "Terlalu banyak percobaan dalam waktu singkat. Tunggu beberapa 
 const INDONESIAN = /\b(gagal|tidak|belum|silakan|kamu|coba|harus|sudah|lowongan|kuota|draf|surat|profil|simpan|masuk)\b/i;
 export const looksIndonesian = (text: string) => INDONESIAN.test(text);
 
-/** Galat dari supabase.auth: masuk, daftar, Google OAuth, reset kata sandi. */
-export function describeAuthError(err: unknown, fallback = "Proses akun belum berhasil. Coba lagi."): string {
+/** Penyedia masuk pihak ketiga yang ditawarkan halaman masuk. */
+export type AuthProvider = "google" | "linkedin";
+
+export const AUTH_PROVIDER_LABEL: Record<AuthProvider, string> = { google: "Google", linkedin: "LinkedIn" };
+
+/** Penyedia lain yang masih bisa dipakai bila satu penyedia tidak tersedia. */
+const AUTH_PROVIDER_ALTERNATIVE: Record<AuthProvider, string> = {
+  google: "Pakai LinkedIn atau email dan kata sandi.",
+  linkedin: "Pakai Google atau email dan kata sandi.",
+};
+
+const PROVIDER_STORAGE_KEY = "applify_oauth_provider";
+
+/** Penyedia dari pesan galat (Supabase menyebut nama penyedianya di sebagian pesan); null bila tidak jelas. */
+export function detectAuthProvider(msg: string): AuthProvider | null {
+  if (/linkedin/i.test(msg)) return "linkedin";
+  if (/google/i.test(msg)) return "google";
+  return null;
+}
+
+interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+/**
+ * Ingat penyedia yang dipilih sebelum browser pindah ke halaman penyedia, supaya halaman /auth/callback tahu
+ * penyedia mana yang gagal (alamat galat dari Supabase tidak menyebutnya). Disimpan di sessionStorage tab ini.
+ */
+export function rememberAuthProvider(provider: AuthProvider, storage?: StorageLike | null): void {
+  try {
+    (storage ?? (typeof sessionStorage === "undefined" ? null : sessionStorage))?.setItem(PROVIDER_STORAGE_KEY, provider);
+  } catch {
+    /* penyimpanan tertutup (mode privat): pesan galat cukup memakai kata umum */
+  }
+}
+
+export function recallAuthProvider(storage?: StorageLike | null): AuthProvider | null {
+  try {
+    const value = (storage ?? (typeof sessionStorage === "undefined" ? null : sessionStorage))?.getItem(PROVIDER_STORAGE_KEY);
+    return value === "google" || value === "linkedin" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Galat dari supabase.auth: masuk, daftar, OAuth (Google atau LinkedIn), reset kata sandi. */
+export function describeAuthError(err: unknown, fallback = "Proses akun belum berhasil. Coba lagi.", provider?: AuthProvider | null): string {
   const { msg, code, status } = norm(err);
+  const who = provider ?? detectAuthProvider(msg);
 
   if (NETWORK.test(msg)) return MSG_NETWORK;
   if (code === "invalid_credentials" || /invalid login credentials/.test(msg)) {
@@ -71,10 +119,14 @@ export function describeAuthError(err: unknown, fallback = "Proses akun belum be
     return "Akun belum bisa dibuat karena gangguan di server. Coba lagi beberapa menit lagi. Bila tetap gagal, hubungi pengelola aplikasi.";
   }
   if (code === "provider_disabled" || /provider is not enabled|unsupported provider/.test(msg)) {
-    return "Masuk dengan Google belum diaktifkan di aplikasi ini. Pakai email dan kata sandi, atau hubungi pengelola.";
+    return who
+      ? `Masuk dengan ${AUTH_PROVIDER_LABEL[who]} belum diaktifkan di aplikasi ini. ${AUTH_PROVIDER_ALTERNATIVE[who]}`
+      : "Masuk dengan akun pihak ketiga belum diaktifkan di aplikasi ini. Pakai email dan kata sandi.";
   }
   if (code === "access_denied" || /access_denied|access denied|user cancel/.test(msg)) {
-    return "Proses masuk dengan Google dibatalkan. Coba lagi bila kamu ingin melanjutkan.";
+    return who
+      ? `Proses masuk dengan ${AUTH_PROVIDER_LABEL[who]} dibatalkan. Coba lagi bila kamu ingin melanjutkan.`
+      : "Proses masuk dibatalkan. Coba lagi bila kamu ingin melanjutkan.";
   }
   if (code === "otp_expired" || /otp_expired|token has expired|link.*expired|expired.*link/.test(msg)) {
     return "Tautan sudah kedaluwarsa atau sudah dipakai. Minta tautan baru, lalu buka tautan itu segera.";

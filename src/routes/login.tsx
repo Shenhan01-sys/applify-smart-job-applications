@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
-import { describeAuthError } from "@/lib/authErrors";
+import { describeAuthError, rememberAuthProvider } from "@/lib/authErrors";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -127,6 +127,7 @@ function LoginPage() {
   const handleGoogleAuth = async () => {
     setGoogleLoading(true);
     setError("");
+    rememberAuthProvider("google");
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -141,7 +142,7 @@ function LoginPage() {
       if (error) throw error;
       // Browser akan pindah ke Google, tidak perlu navigasi di sini.
     } catch (err: any) {
-      setError(describeAuthError(err, "Belum bisa masuk dengan Google. Coba lagi, atau pakai email dan kata sandi."));
+      setError(describeAuthError(err, "Belum bisa masuk dengan Google. Coba lagi, atau pakai email dan kata sandi.", "google"));
       setGoogleLoading(false);
     }
   };
@@ -151,6 +152,7 @@ function LoginPage() {
   const handleLinkedInAuth = async () => {
     setLinkedInLoading(true);
     setError("");
+    rememberAuthProvider("linkedin");
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "linkedin_oidc",
@@ -161,7 +163,7 @@ function LoginPage() {
       if (error) throw error;
       // Browser akan pindah ke LinkedIn, tidak perlu navigasi di sini.
     } catch (err: any) {
-      setError(describeAuthError(err, "Belum bisa masuk dengan LinkedIn. Coba lagi, atau pakai Google atau email."));
+      setError(describeAuthError(err, "Belum bisa masuk dengan LinkedIn. Coba lagi, atau pakai Google atau email.", "linkedin"));
       setLinkedInLoading(false);
     }
   };
