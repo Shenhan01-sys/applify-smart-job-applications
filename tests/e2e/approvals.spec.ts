@@ -711,3 +711,156 @@ test.describe("Persetujuan: email yang tidak dikirim karena mode uji", () => {
     await expect(app.getByTestId("email-test-mode")).toHaveCount(0);
   });
 });
+
+test.describe("Persetujuan: lampiran email", () => {
+  const CV_URL = "https://proyek.supabase.co/storage/v1/object/sign/resumes/cv-1.pdf?token=RAHASIA-TOKEN";
+  const profile = (over: Record<string, unknown> = {}) => ({
+    id: TEST_USER_ID,
+    full_name: "Budi Uji",
+    resume_url: `${TEST_USER_ID}/cv-1.pdf`,
+    transcript_url: `${TEST_USER_ID}/transcript-111.pdf`,
+    portfolio_file_url: `${TEST_USER_ID}/portfolio-222.pdf`,
+    ...over,
+  });
+  const mailLog = (status: string, details: Record<string, any>) => ({
+    action: "email_apply",
+    status,
+    job_id: "job-apr-mail",
+    created_at: isoAgo(60_000),
+    details: { to: "hrd@perusahaan.test", approval_request_id: "apr-mail", ...details },
+  });
+
+  function seed(backend: import("./helpers/mockBackend").MockBackend, opts: { description?: string; approval?: Record<string, unknown>; profile?: Record<string, unknown> | null } = {}) {
+    backend.state.history = [approvedApproval("apr-mail", { job_title: "Staf Admin", company: "PT Surat", resume_url: CV_URL, ...opts.approval })];
+    backend.state.jobs = [jobRow("job-apr-mail", { title: "Staf Admin", description: opts.description ?? "Kirim CV, transkrip nilai, dan portofolio ke hrd@perusahaan.test." })];
+    backend.state.profiles = opts.profile === null ? [] : [opts.profile ?? profile()];
+    backend.state.gmail = true;
+  }
+
+  async function openPanel(app: import("@playwright/test").Page) {
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await app.getByRole("button", { name: /Opsi lain: Kirim lewat Email/ }).click();
+  }
+
+  test("sebelum konfirmasi: CV (nama berkas), Cover letter (PDF), dan dokumen yang diminta lowongan tampil; tidak ada teks 'tanpa lampiran'", async ({ app, backend }) => {
+    seed(backend);
+    await openPanel(app);
+
+    const box = app.getByTestId("email-attachments");
+    await expect(box).toBeVisible();
+    await expect(box.getByText("Lampiran yang akan dikirim")).toBeVisible();
+    await expect(app.getByTestId("email-attachment-cv")).toHaveText("CV (CV-Budi-Uji.pdf)");
+    await expect(app.getByTestId("email-attachment-cover_letter")).toHaveText("Cover letter (PDF)");
+    await expect(app.getByTestId("email-attachment-transcript")).toHaveText("Transkrip nilai (Budi-Uji-Transcript.pdf)");
+    await expect(app.getByTestId("email-attachment-portfolio")).toHaveText("Portofolio (Budi-Uji-Portfolio.pdf)");
+    await expect(box.getByRole("status")).toHaveCount(0);
+    await expect(app.getByText(/tanpa lampiran/i)).toHaveCount(0);
+    await expect(app.getByText(/RAHASIA-TOKEN/)).toHaveCount(0);
+  });
+
+  test("lowongan yang tidak meminta transkrip atau portofolio: hanya CV dan Cover letter (PDF)", async ({ app, backend }) => {
+    seed(backend, { description: "Kami mencari staf admin. Kirim CV ke hrd@perusahaan.test." });
+    await openPanel(app);
+    await expect(app.getByTestId("email-attachment-cv")).toBeVisible();
+    await expect(app.getByTestId("email-attachment-cover_letter")).toBeVisible();
+    await expect(app.getByTestId("email-attachment-transcript")).toHaveCount(0);
+    await expect(app.getByTestId("email-attachment-portfolio")).toHaveCount(0);
+  });
+
+  test("daftar lampiran tampil lagi di kotak konfirmasi, dan antrean baru terisi sesudah 'Ya, masukkan ke antrean'", async ({ app, backend }) => {
+    seed(backend);
+    backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-mail-1", status: "pending" } });
+    await openPanel(app);
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    const confirm = app.getByTestId("email-confirm-attachments");
+    await expect(confirm).toContainText("CV (CV-Budi-Uji.pdf)");
+    await expect(confirm).toContainText("Cover letter (PDF)");
+    await expect(confirm).toContainText("Transkrip nilai (Budi-Uji-Transcript.pdf)");
+    await expect(confirm).toContainText("Portofolio (Budi-Uji-Portfolio.pdf)");
+    expect(backend.callsTo("POST", "/api/automation/queue")).toHaveLength(0);
+
+    await app.getByRole("button", { name: "Ya, masukkan ke antrean" }).click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    // Kontrak antrean tidak berubah: hanya id persetujuan dan alamat; lampiran dipilih worker, bukan klien.
+    expect(calls[0].body).toMatchObject({ job_type: "email_apply", payload: { approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test" } });
+    expect(Object.keys((calls[0].body as any).payload).sort()).toEqual(["apply_email", "approval_request_id"]);
+  });
+
+  test("tanpa CV: peringatan dengan tautan ke Profil, surat PDF tetap terdaftar, tombol kirim tetap bisa dipakai", async ({ app, backend }) => {
+    seed(backend, { approval: { resume_url: null }, profile: profile({ resume_url: null }), description: "Kirim CV." });
+    await openPanel(app);
+
+    const warning = app.getByTestId("email-attachment-warning-no_cv");
+    await expect(warning).toContainText("Kamu belum mengunggah CV; email terkirim tanpa CV");
+    await expect(warning.getByRole("link", { name: "Unggah CV di Profil" })).toHaveAttribute("href", "/profile");
+    await expect(app.getByTestId("email-attachment-cv")).toHaveCount(0);
+    await expect(app.getByTestId("email-attachment-cover_letter")).toBeVisible();
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await expect(app.getByRole("button", { name: "Kirim lewat Email", exact: true })).toBeEnabled();
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-attachments")).toContainText("tanpa CV");
+  });
+
+  test("CV baru diunggah sesudah draf diajukan: peringatan menyuruh mengajukan ulang, bukan 'belum mengunggah'", async ({ app, backend }) => {
+    seed(backend, { approval: { resume_url: null }, description: "Kirim CV." });
+    await openPanel(app);
+    await expect(app.getByTestId("email-attachment-warning-cv_not_on_approval")).toContainText("Ajukan draf lagi");
+    await expect(app.getByTestId("email-attachment-warning-no_cv")).toHaveCount(0);
+  });
+
+  test("dokumen diminta lowongan tetapi belum ada di profil: peringatan dan tidak masuk daftar", async ({ app, backend }) => {
+    seed(backend, { profile: profile({ transcript_url: null }) });
+    await openPanel(app);
+    await expect(app.getByTestId("email-attachment-warning-document_missing")).toContainText("meminta transkrip nilai");
+    await expect(app.getByTestId("email-attachment-transcript")).toHaveCount(0);
+    await expect(app.getByTestId("email-attachment-portfolio")).toBeVisible();
+  });
+
+  test("profil tidak terbaca: daftar lampiran tidak ditampilkan (tidak menebak), panel tetap bekerja", async ({ app, backend }) => {
+    seed(backend);
+    backend.override("GET /rest/v1/profiles", { status: 500, body: {} });
+    await openPanel(app);
+    await expect(app.getByRole("button", { name: "Kirim lewat Email", exact: true })).toBeVisible();
+    await expect(app.getByTestId("email-attachments")).toHaveCount(0);
+  });
+
+  test("sesudah terkirim: baris status menampilkan nama lampiran dari log, tanpa membuka panel", async ({ app, backend }) => {
+    seed(backend);
+    backend.state.logs = [
+      mailLog("success", {
+        note: "email sent; message_id=m1",
+        attachments: [
+          { kind: "cv", filename: "CV-Budi-Uji.pdf", bytes: 4017 },
+          { kind: "cover_letter", filename: "Budi-Uji-Cover-Letter.pdf", bytes: 1200 },
+          { kind: "portfolio", filename: "Budi-Uji-Portfolio.pdf", bytes: 5000 },
+        ],
+        dropped: [{ kind: "transcript", reason: "unavailable", note: "tidak ada berkas di profil" }],
+      }),
+    ];
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const line = app.getByTestId("email-sent-attachments");
+    await expect(line).toContainText("Terkirim dengan lampiran: CV (CV-Budi-Uji.pdf), Cover letter (PDF), Portofolio (Budi-Uji-Portfolio.pdf)");
+    await expect(line).toContainText("Tidak terlampir: Transkrip nilai (tidak bisa diambil)");
+    await expect(app.getByText("sudah dipakai")).toBeVisible();
+    // Sudah terkirim: pratinjau "akan dikirim" tidak tampil lagi.
+    await app.getByRole("button", { name: /Opsi lain: Kirim lewat Email/ }).click();
+    await expect(app.getByTestId("email-attachments")).toHaveCount(0);
+  });
+
+  test("email lama yang terkirim sebelum fitur lampiran (log tanpa daftar): tidak ada baris lampiran, tetap sudah dipakai", async ({ app, backend }) => {
+    seed(backend);
+    backend.state.logs = [mailLog("success", { note: "email sent; message_id=m0" })];
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByText("sudah dipakai")).toBeVisible();
+    await expect(app.getByTestId("email-sent-attachments")).toHaveCount(0);
+  });
+});

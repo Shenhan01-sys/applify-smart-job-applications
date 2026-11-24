@@ -33,6 +33,8 @@ export interface BackendState {
   /** application_logs */
   logs: Row[];
   jobs: Row[];
+  /** profiles (nama, CV, dokumen opsional). Kosong: profil tanpa berkas. */
+  profiles: Row[];
   /** user_form_answers */
   answers: Row[];
   /** ai_applications, dengan `jobs` tertanam seperti hasil select("*, jobs(*)") */
@@ -112,6 +114,7 @@ export class MockBackend {
       queue: [],
       logs: [],
       jobs: [],
+      profiles: [],
       answers: [],
       applications: [],
       approvalDetail: {},
@@ -268,6 +271,13 @@ export class MockBackend {
       return route.fulfill(json(200, authUser()));
     }
 
+    // Jawaban paksa untuk jalur Supabase tertentu, misalnya "GET /rest/v1/profiles" -> 500.
+    const forced = this.overrides.get(`${method} ${path}`);
+    if (forced) {
+      await route.fulfill(json(forced.status, forced.body ?? {}));
+      return;
+    }
+
     // Kuota draf AI bulan ini (halaman Pengaturan): RPC, bukan tabel.
     if (path === "/rest/v1/rpc/get_quota_status" && method === "POST") {
       return route.fulfill(json(200, [{ limit_qty: 10, used: 2, remaining: 8, allowed: true }]));
@@ -312,6 +322,7 @@ export class MockBackend {
       automation_queue: s.queue,
       application_logs: s.logs,
       jobs: s.jobs,
+      profiles: s.profiles,
       user_form_answers: s.answers,
       ai_applications: s.applications,
       // Dibaca halaman Lamaran untuk menyaring skill yang disorot; kosong cukup.
