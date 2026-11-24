@@ -32,7 +32,7 @@ export interface ProviderKeys {
 /** Kunci platform Numes dari secret (NUMES_API_KEY, _2, _3, NUMES_API_KEYS), mis. `numesKeysFromEnv((n) => Deno.env.get(n))`. */
 export function numesKeysFromEnv(get: (name: string) => string | undefined | null): string[] {
   const env: Record<string, string | undefined> = {};
-  for (const name of ["NUMES_API_KEY", "NUMES_API_KEY_2", "NUMES_API_KEY_3", "NUMES_API_KEYS"]) env[name] = get(name) ?? undefined;
+  for (const name of ["NUMES_API_KEY", "NUMES_API_KEY_2", "NUMES_API_KEY_3", "NUMES_API_KEY_4", "NUMES_API_KEY_5", "NUMES_API_KEYS"]) env[name] = get(name) ?? undefined;
   return parseNumesKeys(env);
 }
 

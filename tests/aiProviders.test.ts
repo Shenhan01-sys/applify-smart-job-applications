@@ -131,9 +131,9 @@ test("penyedia: Anthropic hanya di ujung kedua rantai bawaan, dan platformChain 
   assert.deepEqual(platformChain(["numes:x/y:free", "gemini:g1"], { gemini: "g" }).map((c) => c.provider), ["gemini"]);
 });
 
-test("numesKeysFromEnv membaca NUMES_API_KEY, _2, _3, dan NUMES_API_KEYS dari secret", () => {
-  const secrets: Record<string, string> = { NUMES_API_KEY: "k1", NUMES_API_KEY_2: " k2 ", NUMES_API_KEYS: "k2,k3,k4" };
-  assert.deepEqual(numesKeysFromEnv((name) => secrets[name]), ["k1", "k2", "k3"]);
+test("numesKeysFromEnv membaca NUMES_API_KEY, _2 sampai _5, dan NUMES_API_KEYS dari secret", () => {
+  const secrets: Record<string, string> = { NUMES_API_KEY: "k1", NUMES_API_KEY_2: " k2 ", NUMES_API_KEY_4: "k4", NUMES_API_KEYS: "k2,k3,k5,k6" };
+  assert.deepEqual(numesKeysFromEnv((name) => secrets[name]), ["k1", "k2", "k4", "k3", "k5"]);
   assert.deepEqual(numesKeysFromEnv(() => undefined), []);
   assert.deepEqual(numesKeysFromEnv(() => null), []);
   assert.deepEqual(numesKeysFromEnv(() => ""), []);
