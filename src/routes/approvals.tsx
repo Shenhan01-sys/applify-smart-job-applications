@@ -9,8 +9,10 @@ import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
 import AgentSecurityCode from "@/components/AgentSecurityCode";
 import AgentManualSubmit from "@/components/AgentManualSubmit";
+import ExtensionConsent from "@/components/ExtensionConsent";
 import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
+import { extensionConsentState } from "@/lib/extensionConsent";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
@@ -62,6 +64,9 @@ function ApprovalsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   // Data for the "Kirim lewat Email" action on approved history rows.
   const [emailData, setEmailData] = useState<EmailApplyData>(emptyEmailApplyData());
+  // Persetujuan yang jawaban approve-nya meminta izin ekstensi (lamaran belum diantre). Hanya ingatan halaman ini:
+  // sesudah dimuat ulang, blok izin tampil karena persetujuan itu belum punya tugas agen.
+  const [consentIds, setConsentIds] = useState<Set<string>>(() => new Set());
 
   const tabOrder: ('pending' | 'history')[] = ['pending', 'history'];
   const handleTabChange = (tab: 'pending' | 'history') => {
@@ -107,6 +112,20 @@ function ApprovalsPage() {
     setEmailData((d) => ({ ...d, agent: { ...d.agent, [approvalId]: { ...d.agent[approvalId], status: 'pending', error_message: null } } }));
   };
 
+  // Sesudah pengguna mengizinkan Ekstensi Browser dan backend mengantre tugasnya: tandai menunggu ekstensi (status berubah,
+  // polling 15 detik jalan), lalu baca status sebenarnya dari database.
+  const handleConsentGranted = (approvalId: string) => {
+    setConsentIds((ids) => {
+      if (!ids.has(approvalId)) return ids;
+      const next = new Set(ids);
+      next.delete(approvalId);
+      return next;
+    });
+    setEmailData((d) => ({ ...d, agent: { ...d.agent, [approvalId]: { status: 'pending', job_type: 'extension_apply', error_message: null, fields_filled: null } } }));
+    if (isMockMode()) return;
+    loadEmailApplyData(history).then(setEmailData).catch(() => {});
+  };
+
   const loadData = async () => {
     setLoading(true);
     setLoadError("");
@@ -144,9 +163,15 @@ function ApprovalsPage() {
     setModalOpen(true);
   };
 
-  const handleApproved = () => {
+  const handleApproved = (result?: { consentRequired: boolean }) => {
+    const approvedId = selectedRequest?.id;
     setModalOpen(false);
     setSelectedRequest(null);
+    // Situs yang perlu login: lamaran belum diantre. Buka Riwayat supaya blok "Izinkan ekstensi" langsung terlihat.
+    if (result?.consentRequired && approvedId) {
+      setConsentIds((ids) => new Set(ids).add(approvedId));
+      handleTabChange('history');
+    }
     loadData(); // the modal already confirmed the approval with a toast
   };
 
@@ -260,6 +285,17 @@ function ApprovalsPage() {
             const shownStatus = effectiveApprovalStatus(request.status, request.expires_at);
             const config = getStatusConfig(shownStatus);
             const StatusIcon = config.icon;
+            const consent = activeTab === 'history'
+              ? extensionConsentState({
+                  approvalStatus: request.status,
+                  platform: request.platform,
+                  jobUrl: emailData.jobUrls[request.id],
+                  row: emailData.agent[request.id],
+                  agentKnown: emailData.agentKnown,
+                  submitted: emailData.used.has(request.id),
+                  consentRequired: consentIds.has(request.id),
+                })
+              : { show: false as const };
             return (
               <div
                 key={request.id}
@@ -297,6 +333,9 @@ function ApprovalsPage() {
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />
+                    )}
+                    {consent.show && consent.reason && (
+                      <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />

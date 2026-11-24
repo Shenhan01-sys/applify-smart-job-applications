@@ -85,7 +85,7 @@ function SettingsPage() {
           <SavedAnswers />
         </Card>
 
-        <Card icon={Chrome} title="Ekstensi Browser (Chrome & Edge)" color="#0A5BE0"
+        <Card id="ekstensi" icon={Chrome} title="Ekstensi Browser (Chrome & Edge)" color="#0A5BE0"
           desc="Gunakan Ekstensi Browser Applify di Chrome atau Edge untuk membantu mengisi formulir pada portal yang butuh masuk dengan akunmu sendiri.">
           <ExtensionConnectCard />
           <div className="mt-3">
@@ -128,9 +128,9 @@ function SettingsPage() {
   );
 }
 
-function Card({ icon: Icon, title, desc, children, color = '#0A5BE0' }: { icon: typeof Lock; title: string; desc: string; children?: React.ReactNode; color?: string }) {
+function Card({ id, icon: Icon, title, desc, children, color = '#0A5BE0' }: { id?: string; icon: typeof Lock; title: string; desc: string; children?: React.ReactNode; color?: string }) {
   return (
-    <section aria-label={title} className="glass rounded-2xl p-5 hover:shadow-md transition-all duration-200">
+    <section id={id} aria-label={title} className="glass rounded-2xl p-5 hover:shadow-md transition-all duration-200">
       <div className="flex items-start gap-3">
         <div className="h-10 w-10 rounded-lg grid place-items-center text-white shrink-0" style={{ backgroundColor: color }} aria-hidden="true">
           <Icon className="h-5 w-5"/>

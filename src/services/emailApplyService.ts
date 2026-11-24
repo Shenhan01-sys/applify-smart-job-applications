@@ -27,9 +27,11 @@ export interface EmailApplyData {
   manual: Set<string>;
   /** job posting address (jobs.external_url, http or https only), per approval id: "Buka formulir lowongan" */
   jobUrls: Record<string, string>;
+  /** Status agen sudah terbaca dari database. false = belum dimuat atau gagal, jadi "tidak ada tugas" belum berarti apa-apa. */
+  agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {} });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -39,7 +41,7 @@ export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: n
  * (buildAgentApplyRows). Read with the user's own session (RLS owner policies). Best effort: an unreadable
  * log only leaves the outcome unknown. Read only: nothing here writes to automation_queue or application_logs.
  */
-async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentApplyRow>> {
+async function loadAgentApplyRows(ids: string[]): Promise<{ rows: Record<string, AgentApplyRow>; complete: boolean }> {
   const [queue, extension] = await Promise.all([
     supabase
       .from("automation_queue")
@@ -73,7 +75,8 @@ async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentAp
     if (logs.error) console.warn("[agentApply] attempt log lookup skipped:", logs.error.message);
     else workerLogs = logs.data ?? [];
   }
-  return buildAgentApplyRows(queueRows, workerLogs, extensionLogs);
+  // Tugas antrean tidak terbaca: "tidak ada tugas" tidak boleh dianggap benar (blok izin ekstensi tidak boleh ikut menebak).
+  return { rows: buildAgentApplyRows(queueRows, workerLogs, extensionLogs), complete: !queue.error };
 }
 
 /**
@@ -87,11 +90,12 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const approved = approvals.filter((a) => a.status === "approved");
   const data = emptyEmailApplyData();
   if (approved.length === 0) return data;
-  if (isMockMode()) return { ...data, gmail: true };
+  if (isMockMode()) return { ...data, gmail: true, agentKnown: true };
 
   const ids = approved.map((a) => a.id);
   const jobIds = [...new Set(approved.map((a) => a.job_id).filter((x): x is string => !!x))];
 
+  let agentKnown = true;
   const [gmail, logs, queue, jobs, agent, claimRes] = await Promise.all([
     automationApi.getGmailStatus(),
     supabase.from("application_logs").select("details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
@@ -102,10 +106,16 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
     jobIds.length > 0 ? supabase.from("jobs").select("id, description, external_url").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
-    loadAgentApplyRows(ids).catch((err) => {
-      console.warn("[agentApply] status unavailable:", err);
-      return {} as Record<string, AgentApplyRow>;
-    }),
+    loadAgentApplyRows(ids)
+      .then((res) => {
+        agentKnown = res.complete;
+        return res.rows;
+      })
+      .catch((err) => {
+        console.warn("[agentApply] status unavailable:", err);
+        agentKnown = false;
+        return {} as Record<string, AgentApplyRow>;
+      }),
     automationApi.getApprovalClaimStatuses(ids).catch(() => ({ claims: {} })),
   ]);
 
@@ -116,6 +126,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     agent[aid] = { ...base, claim_state: info.state, claim_channel: info.channel };
   }
   data.agent = agent;
+  data.agentKnown = agentKnown;
 
   if (logs.error) console.warn("[emailApply] used-check skipped:", logs.error.message);
   for (const row of logs.data ?? []) {

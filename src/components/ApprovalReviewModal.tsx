@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { automationApi } from '@/services/automationApi'
 import { describeApiError } from '@/lib/apiErrors'
+import { EXTENSION_CONSENT_REQUIRED_TOAST, consentRequiredFrom } from '@/lib/extensionConsent'
 import { HitlTrack } from '@/components/HitlTrack'
 import { platformLabel } from '@/lib/platforms'
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from '@/lib/personalData'
@@ -36,7 +37,8 @@ interface ApprovalReviewModalProps {
   request: ApprovalRequest
   open: boolean
   onClose: () => void
-  onApproved: () => void
+  /** `consentRequired`: lamaran belum diantre; pengguna harus mengizinkan Ekstensi Browser di kartu Riwayat. */
+  onApproved: (result?: { consentRequired: boolean }) => void
   onRejected: () => void
 }
 
@@ -82,9 +84,11 @@ export default function ApprovalReviewModal({
     setLoading(true)
     try {
       // The version on screen (including edits) is the one being approved.
-      await automationApi.approveApplication(request.id, edited ? editedCoverLetter : undefined)
-      toast.success('Disetujui — lamaran masuk antrean agen.')
-      onApproved()
+      const result = await automationApi.approveApplication(request.id, edited ? editedCoverLetter : undefined)
+      // Situs yang perlu login: lamaran belum diantre sampai pengguna mengizinkan ekstensi (kartu Riwayat).
+      const consentRequired = consentRequiredFrom(result)
+      toast.success(consentRequired ? EXTENSION_CONSENT_REQUIRED_TOAST : 'Disetujui — lamaran masuk antrean agen.')
+      onApproved({ consentRequired })
     } catch (error: any) {
       toast.error(describeApiError(error, 'Gagal menyetujui'))
     } finally {

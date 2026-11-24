@@ -40,6 +40,10 @@ export interface BackendState {
   /** GET /api/approvals/:id */
   approvalDetail: Record<string, Row>;
   gmail: boolean;
+  /** Bidang tambahan di jawaban POST /api/approvals/:id/approve, mis. { apply_channel: "extension", extension_consent_required: true }. */
+  approveExtra: Row;
+  /** Pengaturan agen (GET dan PUT /api/automation/settings). */
+  settings: Row;
 }
 
 export interface Override {
@@ -105,6 +109,8 @@ export class MockBackend {
       applications: [],
       approvalDetail: {},
       gmail: false,
+      approveExtra: {},
+      settings: {},
       ...initial,
     };
   }
@@ -162,6 +168,13 @@ export class MockBackend {
     if (method === "GET" && path === "/api/approvals/pending") return route.fulfill(json(200, s.pending));
     if (method === "GET" && path === "/api/approvals/history") return route.fulfill(json(200, s.history));
     if (method === "GET" && path === "/api/oauth/status") return route.fulfill(json(200, { gmail: s.gmail }));
+    if (path === "/api/automation/settings") {
+      if (method === "GET") return route.fulfill(json(200, s.settings));
+      if (method === "PUT") {
+        s.settings = { ...s.settings, ...(body as Row) };
+        return route.fulfill(json(200, s.settings));
+      }
+    }
     // v2: halaman Persetujuan menanyakan status klaim kirim untuk banner klaim macet. Tidak ada klaim macet di fixture.
     if (method === "POST" && path === "/api/approvals/claim-statuses") return route.fulfill(json(200, { claims: {} }));
 
@@ -171,6 +184,22 @@ export class MockBackend {
       return row ? route.fulfill(json(200, row)) : route.fulfill(json(404, { error: "not_found" }));
     }
 
+    // Izin Ekstensi Browser: mengantre tugas extension_apply untuk persetujuan itu, seperti backend sungguhan.
+    const consent = path.match(/^\/api\/approvals\/([^/]+)\/extension-consent$/);
+    if (method === "POST" && consent) {
+      const id = decodeURIComponent(consent[1]);
+      const queueJobId = `queue-ext-${id}`;
+      this.state.queue.unshift({
+        id: queueJobId,
+        job_type: "extension_apply",
+        status: "pending",
+        error_message: null,
+        created_at: new Date().toISOString(),
+        payload: { approval_request_id: id },
+      });
+      return route.fulfill(json(200, { queued: true, queue_job_id: queueJobId }));
+    }
+
     const action = path.match(/^\/api\/approvals\/([^/]+)\/(approve|reject|rerun|mark-sent)$/);
     if (method === "POST" && action) {
       const id = decodeURIComponent(action[1]);
@@ -178,7 +207,7 @@ export class MockBackend {
       if (kind === "approve" || kind === "reject") this.settle(id, kind, body);
       if (kind === "rerun") return route.fulfill(json(200, { success: true, queue_job_id: `queue-rerun-${id}` }));
       if (kind === "mark-sent") return route.fulfill(json(200, { success: true }));
-      return route.fulfill(json(200, { success: true, id, status: kind === "approve" ? "approved" : "rejected" }));
+      return route.fulfill(json(200, { success: true, id, status: kind === "approve" ? "approved" : "rejected", ...(kind === "approve" ? this.state.approveExtra : {}) }));
     }
 
     if (method === "POST" && path === "/api/agent/security-code") return route.fulfill(json(202, { accepted: true }));

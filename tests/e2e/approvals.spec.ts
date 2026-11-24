@@ -517,3 +517,126 @@ test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
     await expect(openBtn).toHaveAttribute("href", jobUrl);
   });
 });
+
+test.describe("Persetujuan: izin Ekstensi Browser", () => {
+  const PORTAL_URL = "https://id.jobstreet.com/id/job/96011760";
+  const CONSENT_PATH = (id: string) => `/api/approvals/${id}/extension-consent`;
+
+  function seedPortal(backend: import("./helpers/mockBackend").MockBackend, id = "apr-ext") {
+    backend.state.history = [approvedApproval(id, { platform: "jobstreet", job_title: "Data Analyst", company: "PT Portal" })];
+    backend.state.jobs = [jobRow(`job-${id}`, { platform_source: "jobstreet", external_url: PORTAL_URL })];
+  }
+
+  test("lamaran disetujui di situs login tanpa tugas agen: blok izin tampil, Izinkan memanggil endpoint sekali dan status menjadi menunggu ekstensi", async ({ app, backend }) => {
+    seedPortal(backend);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const consent = app.getByTestId("extension-consent");
+    await expect(consent.getByText("Izinkan ekstensi browser mengisi formulir ini")).toBeVisible();
+    await expect(consent.getByText(/berhenti sebelum mengirim/)).toBeVisible();
+    await expect(consent.getByText(/menekan Kirim/)).toBeVisible();
+    await expect(consent.getByLabel("Selalu izinkan tanpa bertanya")).not.toBeChecked();
+    // Status sambungan ekstensi tidak diketahui Applify, jadi hanya ada tautan ke bagian ekstensi di Pengaturan.
+    await expect(consent.getByRole("link", { name: "Hubungkan di Pengaturan" })).toHaveAttribute("href", /\/settings#ekstensi/);
+    expect(backend.callsTo("POST", CONSENT_PATH("apr-ext"))).toHaveLength(0);
+
+    await consent.getByRole("button", { name: "Izinkan" }).click();
+    await expect.poll(() => backend.callsTo("POST", CONSENT_PATH("apr-ext")).length).toBe(1);
+    const call = backend.callsTo("POST", CONSENT_PATH("apr-ext"))[0];
+    expect(call.authorization).toBe(`Bearer ${TEST_ACCESS_TOKEN}`);
+    expect(call.body).toEqual({});
+
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+    await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
+    // Izin tidak mengirim apa pun ke situs: tidak ada rerun atau tanda terkirim.
+    expect(backend.callsTo("POST", "/api/approvals/apr-ext/rerun")).toHaveLength(0);
+    expect(backend.callsTo("POST", "/api/approvals/apr-ext/mark-sent")).toHaveLength(0);
+  });
+
+  test("centang 'Selalu izinkan tanpa bertanya' mengirim always: true", async ({ app, backend }) => {
+    seedPortal(backend);
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const consent = app.getByTestId("extension-consent");
+    await consent.getByLabel("Selalu izinkan tanpa bertanya").check();
+    await consent.getByRole("button", { name: "Izinkan" }).click();
+    await expect.poll(() => backend.callsTo("POST", CONSENT_PATH("apr-ext")).length).toBe(1);
+    expect(backend.callsTo("POST", CONSENT_PATH("apr-ext"))[0].body).toEqual({ always: true });
+    await expect(app.getByText("Izin diberikan. Ekstensi akan dipakai otomatis untuk situs yang perlu login.", { exact: false })).toBeVisible();
+  });
+
+  test("jawaban approve meminta izin: Riwayat terbuka sendiri dan blok izin tampil tanpa lamaran masuk antrean", async ({ app, backend }) => {
+    backend.state.pending = [approval("apr-flag", { platform: "jobstreet", job_title: "Frontend Engineer" })];
+    backend.state.approveExtra = { apply_channel: "extension", extension_consent_required: true };
+    await app.goto("/approvals");
+
+    await app.getByRole("button", { name: /Periksa/ }).click();
+    await app.getByRole("dialog").getByRole("button", { name: /Setujui/ }).click();
+
+    await expect(app.getByText("Disetujui. Izinkan ekstensi browser untuk mengisi formulirnya di tab Riwayat.")).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    await expect(app.getByTestId("extension-consent")).toBeVisible();
+    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("1");
+
+    await app.getByTestId("extension-consent").getByRole("button", { name: "Izinkan" }).click();
+    await expect.poll(() => backend.callsTo("POST", CONSENT_PATH("apr-flag")).length).toBe(1);
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+  });
+
+  test("tugas agen aktif, LinkedIn, atau sudah terkirim: blok izin tidak tampil", async ({ app, backend }) => {
+    backend.state.history = [
+      approvedApproval("apr-active", { platform: "jobstreet", job_title: "Aktif" }),
+      approvedApproval("apr-li", { platform: "linkedin", job_title: "Dari LinkedIn" }),
+      approvedApproval("apr-sent", { platform: "jobstreet", job_title: "Sudah Terkirim" }),
+    ];
+    backend.state.jobs = [
+      jobRow("job-apr-active", { platform_source: "jobstreet", external_url: PORTAL_URL }),
+      jobRow("job-apr-li", { platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" }),
+      jobRow("job-apr-sent", { platform_source: "jobstreet", external_url: PORTAL_URL }),
+    ];
+    backend.state.queue = [
+      queueRow("queue-active", "apr-active", "pending", { job_type: "extension_apply" }),
+      queueRow("queue-sent", "apr-sent", "completed"),
+    ];
+    backend.state.logs = [applyLog("queue-sent", "apr-sent", "success", { confirmation_phrase: "Terima kasih" })];
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    await expect(app.getByRole("heading", { name: "Aktif" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Sudah Terkirim" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Dari LinkedIn" })).toBeVisible();
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+  });
+
+  test("percobaan agen berhenti karena situs meminta login: izin ditawarkan lagi dengan catatan login", async ({ app, backend }) => {
+    seedPortal(backend, "apr-auth");
+    backend.state.queue = [queueRow("queue-auth", "apr-auth", "completed")];
+    backend.state.logs = [applyLog("queue-auth", "apr-auth", "incomplete", { reason: "auth_required", fields_filled: 0 })];
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const consent = app.getByTestId("extension-consent");
+    await expect(consent).toBeVisible();
+    await expect(consent.getByText(/meminta kamu masuk ke akun pelamar/)).toBeVisible();
+  });
+
+  test("izin gagal: pesan galat tampil tanpa teks server dan blok tetap ada; 409 dianggap sudah berjalan", async ({ app, backend }) => {
+    seedPortal(backend);
+    backend.override(`POST ${CONSENT_PATH("apr-ext")}`, { status: 500, body: { error: "boom SECRET_KEY", code: "internal_error" } });
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    const consent = app.getByTestId("extension-consent");
+    await consent.getByRole("button", { name: "Izinkan" }).click();
+    await expect(consent.getByRole("alert")).toContainText("Izin belum bisa diberikan");
+    await expect(consent.getByRole("alert")).not.toContainText("SECRET_KEY");
+    await expect(consent).toBeVisible();
+
+    backend.override(`POST ${CONSENT_PATH("apr-ext")}`, { status: 409, body: { error: "already active" } });
+    await consent.getByRole("button", { name: "Izinkan" }).click();
+    await expect(app.getByText("Ekstensi sudah berjalan untuk lamaran ini.")).toBeVisible();
+    await expect(consent.getByRole("alert")).toHaveCount(0);
+  });
+});

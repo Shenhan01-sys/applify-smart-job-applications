@@ -27,6 +27,7 @@ import {
   type LlmTestResponse,
 } from '@/lib/llmKeys'
 import { mockDeleteKey, mockLlmKeysResponse, mockSaveKey, mockTestKey } from '@/mocks/llmKeysMock'
+import { consentRequestBody } from '@/lib/extensionConsent'
 
 // Kunci API sendiri (BYOK) di mode demo: hanya 4 karakter terakhir yang diingat, selama halaman terbuka.
 let mockLlmKeyRows: LlmKeyRow[] = []
@@ -241,9 +242,13 @@ export const automationApi = {
     )
   },
 
-  /** Approve = consent to submit. `coverLetter` carries the user's edits from the review screen. */
+  /**
+   * Approve = consent to submit. `coverLetter` carries the user's edits from the review screen. For a login site
+   * the answer carries `apply_channel: 'extension'` and `extension_consent_required: true`: the job was NOT
+   * queued, the user must allow the Browser Extension first (grantExtensionConsent).
+   */
   async approveApplication(id: string, coverLetter?: string) {
-    return apiFetch(
+    return apiFetch<{ success?: boolean; id?: string; status?: string; apply_channel?: string; extension_consent_required?: boolean }>(
       `${apiBase()}/api/approvals/${id}/approve`,
       {
         method: 'POST',
@@ -251,6 +256,19 @@ export const automationApi = {
         body: JSON.stringify(coverLetter ? { cover_letter: coverLetter } : {}),
       },
       () => ({ success: true, id, status: "approved" }),
+    )
+  },
+
+  /**
+   * Izinkan Ekstensi Browser mengisi formulir persetujuan ini (POST /api/approvals/:id/extension-consent).
+   * 200 { queued: true, queue_job_id }. 409 bila tugas ekstensi sudah aktif; 404 dan 410 dilempar sebagai ApiError
+   * (lihat describeConsentError). Dengan `always` true, backend juga menyalakan pengaturan extension_auto_use.
+   */
+  async grantExtensionConsent(id: string, always = false) {
+    return apiFetch<{ queued?: boolean; queue_job_id?: string }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/extension-consent`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify(consentRequestBody(always)) },
+      () => ({ queued: true, queue_job_id: `mock-extension-queue-${id}` }),
     )
   },
 
