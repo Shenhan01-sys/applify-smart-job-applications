@@ -95,7 +95,7 @@ export const AGENT_AWAITING_LOGIN_HINT =
 
 /** Petunjuk saat ekstensi menunggu login: tab-nya dibuka ekstensi di latar belakang, bukan tab baru dari Applify. */
 export const LOGIN_TAB_INSTRUCTION =
-  "Ekstensi sudah membuka situs lowongan di tab latar belakang (judul tabnya memakai nama situs lowongan). Pindah ke tab itu, lalu masuk ke akunmu di sana.";
+  "Ekstensi sudah membuka situs lowongan di tab baru dalam grup tab Applify. Pindah ke tab itu, lalu masuk ke akunmu di sana.";
 export const OPEN_JOB_PAGE_HINT = "Tab itu tidak ketemu? Buka halaman lowongannya sendiri:";
 export const OPEN_JOB_PAGE_LABEL = "Buka halaman lowongan";
 

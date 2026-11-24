@@ -248,9 +248,9 @@ test("antrean ekstensi Fase 2 & jeda login (awaiting_login): status aktif, resol
   assert.match(card, /OPEN_JOB_PAGE_LABEL/);
   assert.doesNotMatch(card, /Buka tab login/);
   assert.equal(OPEN_JOB_PAGE_LABEL, "Buka halaman lowongan");
-  // Petunjuk utama: pindah ke tab yang dibuka ekstensi (tab latar belakang berjudul nama situs), login di sana.
-  assert.match(LOGIN_TAB_INSTRUCTION, /tab latar belakang/);
-  assert.match(LOGIN_TAB_INSTRUCTION, /judul tabnya memakai nama situs/);
+  // Petunjuk utama: pindah ke tab yang dibuka ekstensi (tab baru dalam grup tab Applify), login di sana.
+  assert.match(LOGIN_TAB_INSTRUCTION, /tab baru/);
+  assert.match(LOGIN_TAB_INSTRUCTION, /grup tab Applify/);
   assert.match(LOGIN_TAB_INSTRUCTION, /Pindah ke tab itu/);
   assert.match(card, /data-testid="login-tab-guide"/);
 

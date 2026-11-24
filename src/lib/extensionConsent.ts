@@ -20,12 +20,12 @@ export const EXTENSION_CONSENT_BUTTON = "Izinkan";
 export const EXTENSION_CONSENT_BUSY_LABEL = "Memproses...";
 export const EXTENSION_CONSENT_ALWAYS_LABEL = "Selalu izinkan tanpa bertanya";
 export const EXTENSION_CONSENT_EXPLAIN =
-  "Ekstensi mengisi formulir di tab latar belakang dan berhenti sebelum mengirim. Kamu sendiri yang menekan Kirim di tab itu.";
+  "Ekstensi membuka tab baru di browser kamu, mengisi formulir di sana, lalu berhenti sebelum mengirim. Kamu sendiri yang menekan Kirim di tab itu.";
 export const EXTENSION_CONSENT_LOGIN_NOTE =
   "Situs ini meminta kamu masuk ke akun pelamar. Ekstensi membuka situsnya dan menunggu kamu login di tab itu.";
 export const EXTENSION_CONSENT_CONNECT_PREFIX = "Pastikan ekstensi sudah terhubung.";
 export const EXTENSION_CONSENT_CONNECT_LINK = "Hubungkan di Pengaturan";
-export const EXTENSION_CONSENT_GRANTED_TEXT = "Izin diberikan. Ekstensi akan membuka situs lowongan di tab latar belakang.";
+export const EXTENSION_CONSENT_GRANTED_TEXT = "Izin diberikan. Ekstensi akan membuka situs lowongan di tab baru di browser kamu.";
 export const EXTENSION_CONSENT_ALWAYS_GRANTED_TEXT =
   "Izin diberikan. Ekstensi akan dipakai otomatis untuk situs yang perlu login. Kamu bisa mematikannya di Pengaturan Agen.";
 export const EXTENSION_CONSENT_ALREADY_RUNNING_TEXT = "Ekstensi sudah berjalan untuk lamaran ini.";

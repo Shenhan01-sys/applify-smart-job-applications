@@ -32,7 +32,7 @@ test("teks blok izin: judul, tombol, centang, dan penjelasan sesuai permintaan p
   assert.equal(EXTENSION_CONSENT_TITLE, "Izinkan ekstensi browser mengisi formulir ini");
   assert.equal(EXTENSION_CONSENT_BUTTON, "Izinkan");
   assert.equal(EXTENSION_CONSENT_ALWAYS_LABEL, "Selalu izinkan tanpa bertanya");
-  assert.match(EXTENSION_CONSENT_EXPLAIN, /latar belakang/);
+  assert.match(EXTENSION_CONSENT_EXPLAIN, /tab baru di browser kamu/);
   assert.match(EXTENSION_CONSENT_EXPLAIN, /berhenti sebelum mengirim/);
   assert.match(EXTENSION_CONSENT_EXPLAIN, /menekan Kirim/);
 });

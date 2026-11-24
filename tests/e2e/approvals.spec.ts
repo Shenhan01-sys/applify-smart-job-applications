@@ -526,7 +526,7 @@ test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
     await expect(openBtn).toBeVisible();
     // Petunjuk utama: pindah ke tab yang dibuka ekstensi. Tautan hanya cadangan.
     await expect(app.getByTestId("login-tab-guide")).toContainText("Pindah ke tab itu");
-    await expect(app.getByTestId("login-tab-guide")).toContainText("tab latar belakang");
+    await expect(app.getByTestId("login-tab-guide")).toContainText("grup tab Applify");
     await expect(openBtn).toHaveText(/Buka halaman lowongan/);
     await expect(openBtn).not.toHaveText(/Buka tab login/);
     await expect(openBtn).toHaveAttribute("href", jobUrl);
