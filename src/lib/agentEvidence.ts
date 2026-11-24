@@ -70,6 +70,8 @@ export interface AgentLogFacts {
    * berstatus awaiting_code; log lain tidak membawa kunci ini.
    */
   awaiting_until?: string | null;
+  /** details.login_url (tanpa query/hash): alamat portal login saat status awaiting_login. */
+  login_url?: string | null;
   /** details.code_length: panjang kode yang diharapkan (null bila tidak diketahui). Hanya pada log awaiting_code. */
   code_length?: number | null;
   /** null atau undefined = log percobaan belum ada atau tidak terbaca */
@@ -208,7 +210,12 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     submit_check_verdict: check ? cleanText(check.verdict, 40) : null,
     confirmation_phrase: check ? cleanText(check.confirmation_phrase, 160) : null,
     reason: cleanText(details.reason, 40),
-    ...(row.status === "awaiting_code" ? { awaiting_until: cleanIso(details.awaiting_until), code_length: cleanCount(details.code_length) } : {}),
+    ...(row.status === "awaiting_code"
+      ? { awaiting_until: cleanIso(details.awaiting_until), code_length: cleanCount(details.code_length) }
+      : {}),
+    ...(row.status === "awaiting_login"
+      ? { awaiting_until: cleanIso(details.awaiting_until), login_url: cleanHttpUrl(details.login_url) }
+      : {}),
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
     questions: parseQuestions(details.questions),

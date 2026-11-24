@@ -363,7 +363,7 @@ test("AgentQuestions: judul, penjelasan, tombol, catatan kata sandi, tanpa isian
 
 test("Persetujuan: pertanyaan tampil di bawah status agen dan di atas opsi email", () => {
   const page = read("../src/routes/approvals.tsx");
-  const status = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]} />");
+  const status = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]}");
   const questions = page.indexOf("<AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />");
   const email = page.indexOf("<EmailApplyPanel");
   assert.ok(status > 0 && questions > status && email > questions);

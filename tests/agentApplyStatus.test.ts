@@ -69,7 +69,7 @@ test("gagal dan dilewati: email ditawarkan sebagai cadangan", () => {
 
 test("halaman Approvals: status agen tampil sebelum opsi email pada riwayat approved", () => {
   const page = read("../src/routes/approvals.tsx");
-  const agentAt = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]} />");
+  const agentAt = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />");
   const emailAt = page.indexOf("<EmailApplyPanel");
   assert.ok(agentAt > 0 && emailAt > agentAt, "AgentApplyStatus harus dirender sebelum EmailApplyPanel");
   assert.match(page, /activeTab === 'history' && request\.status === 'approved' && \(\s*<AgentApplyStatus/);
@@ -77,9 +77,9 @@ test("halaman Approvals: status agen tampil sebelum opsi email pada riwayat appr
   assert.match(panel, /Opsi lain: Kirim lewat Email/);
 });
 
-test("layanan: status agen dibaca dari tugas apply per approval_request_id dan log fields_filled", () => {
+test("layanan: status agen dibaca dari tugas apply & extension_apply per approval_request_id dan log fields_filled", () => {
   const svc = read("../src/services/emailApplyService.ts");
-  assert.match(svc, /\.eq\("job_type", "apply"\)\s*\.in\("payload->>approval_request_id", ids\)/);
+  assert.match(svc, /\.in\("job_type", \["apply", "extension_apply"\]\)\s*\.in\("payload->>approval_request_id", ids\)/);
   assert.match(svc, /\.eq\("action", "apply"\)\s*\.in\("details->>queue_job_id", queueIds\)/);
   assert.doesNotMatch(svc, /from\("automation_queue"\)\s*\.(insert|update|delete)/);
 });
@@ -215,4 +215,40 @@ test("kode keamanan: tidak dimasukkan (code_timeout) dan ditolak (code_rejected)
   const rejected = describeAgentApply({ status: "completed", log_status: "ready", reason: "code_rejected" } as any);
   assert.equal(rejected.label, AGENT_CODE_REJECTED_LABEL);
   assert.match(rejected.hint ?? "", /belum terkirim/);
+});
+
+test("antrean ekstensi Fase 2 & jeda login (awaiting_login): status aktif, resolusi URL login aman, dan batas waktu", () => {
+  const future = new Date(Date.now() + 10 * 60_000).toISOString();
+  const pendingExt = describeAgentApply({ status: "pending", job_type: "extension_apply" });
+  assert.equal(pendingExt.label, "Menunggu Ekstensi Browser");
+  assert.equal(pendingExt.tone, "waiting");
+
+  const runningExt = describeAgentApply({ status: "processing", job_type: "extension_apply" });
+  assert.equal(runningExt.label, "Ekstensi Browser sedang mengisi formulir");
+  assert.equal(runningExt.tone, "working");
+
+  const waitLoginRow = {
+    status: "processing",
+    job_type: "extension_apply",
+    channel: "extension" as const,
+    log_status: "awaiting_login",
+    awaiting_until: future,
+    login_url: "https://login.seek.com/login",
+  };
+  const waiting = describeAgentApply(waitLoginRow);
+  assert.equal(waiting.label, "Menunggu login di tab browser");
+  assert.equal(waiting.tone, "waiting");
+  assert.equal(isAgentApplyActive(waitLoginRow), true);
+
+  // Untuk host OAuth eksternal (login.seek.com), resolveLoginTabUrl mengutamakan halaman lowongan asal (`jobUrl`).
+  const card = read("../src/components/AgentApplyStatus.tsx");
+  assert.match(card, /data-testid="open-login-tab"/);
+  assert.match(card, /Buka tab login/);
+
+  // Timeout login: dari log incomplete login_timeout maupun processing yang deadline-nya terlewati.
+  const timedOutLog = describeAgentApply({ status: "completed", job_type: "extension_apply", log_status: "incomplete", reason: "login_timeout" });
+  assert.equal(timedOutLog.label, "Batas waktu login habis (belum terkirim)");
+  assert.equal(timedOutLog.tone, "manual");
+  const expiredProcessing = describeAgentApply({ ...waitLoginRow, awaiting_until: "2020-01-01T00:00:00Z" }, Date.parse("2026-11-24T12:00:00Z"));
+  assert.equal(expiredProcessing.label, "Batas waktu login habis (belum terkirim)");
 });

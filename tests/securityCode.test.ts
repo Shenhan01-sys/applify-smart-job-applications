@@ -330,7 +330,7 @@ test("AgentSecurityCode: tombol Jalankan agen lagi hanya untuk code_timeout tanp
 
 test("Persetujuan: kolom kode tampil di bawah status agen dan di atas pertanyaan; polling 5 detik saat menunggu kode", () => {
   const page = read("../src/routes/approvals.tsx");
-  const status = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]} />");
+  const status = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]}");
   const code = page.indexOf("<AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />");
   const questions = page.indexOf("<AgentQuestions");
   const email = page.indexOf("<EmailApplyPanel");

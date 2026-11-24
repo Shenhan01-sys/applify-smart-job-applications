@@ -9,6 +9,7 @@ import {
   awaitingCodeLog,
   extensionQuestionsLog,
   isoAgo,
+  jobRow,
   questionsLog,
   queueRow,
   stoppedLog,
@@ -467,5 +468,52 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
     await expect(app.getByText("Terkirim").first()).toBeVisible();
     await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toHaveCount(0);
     await expect(app.getByTestId("agent-self-fill")).toHaveCount(0);
+  });
+});
+
+test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
+  test("extension_apply awaiting_login menampilkan lencana Menunggu login dan tombol Buka tab login ke halaman lowongan (bukan host OAuth terpisah)", async ({ app, backend }) => {
+    const jobUrl = "https://id.jobstreet.com/id/job/96011760";
+    backend.state.history = [
+      approvedApproval("apr-login", {
+        job_id: "job-login",
+        job_title: "Backend Engineer",
+        company: "Acme ID",
+        platform: "jobstreet",
+      }),
+    ];
+    backend.state.jobs = [jobRow("job-login", { platform_source: "jobstreet", external_url: jobUrl })];
+    backend.state.queue = [
+      {
+        ...queueRow("queue-login", "apr-login", "processing"),
+        job_type: "extension_apply",
+        created_at: isoAgo(5 * 60_000),
+      },
+    ];
+    backend.state.logs = [
+      {
+        ...extensionQuestionsLog(
+          "apr-login",
+          {
+            queue_job_id: "queue-login",
+            login_url: "https://login.seek.com/login",
+            awaiting_until: new Date(Date.now() + 10 * 60_000).toISOString(),
+            questions: [],
+            reason: "awaiting_login",
+          },
+          { status: "awaiting_login" },
+        ),
+        created_at: isoAgo(1 * 60_000),
+      },
+    ];
+
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+
+    await expect(app.getByText("Menunggu login di tab browser").first()).toBeVisible();
+    const openBtn = app.getByTestId("open-login-tab");
+    await expect(openBtn).toBeVisible();
+    await expect(openBtn).toHaveText(/Buka tab login/);
+    await expect(openBtn).toHaveAttribute("href", jobUrl);
   });
 });

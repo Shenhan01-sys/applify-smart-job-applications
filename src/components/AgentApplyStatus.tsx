@@ -1,5 +1,5 @@
-import { AlertCircle, Bot, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
-import { describeAgentApply, type AgentApplyRow, type AgentApplyTone } from "@/lib/agentApplyStatus";
+import { AlertCircle, Bot, CheckCircle2, Clock, ExternalLink, Loader2, XCircle } from "lucide-react";
+import { awaitingLoginState, describeAgentApply, resolveLoginTabUrl, type AgentApplyRow, type AgentApplyTone } from "@/lib/agentApplyStatus";
 import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
@@ -28,13 +28,20 @@ function ToneIcon({ tone }: { tone: AgentApplyTone }) {
  * di atas opsi email, supaya jalur utama (agen mengisi formulir lowongan) terlihat lebih dulu. Bila log
  * percobaan punya bukti (tangkapan layar atau daftar isian), blok "Bukti dari agen" ikut tampil.
  */
-export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | undefined }) {
+export default function AgentApplyStatus({
+  row,
+  jobUrl,
+}: {
+  row: AgentApplyRow | null | undefined;
+  jobUrl?: string | null;
+}) {
   const view = describeAgentApply(row);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
   const showHint = !!view.hint && manualSubmitState(row)?.kind !== "not_allowed";
   // Hanya log Ekstensi Browser yang mencatat berkas terpasang (details.documents_attached). Hanya jenisnya, tanpa nama atau jalur berkas.
   const documents = row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
+  const openLoginUrl = awaitingLoginState(row).waiting ? resolveLoginTabUrl(row, jobUrl) : null;
   return (
     <div className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -46,6 +53,19 @@ export default function AgentApplyStatus({ row }: { row: AgentApplyRow | null | 
         </span>
       </div>
       {showHint && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
+      {openLoginUrl && (
+        <div className="mt-2">
+          <a
+            href={openLoginUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="open-login-tab"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition-colors"
+          >
+            Buka tab login <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        </div>
+      )}
       {documents && (
         <p data-testid="agent-documents" className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
           {documents}

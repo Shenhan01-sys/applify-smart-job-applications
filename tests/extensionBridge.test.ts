@@ -312,3 +312,19 @@ test("layanan: log ekstensi dibaca dengan sesi pengguna, dibatasi action apply, 
     'import type { AgentApplyRow } from "./agentApplyStatus.ts";',
   ]);
 });
+
+test("buildAgentApplyRows: tugas extension_apply berstatus awaiting_login tetap aktif walau log ditulis sesudah antrean dibuat", () => {
+  const future = new Date(Date.now() + 10 * 60_000).toISOString();
+  const qExt = { id: "q-ext-1", job_type: "extension_apply", status: "processing", error_message: null, created_at: T(5), payload: { approval_request_id: "a-login" } };
+  const logLogin = extLog("a-login", "awaiting_login", 8, {
+    queue_job_id: "q-ext-1",
+    awaiting_until: future,
+    login_url: "https://www.kalibrr.com/login",
+  });
+  const rows = buildAgentApplyRows([qExt], [], [logLogin]);
+  assert.equal(rows["a-login"].status, "processing");
+  assert.equal(rows["a-login"].job_type, "extension_apply");
+  assert.equal(rows["a-login"].log_status, "awaiting_login");
+  assert.equal(rows["a-login"].login_url, "https://www.kalibrr.com/login");
+  assert.equal(rows["a-login"].awaiting_until, future);
+});

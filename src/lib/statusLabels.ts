@@ -48,6 +48,7 @@ export const QUEUE_STATUS_LABEL: Record<string, string> = {
 /** automation_queue.job_type */
 export const QUEUE_TYPE_LABEL: Record<string, string> = {
   apply: "Isi formulir lowongan",
+  extension_apply: "Isi formulir via Ekstensi Browser",
   email_apply: "Kirim lamaran lewat email",
   search: "Cari lowongan",
   company_insight: "Analisis perusahaan",
@@ -79,7 +80,7 @@ export function isQueueSkipped(status?: string | null, errorMessage?: string | n
  * pencocokan teks pesan. null atau undefined berarti belum diketahui, jadi label tetap "Selesai".
  */
 export function isQueueNeedsManual(status?: string | null, jobType?: string | null, fieldsFilled?: number | null): boolean {
-  return status === "completed" && jobType === "apply" && fieldsFilled === 0;
+  return status === "completed" && (jobType === "apply" || jobType === "extension_apply") && fieldsFilled === 0;
 }
 
 /** Label untuk tugas apply yang selesai tanpa mengisi apa pun; bukan keadaan sukses, jadi tidak memakai "Selesai". */
@@ -116,6 +117,9 @@ export const NO_FIELDS_FILLED_TEXT =
  * `fieldsFilled` (dari log percobaan agen untuk tugas itu) membedakan tugas apply yang selesai tanpa mengisi
  * apa pun (0) dari yang mengisi sebagian atau seluruhnya; null atau kosong berarti belum diketahui.
  */
+export const EXTENSION_STOPPED_BEFORE_SUBMIT_TEXT =
+  "Ekstensi Browser sudah mengisi formulir di tab perambanmu dan berhenti sebelum tombol kirim. Buka tab atau panel Ekstensi untuk memeriksa isian lalu klik Kirim Sekarang.";
+
 export function queueStatusHint(
   status: string | null | undefined,
   jobType?: string | null,
@@ -125,13 +129,19 @@ export function queueStatusHint(
   if (isQueueSkipped(status, errorMessage)) {
     return "Dilewati: lowongan ini tidak punya tautan untuk dilamar. Pilih lowongan lain di halaman Lowongan.";
   }
+  const isExt = jobType === "extension_apply";
   switch (status) {
     case "pending":
-      return "Tugas sudah masuk antrean. Agen akan mengerjakannya begitu gilirannya tiba; kamu tidak perlu melakukan apa-apa.";
+      return isExt
+        ? "Tugas sudah masuk antrean Ekstensi Browser. Ekstensi akan membuka tab latar belakang dan mengisi formulir saat aktif."
+        : "Tugas sudah masuk antrean. Agen akan mengerjakannya begitu gilirannya tiba; kamu tidak perlu melakukan apa-apa.";
     case "processing":
-      return "Agen sedang mengerjakan tugas ini. Halaman ini bisa ditinggalkan; hasilnya muncul di sini.";
+      return isExt
+        ? "Ekstensi Browser sedang membuka atau mengisi formulir lamaran di tab perambanmu."
+        : "Agen sedang mengerjakan tugas ini. Halaman ini bisa ditinggalkan; hasilnya muncul di sini.";
     case "completed":
       if (isQueueNeedsManual(status, jobType, fieldsFilled)) return NO_FIELDS_FILLED_TEXT;
+      if (isExt) return EXTENSION_STOPPED_BEFORE_SUBMIT_TEXT;
       return jobType === "apply"
         ? AGENT_STOPPED_BEFORE_SUBMIT_TEXT
         : "Tugas selesai.";
@@ -154,5 +164,7 @@ export function applyJobFinished(
   before: ReadonlyMap<string, string>,
   items: ReadonlyArray<{ id: string; status: string; job_type?: string | null }>,
 ): boolean {
-  return items.some((i) => i.job_type === "apply" && !isQueueActive(i.status) && isQueueActive(before.get(i.id)));
+  return items.some(
+    (i) => (i.job_type === "apply" || i.job_type === "extension_apply") && !isQueueActive(i.status) && isQueueActive(before.get(i.id)),
+  );
 }

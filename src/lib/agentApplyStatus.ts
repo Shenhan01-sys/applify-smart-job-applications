@@ -6,7 +6,21 @@ import {
   queueStatusHint,
 } from "./statusLabels.ts";
 import type { AgentLogFacts } from "./agentEvidence.ts";
+import { safeJobUrl } from "./manualSubmit.ts";
 import { awaitingCodeState } from "./securityCode.ts";
+
+/** Host penyedia auth/OAuth eksternal yang butuh parameter OAuth baru dari halaman lowongan agar berfungsi. */
+const EXTERNAL_OAUTH_HOSTS = new Set(["login.seek.com", "auth.seek.com", "accounts.google.com", "login.microsoftonline.com"]);
+
+function isExternalOauthUrl(raw: string | null | undefined): boolean {
+  const safe = safeJobUrl(raw);
+  if (!safe) return false;
+  try {
+    return EXTERNAL_OAUTH_HOSTS.has(new URL(safe).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Hasil tugas `apply` (agen pengisi formulir) untuk satu persetujuan, dibaca dari automation_queue
@@ -18,6 +32,8 @@ import { awaitingCodeState } from "./securityCode.ts";
 export interface AgentApplyRow extends AgentLogFacts {
   status?: string | null;
   error_message?: string | null;
+  /** automation_queue.job_type: apply (worker) atau extension_apply (Ekstensi Browser). */
+  job_type?: string | null;
   /** automation_queue.id tugas apply ini; dikirim ke backend bersama kode keamanan. */
   queue_job_id?: string | null;
   /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
@@ -67,6 +83,36 @@ export const AGENT_PARTIAL_LABEL = "Terisi sebagian, belum dikirim";
 export const AGENT_AWAITING_CODE_LABEL = "Menunggu kode keamanan";
 export const AGENT_AWAITING_CODE_HINT =
   "Situs lowongan mengirim kode ke emailmu. Masukkan kodenya di bawah sebelum waktunya habis.";
+
+export const AGENT_AWAITING_LOGIN_LABEL = "Menunggu login di tab browser";
+export const AGENT_AWAITING_LOGIN_HINT =
+  "Ekstensi Browser membuka situs lowongan dan menunggu kamu masuk ke akun pelamar (maks. 15 menit). Selesai login, ekstensi otomatis lanjut mengisi formulir tanpa mengirim otomatis.";
+
+export const AGENT_LOGIN_TIMEOUT_LABEL = "Batas waktu login habis (belum terkirim)";
+export const AGENT_LOGIN_TIMEOUT_HINT =
+  "Ekstensi Browser menunggu selama 15 menit tanpa login selesai. Masuk ke akunmu di situs lowongan lalu jalankan ulang.";
+
+export function awaitingLoginState(row: AgentApplyRow | null | undefined, now: number = Date.now()): { waiting: boolean; untilMs: number | null } {
+  if (!row || row.log_status !== "awaiting_login") return { waiting: false, untilMs: null };
+  if (row.status && row.status !== "pending" && row.status !== "processing") return { waiting: false, untilMs: null };
+  if (!row.awaiting_until) return { waiting: true, untilMs: null };
+  const ms = Date.parse(row.awaiting_until);
+  if (Number.isNaN(ms)) return { waiting: true, untilMs: null };
+  return { waiting: ms > now, untilMs: ms };
+}
+
+/**
+ * Tautan aman untuk tombol "Buka tab login". Bila login_url berada di host OAuth eksternal (mis. login.seek.com),
+ * utamakan halaman lowongan asal (`jobUrl`) karena membuka URL OAuth tanpa state/nonce baru akan gagal di provider.
+ */
+export function resolveLoginTabUrl(row: AgentApplyRow | null | undefined, jobUrl?: string | null): string | null {
+  const safeLogin = safeJobUrl(row?.login_url);
+  const safeFallback = safeJobUrl(jobUrl);
+  if (safeLogin && isExternalOauthUrl(safeLogin)) {
+    return safeFallback ?? safeLogin;
+  }
+  return safeLogin ?? safeFallback ?? null;
+}
 
 export const AGENT_CODE_TIMEOUT_LABEL = "Kode tidak dimasukkan";
 export const AGENT_CODE_TIMEOUT_HINT = "Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru.";
@@ -143,6 +189,14 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
         suggestEmail: false,
       };
     }
+    if (reason === "login_timeout") {
+      return {
+        label: AGENT_LOGIN_TIMEOUT_LABEL,
+        hint: AGENT_LOGIN_TIMEOUT_HINT,
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
     if (reason === "closed_posting") {
       return {
         label: "Lowongan sudah ditutup di situs asal",
@@ -176,8 +230,12 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
 }
 
 /** Tugas selesai tetapi tidak satu isian pun terisi: dari jumlah isian (0) atau alasan no_fields_filled pada log. */
+function effectiveQueueJobType(row: AgentApplyRow): string {
+  return row.job_type === "extension_apply" ? "extension_apply" : "apply";
+}
+
 function filledNothing(row: AgentApplyRow): boolean {
-  return isQueueNeedsManual(row.status, "apply", row.fields_filled) || (row.log_status === "incomplete" && row.reason === "no_fields_filled");
+  return isQueueNeedsManual(row.status, effectiveQueueJobType(row), row.fields_filled) || (row.log_status === "incomplete" && row.reason === "no_fields_filled");
 }
 
 export const AGENT_ABANDONED_LABEL = "Klaim dilepas: persetujuan baru sudah dibuat";
@@ -201,19 +259,36 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined, now: n
     return { label: "Agen belum dijalankan", hint: AGENT_NOT_STARTED_HINT, tone: "none", suggestEmail: true };
   }
   const { status, error_message: err } = row;
+  const jobType = effectiveQueueJobType(row);
   const filled = row.fields_filled;
   if (isQueueSkipped(status, err)) {
-    return { label: "Dilewati", hint: queueStatusHint(status, "apply", err, filled), tone: "manual", suggestEmail: true };
+    return { label: "Dilewati", hint: queueStatusHint(status, jobType, err, filled), tone: "manual", suggestEmail: true };
   }
   switch (status) {
     case "pending":
-      return { label: "Menunggu agen", hint: queueStatusHint(status, "apply", err, filled), tone: "waiting", suggestEmail: false };
+      return {
+        label: jobType === "extension_apply" ? "Menunggu Ekstensi Browser" : "Menunggu agen",
+        hint: queueStatusHint(status, jobType, err, filled),
+        tone: "waiting",
+        suggestEmail: false,
+      };
     case "processing":
+      if (row.log_status === "awaiting_login") {
+        if (awaitingLoginState(row, now).waiting) {
+          return { label: AGENT_AWAITING_LOGIN_LABEL, hint: AGENT_AWAITING_LOGIN_HINT, tone: "waiting", suggestEmail: false };
+        }
+        return { label: AGENT_LOGIN_TIMEOUT_LABEL, hint: AGENT_LOGIN_TIMEOUT_HINT, tone: "manual", suggestEmail: false };
+      }
       // Tombol kirim sudah ditekan dan situs meminta kode dari email: agen menunggu pengguna (log awaiting_code).
       if (awaitingCodeState(row, now).waiting) {
         return { label: AGENT_AWAITING_CODE_LABEL, hint: AGENT_AWAITING_CODE_HINT, tone: "waiting", suggestEmail: false };
       }
-      return { label: "Agen sedang mengisi formulir", hint: queueStatusHint(status, "apply", err, filled), tone: "working", suggestEmail: false };
+      return {
+        label: jobType === "extension_apply" ? "Ekstensi Browser sedang mengisi formulir" : "Agen sedang mengisi formulir",
+        hint: queueStatusHint(status, jobType, err, filled),
+        tone: "working",
+        suggestEmail: false,
+      };
     case "completed": {
       const outcome = describeLogOutcome(row);
       if (outcome) return outcome;
@@ -224,7 +299,7 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined, now: n
         label: typeof filled === "number" && filled > 0
           ? `Formulir terisi (${filled} isian), berhenti sebelum kirim`
           : "Formulir diisi, berhenti sebelum kirim",
-        hint: queueStatusHint(status, "apply", err, filled),
+        hint: queueStatusHint(status, jobType, err, filled),
         tone: "ready",
         suggestEmail: false,
       };
@@ -235,7 +310,7 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined, now: n
         const outcome = describeLogOutcome(row);
         if (outcome) return outcome;
       }
-      return { label: "Agen gagal", hint: queueStatusHint(status, "apply", err, filled), tone: "failed", suggestEmail: true };
+      return { label: "Agen gagal", hint: queueStatusHint(status, jobType, err, filled), tone: "failed", suggestEmail: true };
     }
     default:
       return { label: status, hint: "", tone: "none", suggestEmail: true };
@@ -244,8 +319,8 @@ export function describeAgentApply(row: AgentApplyRow | null | undefined, now: n
 
 /**
  * Tugas agen yang masih berjalan: halaman Persetujuan memuat ulang statusnya secara berkala. Agen yang
- * menunggu kode keamanan juga aktif (tugasnya masih processing), supaya muat ulang terus jalan sampai
- * lamaran terkirim atau waktunya habis.
+ * menunggu kode keamanan atau login ekstensi juga aktif (tugasnya masih processing), supaya muat ulang terus
+ * jalan sampai lamaran terkirim atau waktunya habis.
  */
 export const isAgentApplyActive = (row: AgentApplyRow | null | undefined) =>
-  row?.status === "pending" || row?.status === "processing" || awaitingCodeState(row).waiting;
+  row?.status === "pending" || row?.status === "processing" || awaitingCodeState(row).waiting || awaitingLoginState(row).waiting;

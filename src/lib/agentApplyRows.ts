@@ -79,11 +79,13 @@ export function buildAgentApplyRows(queueRows: unknown, workerLogs: unknown, ext
   const queue = latestQueueByApproval(queueRows);
   const queueIdToApproval = new Map<string, string>();
   for (const [approvalId, row] of queue) {
+    const jobType = stringOrNull(row.job_type);
     out[approvalId] = {
       status: row.status as string | null | undefined,
       error_message: row.error_message as string | null | undefined,
       fields_filled: null,
       queue_job_id: String(row.id),
+      ...(jobType ? { job_type: jobType } : {}),
     };
     queueIdToApproval.set(String(row.id), approvalId);
   }
@@ -109,8 +111,16 @@ export function buildAgentApplyRows(queueRows: unknown, workerLogs: unknown, ext
     if (worker && timeOf(worker) >= timeOf(ext)) continue;
     const facts = agentLogFacts(ext);
     const base = out[approvalId];
-    const newerActiveJob = !!base && ACTIVE_QUEUE_STATUSES.has(String(base.status)) && timeOf(queue.get(approvalId)) > timeOf(ext);
-    out[approvalId] = newerActiveJob ? { ...base, ...facts } : { ...facts, status: "completed", error_message: null };
+    const awaitingLoginActive = !!base && ACTIVE_QUEUE_STATUSES.has(String(base.status)) && facts.log_status === "awaiting_login";
+    const newerActiveJob = !!base && ACTIVE_QUEUE_STATUSES.has(String(base.status)) && (awaitingLoginActive || timeOf(queue.get(approvalId)) > timeOf(ext));
+    const extType = base?.job_type === "extension_apply" ? { job_type: "extension_apply" as const } : {};
+    if (newerActiveJob) {
+      out[approvalId] = { ...base, ...facts };
+    } else if (!base && facts.log_status === "awaiting_login") {
+      out[approvalId] = { ...facts, status: "processing", error_message: null };
+    } else {
+      out[approvalId] = { ...facts, ...extType, status: "completed", error_message: null };
+    }
   }
   return out;
 }

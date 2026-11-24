@@ -43,8 +43,8 @@ async function loadAgentApplyRows(ids: string[]): Promise<Record<string, AgentAp
   const [queue, extension] = await Promise.all([
     supabase
       .from("automation_queue")
-      .select("id, status, error_message, created_at, payload")
-      .eq("job_type", "apply")
+      .select("id, job_type, status, error_message, created_at, payload")
+      .in("job_type", ["apply", "extension_apply"])
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
     supabase

@@ -296,7 +296,7 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />
                     )}
                     {activeTab === 'history' && request.status === 'approved' && (
                       <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />
