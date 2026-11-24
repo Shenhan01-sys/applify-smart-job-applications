@@ -222,7 +222,7 @@ function LinkedInSessionPage() {
             {activeTab === "manual" && (
               <div role="tabpanel" id="panel-manual" aria-labelledby="tab-manual" className="space-y-4">
                 <div>
-                  <label htmlFor="cookies-linkedin" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cookie LinkedIn</label>
+                  <label htmlFor="cookies-linkedin" className="text-sm font-medium text-foreground">Cookie LinkedIn</label>
                   <textarea
                     id="cookies-linkedin"
                     rows={6}

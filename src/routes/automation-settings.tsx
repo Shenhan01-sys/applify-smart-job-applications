@@ -206,7 +206,7 @@ function AutomationSettingsPage() {
                 <InputField label="Alamat profil LinkedIn" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
                 <InputField label="Situs web atau portofolio" value={settings.website || ''} onChange={(v: string) => updateField('website', v)} />
                 <div>
-                  <label htmlFor="setting-cover-letter" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Surat lamaran bawaan</label>
+                  <label htmlFor="setting-cover-letter" className="text-sm font-medium text-foreground">Surat lamaran bawaan</label>
                   <textarea
                     id="setting-cover-letter"
                     rows={6}
@@ -308,7 +308,7 @@ function InputField({ label, value, onChange, onBlur, type = 'text', placeholder
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-foreground flex items-center gap-1.5">
         {Icon && <Icon className="h-3.5 w-3.5 text-[#0A5BE0]" aria-hidden="true" />}
         {label}
       </label>
@@ -352,7 +352,7 @@ function SelectField({ label, value, options, onChange }: any) {
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium text-foreground">{label}</label>
       <select
         id={id}
         value={value}

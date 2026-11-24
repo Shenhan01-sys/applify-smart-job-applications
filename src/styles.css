@@ -623,4 +623,9 @@
   .app-ui .rounded-2xl { border-radius: 18px; }
   .app-ui .rounded-xl { border-radius: 14px; }
   .app-ui h1 { letter-spacing: -0.025em; }
+  /* Garis abu tua (#999) pada kartu dan panel dibuat lebih lembut. Kolom isian dan tombol tetap memakai garis
+     yang lebih tegas supaya batasnya jelas, dan saat disorot garis aslinya (atau warna hover-nya) kembali. */
+  .app-ui .border-\[\#999999\]:where(:not(input, textarea, select, button, a, :hover)) {
+    border-color: rgba(22, 21, 15, 0.14);
+  }
 }
