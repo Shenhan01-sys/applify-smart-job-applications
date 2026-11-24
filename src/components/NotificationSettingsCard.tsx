@@ -272,7 +272,7 @@ export function NotificationSettingsCard() {
 
       {/* Email Transaksional */}
       <div className="rounded-xl border border-black/[8%] bg-[#F7F6F2] p-3.5 space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#16150F]">
             <Mail className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
             Email Notifikasi Sistem

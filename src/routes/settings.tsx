@@ -64,11 +64,11 @@ function SettingsPage() {
 
   return (
     <AppShell>
-      <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Pengaturan</h1>
-        <p className="text-muted-foreground text-sm mt-1">Kelola kuota, notifikasi, dan privasi akunmu</p>
+      <header className="mb-6 max-w-3xl sm:mb-8">
+        <h1 className="text-2xl font-bold sm:text-3xl">Pengaturan</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">Kelola kuota, notifikasi, dan privasi akunmu</p>
       </header>
-      <div className="space-y-4 max-w-3xl">
+      <div className="max-w-3xl space-y-4 sm:space-y-5">
         {gmail && (
           <div
             role={gmail.tone === "error" ? "alert" : "status"}
@@ -87,7 +87,7 @@ function SettingsPage() {
           </div>
         )}
         {/* Kuota: dibaca dari database, bukan dari penyimpanan browser */}
-        <Card icon={Gauge} title="Kuota Draf AI" color="#059669"
+        <Card icon={Gauge} title="Kuota Draf AI"
           desc="Berapa draf lamaran yang masih bisa dibuat AI bulan ini.">
           <div className="mt-4" aria-live="polite">
             {plan.loading ? (
@@ -108,17 +108,17 @@ function SettingsPage() {
         </Card>
 
         {/* Kunci LLM milik pengguna: dikirim hanya lewat badan permintaan, tidak disimpan di browser */}
-        <Card icon={KeyRound} title="Kunci API Sendiri" color="#0F766E"
+        <Card icon={KeyRound} title="Kunci API Sendiri"
           desc="Pakai kunci API LLM milikmu sendiri untuk membuat draf lamaran. Pilih penyedia, tempel kuncinya, lalu simpan.">
           <LlmKeysCard />
         </Card>
 
-        <Card icon={ClipboardList} title="Jawaban formulir tersimpan" color="#0A5BE0"
+        <Card icon={ClipboardList} title="Jawaban formulir tersimpan"
           desc="Jawaban yang kamu berikan untuk pertanyaan agen. Agen memakainya lagi saat menemui pertanyaan yang sama di lowongan lain.">
           <SavedAnswers />
         </Card>
 
-        <Card id="ekstensi" icon={Chrome} title="Ekstensi Browser (Chrome & Edge)" color="#0A5BE0"
+        <Card id="ekstensi" icon={Chrome} title="Ekstensi Browser (Chrome & Edge)"
           desc="Gunakan Ekstensi Browser Applify di Chrome atau Edge untuk membantu mengisi formulir pada portal yang butuh masuk dengan akunmu sendiri.">
           <ExtensionConnectCard />
           <div className="mt-3">
@@ -126,14 +126,14 @@ function SettingsPage() {
           </div>
         </Card>
 
-        <Card icon={Bell} title="Notifikasi WhatsApp" color="#8A9A00"
+        <Card icon={Bell} title="Notifikasi WhatsApp"
           desc="Terima kabar status lamaran, permintaan kode keamanan, dan pengingat tindak lanjut lewat WhatsApp terverifikasi atau email.">
           <NotificationSettingsCard />
         </Card>
 
         {/* Tagihan hanya tampil bila VITE_ENABLE_BILLING=true */}
         {billing && (
-          <Card icon={CreditCard} title="Paket & Tagihan" color="#059669"
+          <Card icon={CreditCard} title="Paket & Tagihan"
             desc={plan.tier === "free" ? "Kamu saat ini di paket Gratis." : `Paket ${TIER_LABEL[plan.tier]} · ${PLAN_PRICE[plan.tier].label}${PLAN_PRICE[plan.tier].period}`}>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link to="/subscription" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition">
@@ -143,7 +143,7 @@ function SettingsPage() {
           </Card>
         )}
 
-        <Card icon={Lock} title="Privasi & Keamanan" color="#6366F1"
+        <Card icon={Lock} title="Privasi & Keamanan"
           desc="Lihat data apa yang disimpan dan siapa yang menerimanya.">
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to="/terms" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition">
@@ -161,19 +161,20 @@ function SettingsPage() {
   );
 }
 
-function Card({ id, icon: Icon, title, desc, children, color = '#0A5BE0' }: { id?: string; icon: typeof Lock; title: string; desc: string; children?: React.ReactNode; color?: string }) {
+function Card({ id, icon: Icon, title, desc, children }: { id?: string; icon: typeof Lock; title: string; desc: string; children?: React.ReactNode }) {
   return (
-    <section id={id} aria-label={title} className="glass rounded-2xl p-5 hover:shadow-md transition-all duration-200">
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg grid place-items-center text-white shrink-0" style={{ backgroundColor: color }} aria-hidden="true">
-          <Icon className="h-5 w-5"/>
+    <section id={id} aria-label={title} className="glass rounded-2xl p-4 sm:p-6 scroll-mt-6">
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary sm:h-10 sm:w-10" aria-hidden="true">
+          <Icon className="h-[18px] w-[18px]" />
         </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold">{title}</h2>
-          <p className="text-sm text-muted-foreground">{desc}</p>
-          {children}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold leading-snug sm:text-lg">{title}</h2>
+          <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">{desc}</p>
         </div>
       </div>
+      {/* Isi kartu sejajar dengan judul di layar lebar, memakai lebar penuh di ponsel. */}
+      {children && <div className="sm:pl-14">{children}</div>}
     </section>
   );
 }
