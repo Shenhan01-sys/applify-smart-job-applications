@@ -13,6 +13,7 @@ import ExtensionConsent from "@/components/ExtensionConsent";
 import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
 import { extensionConsentState } from "@/lib/extensionConsent";
+import { pendingEmptyState } from "@/lib/approvalsEmpty";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
@@ -256,18 +257,22 @@ function ApprovalsPage() {
       <div key={tabKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
       {displayApprovals.length === 0 ? (
         <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[8%]">
-          {activeTab === 'pending' ? (
-            <>
-              <div className="h-12 w-12 rounded-full bg-green-100 grid place-items-center mx-auto mb-4">
-                <CheckCircle2 className="h-6 w-6 text-green-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Tidak ada yang perlu disetujui</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Semua permintaan sudah kamu periksa. Buat draf lamaran dari halaman Lowongan (tombol "Ajukan ke Persetujuan"); permintaan baru muncul di sini.
-              </p>
-              <Link to="/jobs" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition">Cari lowongan</Link>
-            </>
-          ) : (
+          {activeTab === 'pending' ? (() => {
+            // Belum pernah ada persetujuan: bukan "semua sudah diperiksa", karena belum ada yang diperiksa.
+            const empty = pendingEmptyState(history.length);
+            return (
+              <>
+                <div className={`h-12 w-12 rounded-full grid place-items-center mx-auto mb-4 ${empty.kind === 'all_checked' ? 'bg-green-100' : 'bg-black/[5%]'}`}>
+                  {empty.kind === 'all_checked'
+                    ? <CheckCircle2 className="h-6 w-6 text-green-500" />
+                    : <ShieldCheck className="h-6 w-6 text-muted-foreground" />}
+                </div>
+                <h3 className="text-lg font-semibold mb-2" data-testid="pending-empty-title">{empty.title}</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">{empty.body}</p>
+                <Link to="/jobs" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition">Cari lowongan</Link>
+              </>
+            );
+          })() : (
             <>
               <div className="h-12 w-12 rounded-full bg-black/[5%] grid place-items-center mx-auto mb-4">
                 <History className="h-6 w-6 text-muted-foreground" />

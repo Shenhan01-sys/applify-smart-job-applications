@@ -38,9 +38,19 @@ test.describe("Persetujuan: menunggu", () => {
     expect(pending[0].authorization).toBe(`Bearer ${TEST_ACCESS_TOKEN}`);
   });
 
-  test("tanpa antrean, halaman menjelaskan bahwa tidak ada yang perlu disetujui", async ({ app }) => {
+  test("pengguna yang belum pernah punya persetujuan: belum ada yang menunggu, tanpa kata 'semua sudah diperiksa'", async ({ app }) => {
     await app.goto("/approvals");
-    await expect(app.getByRole("heading", { name: "Tidak ada yang perlu disetujui" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Belum ada lamaran yang menunggu persetujuan" })).toBeVisible();
+    await expect(app.getByText("Jalankan pencarian lowongan dulu.", { exact: false })).toBeVisible();
+    await expect(app.getByText("Semua sudah diperiksa")).toHaveCount(0);
+    await expect(app.getByRole("link", { name: "Cari lowongan" })).toBeVisible();
+  });
+
+  test("antrean kosong tetapi riwayat berisi: Semua sudah diperiksa", async ({ app, backend }) => {
+    backend.state.history = [approvedApproval("apr-old", { job_title: "Sudah Disetujui" })];
+    await app.goto("/approvals");
+    await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
+    await expect(app.getByText("Belum ada lamaran yang menunggu persetujuan")).toHaveCount(0);
   });
 
   test("Setujui memanggil POST approve tepat sekali, tanpa reject, dan memindahkan kartu ke Riwayat", async ({ app, backend }) => {
@@ -53,7 +63,8 @@ test.describe("Persetujuan: menunggu", () => {
     await dialog.getByRole("button", { name: /Setujui/ }).click();
 
     await expect(app.getByText("Disetujui — lamaran masuk antrean agen.")).toBeVisible();
-    await expect(app.getByRole("heading", { name: "Tidak ada yang perlu disetujui" })).toBeVisible();
+    // Setelah menyetujui, riwayat berisi: daftar menunggu kosong berarti semuanya sudah diperiksa.
+    await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
 
     const approves = backend.callsTo("POST", "/api/approvals/apr-1/approve");
     expect(approves).toHaveLength(1);
