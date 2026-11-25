@@ -210,7 +210,7 @@ function PaymentSuccessPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Bukti pembayaran ini dikirim ke <span className="font-semibold text-foreground">{user?.email ?? "demo@applify.id"}</span>.
+          Mode simulasi: tidak ada transaksi atau email bukti pembayaran yang dikirim.
           Hubungi support@applify.id bila ada pertanyaan.
         </p>
       </main>
