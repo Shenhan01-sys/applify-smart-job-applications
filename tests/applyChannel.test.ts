@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyJobChannel } from "../src/lib/applyChannel.ts";
+import { classifyJobChannel, isTestPortalUrl, needsBrowserExtension } from "../src/lib/applyChannel.ts";
 import { describeAgentApply, describeLogOutcome } from "../src/lib/agentApplyStatus.ts";
 
 test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekstensi, dan Email Gmail", () => {
   const gh = classifyJobChannel({ platform_source: "greenhouse", external_url: "https://boards.greenhouse.io/acme/jobs/1" });
   assert.equal(gh.channel, "public_ats");
-  assert.equal(gh.badgeLabel, "ATS Otomatis");
+  assert.equal(gh.badgeLabel, "Formulir ATS · Agen");
   assert.equal(gh.autoWorkerSupported, true);
 
   const li = classifyJobChannel({ platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" });
@@ -18,7 +18,10 @@ test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekst
   const ks = classifyJobChannel({ platform_source: "kalibrr", external_url: "https://www.kalibrr.com/c/acme/jobs/1" });
   assert.equal(ks.channel, "auth_portal");
   assert.equal(ks.extensionSupported, true);
-  assert.equal(ks.badgeLabel, "Portal · Pakai Ekstensi");
+  assert.equal(ks.badgeLabel, "Portal · Butuh Ekstensi");
+  assert.equal(needsBrowserExtension(ks), true);
+  assert.match(ks.reason, /\[UJI\]/);
+  assert.equal(needsBrowserExtension(gh), false);
 
   // Domain lama Kalibrr (.id) sama dengan backend EXTENSION_LOGIN_PORTAL_DOMAINS: portal ekstensi, bukan web luar.
   const kid = classifyJobChannel({ platform_source: "other", external_url: "https://www.kalibrr.id/c/acme/jobs/1" });
@@ -57,4 +60,33 @@ test("describeLogOutcome & describeAgentApply: alasan baru Stage 1 tampil jujur 
     const agentView = describeAgentApply({ status: "completed", fields_filled: 0, log_status: "incomplete", reason });
     assert.match(agentView.label, expected);
   }
+});
+
+test("Portal Uji Applify: diisi worker, bukan ekstensi, dan tidak memakai teks 'lebih andal menggunakan Ekstensi'", () => {
+  const uji = classifyJobChannel({ platform_source: "uji", external_url: "https://applify-smart-job-applications.vercel.app/uji-portal" });
+  assert.equal(uji.autoWorkerSupported, true);
+  assert.equal(uji.extensionSupported, false);
+  assert.equal(uji.manualOnly, false);
+  assert.equal(needsBrowserExtension(uji), false);
+  assert.equal(uji.badgeLabel, "Portal Uji Applify");
+  assert.doesNotMatch(uji.reason, /Ekstensi Browser Chrome\/Edge untuk pengisian/);
+  assert.match(uji.reason, /tidak diteruskan ke perusahaan/);
+  assert.equal(isTestPortalUrl("https://applify-smart-job-applications.vercel.app/uji-portal?x=1"), true);
+  // Halaman lain di host yang sama dan host mirip bukan portal uji.
+  assert.equal(isTestPortalUrl("https://applify-smart-job-applications.vercel.app/jobs"), false);
+  assert.equal(isTestPortalUrl("https://applify-smart-job-applications.vercel.app.evil.test/uji-portal"), false);
+  // Situs web biasa tetap memakai teks ekstensi.
+  const other = classifyJobChannel({ platform_source: "other", external_url: "https://careers.acme.example/apply" });
+  assert.equal(other.extensionSupported, true);
+  assert.match(other.reason, /Ekstensi Browser/);
+});
+
+test("portal login menjelaskan butuh ekstensi dan mengarahkan ke [UJI]; LinkedIn manual-only tidak butuh ekstensi", () => {
+  for (const url of ["https://www.jobstreet.com/id/job/1", "https://glints.com/id/opportunities/jobs/1", "https://www.kalibrr.com/c/a/jobs/1", "https://dealls.com/loker/1"]) {
+    const c = classifyJobChannel({ external_url: url });
+    assert.equal(c.channel, "auth_portal", url);
+    assert.equal(needsBrowserExtension(c), true, url);
+  }
+  const li = classifyJobChannel({ platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" });
+  assert.equal(needsBrowserExtension(li), false);
 });

@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import {
@@ -13,6 +13,7 @@ import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { profileSkillList, sortByMatch } from "@/lib/matchScore";
 import { greenMatchView, type GreenMatchView } from "@/lib/greenMatch";
+import { greenCareerListNotice } from "@/lib/greenCareerUi";
 import { profileService } from "@/services/profileService";
 import { ErrorState } from "@/components/ErrorState";
 
@@ -38,6 +39,8 @@ function GreenCareerPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<AssessmentResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
   const [error, setError] = useState("");
   // Kegagalan memuat daftar dipisah dari galat asesmen: daftar gagal berarti layar utama menampilkan "Coba lagi".
   const [loadError, setLoadError] = useState("");
@@ -78,14 +81,24 @@ function GreenCareerPage() {
   };
 
   const startAssessment = async (j: GreenJob) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
-      setBusy(true); setError(""); setJob(j);
+      setBusy(true); setBusyJobId(j.id); setError(""); setJob(j);
       const res = await greenCareerService.startAssessment(j.id);
       setAssessmentId(res.assessmentId); setQuestions(res.questions); setAnswers({}); setView("questions");
-    } catch (e) { setError(describeError(e, "Asesmen belum bisa dimulai. Coba lagi sebentar lagi.")); } finally { setBusy(false); }
+    } catch (e) {
+      setError(describeError(e, "Asesmen belum bisa dimulai. Coba lagi sebentar lagi."));
+    } finally {
+      inFlightRef.current = false;
+      setBusy(false);
+      setBusyJobId(null);
+    }
   };
 
   const submit = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setError(""); setView("analyzing");
     try {
       const payload = questions.map((q) => ({ id: q.id, question: q.question, answer: answers[q.id] ?? "" }));
@@ -95,6 +108,8 @@ function GreenCareerPage() {
       // Jawaban tetap tersimpan di layar, jadi pengguna bisa mengirim ulang tanpa mengetik lagi.
       setError(describeError(e, "Jawabanmu belum bisa dinilai. Jawabanmu masih ada di sini, coba kirim lagi."));
       setView("questions");
+    } finally {
+      inFlightRef.current = false;
     }
   };
 
@@ -127,17 +142,40 @@ function GreenCareerPage() {
             ) : loadError ? (
               <ErrorState className="w-full" title="Lowongan karier hijau belum bisa dimuat" message={loadError} onRetry={load} />
             ) : jobs.length === 0 ? (
-              <div className="glass-solid rounded-3xl w-full text-center py-16 px-4 text-muted-foreground text-sm">
+              <div className="glass-solid rounded-3xl w-full text-center py-16 px-6 text-muted-foreground text-sm">
                 <Leaf className="h-8 w-8 mx-auto text-brand-emerald mb-3" aria-hidden="true" />
-                <p>Belum ada lowongan karier hijau yang tersimpan.</p>
-                <p className="mt-1">Sambil menunggu, kamu bisa mencari lowongan biasa di halaman Lowongan.</p>
-                <Link to="/jobs" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-6 text-sm font-semibold text-white hover:bg-neutral-800">
-                  Cari lowongan
-                </Link>
+                <p className="font-semibold text-neutral-900">{greenCareerListNotice(0).title}</p>
+                <p className="mt-1.5 max-w-xl mx-auto">{greenCareerListNotice(0).body}</p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <button type="button" onClick={load} className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                    Muat ulang
+                  </button>
+                  <Link to="/jobs" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-6 text-sm font-semibold text-white hover:bg-neutral-800">
+                    Cari lowongan
+                  </Link>
+                </div>
               </div>
             ) : (
-              <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-0 animate-fade-up">
-                {shownJobs.map((j) => <JobCard key={j.id} job={j} view={matchViews.get(j.id)!} onStart={() => startAssessment(j)} busy={busy} />)}
+              <div className="w-full flex flex-col gap-5">
+                <div role="status" className="w-full rounded-2xl bg-emerald-50/80 border border-emerald-200 px-5 py-3.5 text-sm text-emerald-950 flex items-start gap-3">
+                  <Leaf className="w-4 h-4 text-brand-emerald shrink-0 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <p className="font-semibold">{greenCareerListNotice(shownJobs.length).title}</p>
+                    <p className="text-xs text-emerald-900/80 mt-0.5">{greenCareerListNotice(shownJobs.length).body}</p>
+                  </div>
+                </div>
+                <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-0 animate-fade-up">
+                  {shownJobs.map((j) => (
+                    <JobCard
+                      key={j.id}
+                      job={j}
+                      view={matchViews.get(j.id)!}
+                      onStart={() => startAssessment(j)}
+                      busy={busy}
+                      loadingThis={busyJobId === j.id}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </>
@@ -156,7 +194,7 @@ function GreenCareerPage() {
 }
 
 /* ── List: job card ── */
-function JobCard({ job, view, onStart, busy }: { job: GreenJob; view: GreenMatchView; onStart: () => void; busy: boolean }) {
+function JobCard({ job, view, onStart, busy, loadingThis }: { job: GreenJob; view: GreenMatchView; onStart: () => void; busy: boolean; loadingThis: boolean }) {
   const esg = job.company_insight?.green_score;
   const tags = job.company_insight?.esg_flags ?? [];
   return (
@@ -180,7 +218,7 @@ function JobCard({ job, view, onStart, busy }: { job: GreenJob; view: GreenMatch
       <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-3 mt-auto">
         <MatchBlock view={view} />
         <button type="button" onClick={onStart} disabled={busy} aria-label={`Ikuti asesmen kesiapan untuk ${job.title} di ${job.company}`} className="w-full mt-2 min-h-11 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <>Ikuti Asesmen <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
+          {loadingThis ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Menyiapkan asesmen...</> : <>Ikuti Asesmen <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
         </button>
         <p className="text-xs text-neutral-500 text-center">Opsional dan tanpa biaya. Hasilnya hanya untuk kamu.</p>
       </div>

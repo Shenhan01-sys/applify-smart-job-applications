@@ -103,6 +103,14 @@ export function matchesJobSearch(job: { title?: string | null; company?: string 
   return searchTerms(raw).every((t) => hay.includes(t.toLowerCase()));
 }
 
+/** Kata cari untuk lowongan uji Applify ("[UJI] Staf Uji Coba"). Diisi agen tanpa Ekstensi Browser. */
+export const TEST_LISTING_QUERY = "[UJI]";
+
+/** True bila kotak cari sudah memuat penanda lowongan uji ("uji" atau "[uji]", tanpa membedakan huruf). */
+export function isTestListingQuery(raw: string): boolean {
+  return searchTerms(raw).some((t) => t.replace(/[[\]]/g, "").toLowerCase() === "uji");
+}
+
 export const SAVED_EMPTY_TITLE = "Belum ada lowongan tersimpan";
 export const SAVED_EMPTY_TEXT = "Tekan ikon simpan pada kartu lowongan untuk menyimpannya.";
 

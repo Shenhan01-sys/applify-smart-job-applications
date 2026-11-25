@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { profileService } from "@/services/profileService";
 import { describeAuthError, recallAuthProvider } from "@/lib/authErrors";
+import { waitForSession } from "@/lib/authSession";
 import { Loader2, AlertCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -27,10 +28,13 @@ function AuthCallbackPage() {
       return;
     }
 
-    // Beri waktu Supabase memproses token di alamat sebelum membaca sesi.
-    const timer = setTimeout(async () => {
+    // Tunggu Supabase memproses token di alamat: lewat peristiwa sesi dan pembacaan berkala (maksimal 9 detik),
+    // bukan satu pembacaan sesudah jeda tetap yang gagal di koneksi lambat.
+    const controller = new AbortController();
+    void (async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { session, error: sessionError, cancelled } = await waitForSession(supabase, { signal: controller.signal });
+        if (cancelled) return;
         if (sessionError) {
           setStatus('error');
           setErrorMsg(describeAuthError(sessionError, "Sesi belum bisa dibaca. Kembali ke halaman masuk lalu coba lagi."));
@@ -40,19 +44,21 @@ function AuthCallbackPage() {
           window.history.replaceState(null, "", window.location.pathname);
           // Pengguna baru (profil masih kosong) langsung ke Profil dengan banner sambutan.
           const target = await profileService.resolvePostLoginTarget(session.user.id);
+          if (controller.signal.aborted) return;
           if (target.to === "/profile") navigate({ to: "/profile", search: { welcome: 1 } });
           else navigate({ to: "/dashboard" });
         } else {
           setStatus('error');
-          setErrorMsg('Proses masuk belum selesai: sesimu tidak ditemukan. Tautan mungkin sudah dipakai atau kedaluwarsa. Kembali ke halaman masuk lalu coba lagi.');
+          setErrorMsg('Proses masuk belum selesai: sesimu tidak ditemukan. Tautan mungkin sudah dipakai atau kedaluwarsa, atau koneksimu lambat. Kembali ke halaman masuk lalu coba lagi.');
         }
       } catch (err: any) {
+        if (controller.signal.aborted) return;
         setStatus('error');
         setErrorMsg(describeAuthError(err, 'Terjadi kesalahan saat memproses login. Kembali ke halaman masuk lalu coba lagi.'));
       }
-    }, 1000);
+    })();
 
-    return () => clearTimeout(timer);
+    return () => controller.abort();
   }, [navigate]);
 
   if (status === 'error') {

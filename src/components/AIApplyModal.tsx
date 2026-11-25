@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
@@ -11,7 +11,7 @@ import { describeError } from "@/lib/authErrors";
 import { ACTIVE_APPLICATION_HINT, REUSED_DRAFT_NOTICE, canStartNewDraft } from "@/lib/activeApplication";
 import { applyBlockers } from "@/lib/onboarding";
 import { displaySkillGaps, highlightedSkills, matchCaption, type JobMatch } from "@/lib/matchScore";
-import { classifyJobChannel } from "@/lib/applyChannel";
+import { classifyJobChannel, needsBrowserExtension } from "@/lib/applyChannel";
 import { canRequestApproval, draftToGenerated } from "@/lib/draftApproval";
 import { applicationStatusLabel } from "@/lib/statusLabels";
 import { draftProgressText, draftWaitHint } from "@/lib/draftProgress";
@@ -83,6 +83,10 @@ type ProfileCheck =
 
 export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, profileSkills = null, onClose, onSuccess, onDraftCreated }: AIApplyModalProps) {
   const channelInfo = useMemo(() => classifyJobChannel(jobData ?? { id: jobId }), [jobData, jobId]);
+  // Penjaga sinkron: state `generating` baru berlaku sesudah render, jadi klik ganda yang cepat bisa lolos dan memicu
+  // dua permintaan sekaligus. Ref berubah seketika.
+  const inFlight = useRef({ generate: false, request: false, enqueue: false });
+  const needsExtension = needsBrowserExtension(channelInfo);
   const [generating, setGenerating] = useState(false);
   // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
@@ -251,6 +255,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   // Generate the application draft (server-side AI; consumes 1 monthly quota)
   const generate = async () => {
     if (!profileOk) return; // penjaga kedua: tombol sudah terkunci, tetapi kuota tidak boleh terpakai karena celah
+    if (inFlight.current.generate) return; // klik ganda: satu permintaan saja, kuota tidak terpotong dua kali
+    inFlight.current.generate = true;
     try {
       setGenerating(true);
       setError("");
@@ -288,6 +294,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     } catch (err: any) {
       setError(describeError(err, "Draf belum bisa dibuat. Coba lagi."));
     } finally {
+      inFlight.current.generate = false;
       setGenerating(false);
     }
   };
@@ -339,6 +346,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   // (Approvals page -> POST /api/approvals/:id/approve) lets the agent submit it.
   const handleRequestApproval = async () => {
     if (!application) return;
+    if (inFlight.current.request) return; // klik ganda: satu persetujuan saja
+    inFlight.current.request = true;
     try {
       setRequesting(true);
       setError("");
@@ -371,6 +380,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setApprovalError(message);
       toast.error(message);
     } finally {
+      inFlight.current.request = false;
       setRequesting(false);
     }
   };
@@ -393,6 +403,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
 
   // Fill-only run: the worker fills the external form and stops before Submit (no approval yet).
   const handleAutoApply = async () => {
+    if (inFlight.current.enqueue) return; // klik ganda: satu tugas antrean saja
+    inFlight.current.enqueue = true;
     try {
       setEnqueuing(true);
       setError("");
@@ -403,6 +415,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     } catch (err: any) {
       setError(describeError(err, "Tugas belum bisa dimasukkan ke antrean. Coba lagi."));
     } finally {
+      inFlight.current.enqueue = false;
       setEnqueuing(false);
     }
   };
@@ -629,6 +642,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               >
                 <span className="font-semibold">Jalur lamaran ({channelInfo.badgeLabel}): </span>
                 <span>{channelInfo.reason}</span>
+                {needsExtension && (
+                  <p className="mt-1.5 font-semibold text-[#0A5BE0]">
+                    Portal ini butuh Ekstensi Browser. Bila kamu mencoba tanpa ekstensi, pilih lowongan berlabel [UJI] di halaman Lowongan.
+                  </p>
+                )}
               </div>
 
               {error && (
@@ -795,6 +813,9 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                           ditampilkan di sini sebagai ringkasan profil; teks itu sudah ada di tab Strategi AI. */}
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Skill yang Disorot</h4>
+                        <p className="mb-3 text-xs text-muted-foreground">
+                          Ini daftar skill dan kata kunci dari profilmu yang paling cocok dengan lowongan ini, sebagai saran untuk CV. Bukan berkas PDF baru.
+                        </p>
                         <ul className="flex flex-wrap gap-2">
                           {shownSkills.map((skill, i) => (
                             <li key={i} className="text-xs bg-[#0A5BE0]/10 text-[#0A5BE0] px-2.5 py-1 rounded-full font-medium">
@@ -868,7 +889,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
             >
               {application ? "Tutup (draf tersimpan)" : "Tutup"}
             </button>
-            {editable && jobData?.external_url && !channelInfo.manualOnly && (
+            {editable && jobData?.external_url && !channelInfo.manualOnly && !needsExtension && (
               <button
                 type="button"
                 onClick={handleAutoApply}
@@ -908,7 +929,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               </button>
             )}
           </div>
-          {editable && jobData?.external_url && (
+          {editable && jobData?.external_url && !needsExtension && (
             <p id="apply-fill-hint" className="text-xs text-muted-foreground">
               "Isi Formulir Saja": agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim. Pantau di Lamaran Saya, bagian Antrean Agen.
             </p>

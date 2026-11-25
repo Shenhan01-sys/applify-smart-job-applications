@@ -45,7 +45,7 @@ export const COPY_LETTER_LABEL = "Salin cover letter";
 export const COPIED_TEXT = "Tersalin";
 export const COPY_UNAVAILABLE_TEXT =
   "Peramban ini tidak mengizinkan menyalin otomatis. Pilih teksnya dengan kursor, lalu salin sendiri.";
-export const LETTER_LOADING_TEXT = "Memuat cover letter...";
+export const LETTER_LOADING_TEXT = "Memuat surat lamaran...";
 export const LETTER_UNAVAILABLE_TEXT = "Cover letter yang disetujui belum bisa dimuat.";
 
 export const MARK_SENT_LABEL = "Saya sudah mengirimnya sendiri";

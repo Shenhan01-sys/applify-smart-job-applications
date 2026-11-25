@@ -199,7 +199,7 @@ test("Coba lagi dan penutupan jendela tetap bekerja seperti sebelumnya", () => {
   assert.match(retry, /Coba lagi/);
   // generating selalu dikembalikan ke false, juga saat gagal
   const fn = src.slice(src.indexOf("const generate = async"), src.indexOf("// Free preview-style regeneration"));
-  assert.match(fn, /finally \{\s*setGenerating\(false\)/);
+  assert.match(fn, /finally \{\s*inFlight\.current\.generate = false;\s*setGenerating\(false\)/);
   assert.match(fn, /setError\(describeError\(err, "Draf belum bisa dibuat\. Coba lagi\."\)\)/);
   // menutup jendela tidak dikaitkan dengan state generating
   assert.match(src, /<Dialog open onOpenChange=\{\(open\) => \{ if \(!open\) onClose\(\); \}\}>/);

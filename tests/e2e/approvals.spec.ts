@@ -59,7 +59,7 @@ test.describe("Persetujuan: menunggu", () => {
 
     await app.getByRole("button", { name: /Periksa/ }).click();
     const dialog = app.getByRole("dialog");
-    await expect(dialog.getByRole("heading", { name: "Gerbang Persetujuan" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Persetujuan Lamaran" })).toBeVisible();
     await dialog.getByRole("button", { name: /Setujui/ }).click();
 
     await expect(app.getByText("Disetujui — lamaran masuk antrean agen.")).toBeVisible();

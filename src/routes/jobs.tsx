@@ -11,7 +11,7 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, freshJobsFilter, JOBS_PAGE_LIMIT, SCANNER_BUTTON_LABEL } from "@/lib/jobFilters";
+import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, freshJobsFilter, isTestListingQuery, JOBS_PAGE_LIMIT, SCANNER_BUTTON_LABEL, TEST_LISTING_QUERY } from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   computeMatch,
@@ -336,6 +336,22 @@ function JobsPage() {
             />
           </div>
         </div>
+        {/* Penanda untuk responden tanpa ekstensi: portal login (JobStreet, Glints, Kalibrr, Dealls) butuh Ekstensi Browser. */}
+        {!isTestListingQuery(searchQuery) && (
+          <div role="note" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-[#16150F]">
+            <span>
+              Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) hanya bisa diisi lewat Ekstensi Browser.
+              Belum memasang ekstensi? Coba lowongan uji berlabel [UJI] atau lowongan dari ATS publik.
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchQuery(TEST_LISTING_QUERY)}
+              className="min-h-9 rounded-lg border-2 border-[#0A5BE0] px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/10"
+            >
+              Tampilkan lowongan [UJI]
+            </button>
+          </div>
+        )}
         <div role="group" aria-label="Saring lowongan" className="mt-4 flex flex-wrap gap-2">
           {FILTERS.map((filter) => (
             <button

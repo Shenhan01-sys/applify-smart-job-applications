@@ -76,3 +76,44 @@ test("temuan 30: jendela draf menyaring Skill yang Disorot dengan skill profil d
   // tidak ada pemanggilan tanpa skill profil yang tersisa di jendela ini
   assert.doesNotMatch(modal, /highlightedSkills\((?:app|insights)\./);
 });
+
+test("klik ganda: buat draf, ajukan persetujuan, dan isi formulir dijaga ref sinkron, bukan hanya state", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  assert.match(src, /useRef\(\{ generate: false, request: false, enqueue: false \}\)/);
+  for (const [fn, key, end] of [
+    ["const generate = async", "generate", "// Free preview-style regeneration"],
+    ["const handleRequestApproval", "request", "// The user sent this application outside Applify"],
+    ["const handleAutoApply", "enqueue", "const tabs = ["],
+  ] as const) {
+    const body = src.slice(src.indexOf(fn), src.indexOf(end));
+    assert.match(body, new RegExp(`if \\(inFlight\\.current\\.${key}\\) return;`), `${key}: keluar bila sudah berjalan`);
+    assert.ok(body.indexOf(`inFlight.current.${key} = true`) < body.indexOf("await "), `${key}: kunci dipasang sebelum await pertama`);
+    assert.match(body, new RegExp(`finally \\{[^}]*inFlight\\.current\\.${key} = false`), `${key}: kunci dilepas di finally`);
+  }
+});
+
+test("Isi Formulir Saja disembunyikan untuk portal login yang butuh ekstensi, dan peringatan ekstensi tampil", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  assert.match(src, /needsBrowserExtension\(channelInfo\)/);
+  assert.match(src, /!channelInfo\.manualOnly && !needsExtension && \(/);
+  assert.match(src, /\{editable && jobData\?\.external_url && !needsExtension && \(\s*<p id="apply-fill-hint"/);
+  assert.match(src, /Portal ini butuh Ekstensi Browser/);
+  assert.match(src, /lowongan berlabel \[UJI\]/);
+});
+
+test("tab CV Hasil AI menjelaskan bahwa isinya saran skill, bukan berkas PDF baru", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  const cv = src.slice(src.indexOf('activeTab === "cv"'), src.indexOf('activeTab === "strategy"'));
+  assert.match(cv, /saran untuk CV/);
+  assert.match(cv, /Bukan berkas PDF baru/);
+});
+
+test("sisa istilah Inggris di Persetujuan dan kartu profil sudah dirapikan", () => {
+  const modal = read("../src/components/ApprovalReviewModal.tsx");
+  assert.doesNotMatch(modal, /Gerbang Persetujuan<\/DialogTitle>/);
+  assert.doesNotMatch(modal, /Belum ada cover letter/);
+  const profile = read("../src/routes/profile.tsx");
+  assert.match(profile, /id="resume-section"/);
+  assert.match(profile, /Mulai dari sini/);
+  assert.match(read("../src/components/profile/LinkedInImportCard.tsx"), /href="#resume-section"/);
+});

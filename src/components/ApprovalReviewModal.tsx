@@ -141,7 +141,7 @@ export default function ApprovalReviewModal({
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col gap-4 rounded-2xl border-2 border-[#16150F]/15 bg-white p-0">
         <DialogHeader className="px-6 pt-6">
           <div className="flex items-center justify-between gap-3">
-            <DialogTitle className="font-display text-2xl text-[#16150F]">Gerbang Persetujuan</DialogTitle>
+            <DialogTitle className="font-display text-2xl text-[#16150F]">Persetujuan Lamaran</DialogTitle>
             <span
               className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border-2 px-2.5 py-1 text-xs font-semibold ${
                 isExpiringSoon
@@ -222,7 +222,7 @@ export default function ApprovalReviewModal({
               />
             ) : (
               <div className="whitespace-pre-wrap rounded-xl border-2 border-[#16150F]/10 bg-white p-4 text-sm leading-relaxed">
-                {editedCoverLetter || 'Belum ada cover letter.'}
+                {editedCoverLetter || 'Belum ada surat lamaran.'}
               </div>
             )}
             {regenWarnings.length > 0 && (

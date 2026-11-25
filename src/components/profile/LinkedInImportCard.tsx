@@ -223,6 +223,9 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
           <p id="li-import-hint" className="mt-1 text-sm text-muted-foreground">{LINKEDIN_PDF_HINT}</p>
           <p className="mt-1 text-xs text-muted-foreground">{LINKEDIN_PDF_PRIVACY}</p>
           <p id="li-import-cv-note" className="mt-1 text-xs text-muted-foreground" data-testid="li-import-cv-note">{LINKEDIN_PDF_CV_NOTE}</p>
+          <p className="mt-1 text-xs">
+            <a href="#resume-section" className="font-semibold text-[#0A5BE0] underline underline-offset-2">Punya CV biasa? Unggah di kartu CV untuk Dilampirkan</a>
+          </p>
         </div>
 
         <div className="shrink-0" aria-busy={reading}>

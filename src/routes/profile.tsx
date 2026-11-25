@@ -909,9 +909,10 @@ function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file
   const spinner = <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />;
 
   return (
-    <section aria-labelledby="resume-heading" className="glass rounded-2xl p-5 md:p-6">
-      <h2 id="resume-heading" ref={heading} tabIndex={-1} className="font-semibold flex items-center gap-2 focus:outline-none">
+    <section id="resume-section" aria-labelledby="resume-heading" className="glass rounded-2xl p-5 md:p-6 ring-2 ring-[#0A5BE0]/30">
+      <h2 id="resume-heading" ref={heading} tabIndex={-1} className="font-semibold flex flex-wrap items-center gap-2 focus:outline-none">
         <Paperclip className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> CV untuk Dilampirkan
+        <span className="rounded-full bg-[#D2F801] px-2 py-0.5 text-xs font-bold text-[#16150F]">Mulai dari sini</span>
       </h2>
       <p id="resume-hint" className="mt-1 text-xs text-muted-foreground">
         Agen melampirkan berkas ini saat mengisi formulir lamaran. PDF, DOC, atau DOCX, maksimal 5 MB.

@@ -206,7 +206,9 @@ test("penjelasan di layar: surat dikirim apa adanya, tanpa AI, satu persetujuan 
 test("kontrak: rute antrean umum dan penjaga persetujuan backend memang memakai bentuk yang dikirim UI", () => {
   const route = read("../../backend/api/routes/automation.ts");
   assert.match(route, /app\.post\('\/queue'/);
-  assert.match(route, /const \{ job_type, payload, priority = 0 \} = request\.body/);
+  // `priority` dari klien tidak lagi dibaca (25 Nov 2026): prioritas ditentukan server per job type.
+  assert.match(route, /const \{ job_type, payload \} = \(request\.body \?\? \{\}\) as any/);
+  assert.doesNotMatch(route, /priority = 0/);
   assert.match(route, /clientErrorReply\(error\)/);
   const guard = read("../../backend/services/queue-guard.ts");
   assert.match(guard, /class ApprovalRequiredError/);

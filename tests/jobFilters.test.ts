@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, SCANNER_BUTTON_LABEL, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
+import { isRealJobUrl, isTestSource, isVisibleJob, visibleJobs, jobSearchFilters, matchesJobSearch, searchTerms, JOBS_PAGE_LIMIT, TEST_LISTING_QUERY, isTestListingQuery, JOB_MAX_AGE_DAYS, freshSinceDate, freshJobsFilter, savedFilterEmpty, SAVED_EMPTY_TITLE, SAVED_EMPTY_TEXT, workplaceKind, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, SCANNER_BUTTON_LABEL, GENERIC_EMPTY_TITLE, GENERIC_EMPTY_TEXT, type JobsEmptyInput } from "../src/lib/jobFilters.ts";
 
 test("freshSinceDate/freshJobsFilter: 30 hari ke belakang (UTC), baris tanpa posted_at tetap dimuat", () => {
   assert.equal(JOB_MAX_AGE_DAYS, 30);
@@ -345,4 +345,31 @@ test("temuan 27: halaman Lowongan memakai subjudul dan label tombol dari pustaka
   assert.match(src, /: jobsEmptySubtitle\(searchQuery\)\}/);
   assert.match(src, /: SCANNER_BUTTON_LABEL\}/);
   assert.doesNotMatch(src, /tombol cari lowongan di bawah/);
+});
+
+test("pencarian UJI dan [UJI] menemukan lowongan uji, baik di saringan server maupun di klien", () => {
+  const rows = [
+    { title: "[UJI] Staf Uji Coba (bukan lowongan sungguhan)", company: "Applify", location: "Yogyakarta" },
+    { title: "[UJI] Staf Uji Coba 2 (bukan lowongan sungguhan)", company: "Applify", location: "Yogyakarta" },
+    { title: "Frontend Engineer", company: "Acme", location: "Jakarta" },
+  ];
+  for (const q of ["UJI", "uji", "[UJI]", " [uji] "]) {
+    assert.deepEqual(rows.filter((r) => matchesJobSearch(r, q)).length, 2, q);
+    assert.equal(jobSearchFilters(q).length, 1, q);
+  }
+  assert.deepEqual(searchTerms("[UJI]"), ["[UJI]"]);
+  assert.match(jobSearchFilters(TEST_LISTING_QUERY)[0], /^title\.ilike\.\*\[UJI\]\*,company\.ilike/);
+  // Baris uji lolos saringan tampil: host Applify nyata, sumber bukan e2e.
+  assert.equal(isVisibleJob({ status: "active", external_url: "https://applify-smart-job-applications.vercel.app/uji-portal", platform_source: "uji" }), true);
+  assert.equal(isTestListingQuery("UJI"), true);
+  assert.equal(isTestListingQuery("[UJI]"), true);
+  assert.equal(isTestListingQuery("frontend"), false);
+  assert.equal(isTestListingQuery("ujian"), false);
+});
+
+test("halaman Lowongan menawarkan jalan pintas [UJI] dan peringatan portal butuh ekstensi", () => {
+  const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
+  assert.match(src, /setSearchQuery\(TEST_LISTING_QUERY\)/);
+  assert.match(src, /Portal · Butuh Ekstensi/);
+  assert.match(src, /Tampilkan lowongan \[UJI\]/);
 });

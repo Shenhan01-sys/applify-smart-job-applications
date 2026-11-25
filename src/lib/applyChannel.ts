@@ -117,6 +117,18 @@ export function sanitizeHttpUrl(raw: unknown): string | null {
   }
 }
 
+/** Portal Uji Applify: halaman lamaran tiruan milik Applify untuk uji coba, tidak diteruskan ke perusahaan mana pun. */
+const TEST_PORTAL_HOST = "applify-smart-job-applications.vercel.app";
+const TEST_PORTAL_PATH = "/uji-portal";
+
+/** True untuk alamat Portal Uji Applify. Diisi agen (worker), bukan Ekstensi Browser. */
+export function isTestPortalUrl(rawUrl: unknown): boolean {
+  const safe = sanitizeHttpUrl(rawUrl);
+  if (!safe) return false;
+  const u = new URL(safe);
+  return u.hostname.toLowerCase() === TEST_PORTAL_HOST && (u.pathname === TEST_PORTAL_PATH || u.pathname.startsWith(`${TEST_PORTAL_PATH}/`));
+}
+
 export function isLinkedInUrl(rawUrl: unknown): boolean {
   const safe = sanitizeHttpUrl(rawUrl);
   if (!safe) return false;
@@ -153,6 +165,11 @@ export function extractApplyEmail(description: string): string | null {
   return null;
 }
 
+/** True bila lowongan ini hanya bisa diisi lewat Ekstensi Browser (portal login: JobStreet, Glints, Kalibrr, Dealls, dan sejenisnya). */
+export function needsBrowserExtension(c: Pick<ChannelClassification, "channel" | "extensionSupported" | "manualOnly">): boolean {
+  return c.channel === "auth_portal" && c.extensionSupported && !c.manualOnly;
+}
+
 export function classifyJobChannel(job: JobChannelInput): ChannelClassification {
   const platform = String(job.platform ?? job.platform_source ?? "")
     .trim()
@@ -180,7 +197,25 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       manualOnly: true,
       badgeLabel: "LinkedIn Manual",
       badgeTone: "manual",
-      reason: "Lowongan LinkedIn wajib dilamar manual demi keamanan akun (worker dan ekstensi dinonaktifkan di LinkedIn).",
+      reason: "Lowongan LinkedIn wajib dilamar manual demi keamanan akun (agen dan ekstensi dinonaktifkan di LinkedIn).",
+    };
+  }
+
+  // Portal Uji Applify diproses agen (worker), bukan ekstensi: jangan menawarkan Ekstensi Browser untuknya.
+  if (isTestPortalUrl(primaryUrl)) {
+    return {
+      channel: "external_web",
+      platform: platform || "portal-uji",
+      applyUrl: primaryUrl,
+      resolvedApplyUrl: null,
+      applyEmail: null,
+      autoWorkerSupported: true,
+      emailApplySupported: false,
+      extensionSupported: false,
+      manualOnly: false,
+      badgeLabel: "Portal Uji Applify",
+      badgeTone: "ats",
+      reason: "Formulir uji milik Applify. Agen Applify yang mengisinya, tanpa Ekstensi Browser. Lamaran ini tidak diteruskan ke perusahaan mana pun.",
     };
   }
 
@@ -200,7 +235,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       emailApplySupported: Boolean(applyEmail),
       extensionSupported: Boolean(targetUrl),
       manualOnly: false,
-      badgeLabel: "ATS Otomatis",
+      badgeLabel: "Formulir ATS · Agen",
       badgeTone: "ats",
       reason: "Formulir ATS publik; agen Applify maupun Ekstensi Chrome/Edge siap membantu pengisian.",
     };
@@ -238,9 +273,9 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       emailApplySupported: false,
       extensionSupported: Boolean(primaryUrl),
       manualOnly: false,
-      badgeLabel: "Portal · Pakai Ekstensi",
+      badgeLabel: "Portal · Butuh Ekstensi",
       badgeTone: "extension",
-      reason: "Portal meminta masuk akun pelamar; setelah disetujui, pakai Ekstensi Browser Chrome/Edge langsung di tab loginmu.",
+      reason: "Portal meminta masuk akun pelamar, jadi butuh Ekstensi Browser Chrome/Edge yang sudah terpasang. Tanpa ekstensi, pilih lowongan berlabel [UJI] atau lowongan dari ATS publik.",
     };
   }
 
