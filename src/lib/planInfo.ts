@@ -14,13 +14,13 @@ export const FREE_FEATURES = [
   "AI Basic (draf surat memakai model gratis Numes, Gemini, dan OpenRouter; Claude hanya cadangan terakhir)",
   "Surat lamaran standar",
   "Skill radar dasar (untuk bidang teknologi)",
+  "Green Career Track (terbuka untuk semua paket)",
   "Human approval",
 ];
 
 export const PRO_FEATURES = [
   "Hingga 20 lamaran per hari",
   "AI Premium (model Numes dan Gemini 4; Claude hanya cadangan terakhir)",
-  "Green Career Track",
 ];
 
 /** Rencana fitur yang belum ada di kode. Ditampilkan terpisah dari daftar paket berbayar, bukan sebagai isi paket. */

@@ -111,6 +111,16 @@ test("batas lamaran Pro di UI (20 per hari) sama dengan worker; Free 10", () => 
   assert.ok(FREE_FEATURES.includes("10 AI Apply per bulan"));
 });
 
+test("UX-P7-07: Green Career Track tidak dijual sebagai isi Pro selama halaman dan fungsinya tidak memeriksa paket", () => {
+  const gated = [
+    read("applify-smart-job-applications/src/routes/green-career.tsx"),
+    read("applify-smart-job-applications/supabase/functions/green-career-assessment/index.ts"),
+  ];
+  for (const src of gated) assert.doesNotMatch(src, /ai_model_tier|isPro|subscriptions?\b/);
+  assert.equal(PRO_FEATURES.filter((f) => /Green Career/i.test(f)).length, 0);
+  assert.ok(FREE_FEATURES.some((f) => /Green Career Track.*semua paket/.test(f)));
+});
+
 test("Golden Window Sniper belum ada di kode, jadi di UI berlabel segera hadir", () => {
   // Bila fitur ini dibuat (kata "golden" muncul di backend atau worker), tes ini gagal supaya labelnya ditinjau.
   const files = [...sourceFiles(join(project, "backend")), ...sourceFiles(join(project, "worker", "src"))];
