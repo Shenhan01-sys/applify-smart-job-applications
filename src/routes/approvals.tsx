@@ -12,6 +12,7 @@ import AgentManualSubmit from "@/components/AgentManualSubmit";
 import ExtensionConsent from "@/components/ExtensionConsent";
 import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
+import { isEmailApplyActive } from "@/lib/emailApply";
 import { extensionConsentState } from "@/lib/extensionConsent";
 import { pendingEmptyState } from "@/lib/approvalsEmpty";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
@@ -108,18 +109,21 @@ function ApprovalsPage() {
     loadData();
   }, []);
 
-  // While the agent is still working on an approved application, refresh its status every 15 s, or every 5 s
-  // while it waits for the security code (the code window is short and the next log row should show quickly).
+  // While the agent or an email_apply job is still running on an approved application, refresh its status every
+  // 15 s, or every 5 s while the agent waits for the security code (E2E-03: ikut polling tugas email_apply).
   const agentRows = Object.values(emailData.agent);
+  const emailJobs = Object.values(emailData.jobs);
   const agentActive = agentRows.some((r) => isAgentApplyActive(r));
+  const emailActive = emailJobs.some((j) => isEmailApplyActive(j));
+  const pollingActive = agentActive || emailActive;
   const awaitingCode = pollIntervalMs(agentRows) === CODE_POLL_MS;
   useEffect(() => {
-    if (!agentActive || isMockMode()) return;
+    if (!pollingActive || isMockMode()) return;
     const t = window.setInterval(() => {
       loadEmailApplyData(history).then(setEmailData).catch(() => {});
     }, awaitingCode ? CODE_POLL_MS : AGENT_POLL_MS);
     return () => window.clearInterval(t);
-  }, [agentActive, awaitingCode, history]);
+  }, [pollingActive, awaitingCode, history]);
 
   // Sesudah backend menerima kode keamanan: baca status agen sekarang juga, tanpa menunggu putaran berikutnya.
   const handleCodeSent = () => {

@@ -102,6 +102,11 @@ export function isCvAttachmentFailure(job?: EmailQueueRow | null): boolean {
   return /gagal diunduh|gagal dilampirkan|cv_attachment_unavailable/i.test(job.error_message ?? "");
 }
 
+/** True bila tugas email_apply masih menunggu atau sedang diproses worker sehingga /approvals perlu polling. */
+export function isEmailApplyActive(job?: EmailQueueRow | null): boolean {
+  return job?.status === "pending" || job?.status === "processing";
+}
+
 export interface EmailApplyContext {
   now?: Date;
   /** A successful application_logs row already consumed this approval (the worker refuses a second use). */
