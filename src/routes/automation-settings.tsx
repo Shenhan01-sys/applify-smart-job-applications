@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { VISA_OPTIONS, visaSelectValue, visaValueToStore } from "@/lib/visaChoice";
-import { listToText, numberToText, parseCommaList, parseOptionalNumber, sameList } from "@/lib/settingsForm";
+import { listToText, numberToText, parseCommaList, parseIndonesianSalary, parseOptionalNumber, sameList } from "@/lib/settingsForm";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -38,6 +38,8 @@ const tabs = [
 
 function AutomationSettingsPage() {
   const [settings, setSettings] = useState<AutomationSettings>({});
+  const [salaryText, setSalaryText] = useState({ desired_salary: "", current_ctc: "" });
+  const [salaryErrors, setSalaryErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,10 +66,13 @@ function AutomationSettingsPage() {
     try {
       if (isMockMode()) {
         setSettings(mockAutomationSettings);
+        setSalaryText({ desired_salary: numberToText(mockAutomationSettings.desired_salary), current_ctc: numberToText(mockAutomationSettings.current_ctc) });
         return;
       }
       const data = await automationApi.getSettings();
       setSettings(data);
+      setSalaryText({ desired_salary: numberToText(data.desired_salary), current_ctc: numberToText(data.current_ctc) });
+      setSalaryErrors({});
     } catch (error) {
       // Jangan tampilkan pengaturan contoh: pengguna bisa menyimpannya menimpa pengaturan aslinya.
       setLoadError(describeApiError(error, 'Pengaturan agen belum bisa dimuat.'));
@@ -77,11 +82,24 @@ function AutomationSettingsPage() {
   };
 
   const handleSave = async () => {
+    const desiredSalary = parseIndonesianSalary(salaryText.desired_salary);
+    const currentCtc = parseIndonesianSalary(salaryText.current_ctc);
+    const nextSalaryErrors: Record<string, string> = {};
+    if (salaryText.desired_salary.trim() && desiredSalary === null) nextSalaryErrors.desired_salary = "Format gaji belum dikenali. Contoh: 5.000.000 atau 6,5 jt.";
+    if (salaryText.current_ctc.trim() && currentCtc === null) nextSalaryErrors.current_ctc = "Format gaji belum dikenali. Contoh: 5.000.000 atau 6,5 jt.";
+    if (Object.keys(nextSalaryErrors).length) {
+      setSalaryErrors(nextSalaryErrors);
+      toast.error("Periksa format gaji sebelum menyimpan.");
+      return;
+    }
+    setSalaryErrors({});
+    const nextSettings = { ...settings, desired_salary: desiredSalary, current_ctc: currentCtc };
     setSaving(true);
     try {
       if (!isMockMode()) {
-        await automationApi.updateSettings(settings);
+        await automationApi.updateSettings(nextSettings);
       }
+      setSettings(nextSettings);
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (error) {
@@ -199,8 +217,8 @@ function AutomationSettingsPage() {
                   onChange={(v: string) => updateField('require_visa', visaValueToStore(v))}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="number" value={numberToText(settings.desired_salary)} onChange={(v: string) => updateField('desired_salary', parseOptionalNumber(v))} icon={DollarSign} />
-                  <InputField label="Gaji saat ini (Rp)" type="number" value={numberToText(settings.current_ctc)} onChange={(v: string) => updateField('current_ctc', parseOptionalNumber(v))} icon={DollarSign} />
+                  <InputField label="Gaji yang diharapkan (Rp, sesuai isian formulir)" type="text" inputMode="decimal" value={salaryText.desired_salary} onChange={(v: string) => { setSalaryText((p) => ({ ...p, desired_salary: v })); setSalaryErrors((p) => ({ ...p, desired_salary: "" })); }} error={salaryErrors.desired_salary} placeholder="Contoh: 5.000.000 atau 6,5 jt" icon={DollarSign} />
+                  <InputField label="Gaji saat ini (Rp)" type="text" inputMode="decimal" value={salaryText.current_ctc} onChange={(v: string) => { setSalaryText((p) => ({ ...p, current_ctc: v })); setSalaryErrors((p) => ({ ...p, current_ctc: "" })); }} error={salaryErrors.current_ctc} placeholder="Contoh: 5.000.000 atau 6,5 jt" icon={DollarSign} />
                 </div>
                 <InputField label="Masa pemberitahuan (hari)" type="number" value={numberToText(settings.notice_period)} onChange={(v: string) => updateField('notice_period', parseOptionalNumber(v))} placeholder="Misalnya 30" icon={Clock} />
                 <InputField label="Alamat profil LinkedIn" value={settings.linkedin_url || ''} onChange={(v: string) => updateField('linkedin_url', v)} />
@@ -318,7 +336,7 @@ function AutomationSettingsPage() {
 }
 
 // Komponen bantu. Setiap label terhubung ke kolomnya lewat htmlFor/id (useId), dan sakelar memakai role="switch".
-function InputField({ label, value, onChange, onBlur, type = 'text', placeholder = '', icon: Icon }: any) {
+function InputField({ label, value, onChange, onBlur, type = 'text', inputMode, placeholder = '', icon: Icon, error }: any) {
   const id = useId();
   return (
     <div>
@@ -329,13 +347,15 @@ function InputField({ label, value, onChange, onBlur, type = 'text', placeholder
       <input
         id={id}
         type={type}
-        inputMode={type === 'number' ? 'numeric' : undefined}
+        inputMode={inputMode ?? (type === 'number' ? 'numeric' : undefined)}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
         className="mt-1.5 w-full h-12 rounded-xl bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all hover:border-black/[12%]"
       />
+      {error && <p className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   );
 }

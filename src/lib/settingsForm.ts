@@ -36,6 +36,43 @@ export function parseOptionalNumber(raw: string): number | null {
 }
 
 /**
+ * Membaca nominal gaji Indonesia. Titik/koma berkelompok tiga digit dianggap pemisah ribuan; koma atau titik
+ * desimal diperbolehkan sebelum satuan (mis. "6,5 jt"). Tanpa satuan, "6.500" berarti enam ribu lima ratus.
+ */
+export function parseIndonesianSalary(raw: string): number | null {
+  let text = raw.trim().toLowerCase().replace(/\u00a0/g, " ").replace(/^rp\s*/i, "").trim();
+  if (!text) return null;
+  text = text.replace(/\s+/g, " ");
+
+  const withUnit = text.match(/^([0-9]+(?:[.,][0-9]+)?)\s*(jt|juta(?:an)?|juta|rb|ribu|m|miliar|milyar)$/i);
+  if (withUnit) {
+    const amount = Number(withUnit[1].replace(",", "."));
+    const unit = withUnit[2].toLowerCase();
+    const multiplier = ["jt", "juta", "jutaan", "m"].includes(unit)
+      ? 1_000_000
+      : ["miliar", "milyar"].includes(unit) ? 1_000_000_000 : 1_000;
+    const result = amount * multiplier;
+    return Number.isFinite(result) && result > 0 ? Math.round(result) : null;
+  }
+
+  // Hapus pemisah ribuan bergaya Indonesia (1.234.567) atau gaya Inggris (1,234,567).
+  if (/^\d{1,3}(?:\.\d{3})+$/.test(text) || /^\d{1,3}(?:,\d{3})+$/.test(text)) {
+    text = text.replace(/[.,]/g, "");
+  } else if (/^\d{1,3}(?:\.\d{3})+,\d{1,2}$/.test(text)) {
+    text = text.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(?:,\d{3})+\.\d{1,2}$/.test(text)) {
+    text = text.replace(/,/g, "");
+  } else if (/^\d+[,.]\d+$/.test(text)) {
+    // Desimal tanpa satuan dipertahankan; jangan memakai parseInt yang memotong "6.500" menjadi 6.
+    text = text.replace(",", ".");
+  }
+
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return null;
+  const result = Number(text);
+  return Number.isFinite(result) && result > 0 ? Math.round(result) : null;
+}
+
+/**
  * Angka yang tersimpan -> isi kolom. null, tidak ada, atau 0 = kolom kosong: backend memperlakukan 0 sebagai
  * "tidak diisi" (sisa dari kolom yang dulu terkirim sebagai 0), dan tidak ada angka bawaan yang tak pernah disimpan.
  */
