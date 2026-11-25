@@ -140,6 +140,7 @@ test("kontrak backend yang dipakai pesan ini memang ada di kode backend (dibaca,
   for (const c of ["rate_limited", "quota_exhausted", "quota_check_failed", "rate_limit_check_failed"]) assert.match(guard, new RegExp(`'${c}'`));
   const sessions = read("../../backend/api/routes/sessions.ts");
   assert.match(sessions, /code: 'session_encryption_not_configured'/);
-  assert.match(sessions, /code: err\.code/);
+  assert.match(sessions, /code: 'invalid_platform'/);
+  assert.doesNotMatch(sessions, /app\.get\(\s*['"]\/:platform\/data['"]/);
   assert.match(read("../../backend/services/session-crypto.ts"), /code = 'session_undecryptable'/);
 });
