@@ -283,9 +283,10 @@ test("konfirmasi email menampilkan akun Gmail yang dikembalikan status, dengan f
   assert.match(panel, /Pengirim:/);
   assert.match(panel, /sambungkan ulang Gmail di Pengaturan agar alamat pengirim tampil di sini/);
   assert.match(panel, /const \[confirmNoCv, setConfirmNoCv\] = useState\(false\)/);
+  assert.match(panel, /const missingCv = plan \? plan\.noCv : !hasApprovalCv/);
   assert.match(panel, /data-testid="email-confirm-no-cv"/);
-  assert.match(panel, /disabled=\{sending \|\| !state\.enabled \|\| \(plan\?\.noCv === true && !confirmNoCv\)\}/);
-  assert.match(panel, /if \(plan\?\.noCv && !confirmNoCv\) return/);
+  assert.match(panel, /disabled=\{sending \|\| !state\.enabled \|\| \(missingCv && !confirmNoCv\)\}/);
+  assert.match(panel, /if \(missingCv && !confirmNoCv\) return/);
   assert.match(panel, /allowWithoutCv: true/);
   assert.match(panel, /const changeConfirmation = \(next: boolean\) => \{\s*setConfirmNoCv\(false\);\s*setConfirming\(next\);/);
 });

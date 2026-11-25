@@ -72,6 +72,10 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   const state = getEmailApplyState(approval, { used, job, gmailConnected, applyEmail: email, agentBlockedReason });
   if (!state.visible) return null;
 
+  // Bila pratinjau lampiran (`plan`) gagal dimuat, tetap jatuh ke `approval.resume_url` agar konfirmasi tanpa CV tidak terlewati.
+  const hasApprovalCv = typeof approval.resume_url === "string" && approval.resume_url.trim().length > 0;
+  const missingCv = plan ? plan.noCv : !hasApprovalCv;
+
   const expires = approval.expires_at ? new Date(approval.expires_at) : null;
   const expiresLabel = expires && Number.isFinite(expires.getTime())
     ? expires.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -81,11 +85,11 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   const notSentText = used && sent ? describeNotAttached(sent) : "";
 
   const submit = async () => {
-    if (plan?.noCv && !confirmNoCv) return;
+    if (missingCv && !confirmNoCv) return;
     setSending(true);
     setError("");
     try {
-      const options = plan?.noCv && confirmNoCv ? { allowWithoutCv: true } : undefined;
+      const options = missingCv && confirmNoCv ? { allowWithoutCv: true } : undefined;
       await enqueueEmailApply(approval, email, options);
       toast.success("Email masuk antrean. Agen akan memprosesnya.");
       changeConfirmation(false);
@@ -241,7 +245,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                   {plan.noCv ? <> (tanpa CV)</> : null}.
                 </p>
               )}
-              {plan?.noCv === true && (
+              {missingCv && (
                 <label className="flex min-h-11 items-center gap-2 text-xs leading-relaxed">
                   <input
                     data-testid="email-confirm-no-cv"
@@ -254,7 +258,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                 </label>
               )}
               <div className="flex gap-2">
-                <button type="button" onClick={submit} disabled={sending || !state.enabled || (plan?.noCv === true && !confirmNoCv)} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
+                <button type="button" onClick={submit} disabled={sending || !state.enabled || (missingCv && !confirmNoCv)} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
                   {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ya, masukkan ke antrean
                 </button>
                 <button type="button" onClick={() => changeConfirmation(false)} disabled={sending} className="h-9 px-4 rounded-lg border-2 border-black/[8%] bg-white text-xs hover:bg-black/[4%]">Batal</button>
