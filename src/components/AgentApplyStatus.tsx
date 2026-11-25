@@ -33,7 +33,7 @@ function ToneIcon({ tone }: { tone: AgentApplyTone }) {
 }
 
 /**
- * Apa yang dikerjakan agen pengisi formulir sesudah lamaran disetujui. Tampil di kartu Riwayat Persetujuan,
+ * Apa yang dikerjakan agen pengisi formulir sesudah lamaran disetujui. Tampil di kartu persetujuan yang sudah disetujui (tab Menunggu atau Riwayat),
  * di atas opsi email, supaya jalur utama (agen mengisi formulir lowongan) terlihat lebih dulu. Bila log
  * percobaan punya bukti (tangkapan layar atau daftar isian), blok "Bukti dari agen" ikut tampil.
  */

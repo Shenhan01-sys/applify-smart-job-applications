@@ -37,7 +37,7 @@ interface ApprovalReviewModalProps {
   request: ApprovalRequest
   open: boolean
   onClose: () => void
-  /** `consentRequired`: lamaran belum diantre; pengguna harus mengizinkan Ekstensi Browser di kartu Riwayat. */
+  /** `consentRequired`: lamaran belum diantre; pengguna harus mengizinkan Ekstensi Browser di kartu persetujuan (tab Menunggu). */
   onApproved: (result?: { consentRequired: boolean }) => void
   onRejected: () => void
 }
@@ -85,7 +85,7 @@ export default function ApprovalReviewModal({
     try {
       // The version on screen (including edits) is the one being approved.
       const result = await automationApi.approveApplication(request.id, edited ? editedCoverLetter : undefined)
-      // Situs yang perlu login: lamaran belum diantre sampai pengguna mengizinkan ekstensi (kartu Riwayat).
+      // Situs yang perlu login: lamaran belum diantre sampai pengguna mengizinkan ekstensi (kartu di tab Menunggu).
       const consentRequired = consentRequiredFrom(result)
       toast.success(consentRequired ? EXTENSION_CONSENT_REQUIRED_TOAST : 'Disetujui — lamaran masuk antrean agen.')
       onApproved({ consentRequired })

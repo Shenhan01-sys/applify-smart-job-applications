@@ -30,11 +30,12 @@ async function openDetail(app: Page) {
   return dialog;
 }
 
+/** Tombol ini sudah dihapus dari layar; tes memastikan ia tidak muncul lagi. */
 const MARK_LABEL = "Saya sudah mengirimnya sendiri";
 const RERUN_LABEL = "Coba kirim otomatis lagi";
 
 test.describe("Lamaran: agen berhenti sebelum kirim", () => {
-  test("situs belum diizinkan (not_allowed): buka formulir, tandai terkirim, dan coba kirim otomatis lagi", async ({ app, backend }) => {
+  test("situs belum diizinkan (not_allowed): buka formulir, salin isian, dan coba kirim otomatis lagi, tanpa tombol tandai terkirim", async ({ app, backend }) => {
     seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
     const dialog = await openDetail(app);
 
@@ -45,7 +46,8 @@ test.describe("Lamaran: agen berhenti sebelum kirim", () => {
     await expect(open).toHaveAttribute("href", FORM_URL);
     await expect(open).toHaveAttribute("target", "_blank");
     await expect(open).toHaveAttribute("rel", /noopener/);
-    await expect(manual.getByRole("button", { name: MARK_LABEL })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
+    await expect(dialog.getByText(MARK_LABEL)).toHaveCount(0);
     await expect(manual.getByRole("button", { name: RERUN_LABEL })).toBeVisible();
     // Cover letter disetujui dimuat dari GET /api/approvals/:id, jadi tombol salinnya muncul.
     await expect(manual.getByRole("button", { name: "Salin cover letter" })).toBeVisible();
@@ -73,67 +75,26 @@ test.describe("Lamaran: agen berhenti sebelum kirim", () => {
     expect(backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/rerun`)).toHaveLength(1);
   });
 
-  test("Tandai terkirim minta konfirmasi, lalu memanggil POST mark-sent tepat sekali dan tidak menjalankan agen", async ({ app, backend }) => {
-    seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
-    const dialog = await openDetail(app);
-
-    await dialog.getByRole("button", { name: MARK_LABEL }).click();
-    // Belum ada panggilan sebelum pengguna menjawab pertanyaan konfirmasi.
-    await expect(dialog.getByText("Tandai lamaran ini sudah terkirim? Agen tidak akan mengirimnya lagi.")).toBeVisible();
-    expect(backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/mark-sent`)).toHaveLength(0);
-
-    await dialog.getByRole("button", { name: "Ya, tandai terkirim" }).click();
-    await expect(dialog.getByText("Ditandai terkirim manual")).toBeVisible();
-    await expect(app.getByText("Lamaran ditandai terkirim. Kartunya pindah ke Terkirim.")).toBeVisible();
-
-    const marks = backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/mark-sent`);
-    expect(marks).toHaveLength(1);
-    expect(marks[0].body).toEqual({});
-    expect(backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/rerun`)).toHaveLength(0);
-  });
-
-  test("Batal pada konfirmasi tidak memanggil mark-sent", async ({ app, backend }) => {
-    seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
-    const dialog = await openDetail(app);
-
-    await dialog.getByRole("button", { name: MARK_LABEL }).click();
-    await dialog.getByRole("button", { name: "Batal" }).click();
-    await expect(dialog.getByRole("button", { name: MARK_LABEL })).toBeVisible();
-    expect(backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/mark-sent`)).toHaveLength(0);
-  });
-
-  test("galat 409 already_sent dari mark-sent tampil sebagai pesan, satu panggilan saja", async ({ app, backend }) => {
-    seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
-    backend.override(`POST /api/approvals/${APPROVAL_ID}/mark-sent`, { status: 409, body: { error: "sudah", code: "already_sent" } });
-    const dialog = await openDetail(app);
-
-    await dialog.getByRole("button", { name: MARK_LABEL }).click();
-    await dialog.getByRole("button", { name: "Ya, tandai terkirim" }).click();
-    await expect(dialog.getByRole("alert")).toContainText("sudah tercatat terkirim");
-    expect(backend.callsTo("POST", `/api/approvals/${APPROVAL_ID}/mark-sent`)).toHaveLength(1);
-    await expect(dialog.getByText("Ditandai terkirim manual")).toHaveCount(0);
-  });
-
-  test("isian wajib kosong (required_remaining): tandai terkirim ada, coba otomatis lagi tidak ada", async ({ app, backend }) => {
+  test("isian wajib kosong (required_remaining): panel tampil tanpa tombol tandai, coba otomatis lagi tidak ada", async ({ app, backend }) => {
     seed(backend, stoppedLog("queue-1", APPROVAL_ID, "required_remaining"));
     const dialog = await openDetail(app);
 
     const manual = dialog.getByRole("region", { name: "Kirim sendiri di situs lowongan" });
     await expect(manual.getByText(/masih ada isian wajib yang kosong/)).toBeVisible();
-    await expect(manual.getByRole("button", { name: MARK_LABEL })).toBeVisible();
+    await expect(manual.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
     // Menjalankan ulang tidak mengisi isian yang kosong, jadi tombolnya tidak ditawarkan.
     await expect(manual.getByRole("button", { name: RERUN_LABEL })).toHaveCount(0);
     await expect(dialog.getByText("Isian wajib yang masih kosong saat agen berhenti:")).toBeVisible();
     await expect(dialog.getByRole("listitem").filter({ hasText: "Nomor telepon" })).toBeVisible();
   });
 
-  test("berhenti tanpa alasan khusus: hanya Tandai terkirim, tanpa coba otomatis lagi", async ({ app, backend }) => {
+  test("berhenti tanpa alasan khusus: panel tanpa tombol tandai dan tanpa coba otomatis lagi", async ({ app, backend }) => {
     seed(backend, stoppedLog("queue-1", APPROVAL_ID, null));
     const dialog = await openDetail(app);
 
     const manual = dialog.getByRole("region", { name: "Kirim sendiri di situs lowongan" });
     await expect(manual.getByText("Agen berhenti sebelum tombol kirim. Lamaran belum terkirim.")).toBeVisible();
-    await expect(manual.getByRole("button", { name: MARK_LABEL })).toBeVisible();
+    await expect(manual.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
     await expect(manual.getByRole("button", { name: RERUN_LABEL })).toHaveCount(0);
   });
 

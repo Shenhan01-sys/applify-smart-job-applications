@@ -1,6 +1,5 @@
 import { fieldValueText, type AgentFilledField, type AgentLogFacts, type FilledFieldKind } from "./agentEvidence.ts";
 import { isAgentApplyActive, type AgentApplyRow } from "./agentApplyStatus.ts";
-import { parseApiError } from "./apiErrors.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
 import { isCodeTimeout } from "./securityCode.ts";
 
@@ -8,10 +7,11 @@ import { isCodeTimeout } from "./securityCode.ts";
  * Jalan keluar saat agen berhenti sebelum tombol kirim (log apply berstatus "ready").
  *
  * Penyebab paling sering: `details.submit_blocked` = "not_allowed", yaitu situs lowongan belum masuk daftar
- * kirim otomatis di server, atau ALLOW_REAL_SUBMIT mati. Sesi browser agen sudah hilang, jadi pengguna tidak
- * bisa menekan kirim di sana. Layar memberi tiga hal: buka formulir lowongan di tab baru, salin isian dan
- * cover letter yang disiapkan agen, lalu tandai lamaran terkirim setelah pengguna mengirimnya sendiri
- * (POST /api/approvals/:id/mark-sent). Tombol "Coba kirim otomatis lagi" memakai endpoint rerun yang sudah ada.
+ * kirim otomatis di server, atau ALLOW_REAL_SUBMIT mati. Sesi browser agen ada di server dan tidak bisa dijangkau
+ * pengguna, jadi pengguna tidak bisa menekan kirim di sana. Layar memberi dua hal: buka formulir lowongan di tab
+ * baru, dan salin isian serta cover letter yang disiapkan agen. Tidak ada tombol "sudah kukirim sendiri": status
+ * Terkirim hanya datang dari log pengiriman agen atau email. Tombol "Coba kirim otomatis lagi" memakai endpoint
+ * rerun yang sudah ada.
  *
  * Fungsi murni tanpa React dan tanpa Supabase, supaya bisa dites dengan `node --test`. Masukan dari database
  * tidak dipercaya: bentuk yang rusak diabaikan dan tidak pernah melempar galat.
@@ -34,8 +34,7 @@ export const MANUAL_NOT_ALLOWED_TEXT =
 export const MANUAL_REQUIRED_REMAINING_TEXT =
   "Agen berhenti karena masih ada isian wajib yang kosong. Lamaran belum terkirim. Kamu bisa melengkapinya dan mengirimnya sendiri di situs lowongan.";
 export const MANUAL_OTHER_TEXT = "Agen berhenti sebelum tombol kirim. Lamaran belum terkirim.";
-export const MANUAL_STEPS_TEXT =
-  "Buka formulirnya, tempel isian dan cover letter dari agen, lalu kirim sendiri. Sesudah itu tandai di sini supaya agen tidak mengirimnya lagi.";
+export const MANUAL_STEPS_TEXT = "Buka formulirnya, lalu tempel isian dan cover letter dari agen bila kamu ingin mengirimnya sendiri.";
 
 export const OPEN_FORM_LABEL = "Buka formulir lowongan";
 export const NO_JOB_URL_TEXT = "Alamat lowongan tidak tersimpan. Buka lowongannya dari halaman Lowongan.";
@@ -47,14 +46,6 @@ export const COPY_UNAVAILABLE_TEXT =
   "Peramban ini tidak mengizinkan menyalin otomatis. Pilih teksnya dengan kursor, lalu salin sendiri.";
 export const LETTER_LOADING_TEXT = "Memuat surat lamaran...";
 export const LETTER_UNAVAILABLE_TEXT = "Cover letter yang disetujui belum bisa dimuat.";
-
-export const MARK_SENT_LABEL = "Saya sudah mengirimnya sendiri";
-export const MARK_SENT_BUSY_LABEL = "Menandai...";
-export const MARK_CONFIRM_TEXT = "Tandai lamaran ini sudah terkirim? Agen tidak akan mengirimnya lagi.";
-export const MARK_CONFIRM_YES_LABEL = "Ya, tandai terkirim";
-export const MARK_CONFIRM_NO_LABEL = "Batal";
-export const MARKED_TEXT = "Ditandai terkirim manual";
-export const MARKED_HINT = "Kamu mengirim lamaran ini sendiri di situs lowongan. Agen tidak akan mengirimnya lagi.";
 
 export const RERUN_LABEL = "Coba kirim otomatis lagi";
 export const RERUN_BUSY_LABEL = "Menjalankan agen...";
@@ -83,7 +74,7 @@ export function manualSubmitState(row: AgentApplyRow | null | undefined): Manual
   return { kind: "other", text: MANUAL_OTHER_TEXT, canRerun: false };
 }
 
-/** Lamaran ini sudah ditandai terkirim oleh pengguna (log success dengan details.manual). */
+/** Log lama: lamaran ini ditandai terkirim oleh pengguna (log success dengan details.manual). Tombol penandanya sudah dihapus. */
 export function isManualSent(row: AgentLogFacts | null | undefined): boolean {
   return !!row && row.log_status === "success" && row.manual === true;
 }
@@ -180,29 +171,4 @@ export async function copyText(text: string, host: ClipboardHost | null | undefi
   } catch {
     return { ok: false, error: COPY_UNAVAILABLE_TEXT };
   }
-}
-
-/**
- * Galat POST /api/approvals/:id/mark-sent -> pesan untuk pengguna. Backend menjawab { error, code }:
- * 404, 409 not_approved | already_sent | agent_working, 422 no_job, 401, 5xx.
- */
-export function markSentErrorMessage(err: unknown): string {
-  const e = parseApiError(err);
-  switch (e.code) {
-    case "already_sent":
-      return "Lamaran ini sudah tercatat terkirim, mungkin oleh agen. Muat ulang halaman untuk melihat statusnya.";
-    case "agent_working":
-      return "Agen sedang bekerja pada lamaran ini. Tunggu sampai selesai, lalu coba lagi.";
-    case "not_approved":
-      return "Persetujuan ini belum disetujui, jadi lamarannya belum bisa ditandai terkirim.";
-    case "no_job":
-      return "Persetujuan ini tidak punya lowongan, jadi belum bisa ditandai terkirim.";
-  }
-  if (e.status === 404) return "Persetujuan ini tidak ditemukan. Muat ulang halaman, lalu coba lagi.";
-  if (e.status === 401) return "Sesi login berakhir atau belum masuk. Masuk lagi, lalu ulangi.";
-  if (e.status !== undefined && e.status >= 500) return "Lamaran belum bisa ditandai terkirim karena server bermasalah. Coba lagi beberapa saat lagi.";
-  if (e.rawText && /failed to fetch|networkerror|load failed|network request failed/i.test(e.rawText)) {
-    return "Server Applify tidak dapat dihubungi. Periksa koneksi internetmu, lalu coba lagi.";
-  }
-  return "Lamaran belum bisa ditandai terkirim. Coba lagi.";
 }

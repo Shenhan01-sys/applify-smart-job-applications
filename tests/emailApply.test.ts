@@ -232,9 +232,9 @@ test("kontrak: layar memakai addToQueue lewat /api/automation/queue dan tidak pe
   assert.doesNotMatch(svc, /approved\s*:\s*true/);
 });
 
-test("halaman Approvals: panel email hanya untuk baris riwayat berstatus approved", () => {
+test("halaman Approvals: panel email hanya untuk baris berstatus approved", () => {
   const page = read("../src/routes/approvals.tsx");
-  assert.match(page, /activeTab === 'history' && request\.status === 'approved' && \(\s*<EmailApplyPanel/);
+  assert.match(page, /\{approved && \(\s*<EmailApplyPanel/);
   const panel = read("../src/components/EmailApplyPanel.tsx");
   assert.match(panel, /getEmailApplyState\(approval, \{ used, job, gmailConnected, applyEmail: email \}\)/);
   assert.match(panel, /if \(!state\.visible\) return null/);

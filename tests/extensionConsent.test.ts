@@ -136,7 +136,8 @@ test("wiring: modal membaca jawaban approve, halaman Persetujuan menampilkan blo
   assert.match(page, /agentKnown: emailData\.agentKnown/);
   assert.match(page, /submitted: emailData\.used\.has\(request\.id\)/);
   assert.match(page, /if \(result\?\.consentRequired && approvedId\)/);
-  assert.match(page, /handleTabChange\('history'\)/);
+  // persetujuan yang belum terkirim tetap di tab Menunggu, jadi tidak ada pindah tab sesudah approve
+  assert.doesNotMatch(page, /handleTabChange\('history'\)/);
 
   const api = read("../src/services/automationApi.ts");
   assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/extension-consent/);

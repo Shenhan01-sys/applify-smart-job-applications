@@ -61,7 +61,8 @@ test("temuan 22: Kedaluwarsa hanya untuk baris yang belum diputuskan; Disetujui 
   const rows = [...Array(5).fill("approved"), "rejected", "pending"].map((status) => approvalStatusLabel(effectiveApprovalStatus(status, lewat, now)));
   assert.deepEqual(rows, ["Disetujui", "Disetujui", "Disetujui", "Disetujui", "Disetujui", "Ditolak", "Kedaluwarsa"]);
   const src = readFileSync(new URL("../src/routes/approvals.tsx", import.meta.url), "utf8");
-  assert.match(src, /approvalStatusLabel\(shownStatus\)/);
+  // lencana kartu memakai label dari placement; baris yang disetujui tidak pernah Kedaluwarsa hanya karena waktu (tests/approvalTabs.test.ts)
+  assert.match(src, /\{placement\.label\}/);
 });
 
 test("teks antarmuka tidak lagi menyebut Job Feed", () => {

@@ -367,7 +367,7 @@ test("Persetujuan: pertanyaan tampil di bawah status agen dan di atas opsi email
   const questions = page.indexOf("<AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />");
   const email = page.indexOf("<EmailApplyPanel");
   assert.ok(status > 0 && questions > status && email > questions);
-  assert.match(page, /activeTab === 'history' && request\.status === 'approved' && \(\s*<AgentQuestions/);
+  assert.match(page, /\{approved && \(\s*<AgentQuestions/);
   // sesudah tugas ulang diterima: status langsung "pending" supaya polling 15 detik jalan
   assert.match(page, /status: 'pending', error_message: null/);
 });

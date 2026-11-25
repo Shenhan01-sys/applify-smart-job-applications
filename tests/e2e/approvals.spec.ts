@@ -17,8 +17,9 @@ import {
 
 /**
  * Halaman Persetujuan (src/routes/approvals.tsx). Backend Fastify dan Supabase dipalsukan; kode aplikasi asli
- * yang berjalan. Kartu agen (pertanyaan, kode keamanan) hanya ada di tab Riwayat untuk persetujuan berstatus
- * approved, karena di sanalah status tugas apply dibaca.
+ * yang berjalan. Kartu agen (pertanyaan, kode keamanan) ada di persetujuan berstatus approved, karena di sanalah
+ * status tugas apply dibaca. Persetujuan yang sudah disetujui tetapi belum terkirim tetap di tab Menunggu; tab
+ * Riwayat hanya memuat yang sudah terkirim, ditolak, atau kedaluwarsa (src/lib/approvalTabs.ts).
  */
 
 test.describe("Persetujuan: menunggu", () => {
@@ -47,13 +48,13 @@ test.describe("Persetujuan: menunggu", () => {
   });
 
   test("antrean kosong tetapi riwayat berisi: Semua sudah diperiksa", async ({ app, backend }) => {
-    backend.state.history = [approvedApproval("apr-old", { job_title: "Sudah Disetujui" })];
+    backend.state.history = [approval("apr-old", { job_title: "Sudah Ditolak", status: "rejected", reviewed_at: isoAgo(60_000) })];
     await app.goto("/approvals");
     await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
     await expect(app.getByText("Belum ada lamaran yang menunggu persetujuan")).toHaveCount(0);
   });
 
-  test("Setujui memanggil POST approve tepat sekali, tanpa reject, dan memindahkan kartu ke Riwayat", async ({ app, backend }) => {
+  test("Setujui memanggil POST approve tepat sekali, tanpa reject, dan kartu tetap di Menunggu sampai terkirim", async ({ app, backend }) => {
     backend.state.pending = [approval("apr-1", { job_title: "Frontend Engineer" })];
     await app.goto("/approvals");
 
@@ -63,8 +64,13 @@ test.describe("Persetujuan: menunggu", () => {
     await dialog.getByRole("button", { name: /Setujui/ }).click();
 
     await expect(app.getByText("Disetujui — lamaran masuk antrean agen.")).toBeVisible();
-    // Setelah menyetujui, riwayat berisi: daftar menunggu kosong berarti semuanya sudah diperiksa.
-    await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
+    // Disetujui belum berarti terkirim: kartunya tetap di Menunggu dengan label status, dan Riwayat tetap kosong.
+    await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toHaveCount(0);
+    await expect(app.getByText("Disetujui, belum terkirim")).toBeVisible();
+    await expect(app.getByRole("button", { name: /Periksa/ })).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
+    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("0");
 
     const approves = backend.callsTo("POST", "/api/approvals/apr-1/approve");
     expect(approves).toHaveLength(1);
@@ -73,7 +79,8 @@ test.describe("Persetujuan: menunggu", () => {
     expect(backend.callsTo("POST", "/api/approvals/apr-1/reject")).toHaveLength(0);
 
     await app.getByRole("button", { name: /Riwayat/ }).click();
-    await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Belum ada riwayat" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toHaveCount(0);
   });
 
   test("Setujui sesudah surat diedit mengirim versi yang diedit", async ({ app, backend }) => {
@@ -139,7 +146,6 @@ test.describe("Persetujuan: kartu pertanyaan agen", () => {
   test("menampilkan pertanyaan yang tidak bisa dijawab agen, per jenis isian", async ({ app, backend }) => {
     seedQuestions(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toBeVisible();
     await expect(app.getByText("3 pertanyaan")).toBeVisible();
@@ -155,7 +161,6 @@ test.describe("Persetujuan: kartu pertanyaan agen", () => {
   test("jawaban kosong ditolak di layar: tidak menyimpan dan tidak menjalankan agen", async ({ app, backend }) => {
     seedQuestions(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await app.getByRole("button", { name: "Simpan jawaban dan jalankan agen lagi" }).click();
     await expect(app.getByText("Lengkapi semua jawaban dulu")).toBeVisible();
@@ -166,7 +171,6 @@ test.describe("Persetujuan: kartu pertanyaan agen", () => {
   test("jawaban disimpan ke bank jawaban lalu agen dijalankan ulang tepat sekali, dalam urutan itu", async ({ app, backend }) => {
     seedQuestions(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await app.getByLabel(QUESTIONS[0].label).fill("Karena produknya membantu pencari kerja.");
     await app.getByLabel(QUESTIONS[1].label).selectOption("Yes");
@@ -203,7 +207,6 @@ test.describe("Persetujuan: kartu pertanyaan agen", () => {
       { id: "ans-1", question_key: QUESTIONS[0].key, question_label: QUESTIONS[0].label, answer: "Jawaban dari lowongan lain.", updated_at: isoAgo(1000) },
     ];
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
     await expect(app.getByLabel(QUESTIONS[0].label)).toHaveValue("Jawaban dari lowongan lain.");
   });
 });
@@ -220,7 +223,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
   test("agen menunggu kode: kolom kode dan penghitung waktu tampil", async ({ app, backend }) => {
     seedAwaiting(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Menunggu kode keamanan").first()).toBeVisible();
     await expect(app.getByRole("heading", { name: "Masukkan kode keamanan" })).toBeVisible();
@@ -233,7 +235,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
   test("kode dikirim ke POST /api/agent/security-code tepat sekali dan tidak bocor ke URL, konsol, atau penyimpanan", async ({ app, backend, guard }) => {
     seedAwaiting(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await app.getByLabel("Kode dari email").fill(CODE);
     await app.getByRole("button", { name: "Kirim kode ke agen" }).click();
@@ -266,7 +267,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
   test("kode dengan spasi atau tanda hubung dirapikan sebelum dikirim", async ({ app, backend }) => {
     seedAwaiting(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await app.getByLabel("Kode dari email").fill("K7Q-93X");
     await app.getByRole("button", { name: "Kirim kode ke agen" }).click();
@@ -277,7 +277,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
   test("kode yang panjangnya salah tidak dikirim", async ({ app, backend }) => {
     seedAwaiting(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const input = app.getByLabel("Kode dari email");
     await input.fill("12");
@@ -291,7 +290,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
     seedAwaiting(backend);
     backend.override("POST /api/agent/security-code", { status: 409, body: { error: "agent_not_waiting", code: "agent_not_waiting" } });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await app.getByLabel("Kode dari email").fill(CODE);
     await app.getByRole("button", { name: "Kirim kode ke agen" }).click();
@@ -306,7 +304,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
     backend.state.queue = [queueRow("queue-t", "apr-t", "completed")];
     backend.state.logs = [stoppedLog("queue-t", "apr-t", null, { reason: "code_timeout" })];
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Kode tidak dimasukkan")).toBeVisible();
     await app.getByRole("button", { name: "Jalankan agen lagi" }).click();
@@ -321,7 +318,6 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
     backend.state.queue = [queueRow("queue-o", "apr-o", "completed")];
     backend.state.logs = [applyLog("queue-o", "apr-o", "awaiting_code", { awaiting_until: new Date(Date.now() + 600_000).toISOString(), code_length: 6 })];
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Agen pengisi formulir")).toBeVisible();
     await expect(app.getByRole("heading", { name: "Masukkan kode keamanan" })).toHaveCount(0);
@@ -341,14 +337,13 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
     backend.state.logs = [log];
   }
 
-  async function openHistory(app: import("@playwright/test").Page) {
+  async function openApproved(app: import("@playwright/test").Page) {
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
   }
 
   test("kartu menampilkan pertanyaan dari ekstensi, kolom rahasia tanpa isian, dan ringkasan berkas tanpa path", async ({ app, backend }) => {
     seedExtension(backend);
-    await openHistory(app);
+    await openApproved(app);
 
     await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toBeVisible();
     // Hanya dua pertanyaan yang bisa dijawab; kolom rahasia tidak dihitung.
@@ -371,7 +366,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
 
   test("log ekstensi dibaca dengan sesi pengguna: kueri dibatasi action apply, kanal ekstensi, dan id persetujuan", async ({ app, backend }) => {
     seedExtension(backend);
-    await openHistory(app);
+    await openApproved(app);
     await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toBeVisible();
 
     const reads = backend.readsOf("application_logs");
@@ -390,7 +385,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
 
   test("jawaban disimpan ke bank jawaban tanpa memanggil rerun worker, lalu kartu minta kembali ke tab lowongan", async ({ app, backend }) => {
     seedExtension(backend);
-    await openHistory(app);
+    await openApproved(app);
 
     await app.getByLabel(WHY.label).fill("Karena produknya membantu pencari kerja.");
     await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
@@ -416,7 +411,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
 
   test("pertanyaan wajib yang kosong ditolak di layar, tidak menyimpan; opsional boleh kosong", async ({ app, backend }) => {
     seedExtension(backend);
-    await openHistory(app);
+    await openApproved(app);
 
     await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
     await expect(app.getByText("Lengkapi semua jawaban dulu")).toBeVisible();
@@ -434,7 +429,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
       { ...questionsLog("queue-m", "apr-m"), created_at: isoAgo(10 * 60_000) },
       extensionQuestionsLog("apr-m", { questions: [{ key: "expected salary", label: "Expected salary (IDR)", kind: "text", required: true }] }),
     ];
-    await openHistory(app);
+    await openApproved(app);
 
     await expect(app.getByLabel("Expected salary (IDR)")).toBeVisible();
     await expect(app.getByLabel(QUESTIONS[1].label)).toHaveCount(0);
@@ -449,7 +444,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
       questionsLog("queue-m", "apr-m"),
       { ...extensionQuestionsLog("apr-m", { questions: [{ key: "expected salary", label: "Expected salary (IDR)", kind: "text", required: true }] }), created_at: isoAgo(10 * 60_000) },
     ];
-    await openHistory(app);
+    await openApproved(app);
 
     await expect(app.getByLabel(QUESTIONS[1].label)).toBeVisible();
     await expect(app.getByLabel("Expected salary (IDR)")).toHaveCount(0);
@@ -462,7 +457,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
       backend,
       extensionQuestionsLog(APR, { questions: [EXTENSION_QUESTIONS[2]], questions_pending: 1, documents_attached: { resume: false } }),
     );
-    await openHistory(app);
+    await openApproved(app);
 
     await expect(app.getByRole("heading", { name: "Isi sendiri di halaman lowongan" })).toBeVisible();
     await expect(app.getByTestId("agent-self-fill")).toContainText("Account password");
@@ -478,7 +473,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
       backend,
       extensionQuestionsLog(APR, { questions: [EXTENSION_QUESTIONS[0], fileQuestion], questions_pending: 2, documents_attached: { resume: false } }),
     );
-    await openHistory(app);
+    await openApproved(app);
 
     // Hanya satu pertanyaan yang bisa dijawab; berkas tidak dihitung dan tidak punya isian.
     await expect(app.getByText("1 pertanyaan")).toBeVisible();
@@ -493,7 +488,7 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
   test("hanya berkas: kartu Isi sendiri dengan petunjuk, tanpa isian dan tanpa tombol simpan", async ({ app, backend }) => {
     const fileQuestion = { key: "unggah cv secara manual", label: "Unggah CV secara manual", kind: "file", required: true };
     seedExtension(backend, extensionQuestionsLog(APR, { questions: [fileQuestion], questions_pending: 1, documents_attached: { resume: false } }));
-    await openHistory(app);
+    await openApproved(app);
 
     await expect(app.getByRole("heading", { name: "Isi sendiri di halaman lowongan" })).toBeVisible();
     await expect(app.getByTestId("agent-file-upload")).toContainText("Unggah CV sendiri di tab lowongan yang dibuka ekstensi");
@@ -504,7 +499,10 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
 
   test("ekstensi sudah mengirim (success): tidak ada kartu pertanyaan, hanya status Terkirim", async ({ app, backend }) => {
     seedExtension(backend, extensionQuestionsLog(APR, { questions: [] }, { status: "success" }));
-    await openHistory(app);
+    await openApproved(app);
+    // Sudah terkirim: kartunya pindah ke Riwayat.
+    await expect(app.getByRole("heading", { name: "Data Analyst" })).toHaveCount(0);
+    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Terkirim").first()).toBeVisible();
     await expect(app.getByRole("heading", { name: "Agen butuh jawabanmu" })).toHaveCount(0);
@@ -549,7 +547,6 @@ test.describe("Persetujuan: antrean ekstensi & jeda menunggu login", () => {
     ];
 
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Menunggu login di tab browser").first()).toBeVisible();
     const openBtn = app.getByTestId("open-login-tab");
@@ -575,7 +572,6 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
   test("lamaran disetujui di situs login tanpa tugas agen: blok izin tampil, Izinkan memanggil endpoint sekali dan status menjadi menunggu ekstensi", async ({ app, backend }) => {
     seedPortal(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const consent = app.getByTestId("extension-consent");
     await expect(consent.getByText("Izinkan ekstensi browser mengisi formulir ini")).toBeVisible();
@@ -602,7 +598,6 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
   test("centang 'Selalu izinkan tanpa bertanya' mengirim always: true", async ({ app, backend }) => {
     seedPortal(backend);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const consent = app.getByTestId("extension-consent");
     await consent.getByLabel("Selalu izinkan tanpa bertanya").check();
@@ -612,7 +607,7 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     await expect(app.getByText("Izin diberikan. Ekstensi akan dipakai otomatis untuk situs yang perlu login.", { exact: false })).toBeVisible();
   });
 
-  test("jawaban approve meminta izin: Riwayat terbuka sendiri dan blok izin tampil tanpa lamaran masuk antrean", async ({ app, backend }) => {
+  test("jawaban approve meminta izin: kartu tetap di Menunggu, blok izin tampil, tanpa lamaran masuk antrean", async ({ app, backend }) => {
     backend.state.pending = [approval("apr-flag", { platform: "jobstreet", job_title: "Frontend Engineer" })];
     backend.state.approveExtra = { apply_channel: "extension", extension_consent_required: true };
     await app.goto("/approvals");
@@ -620,10 +615,12 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     await app.getByRole("button", { name: /Periksa/ }).click();
     await app.getByRole("dialog").getByRole("button", { name: /Setujui/ }).click();
 
-    await expect(app.getByText("Disetujui. Izinkan ekstensi browser untuk mengisi formulirnya di tab Riwayat.")).toBeVisible();
+    await expect(app.getByText("Disetujui. Izinkan ekstensi browser untuk mengisi formulirnya di tab Menunggu.")).toBeVisible();
     await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    await expect(app.getByText("Perlu tindakanmu")).toBeVisible();
     await expect(app.getByTestId("extension-consent")).toBeVisible();
-    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("1");
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
+    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("0");
 
     await app.getByTestId("extension-consent").getByRole("button", { name: "Izinkan" }).click();
     await expect.poll(() => backend.callsTo("POST", CONSENT_PATH("apr-flag")).length).toBe(1);
@@ -647,11 +644,16 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     ];
     backend.state.logs = [applyLog("queue-sent", "apr-sent", "success", { confirmation_phrase: "Terima kasih" })];
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
+    // Menunggu: yang masih berjalan dan yang belum punya tugas (LinkedIn). Yang sudah terkirim pindah ke Riwayat.
     await expect(app.getByRole("heading", { name: "Aktif" })).toBeVisible();
-    await expect(app.getByRole("heading", { name: "Sudah Terkirim" })).toBeVisible();
     await expect(app.getByRole("heading", { name: "Dari LinkedIn" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Sudah Terkirim" })).toHaveCount(0);
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByRole("heading", { name: "Sudah Terkirim" })).toBeVisible();
+    await expect(app.getByRole("heading", { name: "Aktif" })).toHaveCount(0);
     await expect(app.getByTestId("extension-consent")).toHaveCount(0);
   });
 
@@ -660,7 +662,6 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     backend.state.queue = [queueRow("queue-auth", "apr-auth", "completed")];
     backend.state.logs = [applyLog("queue-auth", "apr-auth", "incomplete", { reason: "auth_required", fields_filled: 0 })];
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const consent = app.getByTestId("extension-consent");
     await expect(consent).toBeVisible();
@@ -671,7 +672,6 @@ test.describe("Persetujuan: izin Ekstensi Browser", () => {
     seedPortal(backend);
     backend.override(`POST ${CONSENT_PATH("apr-ext")}`, { status: 500, body: { error: "boom SECRET_KEY", code: "internal_error" } });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const consent = app.getByTestId("extension-consent");
     await consent.getByRole("button", { name: "Izinkan" }).click();
@@ -701,7 +701,6 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
       scheduled_at: new Date(Date.now() + 30_000).toISOString(),
     });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
     const hint = app.getByTestId("extension-wait-hint");
@@ -713,7 +712,6 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
   test("baris lama dengan pesan tanpa kode tetap terbaca sebagai butuh izin, tanpa menyebut host", async ({ app, backend }) => {
     seedDealls(backend, { error_message: "Izin situs ATS belum diberikan di ekstensi.", scheduled_at: new Date(Date.now() + 60_000).toISOString() });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const hint = app.getByTestId("extension-wait-hint");
     await expect(hint).toContainText("Ekstensi perlu izin untuk membuka situs lowongan ini.");
@@ -723,7 +721,6 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
   test("tugas jatuh tempo lebih dari lima menit tanpa disentuh: ekstensi belum aktif", async ({ app, backend }) => {
     seedDealls(backend, { error_message: null, scheduled_at: isoAgo(12 * 60_000) });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const hint = app.getByTestId("extension-wait-hint");
     await expect(hint).toHaveAttribute("data-wait-reason", "no_extension_seen");
@@ -734,7 +731,6 @@ test.describe("Persetujuan: ekstensi menunggu", () => {
   test("menunggu biasa (baru masuk antrean): teks lama dipertahankan tanpa sorotan", async ({ app, backend }) => {
     seedDealls(backend, { error_message: null, scheduled_at: isoAgo(30_000) });
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     await expect(app.getByText("Menunggu Ekstensi Browser").first()).toBeVisible();
     await expect(app.getByText(/Ekstensi akan membuka tab baru di browser kamu dan mengisi formulir di sana/)).toBeVisible();
@@ -759,7 +755,6 @@ test.describe("Persetujuan: email yang tidak dikirim karena mode uji", () => {
   test("log skipped real_submit_off: lencana Belum dikirim (mode uji) dan penjelasannya, bukan dianggap terkirim", async ({ app, backend }) => {
     seedEmail(backend, [emailLog("skipped", { reason: "real_submit_off", note: "email tidak dikirim" })]);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
 
     const badge = app.getByTestId("email-test-mode");
     await expect(badge).toHaveText("Belum dikirim (mode uji)");
@@ -774,14 +769,12 @@ test.describe("Persetujuan: email yang tidak dikirim karena mode uji", () => {
   test("catatan lama (ALLOW_REAL_SUBMIT=false tanpa reason) dikenali sama; skipped karena kuota bukan mode uji", async ({ app, backend }) => {
     seedEmail(backend, [emailLog("skipped", { note: "email tidak dikirim (ALLOW_REAL_SUBMIT=false)" })]);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
     await expect(app.getByTestId("email-test-mode")).toBeVisible();
   });
 
   test("skipped karena alasan lain atau tanpa log: tidak ada lencana mode uji", async ({ app, backend }) => {
     seedEmail(backend, [emailLog("skipped", { note: "kuota harian habis (10/10, paket free); email tidak dikirim" })]);
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
     await expect(app.getByRole("heading", { name: "Staf Admin" })).toBeVisible();
     await expect(app.getByTestId("email-test-mode")).toHaveCount(0);
   });
@@ -825,7 +818,6 @@ test.describe("Persetujuan: lampiran email", () => {
 
   async function openPanel(app: import("@playwright/test").Page) {
     await app.goto("/approvals");
-    await app.getByRole("button", { name: /Riwayat/ }).click();
     await app.getByRole("button", { name: /Opsi lain: Kirim lewat Email/ }).click();
   }
 
@@ -948,5 +940,88 @@ test.describe("Persetujuan: lampiran email", () => {
     await app.getByRole("button", { name: /Riwayat/ }).click();
     await expect(app.getByText("sudah dipakai")).toBeVisible();
     await expect(app.getByTestId("email-sent-attachments")).toHaveCount(0);
+  });
+});
+
+test.describe("Persetujuan: pembagian tab Menunggu dan Riwayat", () => {
+  test("disetujui tetapi belum terkirim tetap di Menunggu dengan label status; Riwayat hanya terkirim, ditolak, kedaluwarsa", async ({ app, backend }) => {
+    backend.state.pending = [approval("apr-new", { job_title: "Draf Baru" })];
+    backend.state.history = [
+      approvedApproval("apr-proc", { job_title: "Sedang Jalan" }),
+      approvedApproval("apr-fill", { job_title: "Terisi Saja" }),
+      approvedApproval("apr-fail", { job_title: "Agen Gagal" }),
+      approvedApproval("apr-sent", { job_title: "Sudah Terkirim" }),
+      approval("apr-rej", { job_title: "Ditolak Pengguna", status: "rejected", reviewed_at: isoAgo(60_000) }),
+      approval("apr-exp", { job_title: "Sudah Lewat", status: "expired", expires_at: isoAgo(60_000), reviewed_at: isoAgo(120_000) }),
+    ];
+    backend.state.queue = [
+      queueRow("queue-proc", "apr-proc", "processing"),
+      queueRow("queue-fill", "apr-fill", "completed"),
+      queueRow("queue-fail", "apr-fail", "failed", { error_message: "Timeout membuka formulir" }),
+      queueRow("queue-sent", "apr-sent", "completed"),
+    ];
+    backend.state.logs = [
+      stoppedLog("queue-fill", "apr-fill", "not_allowed"),
+      applyLog("queue-sent", "apr-sent", "success", { confirmation_phrase: "Terima kasih" }),
+    ];
+    await app.goto("/approvals");
+
+    // Menunggu: draf baru + tiga persetujuan yang belum terkirim.
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("4");
+    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("3");
+    for (const title of ["Draf Baru", "Sedang Jalan", "Terisi Saja", "Agen Gagal"]) {
+      await expect(app.getByRole("heading", { name: title })).toBeVisible();
+    }
+    for (const title of ["Sudah Terkirim", "Ditolak Pengguna", "Sudah Lewat"]) {
+      await expect(app.getByRole("heading", { name: title })).toHaveCount(0);
+    }
+    await expect(app.getByText("Menunggu persetujuan", { exact: true })).toBeVisible();
+    await expect(app.getByText("Sedang diproses", { exact: true })).toBeVisible();
+    await expect(app.getByText("Terisi, belum terkirim", { exact: true })).toBeVisible();
+    await expect(app.getByText("Gagal, bisa dicoba lagi", { exact: true })).toBeVisible();
+    // Hanya draf yang menunggu keputusan yang punya tombol Periksa.
+    await expect(app.getByRole("button", { name: /Periksa/ })).toHaveCount(1);
+
+    // Riwayat: terkirim, ditolak, dan kedaluwarsa, tanpa yang masih berjalan.
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    for (const title of ["Sudah Terkirim", "Ditolak Pengguna", "Sudah Lewat"]) {
+      await expect(app.getByRole("heading", { name: title })).toBeVisible();
+    }
+    for (const title of ["Draf Baru", "Sedang Jalan", "Terisi Saja", "Agen Gagal"]) {
+      await expect(app.getByRole("heading", { name: title })).toHaveCount(0);
+    }
+    await expect(app.getByText("Terkirim", { exact: true }).first()).toBeVisible();
+    await expect(app.getByText("Ditolak", { exact: true })).toBeVisible();
+    await expect(app.getByText("Kedaluwarsa", { exact: true })).toBeVisible();
+    await expect(app.getByRole("button", { name: /Periksa/ })).toHaveCount(0);
+  });
+
+  test("agen gagal dan masa berlaku persetujuan habis: tidak bisa dicoba lagi, ditutup di Riwayat sebagai kedaluwarsa", async ({ app, backend }) => {
+    backend.state.history = [approvedApproval("apr-late", { job_title: "Gagal Lama", expires_at: isoAgo(30 * 60_000) })];
+    backend.state.queue = [queueRow("queue-late", "apr-late", "failed", { error_message: "Timeout membuka formulir" })];
+    await app.goto("/approvals");
+
+    await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(app.getByRole("heading", { name: "Gagal Lama" })).toBeVisible();
+    await expect(app.getByText("Gagal, masa berlaku habis", { exact: true })).toBeVisible();
+  });
+
+  test("tombol 'Saya sudah mengirimnya sendiri' tidak ada; panel kirim sendiri tetap menawarkan buka formulir dan salin isian", async ({ app, backend }) => {
+    backend.state.history = [approvedApproval("apr-m", { job_title: "Berhenti Sebelum Kirim" })];
+    backend.state.jobs = [jobRow("job-apr-m", { external_url: "https://jobs.example.test/job-apr-m" })];
+    backend.state.queue = [queueRow("queue-m", "apr-m", "completed")];
+    backend.state.logs = [stoppedLog("queue-m", "apr-m", "not_allowed")];
+    await app.goto("/approvals");
+
+    await expect(app.getByText("Terisi, belum terkirim", { exact: true })).toBeVisible();
+    const manual = app.getByRole("region", { name: "Kirim sendiri di situs lowongan" });
+    await expect(manual).toBeVisible();
+    await expect(manual.getByRole("link", { name: /Buka formulir lowongan/ })).toBeVisible();
+    await expect(manual.getByText("Salin isian agen (1)")).toBeVisible();
+    await expect(app.getByRole("button", { name: /Saya sudah mengirimnya sendiri/ })).toHaveCount(0);
+    await expect(app.getByText(/sudah mengirimnya sendiri/i)).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Ya, tandai terkirim/ })).toHaveCount(0);
+    expect(backend.callsTo("POST", "/api/approvals/apr-m/mark-sent")).toHaveLength(0);
   });
 });

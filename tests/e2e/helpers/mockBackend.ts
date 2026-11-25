@@ -272,7 +272,7 @@ export class MockBackend {
     return route.fulfill(json(501, { error: "not_mocked", path }));
   }
 
-  /** Setujui atau tolak memindahkan baris dari Menunggu ke Riwayat, seperti backend sungguhan. */
+  /** Setujui atau tolak memindahkan baris dari daftar pending ke daftar history backend, seperti backend sungguhan. */
   private settle(id: string, kind: "approve" | "reject", body: unknown): void {
     const idx = this.state.pending.findIndex((a) => a.id === id);
     if (idx < 0) return;

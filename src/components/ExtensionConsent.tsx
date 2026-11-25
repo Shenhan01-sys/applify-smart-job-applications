@@ -26,7 +26,7 @@ interface Props {
 }
 
 /**
- * Izin memakai Ekstensi Browser untuk satu persetujuan. Tampil di kartu Riwayat bila lamaran disetujui, belum
+ * Izin memakai Ekstensi Browser untuk satu persetujuan. Tampil di kartu persetujuan (tab Menunggu) bila lamaran disetujui, belum
  * terkirim, dan belum ada tugas agen yang aktif (lihat lib/extensionConsent.ts). Tombol Izinkan memanggil
  * POST /api/approvals/:id/extension-consent; centang "Selalu izinkan" juga menyalakan pengaturan ekstensi otomatis.
  * Status sambungan ekstensi tidak diketahui Applify, jadi hanya ada tautan ke bagian ekstensi di Pengaturan.

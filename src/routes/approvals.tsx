@@ -17,13 +17,13 @@ import { pendingEmptyState } from "@/lib/approvalsEmpty";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
-import { approvalStatusLabel, effectiveApprovalStatus } from "@/lib/statusLabels";
+import { splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
 import {
   ShieldCheck, History, ChevronRight, Clock, CheckCircle2,
-  XCircle, AlertCircle, Loader2, Sparkles
+  XCircle, AlertCircle, Loader2, Sparkles, type LucideIcon
 } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -53,6 +53,31 @@ interface ApprovalRequest {
   cover_letter?: string | null;
   resume_url?: string | null;
 }
+
+type StageStyle = { icon: LucideIcon; text: string };
+
+const AMBER = 'bg-amber-100 text-amber-800 border-amber-200';
+const GREEN = 'bg-green-100 text-green-800 border-green-200';
+const RED = 'bg-red-100 text-red-800 border-red-200';
+const GRAY = 'bg-gray-100 text-gray-800 border-gray-200';
+const BLUE = 'bg-blue-100 text-blue-800 border-blue-200';
+
+/** Ikon dan warna lencana per tahap (lib/approvalTabs.ts). Labelnya datang dari placement.label. */
+const STAGE_STYLE: Record<ApprovalStage, StageStyle> = {
+  review:          { icon: Clock,        text: AMBER },
+  checking:        { icon: AlertCircle,  text: GRAY },
+  not_started:     { icon: Clock,        text: GRAY },
+  processing:      { icon: Loader2,      text: BLUE },
+  needs_action:    { icon: AlertCircle,  text: AMBER },
+  filled_not_sent: { icon: AlertCircle,  text: AMBER },
+  unverified:      { icon: AlertCircle,  text: AMBER },
+  test_mode:       { icon: AlertCircle,  text: GRAY },
+  failed_retry:    { icon: XCircle,      text: RED },
+  sent:            { icon: CheckCircle2, text: GREEN },
+  rejected:        { icon: XCircle,      text: RED },
+  expired:         { icon: AlertCircle,  text: GRAY },
+  replaced:        { icon: AlertCircle,  text: GRAY },
+};
 
 function ApprovalsPage() {
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
@@ -98,12 +123,6 @@ function ApprovalsPage() {
 
   // Sesudah backend menerima kode keamanan: baca status agen sekarang juga, tanpa menunggu putaran berikutnya.
   const handleCodeSent = () => {
-    if (isMockMode()) return;
-    loadEmailApplyData(history).then(setEmailData).catch(() => {});
-  };
-
-  // Sesudah pengguna menandai lamaran terkirim (dikirim sendiri): backend sudah mencatatnya, baca log dan status sekarang juga.
-  const handleManualMarked = () => {
     if (isMockMode()) return;
     loadEmailApplyData(history).then(setEmailData).catch(() => {});
   };
@@ -169,10 +188,10 @@ function ApprovalsPage() {
     const approvedId = selectedRequest?.id;
     setModalOpen(false);
     setSelectedRequest(null);
-    // Situs yang perlu login: lamaran belum diantre. Buka Riwayat supaya blok "Izinkan ekstensi" langsung terlihat.
+    // Situs yang perlu login: lamaran belum diantre. Persetujuannya tetap di tab Menunggu (belum terkirim),
+    // dan blok "Izinkan ekstensi" langsung terlihat di kartunya.
     if (result?.consentRequired && approvedId) {
       setConsentIds((ids) => new Set(ids).add(approvedId));
-      handleTabChange('history');
     }
     loadData(); // the modal already confirmed the approval with a toast
   };
@@ -181,16 +200,6 @@ function ApprovalsPage() {
     setModalOpen(false);
     setSelectedRequest(null);
     loadData();
-  };
-
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { icon: any; color: string; bg: string; border: string; text: string }> = {
-      pending:   { icon: Clock,       color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200', text: 'bg-amber-100 text-amber-800 border-amber-200' },
-      approved:  { icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200', text: 'bg-green-100 text-green-800 border-green-200' },
-      rejected:  { icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',   text: 'bg-red-100 text-red-800 border-red-200' },
-      expired:   { icon: AlertCircle,  color: 'text-gray-600',   bg: 'bg-gray-50',   border: 'border-gray-200',  text: 'bg-gray-100 text-gray-800 border-gray-200' },
-    };
-    return configs[status] || configs.pending;
   };
 
   if (loading) {
@@ -215,7 +224,16 @@ function ApprovalsPage() {
     );
   }
 
-  const displayApprovals = activeTab === 'pending' ? pendingApprovals : history;
+  // Menunggu memuat yang belum selesai (termasuk yang sudah disetujui tetapi belum terkirim). Riwayat hanya yang terkirim atau ditutup.
+  const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) => ({
+    agent: emailData.agent[a.id],
+    sent: emailData.used.has(a.id),
+    emailJob: emailData.jobs[a.id],
+    testMode: emailData.testMode.has(a.id),
+    agentKnown: emailData.agentKnown,
+    consentRequired: consentIds.has(a.id),
+  }));
+  const displayApprovals = activeTab === 'pending' ? tabs.pending : tabs.history;
 
   return (
     <AppShell>
@@ -229,8 +247,8 @@ function ApprovalsPage() {
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
         {[
-          { key: 'pending' as const, label: 'Menunggu', icon: ShieldCheck, count: pendingApprovals.length },
-          { key: 'history' as const, label: 'Riwayat', icon: History, count: history.length },
+          { key: 'pending' as const, label: 'Menunggu', icon: ShieldCheck, count: tabs.pending.length },
+          { key: 'history' as const, label: 'Riwayat', icon: History, count: tabs.history.length },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -260,7 +278,7 @@ function ApprovalsPage() {
         <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[8%]">
           {activeTab === 'pending' ? (() => {
             // Belum pernah ada persetujuan: bukan "semua sudah diperiksa", karena belum ada yang diperiksa.
-            const empty = pendingEmptyState(history.length);
+            const empty = pendingEmptyState(tabs.history.length);
             return (
               <>
                 <div className={`h-12 w-12 rounded-full grid place-items-center mx-auto mb-4 ${empty.kind === 'all_checked' ? 'bg-green-100' : 'bg-black/[5%]'}`}>
@@ -280,18 +298,18 @@ function ApprovalsPage() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Belum ada riwayat</h3>
               <p className="text-sm text-muted-foreground">
-                Lamaran yang sudah kamu setujui atau tolak akan muncul di sini.
+                Lamaran yang sudah terkirim, kamu tolak, atau kedaluwarsa akan muncul di sini.
               </p>
             </>
           )}
         </div>
       ) : (
         <div className="space-y-3">
-          {displayApprovals.map((request, i) => {
-            const shownStatus = effectiveApprovalStatus(request.status, request.expires_at);
-            const config = getStatusConfig(shownStatus);
+          {displayApprovals.map(({ item: request, placement }, i) => {
+            const config = STAGE_STYLE[placement.stage];
             const StatusIcon = config.icon;
-            const consent = activeTab === 'history'
+            const approved = request.status === 'approved';
+            const consent = approved
               ? extensionConsentState({
                   approvalStatus: request.status,
                   platform: request.platform,
@@ -313,8 +331,8 @@ function ApprovalsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-bold truncate">{request.job_title}</h3>
                       <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${config.text}`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {approvalStatusLabel(shownStatus)}
+                        <StatusIcon className={`h-3 w-3${placement.stage === 'processing' ? ' animate-spin' : ''}`} aria-hidden="true" />
+                        {placement.label}
                       </span>
                       <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-black/[4%] text-muted-foreground border-2 border-black/[6%]">
                         <Sparkles className="h-3 w-3" />
@@ -337,32 +355,31 @@ function ApprovalsPage() {
                         Alasan: {request.rejection_reason}
                       </p>
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <AgentManualSubmit
                         approvalId={request.id}
                         row={emailData.agent[request.id]}
                         jobUrl={emailData.jobUrls[request.id]}
                         coverLetter={request.cover_letter ?? null}
                         onRerun={handleAgentRerun}
-                        onMarked={handleManualMarked}
                       />
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={loadData} />
                     )}
-                    {activeTab === 'history' && request.status === 'approved' && (
+                    {approved && (
                       <EmailApplyPanel
                         approval={request}
                         gmailConnected={emailData.gmail}
@@ -378,7 +395,7 @@ function ApprovalsPage() {
                       />
                     )}
                   </div>
-                  {activeTab === 'pending' && (
+                  {placement.stage === 'review' && (
                     <button
                       onClick={() => handleReview(request)}
                       className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-1.5 shrink-0 group-hover:shadow-md hover:-translate-y-0.5"

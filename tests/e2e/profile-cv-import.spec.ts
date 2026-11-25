@@ -132,7 +132,7 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
 
     const error = app.locator("#li-import-error");
     await expect(error).toContainText("CV tersimpan, tetapi isinya belum bisa dibaca untuk mengisi profil.");
-    await expect(error).toContainText("tidak berisi teks");
+    await expect(error).toContainText("berupa gambar");
     await expect(error).toHaveAttribute("role", "alert");
     expect(backend.state.storage).toHaveLength(1);
     expect(backend.state.profiles[0].resume_url).toMatch(/\/cv-\d+\.pdf$/);

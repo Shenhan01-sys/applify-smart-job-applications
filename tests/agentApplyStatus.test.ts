@@ -69,12 +69,12 @@ test("gagal dan dilewati: email ditawarkan sebagai cadangan", () => {
   assert.equal(s.suggestEmail, true);
 });
 
-test("halaman Approvals: status agen tampil sebelum opsi email pada riwayat approved", () => {
+test("halaman Approvals: status agen tampil sebelum opsi email pada persetujuan yang disetujui", () => {
   const page = read("../src/routes/approvals.tsx");
   const agentAt = page.indexOf("<AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />");
   const emailAt = page.indexOf("<EmailApplyPanel");
   assert.ok(agentAt > 0 && emailAt > agentAt, "AgentApplyStatus harus dirender sebelum EmailApplyPanel");
-  assert.match(page, /activeTab === 'history' && request\.status === 'approved' && \(\s*<AgentApplyStatus/);
+  assert.match(page, /\{approved && \(\s*<AgentApplyStatus/);
   const panel = read("../src/components/EmailApplyPanel.tsx");
   assert.match(panel, /Opsi lain: Kirim lewat Email/);
 });

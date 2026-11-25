@@ -81,7 +81,7 @@ export interface AgentLogFacts {
   /** application_logs.created_at */
   logged_at?: string | null;
   /**
-   * details.manual === true: pengguna menandai sendiri bahwa lamaran sudah terkirim (POST /api/approvals/:id/mark-sent).
+   * details.manual === true: log lama, pengguna menandai sendiri bahwa lamaran sudah terkirim (POST /api/approvals/:id/mark-sent; tombolnya sudah dihapus dari layar).
    * Agen tidak menekan kirim, jadi tidak ada tangkapan layar halaman konfirmasi. Kunci ini hanya ada bila true.
    */
   manual?: boolean;

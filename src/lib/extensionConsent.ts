@@ -29,7 +29,7 @@ export const EXTENSION_CONSENT_GRANTED_TEXT = "Izin diberikan. Ekstensi akan mem
 export const EXTENSION_CONSENT_ALWAYS_GRANTED_TEXT =
   "Izin diberikan. Ekstensi akan dipakai otomatis untuk situs yang perlu login. Kamu bisa mematikannya di Pengaturan Agen.";
 export const EXTENSION_CONSENT_ALREADY_RUNNING_TEXT = "Ekstensi sudah berjalan untuk lamaran ini.";
-export const EXTENSION_CONSENT_REQUIRED_TOAST = "Disetujui. Izinkan ekstensi browser untuk mengisi formulirnya di tab Riwayat.";
+export const EXTENSION_CONSENT_REQUIRED_TOAST = "Disetujui. Izinkan ekstensi browser untuk mengisi formulirnya di tab Menunggu.";
 export const EXTENSION_CONSENT_EXPIRED_TEXT = "Persetujuan ini sudah kedaluwarsa. Ajukan lagi dari halaman Lowongan.";
 
 /** Alasan blok izin tampil. */

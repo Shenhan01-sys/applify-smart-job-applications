@@ -26,7 +26,7 @@ export function approval(id: string, over: Row = {}): Row {
   };
 }
 
-/** Persetujuan yang sudah disetujui (muncul di tab Riwayat, tempat status agen ditampilkan). */
+/** Persetujuan yang sudah disetujui. Tetap di tab Menunggu sampai ada log success; kartu status agen tampil di sana. */
 export function approvedApproval(id: string, over: Row = {}): Row {
   return approval(id, { status: "approved", reviewed_at: isoAgo(2 * MIN), ...over });
 }

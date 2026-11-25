@@ -26,7 +26,7 @@ function isExternalOauthUrl(raw: string | null | undefined): boolean {
 /**
  * Hasil tugas `apply` (agen pengisi formulir) untuk satu persetujuan, dibaca dari automation_queue
  * (payload.approval_request_id) dan log percobaannya (application_logs: status dan details).
- * Kartu Riwayat Persetujuan memakainya agar pengguna melihat apa yang dikerjakan agen sesudah Setujui,
+ * Kartu persetujuan yang sudah disetujui memakainya agar pengguna melihat apa yang dikerjakan agen sesudah Setujui,
  * bukan hanya tombol email (temuan uji klik 23 November 2026). Status antrean hanya bilang tugasnya
  * selesai; apakah lamaran terkirim dibaca dari log (`log_status`, `submit_check_verdict`, dan seterusnya).
  */

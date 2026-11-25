@@ -546,9 +546,9 @@ export function AppsPage() {
   // Agen menahan formulir karena situs lowongan mengirim kode keamanan ke email. Kodenya dimasukkan di halaman Persetujuan.
   const selectedAwaitingCode = awaitingCodeState(selectedFacts).waiting;
   // Agen berhenti sebelum kirim (situs belum diizinkan, dan sebagainya): pengguna bisa membuka formulir, menyalin isian,
-  // dan menandai lamaran terkirim. Pertanyaan, kode keamanan, dan hasil lain yang punya alur sendiri tidak masuk (lib/manualSubmit.ts).
+  // atau menjalankan agen lagi. Pertanyaan, kode keamanan, dan hasil lain yang punya alur sendiri tidak masuk (lib/manualSubmit.ts).
   const selectedManualState = manualSubmitState(selectedFacts);
-  // Ditandai terkirim oleh pengguna sendiri: bukan kiriman agen, jadi tidak ada bukti dari situs untuk ditampilkan.
+  // Log lama yang ditandai terkirim oleh pengguna sendiri: bukan kiriman agen, jadi tidak ada bukti dari situs untuk ditampilkan.
   const selectedManualSent = isManualSent(selectedFacts);
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
@@ -796,10 +796,6 @@ export function AppsPage() {
                             row={selectedFacts}
                             jobUrl={selectedJob?.external_url}
                             loadCoverLetter
-                            onMarked={() => {
-                              toast.success("Lamaran ditandai terkirim. Kartunya pindah ke Terkirim.");
-                              reloadAfterApply();
-                            }}
                           />
                         )}
                         {!selectedIssue && !selectedAwaitingCode && !selectedManualState && <p className="text-sm text-muted-foreground">

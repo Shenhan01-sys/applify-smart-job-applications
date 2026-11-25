@@ -49,7 +49,8 @@ test("Lamaran: antrean agen terlihat dan jendela detail memakai Radix Dialog", (
 
 test("Persetujuan: label Indonesia dan galat tidak diganti data contoh", () => {
   const src = read("../src/routes/approvals.tsx");
-  assert.match(src, /approvalStatusLabel\((request\.status|shownStatus)\)/);
+  // label lencana datang dari placement (lib/approvalTabs.ts), bukan kode status mentah
+  assert.match(src, /\{placement\.label\}/);
   assert.doesNotMatch(src, /\{request\.status\}/);
   assert.match(src, /<ErrorState/);
   assert.doesNotMatch(src, /toast\.error\('Gagal memuat approvals'\)/);

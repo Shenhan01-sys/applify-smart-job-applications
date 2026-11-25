@@ -10,7 +10,6 @@ import {
   isManualSent,
   manualSentRow,
   manualSubmitState,
-  markSentErrorMessage,
   safeJobUrl,
 } from "../src/lib/manualSubmit.ts";
 import { agentLogFacts } from "../src/lib/agentEvidence.ts";
@@ -21,7 +20,6 @@ import {
   describeAgentApply,
   describeLogOutcome,
 } from "../src/lib/agentApplyStatus.ts";
-import { ApiError } from "../src/lib/apiErrors.ts";
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
@@ -42,7 +40,7 @@ const READY_NOT_ALLOWED = {
   },
 };
 
-// Log yang ditulis POST /api/approvals/:id/mark-sent (backend/services/manual-submit-guard.ts).
+// Log lama yang ditulis POST /api/approvals/:id/mark-sent (backend/services/manual-submit-guard.ts). Tombolnya sudah dihapus dari layar; lognya tetap terbaca.
 const MANUAL_LOG = {
   job_id: "job-1",
   status: "success",
@@ -123,7 +121,7 @@ test("manualSentRow: log manual menggantikan hasil percobaan agen, isian agen te
   assert.equal(row.logged_at, "2026-11-23T15:00:00Z");
   assert.equal(row.filled_fields?.length, 1);
   assert.equal(describeAgentApply(row).label, AGENT_MANUAL_SENT_LABEL);
-  assert.equal(manualSubmitState(row), null, "sesudah ditandai tidak ada lagi tombol kirim sendiri");
+  assert.equal(manualSubmitState(row), null, "log manual lama tidak lagi menampilkan panel kirim sendiri");
 
   // tanpa tugas agen sama sekali (tidak pernah dijalankan): tetap terbaca, status tugas diisi completed
   const bare = manualSentRow(undefined, null);
@@ -142,7 +140,7 @@ test("isManualSent: hanya log success dengan manual true", () => {
 
 // ---- kapan jalan keluar ditawarkan -----------------------------------------------------------------
 
-test("manualSubmitState: ready dengan submit_blocked not_allowed menawarkan semuanya, termasuk coba lagi", () => {
+test("manualSubmitState: ready dengan submit_blocked not_allowed menawarkan buka formulir, salin, dan coba lagi", () => {
   const s = manualSubmitState({ status: "completed", ...agentLogFacts(READY_NOT_ALLOWED) });
   assert.equal(s?.kind, "not_allowed");
   assert.equal(s?.canRerun, true);
@@ -155,7 +153,7 @@ test("manualSubmitState: ready dengan submit_blocked not_allowed menawarkan semu
   assert.equal(manualSubmitState(agentLogFacts(READY_NOT_ALLOWED))?.kind, "not_allowed");
 });
 
-test("manualSubmitState: isian wajib kosong dan ready lain: tombol kirim sendiri ada, coba kirim otomatis lagi tidak", () => {
+test("manualSubmitState: isian wajib kosong dan ready lain: panel tampil, coba kirim otomatis lagi tidak", () => {
   const remaining = manualSubmitState({ log_status: "ready", submit_blocked: "required_remaining" });
   assert.equal(remaining?.kind, "required_remaining");
   assert.equal(remaining?.canRerun, false);
@@ -250,27 +248,11 @@ test("copyText: berhasil lewat Clipboard API, gagal dengan pesan jujur bila tida
   assert.match(manual.COPY_UNAVAILABLE_TEXT, /Pilih teksnya/);
 });
 
-// ---- galat endpoint tandai terkirim ----------------------------------------------------------------
-
-test("markSentErrorMessage: setiap penolakan backend dijelaskan satu per satu", () => {
-  const body = (status: number, code: string, error = "x") => new ApiError(status, JSON.stringify({ error, code }));
-  assert.match(markSentErrorMessage(body(409, "already_sent")), /sudah tercatat terkirim/);
-  assert.match(markSentErrorMessage(body(409, "agent_working")), /Agen sedang bekerja/);
-  assert.match(markSentErrorMessage(body(409, "not_approved")), /belum disetujui/);
-  assert.match(markSentErrorMessage(body(422, "no_job")), /tidak punya lowongan/);
-  assert.match(markSentErrorMessage(new ApiError(404, JSON.stringify({ error: "Approval request not found", code: "not_found" }))), /tidak ditemukan/);
-  assert.match(markSentErrorMessage(new ApiError(401, JSON.stringify({ error: "Unauthorized" }))), /Masuk lagi/);
-  assert.match(markSentErrorMessage(new ApiError(500, JSON.stringify({ error: "Failed to mark as sent: x", code: "mark_failed" }))), /server bermasalah/);
-  assert.match(markSentErrorMessage(new Error("Failed to fetch")), /tidak dapat dihubungi/);
-  assert.equal(markSentErrorMessage(new Error("aneh")), "Lamaran belum bisa ditandai terkirim. Coba lagi.");
-  assert.equal(markSentErrorMessage(undefined), "Lamaran belum bisa ditandai terkirim. Coba lagi.");
-});
-
 test("teks pengguna: tanpa tanda seru dan tanpa em dash, kalimat wajib dari spesifikasi ada", () => {
   const texts = Object.entries(manual)
     .filter(([, v]) => typeof v === "string")
     .map(([k, v]) => [k, v as string] as const);
-  assert.ok(texts.length >= 20);
+  assert.ok(texts.length >= 15);
   for (const [name, text] of texts) {
     assert.doesNotMatch(text, /!/, name);
     assert.doesNotMatch(text, /—/, name);
@@ -279,9 +261,8 @@ test("teks pengguna: tanpa tanda seru dan tanpa em dash, kalimat wajib dari spes
   assert.equal(manual.COPY_PANEL_LABEL, "Salin isian agen");
   assert.equal(manual.COPY_LETTER_LABEL, "Salin cover letter");
   assert.equal(manual.COPIED_TEXT, "Tersalin");
-  assert.equal(manual.MARK_SENT_LABEL, "Saya sudah mengirimnya sendiri");
-  assert.equal(manual.MARK_CONFIRM_TEXT, "Tandai lamaran ini sudah terkirim? Agen tidak akan mengirimnya lagi.");
-  assert.equal(manual.MARKED_TEXT, "Ditandai terkirim manual");
+  assert.match(manual.MANUAL_STEPS_TEXT, /Buka formulirnya/);
+  assert.doesNotMatch(manual.MANUAL_STEPS_TEXT, /tandai/i);
   assert.equal(manual.RERUN_LABEL, "Coba kirim otomatis lagi");
   for (const body of [AGENT_MANUAL_SENT_LABEL, AGENT_MANUAL_SENT_HINT]) {
     assert.doesNotMatch(body, /!|—/);
@@ -290,17 +271,13 @@ test("teks pengguna: tanpa tanda seru dan tanpa em dash, kalimat wajib dari spes
 
 // ---- kabel layar (suite ini tidak punya DOM: membaca teks sumber) -----------------------------------
 
-test("kabel: komponen membuka formulir di tab baru dengan rel aman, menyalin lewat Clipboard API, dan meminta konfirmasi", () => {
+test("kabel: komponen membuka formulir di tab baru dengan rel aman dan menyalin lewat Clipboard API", () => {
   const src = read("../src/components/AgentManualSubmit.tsx");
   assert.match(src, /target="_blank" rel="noopener noreferrer"/);
   assert.match(src, /safeJobUrl\(jobUrl\)/);
   assert.match(src, /copyText\(text, typeof navigator !== "undefined" \? navigator : null\)/);
-  assert.match(src, /MARK_CONFIRM_TEXT/);
-  assert.match(src, /role="group" aria-labelledby=\{confirmId\}/);
-  assert.match(src, /await markApprovalSent\(approvalId\)/);
-  assert.match(src, /markSentErrorMessage\(err\)/);
   // coba kirim otomatis lagi: endpoint rerun yang sudah ada, hanya bila situs belum diizinkan (canRerun)
-  assert.match(src, /state\.canRerun && !confirming/);
+  assert.match(src, /approvalId && state\.canRerun/);
   assert.match(src, /await rerunApproval\(approvalId\)/);
   assert.match(src, /describeRerunError\(err\)/);
   // aksesibel: tombol bertipe, ukuran sentuh, status terbaca pembaca layar, galat sebagai alert
@@ -320,16 +297,16 @@ test("kabel: kartu Persetujuan memasang panel kirim sendiri sesudah pertanyaan a
   const manualAt = page.indexOf("<AgentManualSubmit");
   const emailAt = page.indexOf("<EmailApplyPanel");
   assert.ok(questionsAt > 0 && manualAt > questionsAt && emailAt > manualAt);
-  assert.match(page, /activeTab === 'history' && request\.status === 'approved' && \(\s*<AgentManualSubmit/);
+  // kartu agen tampil di tab mana pun selama persetujuannya sudah disetujui (Menunggu atau Riwayat)
+  assert.match(page, /\{approved && \(\s*<AgentManualSubmit/);
   assert.match(page, /jobUrl=\{emailData\.jobUrls\[request\.id\]\}/);
   assert.match(page, /coverLetter=\{request\.cover_letter \?\? null\}/);
-  assert.match(page, /onMarked=\{handleManualMarked\}/);
   assert.match(page, /onRerun=\{handleAgentRerun\}/);
   const card = read("../src/components/AgentApplyStatus.tsx");
   assert.match(card, /manualSubmitState\(row\)\?\.kind !== "not_allowed"/);
 });
 
-test("kabel: Lamaran Saya memasang panel di jendela detail dan memuat ulang papan sesudah penandaan", () => {
+test("kabel: Lamaran Saya memasang panel di jendela detail", () => {
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /const selectedManualState = manualSubmitState\(selectedFacts\);/);
   assert.match(src, /const selectedManualSent = isManualSent\(selectedFacts\);/);
@@ -339,19 +316,44 @@ test("kabel: Lamaran Saya memasang panel di jendela detail dan memuat ulang papa
   assert.match(block, /approvalId=\{selectedFacts\?\.approval_request_id\}/);
   assert.match(block, /jobUrl=\{selectedJob\?\.external_url\}/);
   assert.match(block, /loadCoverLetter/);
-  assert.match(block, /reloadAfterApply\(\)/);
 });
 
-test("kabel: layanan membaca log manual dan alamat lowongan, dan memanggil endpoint mark-sent lewat automationApi", () => {
+test("kabel: layanan membaca log manual lama dan alamat lowongan, dan memuat cover letter lewat automationApi", () => {
   const svc = read("../src/services/emailApplyService.ts");
   assert.match(svc, /\.select\("action, details, created_at"\)\.eq\("status", "success"\)/);
   assert.match(svc, /details\?\.manual === true/);
   assert.match(svc, /\.select\("id, title, description, requirements, responsibilities, external_url"\)/);
   assert.match(svc, /safeJobUrl\(/);
-  const api = read("../src/services/automationApi.ts");
-  assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/mark-sent/);
   const svc2 = read("../src/services/manualSubmitService.ts");
-  assert.match(svc2, /automationApi\.markApprovalSent\(approvalId\)/);
   assert.match(svc2, /automationApi\.getApproval\(approvalId\)/);
   assert.doesNotMatch(svc2, /supabase/);
+});
+
+// ---- tombol "Saya sudah mengirimnya sendiri" sudah dihapus -------------------------------------------
+
+test("tombol tandai terkirim sendiri sudah tidak ada di layar, komponen, layanan, atau klien API", () => {
+  const files = [
+    "../src/components/AgentManualSubmit.tsx",
+    "../src/routes/approvals.tsx",
+    "../src/routes/applications.tsx",
+    "../src/lib/manualSubmit.ts",
+    "../src/services/manualSubmitService.ts",
+    "../src/services/automationApi.ts",
+  ];
+  for (const file of files) {
+    const src = read(file);
+    assert.doesNotMatch(src, /Saya sudah mengirimnya sendiri/, file);
+    assert.doesNotMatch(src, /Ya, tandai terkirim/, file);
+    assert.doesNotMatch(src, /Tandai lamaran ini sudah terkirim/, file);
+    assert.doesNotMatch(src, /markApprovalSent|markSentErrorMessage|handleManualMarked|onMarked/, file);
+    assert.doesNotMatch(src, /MARK_SENT_|MARK_CONFIRM_/, file);
+  }
+  const names = Object.keys(manual);
+  for (const gone of ["MARK_SENT_LABEL", "MARK_CONFIRM_TEXT", "MARKED_TEXT", "markSentErrorMessage"]) {
+    assert.equal(names.includes(gone), false, gone);
+  }
+  // Panel kirim sendiri tetap ada, tetapi tidak menawarkan penandaan.
+  const panel = read("../src/components/AgentManualSubmit.tsx");
+  assert.match(panel, /OPEN_FORM_LABEL/);
+  assert.doesNotMatch(panel, /markApprovalSent|setConfirming|confirmMark/);
 });

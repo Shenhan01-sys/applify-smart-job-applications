@@ -9,13 +9,6 @@ import {
   LETTER_UNAVAILABLE_TEXT,
   MANUAL_HEADING,
   MANUAL_STEPS_TEXT,
-  MARKED_HINT,
-  MARKED_TEXT,
-  MARK_CONFIRM_NO_LABEL,
-  MARK_CONFIRM_TEXT,
-  MARK_CONFIRM_YES_LABEL,
-  MARK_SENT_BUSY_LABEL,
-  MARK_SENT_LABEL,
   NO_JOB_URL_TEXT,
   OPEN_FORM_LABEL,
   RERUN_BUSY_LABEL,
@@ -24,23 +17,20 @@ import {
   cleanCoverLetter,
   copyText,
   copyableFields,
-  isManualSent,
   manualSubmitState,
-  markSentErrorMessage,
   safeJobUrl,
 } from "@/lib/manualSubmit";
 import { describeRerunError, rerunApproval } from "@/services/formAnswerService";
-import { loadApprovedCoverLetter, markApprovalSent } from "@/services/manualSubmitService";
+import { loadApprovedCoverLetter } from "@/services/manualSubmitService";
 
 const PRIMARY = "inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white transition hover:bg-[#0256d3] disabled:cursor-not-allowed disabled:opacity-60";
-const DARK = "inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#16150F] px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0";
 const OUTLINE = "inline-flex min-h-11 items-center gap-1.5 rounded-lg border-2 border-[#999999] bg-white px-4 text-sm font-semibold transition hover:bg-black/[4%] disabled:cursor-not-allowed disabled:opacity-60";
 const COPY_BUTTON = "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border-2 border-black/[10%] bg-white px-3 text-xs font-semibold transition hover:bg-black/[4%]";
 
 type LetterState = { phase: "idle" | "loading" | "error" } | { phase: "ready"; text: string | null };
 
 interface Props {
-  /** Persetujuan yang dipakai percobaan agen. Tanpa ini tombol tandai dan coba lagi tidak tampil. */
+  /** Persetujuan yang dipakai percobaan agen. Tanpa ini tombol coba lagi tidak tampil. */
   approvalId?: string | null;
   /** Percobaan agen terbaru (fakta dari log, dan status tugas bila ada). */
   row: AgentApplyRow | null | undefined;
@@ -51,18 +41,16 @@ interface Props {
   loadCoverLetter?: boolean;
   /** Sesudah backend menerima tugas ulang, supaya halaman memperbarui status agen dan memulai polling. */
   onRerun?: (approvalId: string) => void;
-  /** Sesudah backend mencatat tanda terkirim, supaya halaman memuat ulang datanya (papan pindah ke Terkirim). */
-  onMarked?: (approvalId: string) => void;
   className?: string;
 }
 
 /**
  * "Kirim sendiri di situs lowongan": jalan keluar saat agen mengisi formulir lalu berhenti sebelum tombol kirim
- * (log ready). Sesi browser agen sudah hilang, jadi pengguna membuka formulir lowongan, menyalin isian dan
- * cover letter dari agen, mengirim sendiri, lalu menandainya di sini. Penandaan memanggil
- * POST /api/approvals/:id/mark-sent: tidak ada yang dikirim ke situs, hanya pencatatan di Applify. Bila situs
- * nanti diizinkan, "Coba kirim otomatis lagi" menjalankan agen lagi lewat endpoint rerun yang sama dengan alur
- * pertanyaan dan kode keamanan. Alur itu (pertanyaan, kode) punya komponennya sendiri dan tidak tampil di sini.
+ * (log ready). Sesi browser agen ada di server dan tidak bisa dijangkau pengguna, jadi pengguna membuka formulir
+ * lowongan di tab baru, lalu menyalin isian dan cover letter dari agen. Applify tidak punya tombol "sudah
+ * kukirim sendiri": status Terkirim hanya datang dari log pengiriman agen atau email. Bila situs nanti diizinkan,
+ * "Coba kirim otomatis lagi" menjalankan agen lagi lewat endpoint rerun yang sama dengan alur pertanyaan dan
+ * kode keamanan. Alur itu (pertanyaan, kode) punya komponennya sendiri dan tidak tampil di sini.
  */
 export default function AgentManualSubmit({
   approvalId,
@@ -71,27 +59,20 @@ export default function AgentManualSubmit({
   coverLetter,
   loadCoverLetter = false,
   onRerun,
-  onMarked,
   className = "mt-3",
 }: Props) {
   const uid = useId();
   const headingId = `${uid}-heading`;
-  const confirmId = `${uid}-confirm`;
   const state = manualSubmitState(row);
-  const sent = isManualSent(row);
   const visible = !!state;
 
   const [letter, setLetter] = useState<LetterState>({ phase: "idle" });
   const [copied, setCopied] = useState<string | null>(null);
   const [copyError, setCopyError] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState<"mark" | "rerun" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [marked, setMarked] = useState(false);
   const [rerunStarted, setRerunStarted] = useState(false);
   const copyTimer = useRef<number | undefined>(undefined);
-  const markButton = useRef<HTMLButtonElement>(null);
-  const confirmYes = useRef<HTMLButtonElement>(null);
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
@@ -118,24 +99,8 @@ export default function AgentManualSubmit({
   useEffect(() => {
     setRerunStarted(false);
     setError("");
-    setConfirming(false);
   }, [attemptAt]);
 
-  useEffect(() => {
-    if (confirming) confirmYes.current?.focus();
-  }, [confirming]);
-
-  if (marked || sent) {
-    return (
-      <div role="status" className={`${className} flex items-start gap-2 rounded-xl border-2 border-green-300 bg-green-50 px-3 py-2.5 text-green-900`}>
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <div className="text-xs leading-relaxed">
-          <p className="font-semibold">{MARKED_TEXT}</p>
-          <p className="mt-0.5">{MARKED_HINT}</p>
-        </div>
-      </div>
-    );
-  }
   if (!state) return null;
 
   const url = safeJobUrl(jobUrl);
@@ -154,37 +119,18 @@ export default function AgentManualSubmit({
     }
   }
 
-  async function confirmMark() {
-    if (busy || !approvalId) return;
-    setBusy("mark");
-    setError("");
-    try {
-      await markApprovalSent(approvalId);
-    } catch (err) {
-      setError(markSentErrorMessage(err));
-      setConfirming(false);
-      setBusy(null);
-      markButton.current?.focus();
-      return;
-    }
-    setBusy(null);
-    setConfirming(false);
-    setMarked(true);
-    onMarked?.(approvalId);
-  }
-
   async function rerun() {
     if (busy || !approvalId) return;
-    setBusy("rerun");
+    setBusy(true);
     setError("");
     try {
       await rerunApproval(approvalId);
     } catch (err) {
       setError(describeRerunError(err));
-      setBusy(null);
+      setBusy(false);
       return;
     }
-    setBusy(null);
+    setBusy(false);
     setRerunStarted(true);
     onRerun?.(approvalId);
   }
@@ -280,58 +226,17 @@ export default function AgentManualSubmit({
       )}
 
       {error && (
-        <p role="alert" id={`${uid}-error`} className="mt-3 rounded-lg border-2 border-red-100 bg-red-50 p-2 text-xs text-red-700">
+        <p role="alert" className="mt-3 rounded-lg border-2 border-red-100 bg-red-50 p-2 text-xs text-red-700">
           {error}
         </p>
       )}
 
-      {approvalId && (
+      {approvalId && state.canRerun && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {confirming ? (
-            <div role="group" aria-labelledby={confirmId} className="w-full rounded-lg border-2 border-amber-300 bg-amber-50 p-3">
-              <p id={confirmId} className="text-xs font-semibold text-amber-900">
-                {MARK_CONFIRM_TEXT}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button ref={confirmYes} type="button" onClick={confirmMark} disabled={busy !== null} aria-busy={busy === "mark"} className={DARK}>
-                  {busy === "mark" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                  {busy === "mark" ? MARK_SENT_BUSY_LABEL : MARK_CONFIRM_YES_LABEL}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirming(false);
-                    markButton.current?.focus();
-                  }}
-                  disabled={busy !== null}
-                  className={OUTLINE}
-                >
-                  {MARK_CONFIRM_NO_LABEL}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              ref={markButton}
-              type="button"
-              onClick={() => {
-                setError("");
-                setConfirming(true);
-              }}
-              disabled={busy !== null}
-              aria-describedby={error ? `${uid}-error` : undefined}
-              className={DARK}
-            >
-              <CheckCircle2 className="h-4 w-4 text-[#D2F801]" aria-hidden="true" />
-              {MARK_SENT_LABEL}
-            </button>
-          )}
-          {state.canRerun && !confirming && (
-            <button type="button" onClick={rerun} disabled={busy !== null || rerunStarted} aria-busy={busy === "rerun"} className={OUTLINE}>
-              {busy === "rerun" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
-              {busy === "rerun" ? RERUN_BUSY_LABEL : RERUN_LABEL}
-            </button>
-          )}
+          <button type="button" onClick={rerun} disabled={busy || rerunStarted} aria-busy={busy} className={OUTLINE}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+            {busy ? RERUN_BUSY_LABEL : RERUN_LABEL}
+          </button>
         </div>
       )}
     </section>

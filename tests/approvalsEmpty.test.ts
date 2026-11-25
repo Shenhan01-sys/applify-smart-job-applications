@@ -31,7 +31,7 @@ test("tab Menunggu kosong: tanpa riwayat = belum pernah ada, dengan riwayat = se
 
 test("halaman Persetujuan memakai keadaan kosong dari jumlah riwayat, bukan kalimat tetap", () => {
   const page = read("../src/routes/approvals.tsx");
-  assert.match(page, /pendingEmptyState\(history\.length\)/);
+  assert.match(page, /pendingEmptyState\(tabs\.history\.length\)/);
   assert.doesNotMatch(page, /Tidak ada yang perlu disetujui/);
   assert.doesNotMatch(page, /Semua permintaan sudah kamu periksa/);
 });
