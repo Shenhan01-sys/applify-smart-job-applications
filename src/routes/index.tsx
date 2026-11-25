@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-  Sparkles, Zap, Brain, Radar, EyeOff, ArrowRight, Check, Rocket, Bot,
-  CalendarCheck, Star, LogIn, UserPlus, Search, Send, Leaf,
-  TrendingUp, Scale, Globe, Clock, BadgeCheck, Quote, Briefcase, GraduationCap,
+  Sparkles, Zap, Brain, Radar, ArrowRight, Check, Bot,
+  LogIn, UserPlus, Search, Send, Leaf,
+  TrendingUp, Scale, Globe, BadgeCheck, Briefcase, GraduationCap,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
 import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
@@ -41,43 +41,6 @@ function ScrollReveal({ children, delay = 0, className = "" }: { children: React
   );
 }
 
-function CountUp({ to, suffix = "", prefix = "", duration = 1500, decimals = 0 }: { to: number; suffix?: string; prefix?: string; duration?: number; decimals?: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let raf = 0;
-    let started = false;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting && !started) {
-          started = true;
-          const start = performance.now();
-          const tick = (now: number) => {
-            const p = Math.min(1, (now - start) / duration);
-            const eased = 1 - Math.pow(1 - p, 3);
-            setVal(to * eased);
-            if (p < 1) raf = requestAnimationFrame(tick);
-          };
-          raf = requestAnimationFrame(tick);
-          obs.disconnect();
-        }
-      },
-      { threshold: 0.4 }
-    );
-    obs.observe(el);
-    return () => { obs.disconnect(); cancelAnimationFrame(raf); };
-  }, [to, duration]);
-  return (
-    <span ref={ref}>
-      {prefix}
-      {val.toLocaleString("id-ID", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
-      {suffix}
-    </span>
-  );
-}
-
 /* ─────────────────────────  Brand marks  ───────────────────────── */
 
 function AgentMark({ size = 32 }: { size?: number }) {
@@ -112,16 +75,19 @@ function AgentMascot({ className = "" }: { className?: string }) {
 
 /* ─────────────────────────  Data  ───────────────────────── */
 
-const platforms = ["LinkedIn", "Jobstreet", "Glints", "KitaLulus", "Kalibrr", "Dealls", "Facebook Groups"];
+const platforms = ["JobStreet", "Glints", "Kalibrr", "Dealls", "LinkedIn", "Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workable"];
 
 const platformMeta: Record<string, { color: string; bg: string; emoji: string }> = {
   LinkedIn:          { color: "#FFFFFF", bg: "#0A66C2", emoji: "💼" },
-  Jobstreet:         { color: "#FFFFFF", bg: "#E8192C", emoji: "🔍" },
+  JobStreet:         { color: "#FFFFFF", bg: "#E8192C", emoji: "🔍" },
   Glints:            { color: "#16150F", bg: "#0BD461", emoji: "✨" },
-  KitaLulus:         { color: "#FFFFFF", bg: "#FF6B00", emoji: "🎓" },
   Kalibrr:           { color: "#FFFFFF", bg: "#2563EB", emoji: "📋" },
   Dealls:            { color: "#FFFFFF", bg: "#6366F1", emoji: "🤝" },
-  "Facebook Groups": { color: "#FFFFFF", bg: "#1877F2", emoji: "👥" },
+  Greenhouse:        { color: "#FFFFFF", bg: "#2D8A57", emoji: "🌱" },
+  Lever:             { color: "#FFFFFF", bg: "#4A5568", emoji: "🔄" },
+  Ashby:             { color: "#FFFFFF", bg: "#5B4BCE", emoji: "⚡" },
+  SmartRecruiters:   { color: "#FFFFFF", bg: "#1664A6", emoji: "🧩" },
+  Workable:          { color: "#FFFFFF", bg: "#1F6E5C", emoji: "🔧" },
 };
 
 /* ─────────────────────────  Page  ───────────────────────── */
@@ -151,14 +117,14 @@ function Landing() {
       <Navbar authLink={authLink} />
       <Hero authLink={authLink} />
       <PlatformMarquee />
-      <StatBand />
+      <TruthBand />
       <Manifesto />
       <ProblemSolution />
       <HowItWorks />
       <CapabilitiesBento />
       <ImpactPillars />
       <GreenCareerSpotlight authLink={authLink} />
-      <Testimonials />
+      <SubmissionPaths />
       <Pricing authLink={authLink} />
       <BehindApplify />
       <FinalCTA authLink={authLink} />
@@ -225,18 +191,18 @@ function Hero({ authLink }: { authLink: string }) {
       <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 md:py-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 md:px-8">
         <div className="flex flex-col justify-center animate-fade-up">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#D2F801] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#16150F]">
-            <Sparkles className="h-3.5 w-3.5" /> Autonomous AI Career Agent
+            <Sparkles className="h-3.5 w-3.5" /> Asisten AI untuk menyiapkan lamaran
           </span>
           <h1 className="mt-6 font-display text-[2.6rem] font-extrabold leading-[0.98] tracking-tight md:text-6xl lg:text-[4.5rem]">
-            Agen AI <span className="text-[#0A5BE0]">Otonom</span><br />
-            yang <span className="relative inline-block">Melamar Kerja
+            Asisten AI untuk<br />
+            menyiapkan <span className="relative inline-block">Lamaran Kerja
               <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 300 10" preserveAspectRatio="none" aria-hidden="true">
                 <path d="M2 7 Q150 1 298 6" stroke="#D2F801" strokeWidth="6" fill="none" strokeLinecap="round" />
               </svg>
             </span><br />untukmu.
           </h1>
           <p className="mt-7 max-w-xl text-base md:text-lg text-muted-foreground leading-relaxed">
-            Applify memindai LinkedIn, Jobstreet, Glints, dan 4 platform lain sekaligus — lalu <b className="text-foreground font-semibold">menulis, melamar, dan menyiapkan interview</b> atas namamu. Otomatis. 24/7.
+            Applify membantu mencari lowongan dan menyiapkan draf lamaran. Tidak ada lamaran yang dikirim sebelum kamu menekan Setujui di halaman Persetujuan. Cara pengiriman bergantung pada situs lowongan.
           </p>
           <div className="mt-4 font-display text-lg font-semibold text-[#16150F]">
             Apply Smarter. <span className="text-[#0A5BE0]">Fairer.</span> Together.
@@ -247,21 +213,15 @@ function Hero({ authLink }: { authLink: string }) {
               search={authLink === "/login" ? { mode: "daftar" } : undefined}
               className="inline-flex h-12 items-center rounded-xl bg-[#16150F] px-6 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
             >
-              Aktifkan Agen Gratis <ArrowRight className="ml-2 h-4 w-4" />
+              Daftar Gratis <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <a href="#cara-kerja" className="inline-flex h-12 items-center rounded-xl border-2 border-[color:var(--border)] bg-white px-6 text-sm font-semibold hover:bg-black/[3%] transition">
               Lihat Cara Kerja →
             </a>
           </div>
-          <div className="mt-9 flex items-center gap-4">
-            <div className="flex -space-x-2">
-              {["#0A5BE0", "#D9741A", "#1C9656", "#16150F"].map((c, i) => (
-                <div key={i} className="h-9 w-9 rounded-full border-2 border-[#F4F1E8] grid place-items-center text-white text-xs font-bold" style={{ background: c }}>
-                  {["RZ", "DW", "AP", "FH"][i]}
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground"><span className="font-mono font-bold text-foreground"><CountUp to={12400} suffix="+" /></span> pencari kerja sudah bergabung</p>
+          <div className="mt-9 flex items-center gap-2 text-sm text-muted-foreground">
+            <Check className="h-4 w-4 text-[#1C9656]" aria-hidden="true" />
+            Kamu meninjau dan menyetujui lamaran sebelum dikirim.
           </div>
         </div>
 
@@ -273,9 +233,7 @@ function Hero({ authLink }: { authLink: string }) {
   );
 }
 
-/* ── Hero "Agent Workspace" live panel (ported from hero v4 design) ──
-   The transparency layer: 4 auto-cycling scenes showing the autonomous
-   agent scraping → writing → submitting → preparing interviews. */
+/* Ilustrasi alur kerja Applify. Ini contoh tampilan, bukan aktivitas langsung. */
 type HSvg = SVGProps<SVGSVGElement>;
 const HIcons = {
   Bot: (p: HSvg) => (
@@ -320,9 +278,9 @@ function SceneScraping() {
   return (
     <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
       <div className="flex justify-between items-center w-full mb-4 opacity-80">
-        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Mengekstrak Syarat Loker</span>
+        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Mencari lowongan</span>
         <span className="font-display text-xs font-bold text-brand-lime flex items-center gap-1 animate-pulseGlow">
-          <HIcons.Search /> Reading...
+          <HIcons.Search /> Sedang mencari
         </span>
       </div>
       <div className="relative w-full max-w-[200px] bg-white border border-neutral-200 rounded-lg shadow-sm p-4 text-left overflow-hidden">
@@ -362,9 +320,9 @@ function SceneWriting() {
   return (
     <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
       <div className="flex justify-between items-center w-full mb-4 opacity-80">
-        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Menyesuaikan CV</span>
+        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Menyiapkan draf lamaran</span>
         <span className="font-display text-xs font-bold text-neutral-800 flex items-center gap-1">
-          <HIcons.PenTool /> Tailoring...
+          <HIcons.PenTool /> Draf untuk ditinjau
         </span>
       </div>
       <div className="w-full max-w-[200px] h-[225px] bg-white border border-neutral-200 rounded-lg shadow-sm p-4 flex flex-col relative overflow-hidden">
@@ -408,7 +366,7 @@ function SceneWriting() {
         </div>
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap bg-neutral-900 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg opacity-0 animate-popIn z-20" style={{ animationDelay: "2.6s" }}>
           <HIcons.CheckCircle className="w-3.5 h-3.5 text-brand-lime" />
-          <span className="font-sans text-[10px] font-bold text-white tracking-wide uppercase">ATS Optimized</span>
+          <span className="font-sans text-[10px] font-bold text-white tracking-wide uppercase">Draf lamaran</span>
         </div>
       </div>
     </div>
@@ -435,8 +393,8 @@ function SceneUploading() {
           </div>
           <div className="w-full max-w-[150px] space-y-1">
             <div className="flex justify-between text-[9px] font-sans text-neutral-500 font-semibold">
-              <span>Submitting...</span>
-              <span>Success</span>
+              <span>Menunggu persetujuan</span>
+              <span>Belum dikirim</span>
             </div>
             <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
               <div className="h-full bg-brand-lime rounded-full animate-progressFill" />
@@ -448,37 +406,25 @@ function SceneUploading() {
   );
 }
 
-function SceneInterview() {
+function SceneTracking() {
   return (
-    <div className="absolute inset-0 w-full h-full p-6 flex flex-col justify-center items-center">
-      <div className="flex justify-between items-center w-full mb-5 opacity-80">
-        <span className="font-sans text-xs font-bold text-neutral-500 uppercase tracking-wider">Menyiapkan Interview</span>
-        <span className="font-display text-xs font-bold text-neutral-800 flex items-center gap-1">
-          <HIcons.Briefcase className="w-3.5 h-3.5" /> Pipeline Sync...
-        </span>
-      </div>
-      <div className="relative w-[280px] flex gap-2">
-        {["Applied", "AI Prep", "Ready"].map((col, i) => (
-          <div key={col} className="w-[88px] h-[160px] bg-neutral-100 rounded-xl p-1.5 flex flex-col gap-1.5 border border-neutral-200/60 shadow-inner">
-            <div className="text-[9px] font-sans font-bold text-neutral-400 uppercase tracking-widest text-center mt-0.5 mb-1">{col}</div>
-            {i === 0 && <div className="w-full h-10 bg-white rounded border border-neutral-200 opacity-60" />}
-            {i === 2 && (
-              <>
-                <div className="w-full h-10 bg-brand-lime/10 rounded border border-brand-lime/30 opacity-70" />
-                <div className="w-full h-10 bg-white rounded border border-neutral-200 opacity-40" />
-              </>
-            )}
-          </div>
-        ))}
-        <div className="absolute top-[34px] left-[6px] w-[76px] h-12 bg-white rounded-md border border-neutral-200 shadow-sm flex flex-col justify-center px-2 gap-1.5 animate-kanbanDrag z-10 origin-center cursor-grab">
-          <div className="h-1.5 bg-neutral-300 w-3/4 rounded-full" />
-          <div className="h-1.5 bg-neutral-200 w-1/2 rounded-full" />
-          <div className="absolute inset-0 flex items-center justify-center bg-white/90 backdrop-blur-[1px] rounded-md opacity-0 animate-kanbanSparkle">
-            <HIcons.Sparkles className="w-5 h-5 text-brand-lime drop-shadow-md" />
-          </div>
-          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-brand-lime rounded-full flex items-center justify-center opacity-0 animate-kanbanCheck shadow-md">
-            <HIcons.CheckCircle className="w-3 h-3 text-lime-900" />
-          </div>
+    <div className="absolute inset-0 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-5 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-bold text-neutral-900">Tinjau lamaran</span>
+          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Belum dikirim</span>
+        </div>
+        <div className="mt-4 rounded-xl bg-neutral-50 p-4">
+          <div className="h-2 w-3/4 rounded bg-neutral-300" />
+          <div className="mt-3 h-2 w-full rounded bg-neutral-200" />
+          <div className="mt-2 h-2 w-5/6 rounded bg-neutral-200" />
+          <div className="mt-2 h-2 w-2/3 rounded bg-neutral-200" />
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 text-xs text-neutral-600">
+          <span>Periksa draf sebelum mengirim</span>
+          <span className="inline-flex items-center gap-1 rounded-lg bg-[#16150F] px-3 py-2 font-semibold text-white">
+            <HIcons.Check className="h-3 w-3" /> Setujui
+          </span>
         </div>
       </div>
     </div>
@@ -488,10 +434,10 @@ function SceneInterview() {
 function AgentLivePanel() {
   const [activeScene, setActiveScene] = useState(0);
   const steps = [
-    { id: 0, label: "Memindai Portal", icon: HIcons.Search },
-    { id: 1, label: "Menulis CV ATS", icon: HIcons.PenTool },
-    { id: 2, label: "Auto Submit", icon: HIcons.UploadCloud },
-    { id: 3, label: "Interview Prep", icon: HIcons.MessageSquare },
+    { id: 0, label: "Cari lowongan", icon: HIcons.Search },
+    { id: 1, label: "Siapkan draf", icon: HIcons.PenTool },
+    { id: 2, label: "Tinjau lamaran", icon: HIcons.CheckCircle },
+    { id: 3, label: "Pantau status", icon: HIcons.Briefcase },
   ];
 
   useEffect(() => {
@@ -513,8 +459,8 @@ function AgentLivePanel() {
               <HIcons.Bot />
             </div>
             <div>
-              <h3 className="font-display font-bold text-sm text-neutral-900 leading-tight">Agent Workspace</h3>
-              <p className="font-sans text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">Autonomous Mode</p>
+              <h3 className="font-display font-bold text-sm text-neutral-900 leading-tight">Alur Applify</h3>
+              <p className="font-sans text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">Contoh tampilan</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-1 bg-lime-100 border border-lime-200 rounded-full">
@@ -522,12 +468,12 @@ function AgentLivePanel() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-600" />
             </span>
-            <span className="font-sans text-[10px] font-extrabold text-lime-800 tracking-wider">LIVE</span>
+            <span className="font-sans text-[10px] font-extrabold text-lime-800 tracking-wider">ILUSTRASI</span>
           </div>
         </div>
 
         <div className="relative h-[270px] bg-neutral-50/50 w-full overflow-hidden">
-          {[SceneScraping, SceneWriting, SceneUploading, SceneInterview].map((Scene, idx) => (
+          {[SceneScraping, SceneWriting, SceneUploading, SceneTracking].map((Scene, idx) => (
             <div key={idx} className={`transition-all duration-700 ease-in-out absolute inset-0 flex items-center justify-center ${activeScene === idx ? "opacity-100 z-10 scale-100" : "opacity-0 z-0 scale-95"}`}>
               {activeScene === idx && <Scene />}
             </div>
@@ -569,7 +515,7 @@ function PlatformMarquee() {
   const items = [...platforms, ...platforms];
   return (
     <section className="border-y border-[color:var(--border)] bg-white py-12 overflow-hidden">
-      <p className="text-center text-xs uppercase tracking-[0.22em] text-muted-foreground font-semibold">Satu agen. Semua platform kerja Indonesia.</p>
+      <p className="text-center text-xs uppercase tracking-[0.22em] text-muted-foreground font-semibold">Sumber lowongan yang tersedia di Applify.</p>
       <div className="mt-8 flex animate-marquee gap-4 whitespace-nowrap">
         {items.map((p, i) => {
           const meta = platformMeta[p] ?? { color: "#FFFFFF", bg: "#8B92B4", emoji: "🔗" };
@@ -587,20 +533,19 @@ function PlatformMarquee() {
 
 /* ─────────────────────────  Stat band  ───────────────────────── */
 
-function StatBand() {
-  const stats = [
-    { v: <CountUp to={91} suffix="%" />, l: "Lolos screening ATS" },
-    { v: <><CountUp to={4} suffix="x" /></>, l: "Callback lebih cepat" },
-    { v: <CountUp to={7} />, l: "Platform terindeks" },
-    { v: <CountUp to={12400} suffix="+" />, l: "Pencari kerja" },
+function TruthBand() {
+  const points = [
+    "Cari lowongan dari sumber yang didukung",
+    "Siapkan draf dengan bantuan AI",
+    "Tinjau dan setujui sebelum dikirim",
   ];
   return (
     <section className="bg-[#16150F] text-[#F4F1E8]">
-      <div className="mx-auto max-w-7xl px-4 py-12 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-8">
-        {stats.map((s, i) => (
-          <div key={i} className="text-center md:text-left">
-            <p className="font-display text-4xl md:text-5xl font-extrabold text-[#D2F801] tracking-tight">{s.v}</p>
-            <p className="mt-1.5 text-sm text-[#C9C4B2]">{s.l}</p>
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {points.map((point) => (
+          <div key={point} className="flex items-center justify-center gap-2 text-center md:justify-start">
+            <Check className="h-4 w-4 shrink-0 text-[#D2F801]" aria-hidden="true" />
+            <p className="text-sm text-[#F4F1E8]">{point}</p>
           </div>
         ))}
       </div>
@@ -644,7 +589,7 @@ function Manifesto() {
               </span>
             </div>
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-neutral-900 leading-[1.1] tracking-tight">
-              Karier Anda ditentukan oleh <span className="text-brand-lime bg-brand-dark px-2 pt-1 pb-0.5 rounded-md inline-block leading-none align-bottom">skill.</span>
+              Siapkan lamaran berdasarkan <span className="text-brand-lime bg-brand-dark px-2 pt-1 pb-0.5 rounded-md inline-block leading-none align-bottom">profilmu.</span>
             </h2>
             <div className="font-display text-xl sm:text-2xl font-bold text-neutral-400 mt-6 leading-snug space-y-2">
               <p className="line-through decoration-neutral-300 decoration-4">Bukan nama belakang.</p>
@@ -652,7 +597,7 @@ function Manifesto() {
               <p className="line-through decoration-neutral-300 decoration-4">Bukan almamater.</p>
             </div>
             <p className="mt-8 font-sans text-base text-neutral-600 leading-relaxed font-medium">
-              Kami mendemokratisasi akses ke pasar kerja melalui agen AI otonom, memastikan peluang kerja dinilai berdasarkan merit, bukan bias.
+              Applify membantu kamu mencari lowongan, menyiapkan draf, dan memantau lamaran.
             </p>
           </div>
 
@@ -664,19 +609,19 @@ function Manifesto() {
               <div className="absolute inset-0 bg-cyber-grid opacity-50 z-0" />
               <div className="z-10 w-1/2 flex flex-col justify-between">
                 <div>
-                  <h3 className="font-display text-xl font-bold text-neutral-900">Otonom &amp; End-to-End</h3>
-                  <p className="font-sans text-sm text-neutral-500 mt-1 pr-4">Mesin pintar yang bergerak dalam loop tak henti.</p>
+                  <h3 className="font-display text-xl font-bold text-neutral-900">Bantuan untuk proses lamaran</h3>
+                  <p className="font-sans text-sm text-neutral-500 mt-1 pr-4">Contoh tahapan pencarian, draf, dan persetujuan.</p>
                 </div>
                 <div className="mt-4 bg-white/80 backdrop-blur-sm border border-neutral-200 rounded-lg p-3 w-48 shadow-sm">
                   <div className="flex items-center gap-1.5 mb-2 border-b border-neutral-100 pb-1">
                     <div className="w-2 h-2 bg-brand-lime rounded-full animate-pulse" />
-                    <span className="text-[9px] font-display font-bold text-neutral-800 uppercase tracking-widest">Live Agent Log</span>
+                    <span className="text-[9px] font-display font-bold text-neutral-800 uppercase tracking-widest">Contoh alur</span>
                   </div>
                   <div className="flex flex-col gap-1 text-[9px] font-mono text-neutral-500">
-                    <div className="animate-logFade mf-d1">&gt; Fetching 430 jobs...</div>
-                    <div className="animate-logFade mf-d2">&gt; Matching skills...</div>
-                    <div className="animate-logFade mf-d3">&gt; Optimizing ATS...</div>
-                    <div className="animate-logFade mf-d4 font-bold text-brand-lime">&gt; Sent apps successfully.</div>
+                    <div className="animate-logFade mf-d1">&gt; Mencari lowongan...</div>
+                    <div className="animate-logFade mf-d2">&gt; Menyiapkan draf...</div>
+                    <div className="animate-logFade mf-d3">&gt; Menunggu tinjauanmu...</div>
+                    <div className="animate-logFade mf-d4 font-bold text-brand-lime">&gt; Belum dikirim.</div>
                   </div>
                 </div>
               </div>
@@ -694,8 +639,8 @@ function Manifesto() {
             {/* Visual B: Adil */}
             <div className="col-span-1 row-span-1 bg-white border border-neutral-200 rounded-[2rem] p-6 flex flex-col relative overflow-hidden min-h-[250px]">
               <div className="z-10 mb-2">
-                <h3 className="font-display text-lg font-bold text-neutral-900">Blind Merit Mode</h3>
-                <p className="font-sans text-xs text-neutral-500 mt-1">Meratakan hierarki bias.</p>
+                <h3 className="font-display text-lg font-bold text-neutral-900">Tinjau sebelum kirim</h3>
+                <p className="font-sans text-xs text-neutral-500 mt-1">Kamu memeriksa draf sebelum menyetujuinya.</p>
               </div>
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 h-[100px] flex items-end justify-center gap-5 border-b-2 border-neutral-100 pb-1">
                 <div className="absolute left-0 right-0 h-0.5 bg-brand-lime shadow-[0_0_8px_#A3E635] z-30 animate-scanner" />
@@ -767,18 +712,15 @@ function ProblemSolution() {
               </span>
               <div className="mt-6 space-y-5">
                 {[
-                  { n: <CountUp to={100} suffix="+" />, l: "lamaran rata-rata sebelum diterima kerja", icon: Briefcase },
-                  { n: <CountUp to={75} suffix="%" />, l: "CV ditolak ATS sebelum dibaca manusia", icon: EyeOff },
-                  { n: <>berminggu</>, l: "waktu terbuang menyalin data form yang sama", icon: Clock },
-                ].map((p, i) => (
-                  <div key={i} className="flex items-center gap-4">
+                  { l: "Mengulang data yang sama di banyak formulir", icon: Briefcase },
+                  { l: "Menyesuaikan profil untuk lowongan berbeda", icon: Brain },
+                  { l: "Memantau lamaran dari beberapa situs", icon: Search },
+                ].map((p) => (
+                  <div key={p.l} className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-2xl bg-white border-2 border-[color:var(--border)] grid place-items-center text-[#D9741A] shrink-0">
                       <p.icon className="h-5 w-5" />
                     </div>
-                    <div>
-                      <p className="font-display text-2xl font-extrabold text-[#16150F]">{p.n}</p>
-                      <p className="text-sm text-muted-foreground">{p.l}</p>
-                    </div>
+                    <p className="text-sm text-muted-foreground">{p.l}</p>
                   </div>
                 ))}
               </div>
@@ -791,14 +733,14 @@ function ProblemSolution() {
                 Dengan Applify
               </span>
               <p className="mt-6 text-lg font-medium text-[#ECE8DA] leading-relaxed">
-                Satu agen otonom menggantikan ratusan jam kerja manual:
+                Applify membantu menyiapkan dan memantau lamaran:
               </p>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 {[
-                  { icon: Search, t: "Cari di 7 platform" },
-                  { icon: Brain, t: "Tulis CV per lowongan" },
-                  { icon: Send, t: "Lamar ATS-ready" },
-                  { icon: CalendarCheck, t: "Siapkan interview" },
+                  { icon: Search, t: "Cari lowongan" },
+                  { icon: Brain, t: "Siapkan draf lamaran" },
+                  { icon: Check, t: "Setujui sebelum dikirim" },
+                  { icon: Send, t: "Pantau status lamaran" },
                 ].map((s) => (
                   <div key={s.t} className="rounded-2xl bg-white/[6%] border border-white/10 p-4">
                     <div className="h-9 w-9 rounded-lg bg-[#D2F801] grid place-items-center text-[#16150F]">
@@ -808,8 +750,8 @@ function ProblemSolution() {
                   </div>
                 ))}
               </div>
-              <p className="mt-6 font-display text-xl font-bold">
-                Dari <span className="text-[#D9741A] line-through decoration-2">berminggu-minggu</span> → <span className="text-[#D2F801]">hitungan menit.</span>
+              <p className="mt-6 font-display text-xl font-bold text-[#D2F801]">
+                Kamu tetap menentukan kapan lamaran dikirim.
               </p>
             </div>
           </div>
@@ -933,38 +875,25 @@ function HiwAgent() {
   );
 }
 
-function HiwInterview() {
+function HiwApproval() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="absolute w-72 h-72 bg-brand-green/10 rounded-full blur-3xl animate-ambientGlow z-0" />
-      <div className="scene-viewport relative flex z-10 w-full h-full">
-        <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 340 340">
-          <path d="M 120,110 C 200,110 180,210 240,210" fill="none" stroke="#e5e5e5" strokeWidth="2" strokeDasharray="4 4" />
-          <path d="M 120,110 C 200,110 180,210 240,210" fill="none" stroke="#1C9656" strokeWidth="2" className="dash-path animate-drawSyncPath" />
-        </svg>
-        <div className="absolute w-3 h-3 bg-brand-green rounded-full shadow-[0_0_10px_#1C9656] z-10 offset-path-anim animate-dataTravel" style={{ offsetPath: 'path("M 120,110 C 200,110 180,210 240,210")' }} />
-        <div className="absolute top-[80px] left-[30px] w-[130px] bg-white border border-neutral-200 p-3 rounded-xl shadow-xl animate-floatEmail z-20">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 bg-green-50 text-brand-green rounded-full flex items-center justify-center"><HIcons.Mail /></div>
-            <div>
-              <div className="text-[9px] font-bold text-neutral-900">Tech Corp HR</div>
-              <div className="text-[7px] text-neutral-500">Interview Invite</div>
-            </div>
-          </div>
-          <div className="bg-neutral-50 border border-neutral-100 rounded px-2 py-1 inline-block">
-            <span className="text-[8px] font-mono font-bold text-brand-green">14 OCT, 10:00 AM</span>
-          </div>
+    <div className="absolute inset-0 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-5 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-bold text-neutral-900">Tinjau lamaran</span>
+          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Belum dikirim</span>
         </div>
-        <div className="absolute top-[160px] right-[20px] w-[140px] bg-white rounded-xl shadow-lg border border-neutral-200 p-3 z-10 flex flex-col">
-          <div className="text-[10px] font-bold text-center mb-2 uppercase tracking-widest text-neutral-400">October</div>
-          <div className="grid grid-cols-4 gap-1.5 flex-1 relative">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className={`rounded border border-neutral-100 transition-all duration-300 h-5 ${i === 6 ? "animate-calSlotActivate relative z-20" : "bg-neutral-50"}`} />
-            ))}
-            <div className="absolute -bottom-4 -left-6 bg-brand-dark text-white px-2 py-1 rounded-md shadow-xl animate-popBadge z-30 flex items-center gap-1 border border-neutral-700">
-              <HIcons.Check /> <span className="text-[7px] font-bold uppercase tracking-widest text-[#D2F801]">Auto-Confirmed</span>
-            </div>
-          </div>
+        <div className="mt-4 rounded-xl bg-neutral-50 p-4">
+          <div className="h-2 w-3/4 rounded bg-neutral-300" />
+          <div className="mt-3 h-2 w-full rounded bg-neutral-200" />
+          <div className="mt-2 h-2 w-5/6 rounded bg-neutral-200" />
+          <div className="mt-2 h-2 w-2/3 rounded bg-neutral-200" />
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 text-xs text-neutral-600">
+          <span>Periksa draf sebelum mengirim</span>
+          <span className="inline-flex items-center gap-1 rounded-lg bg-[#16150F] px-3 py-2 font-semibold text-white">
+            <HIcons.Check className="h-3 w-3" /> Setujui
+          </span>
         </div>
       </div>
     </div>
@@ -986,22 +915,22 @@ function HiwTracking() {
           </div>
           <div className="absolute top-[5%] left-[5%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingTopLeft z-30">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[8px] font-bold text-neutral-800">GOTO</span>
-              <span className="text-[6px] font-bold px-1 rounded bg-blue-50 text-brand-blue uppercase">Viewed</span>
+              <span className="text-[8px] font-bold text-neutral-800">Lamaran A</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-blue-50 text-brand-blue uppercase">Draf</span>
             </div>
             <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-1/3 bg-brand-blue" /></div>
           </div>
           <div className="absolute top-[40%] -right-[5%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingRight z-30">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[8px] font-bold text-neutral-800">Shopee</span>
-              <span className="text-[6px] font-bold px-1 rounded bg-orange-50 text-brand-orange uppercase">Assessed</span>
+              <span className="text-[8px] font-bold text-neutral-800">Lamaran B</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-orange-50 text-brand-orange uppercase">Menunggu</span>
             </div>
             <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-2/3 bg-brand-orange" /></div>
           </div>
           <div className="absolute bottom-[5%] left-[10%] w-24 bg-white border border-neutral-200 rounded-lg p-2 shadow-sm animate-pingBottomLeft z-30">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[8px] font-bold text-neutral-800">Traveloka</span>
-              <span className="text-[6px] font-bold px-1 rounded bg-green-50 text-brand-green uppercase">Interview</span>
+              <span className="text-[8px] font-bold text-neutral-800">Lamaran C</span>
+              <span className="text-[6px] font-bold px-1 rounded bg-green-50 text-brand-green uppercase">Terkirim</span>
             </div>
             <div className="h-1 w-full bg-neutral-100 rounded overflow-hidden"><div className="h-full w-full bg-brand-green" /></div>
           </div>
@@ -1013,10 +942,10 @@ function HiwTracking() {
 
 function HowItWorks() {
   const steps = [
-    { id: "01", title: "Upload Profil Sekali", desc: "AI mengekstrak dan memetakan skill-mu menjadi profil digital." },
-    { id: "02", title: "Otomasi Tailoring 24/7", desc: "Agen membaca syarat lowongan dan menulis ulang CV secara spesifik." },
-    { id: "03", title: "Auto-Sync Interview", desc: "Sistem menyinkronkan jadwal otomatis. Kamu tinggal bersiap diri." },
-    { id: "04", title: "Radar Pemantauan", desc: "Lacak seluruh status lamaran dari berbagai platform di satu layar." },
+    { id: "01", title: "Lengkapi profil", desc: "Unggah CV PDF atau isi profilmu. Applify membantu membaca data CV untuk mengisi profil." },
+    { id: "02", title: "Cari lowongan dan siapkan draf", desc: "Pilih lowongan, lalu minta AI membantu menyiapkan draf lamaran untuk kamu periksa." },
+    { id: "03", title: "Tinjau dan setujui", desc: "Periksa draf di halaman Persetujuan. Tidak ada lamaran yang dikirim sebelum kamu menekan Setujui." },
+    { id: "04", title: "Kirim sesuai situs", desc: "Cara pengiriman bergantung pada situs lowongan. Lihat jalur pengiriman di bawah." },
   ];
   const [activeStep, setActiveStep] = useState(0);
   const timerRef = useRef<number | null>(null);
@@ -1043,8 +972,8 @@ function HowItWorks() {
       <section id="cara-kerja" className="w-full py-20 relative overflow-hidden bg-brand-paper">
         <div className="text-center max-w-2xl mx-auto mb-16 relative z-10 px-4">
           <p className="text-xs uppercase tracking-[0.22em] text-brand-blue font-bold">Cara Kerja</p>
-          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight text-neutral-900">Empat langkah sampai bekerja.</h2>
-          <p className="mt-4 text-neutral-500 text-sm md:text-base max-w-lg mx-auto">Sistem yang dirancang untuk memangkas friksi. Sekali pengaturan, biarkan agen kecerdasan buatan mengambil alih sisanya.</p>
+          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight text-neutral-900">Empat langkah menyiapkan lamaran.</h2>
+          <p className="mt-4 text-neutral-500 text-sm md:text-base max-w-lg mx-auto">Applify membantu mencari lowongan dan menyiapkan draf. Kamu tetap memeriksa dan menyetujui lamaran sebelum pengiriman.</p>
         </div>
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10 px-4 md:px-8">
@@ -1083,9 +1012,23 @@ function HowItWorks() {
             <div className="absolute inset-0 w-full h-full">
               {activeStep === 0 && <HiwUpload key="scene0" />}
               {activeStep === 1 && <HiwAgent key="scene1" />}
-              {activeStep === 2 && <HiwInterview key="scene2" />}
+              {activeStep === 2 && <HiwApproval key="scene2" />}
               {activeStep === 3 && <HiwTracking key="scene3" />}
             </div>
+          </div>
+        </div>
+        <div className="mx-auto mt-10 grid max-w-6xl gap-4 px-4 md:grid-cols-3 md:px-8">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <h3 className="font-display font-bold text-neutral-900">Situs karier perusahaan</h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Untuk situs yang didukung seperti Greenhouse, Lever, Ashby, dan Workable, agen server mengisi dan mengirim lamaran setelah kamu menekan Setujui.</p>
+          </div>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <h3 className="font-display font-bold text-neutral-900">Portal akun pelamar</h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu menekan Kirim sendiri.</p>
+          </div>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <h3 className="font-display font-bold text-neutral-900">Lamaran lewat email</h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Setelah kamu menekan Setujui, lamaran dikirim lewat akun Gmail yang sudah kamu hubungkan.</p>
           </div>
         </div>
       </section>
@@ -1102,53 +1045,44 @@ function CapabilitiesBento() {
         <div className="text-center max-w-2xl mx-auto">
           <p className="text-xs uppercase tracking-[0.22em] text-[#1C9656] font-bold">Kapabilitas</p>
           <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight">Bukan job board biasa.</h2>
-          <p className="mt-4 text-muted-foreground">Lima kemampuan eksklusif yang tidak akan kamu temukan di platform lain.</p>
+          <p className="mt-4 text-muted-foreground">Fitur untuk membantu kamu menyiapkan dan mengelola lamaran.</p>
         </div>
 
         <div className="mt-12 grid gap-4 md:grid-cols-4 md:auto-rows-[230px]">
-          {/* Hero cell 2x2 — Collective ATS Intelligence */}
+          {/* Hero cell 2x2 — draf lamaran */}
           <div className="md:col-span-2 md:row-span-2 glass rounded-3xl p-7 relative overflow-hidden flex flex-col">
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#0A5BE0] px-3 py-1 text-xs font-bold text-white">
-              ✦ Eksklusif Indonesia
+              Bantuan AI
             </span>
             <div className="mt-5 h-12 w-12 rounded-xl bg-[#16150F] grid place-items-center text-[#D2F801]">
               <Brain className="h-6 w-6" />
             </div>
-            <h3 className="mt-4 font-display text-2xl font-extrabold leading-tight">Collective ATS Intelligence</h3>
+            <h3 className="mt-4 font-display text-2xl font-extrabold leading-tight">Draf lamaran berbantuan AI</h3>
             <p className="mt-2 text-sm text-muted-foreground leading-snug">
-              Agregasi data ATS dari 12.000+ pelamar — kami tahu keyword yang lolos di Workday, Lever &amp; Greenhouse.
+              Gunakan profil dan informasi lowongan untuk menyiapkan draf yang bisa kamu tinjau dan ubah.
             </p>
             <div className="mt-auto pt-5 space-y-2.5">
-              {[
-                { c: "Gojek", ats: "Workday", m: 87 },
-                { c: "Tokopedia", ats: "Lever", m: 74 },
-                { c: "Shopee", ats: "Greenhouse", m: 92 },
-              ].map((row) => (
-                <div key={row.c} className="rounded-xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <div>
-                      <p className="font-semibold">{row.c}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{row.ats}</p>
-                    </div>
-                    <span className="font-mono text-sm font-bold text-[#1C9656]">{row.m}%</span>
-                  </div>
-                  <div className="mt-2 h-1.5 rounded-full bg-black/[6%] overflow-hidden">
-                    <div className="h-full bg-[#1C9656] rounded-full" style={{ width: `${row.m}%` }} />
-                  </div>
-                </div>
-              ))}
+              <div className="rounded-xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-3">
+                <p className="text-xs font-semibold text-neutral-700">Draf lamaran</p>
+                <div className="mt-2 h-2 w-3/4 rounded bg-neutral-300" />
+                <div className="mt-2 h-2 w-full rounded bg-neutral-200" />
+                <div className="mt-2 h-2 w-5/6 rounded bg-neutral-200" />
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#1C9656]">
+                <Check className="h-4 w-4" aria-hidden="true" /> Bisa ditinjau sebelum diajukan
+              </div>
             </div>
           </div>
 
-          <BentoCard icon={EyeOff} badge="Social Impact" badgeTone="#16150F" title="Blind Merit Mode" desc="Sembunyikan identitas; biarkan skill dinilai lebih dulu." accent="#1C9656" />
+          <BentoCard icon={Check} badge="Kendali ada padamu" badgeTone="#16150F" title="Persetujuan sebelum kirim" desc="Periksa lamaran dan tekan Setujui sebelum pengiriman dimulai." accent="#1C9656" />
           <BentoCard icon={Zap} badge="Segera hadir" badgeTone="#0A5BE0" title="Golden Window Sniper" desc="Rencana fitur: memantau lowongan baru agar kamu bisa melamar lebih awal. Belum tersedia." accent="#D9741A" />
 
           {/* Wide cell 2x1 — Skill Radar with mini radar */}
           <div className="md:col-span-2 glass rounded-3xl p-6 flex items-center gap-5">
             <div className="flex-1">
-              <span className="inline-flex items-center rounded-full bg-[#16150F] px-3 py-1 text-xs font-bold text-[#D2F801]">Smart Learning</span>
+              <span className="inline-flex items-center rounded-full bg-[#16150F] px-3 py-1 text-xs font-bold text-[#D2F801]">Profil</span>
               <h3 className="mt-3 font-display text-xl font-bold">Skill Radar</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-snug">Visualisasi gap skill-mu vs tren pasar, real-time.</p>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-snug">Lihat ringkasan kecocokan skill profil dengan kebutuhan lowongan.</p>
             </div>
             <RadarMini />
           </div>
@@ -1198,9 +1132,9 @@ function ImpactPillars() {
               tag="Pilar Ekonomi"
               title="Produktivitas & peluang kerja"
               points={[
-                "Memangkas waktu cari kerja dari berminggu jadi menit.",
-                "Mempertemukan talenta dengan lowongan yang tepat, lebih cepat.",
-                "Membuka akses pasar kerja lintas kota & platform.",
+                "Cari lowongan dari sumber yang tersedia di Applify.",
+                "Siapkan draf lamaran dengan bantuan AI.",
+                "Pantau status lamaran dalam satu tempat.",
               ]}
               icon={TrendingUp}
             />
@@ -1209,9 +1143,9 @@ function ImpactPillars() {
               tag="Pilar Sosial"
               title="Kesetaraan & inklusi"
               points={[
-                "Blind Merit Mode melawan bias kampus & latar belakang.",
-                "Menjangkau pencari kerja dari kampus non-favorit & daerah.",
-                "AI gratis (DeepSeek) → akses tak bergantung kemampuan bayar.",
+                "Gunakan profil dan pengalamanmu untuk menyiapkan draf.",
+                "Tinjau lamaran sebelum memberi persetujuan.",
+                "Mulai dengan fitur paket Free yang tersedia.",
               ]}
               icon={Scale}
             />
@@ -1220,7 +1154,7 @@ function ImpactPillars() {
           {/* SDG band */}
           <div className="mt-10 rounded-3xl bg-[#16150F] p-7 md:p-9 text-center">
             <p className="text-xs uppercase tracking-[0.22em] text-[#D2F801] font-bold">Selaras dengan SDGs</p>
-            <p className="mt-2 text-[#C9C4B2] text-sm max-w-2xl mx-auto">Applify berkontribusi langsung pada lima Tujuan Pembangunan Berkelanjutan PBB.</p>
+            <p className="mt-2 text-[#C9C4B2] text-sm max-w-2xl mx-auto">Misi Applify berkaitan dengan Tujuan Pembangunan Berkelanjutan PBB.</p>
             <div className="mt-7 flex flex-wrap justify-center gap-4">
               {sdgs.map((s) => (
                 <div key={s.n} className="group flex flex-col items-center gap-2 w-28">
@@ -1277,10 +1211,10 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
               </span>
               <h2 className="mt-5 font-display text-3xl md:text-4xl font-extrabold leading-tight">Green Career Track</h2>
               <p className="mt-4 text-white/85 leading-relaxed max-w-lg">
-                Agen menelusuri rekam jejak perusahaan, memprioritaskan <b>green jobs & perusahaan berdampak positif</b>, lalu menjalankan sesi asesmen AI untuk memastikan kamu benar-benar cocok sebelum melamar.
+                Lihat lowongan karier hijau, ringkasan perusahaan, dan asesmen kesiapan yang berkaitan dengan posisi.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
-                {["ESG screening otomatis", "Asesmen kesiapan AI", "Prioritas green jobs"].map((t) => (
+                {["Lowongan karier hijau", "Ringkasan perusahaan", "Asesmen kesiapan"].map((t) => (
                   <span key={t} className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3.5 py-1.5 text-sm font-medium">
                     <Check className="h-3.5 w-3.5 text-[#D2F801]" /> {t}
                   </span>
@@ -1296,23 +1230,13 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
             </div>
             <div className="relative">
               <div className="rounded-2xl bg-white/10 border border-white/15 p-5 backdrop-blur-sm">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Skor Green Company</p>
-                  <span className="text-xs font-mono bg-[#D2F801] text-[#16150F] rounded-full px-2 py-0.5 font-bold">GREEN</span>
-                </div>
-                {[
-                  { c: "SolarNusa Energy", s: 92 },
-                  { c: "EcoWaste Indonesia", s: 84 },
-                  { c: "GreenMobility Co", s: 78 },
-                ].map((row) => (
-                  <div key={row.c} className="mt-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{row.c}</span>
-                      <span className="font-mono font-bold text-[#D2F801]">{row.s}</span>
-                    </div>
-                    <div className="mt-1.5 h-2 rounded-full bg-white/15 overflow-hidden">
-                      <div className="h-full bg-[#D2F801] rounded-full" style={{ width: `${row.s}%` }} />
-                    </div>
+                <p className="text-sm font-semibold">Informasi karier hijau</p>
+                {["Lowongan", "Profil perusahaan", "Asesmen kesiapan"].map((label) => (
+                  <div key={label} className="mt-4 flex items-center gap-3 rounded-xl bg-white/10 p-3">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#D2F801] text-[#16150F]">
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="text-sm font-medium">{label}</span>
                   </div>
                 ))}
               </div>
@@ -1324,42 +1248,39 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
   );
 }
 
-/* ─────────────────────────  Testimonials  ───────────────────────── */
+/* ─────────────────────────  Jalur pengiriman  ───────────────────────── */
 
-function Testimonials() {
-  const reviews = [
-    { name: "Dinda Rahmawati", role: "Fresh Graduate — Ekonomi UI", quote: "Setelah 3 bulan nganggur, seminggu pakai Applify langsung dapat 6 callback. Golden Window beneran works!", stat: "+6 callback dalam 7 hari", avatar: 1 as const, tone: "#1C9656" },
-    { name: "Reza Firmansyah", role: "Job Seeker · 2 tahun pengalaman", quote: "ATS Collective Intelligence itu killer feature. Akhirnya lolos Shopee setelah 4 kali ditolak — ternyata keyword-nya selama ini salah.", stat: "Dari 0 ke hired di Shopee", avatar: 2 as const, tone: "#0A5BE0" },
-    { name: "Anisa Putri", role: "Fresh Grad — Poltek Bandung", quote: "Blind Merit Mode bikin gue pede. Gue dari Poltek, bukan UI/ITB, tapi skill gue akhirnya dilihat duluan.", stat: "Lolos ATS 9/10 lamaran", avatar: 3 as const, tone: "#D9741A" },
+function SubmissionPaths() {
+  const paths = [
+    {
+      title: "Situs karier perusahaan",
+      body: "Untuk Greenhouse, Lever, Ashby, Workable, dan situs yang didukung, agen server mengisi formulir lalu mengirim setelah kamu menekan Setujui.",
+    },
+    {
+      title: "Portal akun pelamar",
+      body: "Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu menekan Kirim sendiri.",
+    },
+    {
+      title: "Lamaran lewat email",
+      body: "Setelah kamu menekan Setujui, lamaran dikirim lewat akun Gmail yang sudah kamu hubungkan.",
+    },
   ];
   return (
     <ScrollReveal delay={100}>
       <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
-          <p className="text-xs uppercase tracking-[0.22em] text-[#D9741A] font-bold">Testimoni</p>
-          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight">Mereka sudah merasakan hasilnya.</h2>
-          <p className="mt-4 text-muted-foreground text-sm">Dari fresh graduate hingga job seeker berpengalaman.</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-[#0A5BE0] font-bold">Kamu tetap memegang kendali</p>
+          <h2 className="mt-3 font-display text-3xl md:text-5xl font-extrabold tracking-tight">Cara pengiriman mengikuti situs lowongan.</h2>
+          <p className="mt-4 text-muted-foreground text-sm">Tidak ada lamaran yang dikirim sebelum kamu menekan Setujui di halaman Persetujuan.</p>
         </div>
         <div className="mt-12 grid gap-6 md:grid-cols-3">
-          {reviews.map((r) => (
-            <div key={r.name} className="glass rounded-3xl p-6 flex flex-col gap-4 hover:-translate-y-1 transition-transform duration-300">
-              <Quote className="h-7 w-7 text-[#D2F801]" fill="#D2F801" />
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-[#D9741A] text-[#D9741A]" />
-                ))}
+          {paths.map((path) => (
+            <div key={path.title} className="glass rounded-3xl p-6">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#16150F] text-[#D2F801]">
+                <Check className="h-5 w-5" aria-hidden="true" />
               </div>
-              <p className="text-sm leading-relaxed text-foreground/80 flex-1">"{r.quote}"</p>
-              <div className="rounded-xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-2.5 text-xs font-semibold font-mono" style={{ color: r.tone }}>
-                📈 {r.stat}
-              </div>
-              <div className="flex items-center gap-3 mt-1 border-t border-[color:var(--border)] pt-4">
-                <AvatarIllo variant={r.avatar} />
-                <div>
-                  <p className="text-sm font-semibold">{r.name}</p>
-                  <p className="text-xs text-muted-foreground">{r.role}</p>
-                </div>
-              </div>
+              <h3 className="mt-4 font-display text-lg font-bold">{path.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{path.body}</p>
             </div>
           ))}
         </div>
@@ -1374,7 +1295,7 @@ function Pricing({ authLink }: { authLink: string }) {
   const tiers = [
     { name: "Free", price: "Gratis", per: "selamanya", features: FREE_FEATURES },
     { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: PRO_FEATURES },
-    { name: "Kampus", price: "Rp 50jt", per: "/semester", features: ["Lisensi B2B2C kampus", "Dashboard karier kampus", "Semua fitur Pro untuk mahasiswa", "Laporan penempatan kerja", "Onboarding & pelatihan", "Co-branding"] },
+    { name: "Kampus", price: "Rp 50jt", per: "/semester", features: ["Hubungi tim Applify untuk membahas kebutuhan kampus."] },
   ];
   return (
     <ScrollReveal delay={100}>
@@ -1425,12 +1346,12 @@ function BehindApplify() {
           <p className="text-xs uppercase tracking-[0.22em] text-[#1C9656] font-bold">Dibalik Applify</p>
           <h2 className="mt-3 font-display text-3xl md:text-4xl font-extrabold tracking-tight">Dibuat untuk pencari kerja Indonesia.</h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Applify dikembangkan oleh tim mahasiswa yang percaya teknologi AI seharusnya menutup kesenjangan — bukan memperlebarnya. Proyek ini lahir sebagai inisiatif kewirausahaan kampus dan terus dikembangkan menjadi produk nyata.
+            Applify dikembangkan oleh tim mahasiswa dengan keyakinan bahwa teknologi AI dapat membantu memperluas akses ke peluang kerja. Proyek ini lahir sebagai inisiatif kewirausahaan kampus dan terus dikembangkan menjadi produk.
           </p>
           <div className="mt-10 grid gap-5 sm:grid-cols-3 max-w-3xl mx-auto">
             {[
               { icon: GraduationCap, t: "Berbasis riset kampus", d: "Lahir dari program kewirausahaan & business plan." },
-              { icon: BadgeCheck, t: "Produk nyata", d: "Bukan sekadar prototipe — AI & otomasi sudah berjalan." },
+              { icon: BadgeCheck, t: "Fitur tersedia", d: "Cari lowongan, siapkan draf, dan kelola lamaran di Applify." },
               { icon: Globe, t: "Fokus Indonesia", d: "Dirancang untuk pasar & platform kerja lokal." },
             ].map((c) => (
               <div key={c.t} className="rounded-2xl border-2 border-[color:var(--border)] bg-[#FBF9F2] p-6">
@@ -1462,13 +1383,13 @@ function FinalCTA({ authLink }: { authLink: string }) {
             <h2 className="mt-6 font-display text-3xl md:text-5xl font-extrabold tracking-tight max-w-2xl mx-auto text-[#F4F1E8]">
               Sudah saatnya AI bekerja untuk <span className="text-[#D2F801]">kariermu.</span>
             </h2>
-            <p className="mt-4 text-[#C9C4B2] max-w-xl mx-auto">Gabung 12.400+ pencari kerja Indonesia yang sudah membiarkan agen melakukan kerja berat.</p>
+            <p className="mt-4 text-[#C9C4B2] max-w-xl mx-auto">Buat akun gratis untuk mulai melengkapi profil dan menyiapkan draf lamaran.</p>
             <Link
               to={authLink}
               search={authLink === "/login" ? { mode: "daftar" } : undefined}
               className="mt-8 inline-flex h-14 items-center rounded-2xl bg-[#D2F801] px-8 text-base font-semibold text-[#16150F] hover:opacity-90 transition"
             >
-              Aktifkan Agen Sekarang <ArrowRight className="ml-2 h-5 w-5" />
+              Daftar Gratis <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </div>
         </div>
@@ -1488,7 +1409,7 @@ function Footer() {
             <AgentMark size={32} />
             <span className="font-display font-extrabold">Applify</span>
           </div>
-          <p className="mt-3 text-sm text-muted-foreground max-w-xs">Agen AI Otonom untuk akses kerja yang setara. Apply Smarter. Fairer. Together.</p>
+          <p className="mt-3 text-sm text-muted-foreground max-w-xs">Asisten AI untuk membantu menyiapkan lamaran kerja. Apply Smarter. Fairer. Together.</p>
         </div>
         {[
           {
@@ -1548,7 +1469,7 @@ function MobileStickyBar({ authLink }: { authLink: string }) {
         search={authLink === "/login" ? { mode: "daftar" } : undefined}
         className="flex-[2] h-11 rounded-xl bg-[#16150F] grid place-items-center text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
       >
-        Aktifkan Agen Gratis
+        Daftar Gratis
       </Link>
     </div>
   );
@@ -1605,39 +1526,6 @@ function StepIllo({ step }: { step: 1 | 2 | 3 }) {
       {([[16, 28, "#D2F801"], [104, 26, "#0A5BE0"], [14, 60, "#1C9656"], [106, 62, "#D9741A"], [20, 80, "#0A5BE0"], [100, 80, "#D9741A"]] as [number, number, string][]).map(([cx, cy, fill], i) => (
         <circle key={i} cx={cx} cy={cy} r="3.5" fill={fill} opacity="0.85" />
       ))}
-    </svg>
-  );
-}
-
-function AvatarIllo({ variant }: { variant: 1 | 2 | 3 }) {
-  if (variant === 1) return (
-    <svg viewBox="0 0 56 56" className="w-12 h-12 shrink-0" aria-hidden="true">
-      <circle cx="28" cy="28" r="28" fill="rgba(28,150,86,0.14)" />
-      <ellipse cx="28" cy="19" rx="13" ry="9.5" fill="#1C9656" />
-      <ellipse cx="28" cy="27" rx="12.5" ry="13" fill="#FDDBB4" />
-      <circle cx="23" cy="26" r="2.2" fill="#16150F" /><circle cx="33" cy="26" r="2.2" fill="#16150F" />
-      <path d="M23 32 Q28 37.5 33 32" stroke="#c47a5a" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <path d="M15 55 Q28 47 41 55" fill="#1C9656" opacity="0.8" />
-    </svg>
-  );
-  if (variant === 2) return (
-    <svg viewBox="0 0 56 56" className="w-12 h-12 shrink-0" aria-hidden="true">
-      <circle cx="28" cy="28" r="28" fill="rgba(10,91,224,0.14)" />
-      <ellipse cx="28" cy="17" rx="13" ry="8" fill="#16150F" />
-      <ellipse cx="28" cy="27" rx="12.5" ry="13" fill="#F5CBA7" />
-      <circle cx="23" cy="25" r="2.2" fill="#16150F" /><circle cx="33" cy="25" r="2.2" fill="#16150F" />
-      <path d="M23 32 Q28 36.5 33 32" stroke="#c47a5a" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <path d="M15 55 Q28 47 41 55" fill="#0A5BE0" opacity="0.8" />
-    </svg>
-  );
-  return (
-    <svg viewBox="0 0 56 56" className="w-12 h-12 shrink-0" aria-hidden="true">
-      <circle cx="28" cy="28" r="28" fill="rgba(217,116,26,0.16)" />
-      <path d="M14 22 Q14 8 28 7 Q42 8 42 22" fill="#3d2108" />
-      <ellipse cx="28" cy="27" rx="12.5" ry="13" fill="#FDDBB4" />
-      <circle cx="23" cy="26" r="2.2" fill="#16150F" /><circle cx="33" cy="26" r="2.2" fill="#16150F" />
-      <path d="M23 32 Q28 37.5 33 32" stroke="#c47a5a" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <path d="M15 55 Q28 47 41 55" fill="#D9741A" opacity="0.85" />
     </svg>
   );
 }
