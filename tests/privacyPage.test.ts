@@ -34,6 +34,11 @@ test("kebijakan privasi: menyebut data, penyimpanan, pihak ketiga, persetujuan, 
   }
   assert.ok(PRIVACY_SECTIONS.some((s) => s.id === "hapus-data"));
   assert.match(allText, /belum punya tombol hapus akun/);
+  const google = PRIVACY_SECTIONS.find((s) => s.id === "data-google")?.paragraphs?.join(" ") ?? "";
+  assert.match(google, /gmail\.send/);
+  assert.match(google, /userinfo\.email/);
+  assert.match(google, /alamat pengirim tampil sebelum/);
+  assert.match(google, /tidak membaca kotak masuk atau email lain di akunmu/);
 });
 
 test("kebijakan privasi: satu-satunya alamat email adalah kontak peneliti, dan tidak ada penanda data kosong di halaman", () => {

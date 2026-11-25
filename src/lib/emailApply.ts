@@ -13,7 +13,7 @@
  * Plain TypeScript (only one relative import, with its extension), so it runs under `node --test` without a bundler.
  */
 
-import { describeApiError } from "./apiErrors.ts";
+import { describeApiError, parseApiError } from "./apiErrors.ts";
 
 export const EMAIL_APPLY_JOB_TYPE = "email_apply";
 
@@ -94,6 +94,12 @@ export interface ApprovalLike {
 export interface EmailQueueRow {
   status?: string | null;
   error_message?: string | null;
+}
+
+/** True bila percobaan kirim terakhir gagal karena berkas CV pada persetujuan tidak bisa diunduh/dilampirkan. */
+export function isCvAttachmentFailure(job?: EmailQueueRow | null): boolean {
+  if (job?.status !== "failed") return false;
+  return /gagal diunduh|gagal dilampirkan|cv_attachment_unavailable/i.test(job.error_message ?? "");
 }
 
 export interface EmailApplyContext {
@@ -194,7 +200,7 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
 
 export interface EmailApplyRequest {
   job_type: typeof EMAIL_APPLY_JOB_TYPE;
-  payload: { approval_request_id: string; apply_email: string };
+  payload: { approval_request_id: string; apply_email: string; allow_without_cv?: true };
 }
 
 /**
@@ -202,17 +208,24 @@ export interface EmailApplyRequest {
  * the approval row on the server, and there is no `approved` key on purpose (the server sets it only after it
  * has read that row and drops any value a client sends). Returns null when the input is not enough.
  */
-export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: string): EmailApplyRequest | null {
+export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: string, options: { allowWithoutCv?: boolean } = {}): EmailApplyRequest | null {
   const check = validateRecruiterEmail(applyEmail);
   if (!check.ok || !approval.id || !approval.job_id) return null;
   return {
     job_type: EMAIL_APPLY_JOB_TYPE,
-    payload: { approval_request_id: approval.id, apply_email: check.email },
+    payload: {
+      approval_request_id: approval.id,
+      apply_email: check.email,
+      ...(options.allowWithoutCv === true ? { allow_without_cv: true as const } : {}),
+    },
   };
 }
 
 /** Turn what apiFetch throws into a message for the user (the server's own text is never shown). */
 export function describeQueueError(err: unknown): string {
+  if (parseApiError(err).code === "missing_cv_unconfirmed") {
+    return "CV belum dilampirkan. Unggah CV di Profil atau centang konfirmasi kirim tanpa CV sebelum mengirim.";
+  }
   return describeApiError(
     err,
     "Lamaran belum bisa masuk ke antrean. Periksa koneksi internetmu lalu coba kirim ulang. Surat dan persetujuanmu tidak hilang.",

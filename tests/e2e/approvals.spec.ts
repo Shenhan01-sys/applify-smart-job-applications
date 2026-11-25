@@ -814,6 +814,7 @@ test.describe("Persetujuan: lampiran email", () => {
     backend.state.jobs = [jobRow("job-apr-mail", { title: "Staf Admin", description: opts.description ?? "Kirim CV, transkrip nilai, dan portofolio ke hrd@perusahaan.test." })];
     backend.state.profiles = opts.profile === null ? [] : [opts.profile ?? profile()];
     backend.state.gmail = true;
+    backend.state.gmailEmail = "pelamar@gmail.test";
   }
 
   async function openPanel(app: import("@playwright/test").Page) {
@@ -846,13 +847,14 @@ test.describe("Persetujuan: lampiran email", () => {
     await expect(app.getByTestId("email-attachment-portfolio")).toHaveCount(0);
   });
 
-  test("daftar lampiran tampil lagi di kotak konfirmasi, dan antrean baru terisi sesudah 'Ya, masukkan ke antrean'", async ({ app, backend }) => {
+  test("konfirmasi menampilkan alamat Gmail pengirim dan daftar lampiran sebelum mengantre email", async ({ app, backend }) => {
     seed(backend);
     backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-mail-1", status: "pending" } });
     await openPanel(app);
 
     await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
     await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-sender")).toContainText("pelamar@gmail.test");
     const confirm = app.getByTestId("email-confirm-attachments");
     await expect(confirm).toContainText("CV (CV-Budi-Uji.pdf)");
     await expect(confirm).toContainText("Cover letter (PDF)");
@@ -869,8 +871,10 @@ test.describe("Persetujuan: lampiran email", () => {
     expect(Object.keys((calls[0].body as any).payload).sort()).toEqual(["apply_email", "approval_request_id"]);
   });
 
-  test("tanpa CV: peringatan dengan tautan ke Profil, surat PDF tetap terdaftar, tombol kirim tetap bisa dipakai", async ({ app, backend }) => {
+  test("tanpa CV: wajib centang konfirmasi eksplisit, reset saat konfirmasi dibuka ulang, lalu antrekan mencatat opt-in", async ({ app, backend }) => {
     seed(backend, { approval: { resume_url: null }, profile: profile({ resume_url: null }), description: "Kirim CV." });
+    backend.state.gmailEmail = null;
+    backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-no-cv", status: "pending" } });
     await openPanel(app);
 
     const warning = app.getByTestId("email-attachment-warning-no_cv");
@@ -883,6 +887,77 @@ test.describe("Persetujuan: lampiran email", () => {
     await expect(app.getByRole("button", { name: "Kirim lewat Email", exact: true })).toBeEnabled();
     await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
     await expect(app.getByTestId("email-confirm-attachments")).toContainText("tanpa CV");
+    await expect(app.getByTestId("email-confirm-sender")).toContainText("sambungkan ulang Gmail di Pengaturan agar alamat pengirim tampil di sini");
+    const consent = app.getByTestId("email-confirm-no-cv");
+    const send = app.getByRole("button", { name: "Ya, masukkan ke antrean" });
+    await expect(consent).not.toBeChecked();
+    await expect(send).toBeDisabled();
+    await consent.check();
+    await expect(send).toBeEnabled();
+    await app.getByRole("button", { name: "Batal" }).click();
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(consent).not.toBeChecked();
+    await expect(send).toBeDisabled();
+    await consent.check();
+    await expect(send).toBeEnabled();
+    await send.click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
+  });
+
+  test("tanpa CV saat pratinjau lampiran tidak tersedia (data lowongan tidak termuat): tetap wajib centang konfirmasi tanpa CV", async ({ app, backend }) => {
+    seed(backend, { approval: { resume_url: null }, profile: null, description: "Kirim CV." });
+    backend.state.jobs = [];
+    backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-no-cv-fallback", status: "pending" } });
+    await openPanel(app);
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-attachments")).toHaveCount(0);
+    const consent = app.getByTestId("email-confirm-no-cv");
+    const send = app.getByRole("button", { name: "Ya, masukkan ke antrean" });
+    await expect(consent).not.toBeChecked();
+    await expect(send).toBeDisabled();
+    await consent.check();
+    await expect(send).toBeEnabled();
+    await send.click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
+  });
+
+  test("resume_url ada tetapi percobaan sebelumnya gagal mengunduh CV: tampilkan catatan & centang kirim tanpa CV agar percobaan ulang tidak buntu", async ({ app, backend }) => {
+    seed(backend);
+    backend.state.queue = [
+      {
+        id: "queue-cv-fail",
+        job_type: "email_apply",
+        status: "failed",
+        payload: { approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test" },
+        error_message: "Berkas CV pada persetujuan ini gagal diunduh untuk dilampirkan dan pengiriman tanpa CV belum dikonfirmasi; email tidak dikirim.",
+        created_at: isoAgo(30_000),
+      },
+    ];
+    backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-cv-retry", status: "pending" } });
+    await openPanel(app);
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-cv-retry-note")).toContainText("gagal mengunduh berkas CV");
+    const consent = app.getByTestId("email-confirm-no-cv");
+    const send = app.getByRole("button", { name: "Ya, masukkan ke antrean" });
+    await expect(consent).not.toBeChecked();
+    await expect(send).toBeDisabled();
+    await consent.check();
+    await expect(send).toBeEnabled();
+    await send.click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
   });
 
   test("CV baru diunggah sesudah draf diajukan: peringatan menyuruh mengajukan ulang, bukan 'belum mengunggah'", async ({ app, backend }) => {

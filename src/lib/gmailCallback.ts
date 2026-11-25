@@ -35,6 +35,7 @@ export function parseGmailCallback(search: GmailSearch | null | undefined): Gmai
 
 export const GMAIL_CONNECTED_TEXT = "Gmail terhubung. Kamu bisa mengirim lamaran lewat email dari persetujuan yang sudah disetujui.";
 export const GMAIL_DENIED_TEXT = "Izin Gmail tidak diberikan, jadi Gmail belum terhubung. Coba lagi dan pilih Izinkan.";
+export const GMAIL_SCOPE_DENIED_TEXT = "Izin kirim email Gmail tidak dicentang, jadi Gmail belum terhubung. Coba lagi dan centang izin kirim email.";
 export const GMAIL_FAILED_TEXT = "Gmail belum bisa disambungkan saat ini. Coba lagi nanti.";
 export const GMAIL_SESSION_TEXT = "Sambungan Gmail terputus di tengah jalan atau sudah lewat waktunya. Mulai lagi dari tombol Hubungkan Gmail.";
 export const GMAIL_UNAVAILABLE_TEXT = "Kirim lewat Gmail belum tersedia.";
@@ -46,6 +47,8 @@ export function gmailBanner(callback: GmailCallback): GmailBanner {
   switch (callback.reason) {
     case "access_denied":
       return { tone: "error", text: GMAIL_DENIED_TEXT };
+    case "scope_denied":
+      return { tone: "error", text: GMAIL_SCOPE_DENIED_TEXT };
     case "token_exchange":
     case "storage":
       return { tone: "error", text: GMAIL_FAILED_TEXT };

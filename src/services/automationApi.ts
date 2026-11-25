@@ -180,10 +180,10 @@ export const automationApi = {
    * Is the current user's Gmail connected (GET /api/oauth/status)? null = could not be checked. The email
    * channel needs it, and a failed request must not look like "connected", so there is no placeholder fallback.
    */
-  async getGmailStatus(): Promise<{ gmail: boolean } | null> {
-    if (isMockMode()) return { gmail: true }
+  async getGmailStatus(): Promise<{ gmail: boolean; email?: string | null } | null> {
+    if (isMockMode()) return { gmail: true, email: null }
     try {
-      return await apiFetch<{ gmail: boolean }>(`${apiBase()}/api/oauth/status`, { headers: await getAuthHeaders() })
+      return await apiFetch<{ gmail: boolean; email?: string | null }>(`${apiBase()}/api/oauth/status`, { headers: await getAuthHeaders() })
     } catch (err) {
       console.warn('[automationApi] Gmail status unavailable:', err)
       return null

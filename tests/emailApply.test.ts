@@ -7,6 +7,7 @@ import {
   describeQueueError,
   extractRecruiterEmails,
   getEmailApplyState,
+  isCvAttachmentFailure,
   validateRecruiterEmail,
   type ApprovalLike,
   type EmailApplyContext,
@@ -178,6 +179,18 @@ test("permintaan antrean mengikuti kontrak akhir backend: hanya approval_request
   assert.equal("application_id" in req!.payload, false);
 });
 
+test("permintaan antrean menyertakan allow_without_cv hanya bila ada konfirmasi eksplisit", () => {
+  const normal = buildEmailApplyRequest(approval(), "hrd@perusahaan.co.id");
+  const falseOptIn = buildEmailApplyRequest(approval(), "hrd@perusahaan.co.id", { allowWithoutCv: false });
+  const confirmed = buildEmailApplyRequest(approval(), "hrd@perusahaan.co.id", { allowWithoutCv: true });
+  assert.deepEqual(normal?.payload, { approval_request_id: "apr-1", apply_email: "hrd@perusahaan.co.id" });
+  assert.deepEqual(falseOptIn?.payload, { approval_request_id: "apr-1", apply_email: "hrd@perusahaan.co.id" });
+  assert.deepEqual(confirmed?.payload, { approval_request_id: "apr-1", apply_email: "hrd@perusahaan.co.id", allow_without_cv: true });
+  const service = read("../src/services/emailApplyService.ts");
+  assert.match(service, /enqueueEmailApply\(approval: ApprovalLike, applyEmail: string, options: \{ allowWithoutCv\?: boolean \} = \{\}\)/);
+  assert.match(service, /buildEmailApplyRequest\(approval, applyEmail, options\)/);
+});
+
 test("permintaan antrean tidak dibuat dari masukan yang belum cukup", () => {
   assert.equal(buildEmailApplyRequest(approval(), "salah"), null);
   assert.equal(buildEmailApplyRequest(approval({ job_id: null }), "hrd@perusahaan.co.id"), null);
@@ -206,6 +219,7 @@ test("galat antrean: kode approval_required, galat server berbentuk JSON, jaring
   assert.doesNotMatch(describeQueueError("kacau"), /kacau/);
   assert.equal(describeQueueError(new ApiError(503, JSON.stringify({ error: "Gmail not configured on server" }))), "Kirim lewat Gmail belum tersedia.");
   assert.match(describeQueueError(undefined), /Lamaran belum bisa masuk ke antrean/);
+  assert.match(describeQueueError(new ApiError(409, JSON.stringify({ code: "missing_cv_unconfirmed" }))), /Unggah CV di Profil atau centang konfirmasi kirim tanpa CV/);
 });
 
 test("penjelasan di layar: surat dikirim apa adanya, tanpa AI, satu persetujuan satu pengiriman", () => {
@@ -253,4 +267,38 @@ test("halaman Approvals: panel email hanya untuk baris berstatus approved", () =
   assert.match(panel, /getEmailApplyState\(approval, \{ used, job, gmailConnected, applyEmail: email, agentBlockedReason \}\)/);
   assert.match(panel, /if \(!state\.visible\) return null/);
   assert.match(panel, /EMAIL_APPLY_EXPLANATION/);
+});
+
+test("konfirmasi email menampilkan akun Gmail yang dikembalikan status, dengan fallback jujur, dan mengunci kirim tanpa CV", () => {
+  const panel = read("../src/components/EmailApplyPanel.tsx");
+  const service = read("../src/services/emailApplyService.ts");
+  const api = read("../src/services/automationApi.ts");
+  const page = read("../src/routes/approvals.tsx");
+  assert.match(api, /getGmailStatus\(\): Promise<\{ gmail: boolean; email\?: string \| null \} \| null>/);
+  assert.match(service, /gmailEmail: string \| null/);
+  assert.match(service, /gmailEmail: null/);
+  assert.match(service, /data\.gmailEmail = typeof gmail\?\.email === "string"[^;]*\? gmail\.email\.trim\(\) : null/);
+  assert.match(page, /gmailEmail=\{emailData\.gmailEmail\}/);
+  assert.match(panel, /data-testid="email-confirm-sender"/);
+  assert.match(panel, /<b className="break-all">\{gmailEmail\}<\/b>/);
+  assert.match(panel, /Pengirim:/);
+  assert.match(panel, /sambungkan ulang Gmail di Pengaturan agar alamat pengirim tampil di sini/);
+  assert.match(panel, /const \[confirmNoCv, setConfirmNoCv\] = useState\(false\)/);
+  assert.match(panel, /const planNoCv = plan \? plan\.noCv : !hasApprovalCv/);
+  assert.match(panel, /const lastFailedCvDownload = isCvAttachmentFailure\(job\)/);
+  assert.match(panel, /const missingCv = planNoCv \|\| lastFailedCvDownload/);
+  assert.match(panel, /data-testid="email-confirm-no-cv"/);
+  assert.match(panel, /disabled=\{sending \|\| !state\.enabled \|\| \(missingCv && !confirmNoCv\)\}/);
+  assert.match(panel, /if \(missingCv && !confirmNoCv\) return/);
+  assert.match(panel, /allowWithoutCv: true/);
+  assert.match(panel, /const changeConfirmation = \(next: boolean\) => \{\s*setConfirmNoCv\(false\);\s*setConfirming\(next\);/);
+});
+
+test("isCvAttachmentFailure mengenali galat gagal unduh/lampirkan CV pada percobaan terakhir saja", () => {
+  assert.equal(isCvAttachmentFailure(null), false);
+  assert.equal(isCvAttachmentFailure({ status: "completed", error_message: "cv_attachment_unavailable" }), false);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "Gmail not connected" }), false);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "Berkas CV pada persetujuan ini gagal diunduh untuk dilampirkan" }), true);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "CV pada persetujuan gagal dilampirkan" }), true);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "cv_attachment_unavailable" }), true);
 });

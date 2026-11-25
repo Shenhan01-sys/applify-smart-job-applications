@@ -83,7 +83,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     title: "Penggunaan data Google",
     paragraphs: [
       "Masuk dengan Google hanya memberi Applify nama dan email akun Google-mu. Data itu dipakai untuk mengenali akunmu.",
-      "Izin Gmail diminta hanya bila kamu menghubungkan Gmail untuk mengirim lamaran lewat email. Izin yang diminta hanya untuk mengirim email (gmail.send). Applify tidak membaca kotak masuk atau email lain di akunmu. Email baru dikirim setelah kamu menyetujui lamaran di halaman Persetujuan.",
+      "Izin Gmail diminta hanya bila kamu menghubungkan Gmail untuk mengirim lamaran lewat email. Applify meminta izin mengirim email (gmail.send) dan membaca alamat akun Gmail yang terhubung (userinfo.email) agar alamat pengirim tampil sebelum kamu mengirim. Applify tidak membaca kotak masuk atau email lain di akunmu. Email baru dikirim setelah kamu menyetujui lamaran di halaman Persetujuan.",
     ],
   },
   {

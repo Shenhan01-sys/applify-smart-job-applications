@@ -399,6 +399,7 @@ function ApprovalsPage() {
                         <EmailApplyPanel
                           approval={request}
                           gmailConnected={emailData.gmail}
+                          gmailEmail={emailData.gmailEmail}
                           used={emailData.used.has(request.id)}
                           job={emailData.jobs[request.id]}
                           suggestions={emailData.suggestions[request.id]}
