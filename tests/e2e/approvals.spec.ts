@@ -929,6 +929,37 @@ test.describe("Persetujuan: lampiran email", () => {
     expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
   });
 
+  test("resume_url ada tetapi percobaan sebelumnya gagal mengunduh CV: tampilkan catatan & centang kirim tanpa CV agar percobaan ulang tidak buntu", async ({ app, backend }) => {
+    seed(backend);
+    backend.state.queue = [
+      {
+        id: "queue-cv-fail",
+        job_type: "email_apply",
+        status: "failed",
+        payload: { approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test" },
+        error_message: "Berkas CV pada persetujuan ini gagal diunduh untuk dilampirkan dan pengiriman tanpa CV belum dikonfirmasi; email tidak dikirim.",
+        created_at: isoAgo(30_000),
+      },
+    ];
+    backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-cv-retry", status: "pending" } });
+    await openPanel(app);
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-cv-retry-note")).toContainText("gagal mengunduh berkas CV");
+    const consent = app.getByTestId("email-confirm-no-cv");
+    const send = app.getByRole("button", { name: "Ya, masukkan ke antrean" });
+    await expect(consent).not.toBeChecked();
+    await expect(send).toBeDisabled();
+    await consent.check();
+    await expect(send).toBeEnabled();
+    await send.click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
+  });
+
   test("CV baru diunggah sesudah draf diajukan: peringatan menyuruh mengajukan ulang, bukan 'belum mengunggah'", async ({ app, backend }) => {
     seed(backend, { approval: { resume_url: null }, description: "Kirim CV." });
     await openPanel(app);

@@ -11,6 +11,7 @@ import {
   EMAIL_APPLY_EXPLANATION,
   describeQueueError,
   getEmailApplyState,
+  isCvAttachmentFailure,
   type ApprovalLike,
   type EmailQueueRow,
 } from "@/lib/emailApply";
@@ -73,8 +74,11 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   if (!state.visible) return null;
 
   // Bila pratinjau lampiran (`plan`) gagal dimuat, tetap jatuh ke `approval.resume_url` agar konfirmasi tanpa CV tidak terlewati.
+  // Jika percobaan sebelumnya gagal mengunduh berkas CV (`cv_attachment_unavailable`), tampilkan juga centang kirim tanpa CV agar percobaan ulang tidak buntu.
   const hasApprovalCv = typeof approval.resume_url === "string" && approval.resume_url.trim().length > 0;
-  const missingCv = plan ? plan.noCv : !hasApprovalCv;
+  const planNoCv = plan ? plan.noCv : !hasApprovalCv;
+  const lastFailedCvDownload = isCvAttachmentFailure(job);
+  const missingCv = planNoCv || lastFailedCvDownload;
 
   const expires = approval.expires_at ? new Date(approval.expires_at) : null;
   const expiresLabel = expires && Number.isFinite(expires.getTime())
@@ -243,6 +247,13 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                 <p data-testid="email-confirm-attachments" className="text-xs leading-relaxed">
                   <b>Lampiran:</b> {plan.items.length > 0 ? plan.items.map((i) => i.label).join(", ") : "tidak ada"}
                   {plan.noCv ? <> (tanpa CV)</> : null}.
+                </p>
+              )}
+              {lastFailedCvDownload && !planNoCv && (
+                <p data-testid="email-confirm-cv-retry-note" className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-2">
+                  Percobaan sebelumnya gagal mengunduh berkas CV. Kamu bisa mengunggah ulang CV di{" "}
+                  <Link to="/profile" className="font-semibold underline underline-offset-2">Profil</Link>{" "}
+                  lalu mengajukan draf baru, atau centang di bawah untuk tetap mengirim tanpa CV.
                 </p>
               )}
               {missingCv && (

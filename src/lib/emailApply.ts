@@ -96,6 +96,12 @@ export interface EmailQueueRow {
   error_message?: string | null;
 }
 
+/** True bila percobaan kirim terakhir gagal karena berkas CV pada persetujuan tidak bisa diunduh/dilampirkan. */
+export function isCvAttachmentFailure(job?: EmailQueueRow | null): boolean {
+  if (job?.status !== "failed") return false;
+  return /gagal diunduh|gagal dilampirkan|cv_attachment_unavailable/i.test(job.error_message ?? "");
+}
+
 export interface EmailApplyContext {
   now?: Date;
   /** A successful application_logs row already consumed this approval (the worker refuses a second use). */

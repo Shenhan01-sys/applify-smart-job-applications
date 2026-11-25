@@ -7,6 +7,7 @@ import {
   describeQueueError,
   extractRecruiterEmails,
   getEmailApplyState,
+  isCvAttachmentFailure,
   validateRecruiterEmail,
   type ApprovalLike,
   type EmailApplyContext,
@@ -283,10 +284,21 @@ test("konfirmasi email menampilkan akun Gmail yang dikembalikan status, dengan f
   assert.match(panel, /Pengirim:/);
   assert.match(panel, /sambungkan ulang Gmail di Pengaturan agar alamat pengirim tampil di sini/);
   assert.match(panel, /const \[confirmNoCv, setConfirmNoCv\] = useState\(false\)/);
-  assert.match(panel, /const missingCv = plan \? plan\.noCv : !hasApprovalCv/);
+  assert.match(panel, /const planNoCv = plan \? plan\.noCv : !hasApprovalCv/);
+  assert.match(panel, /const lastFailedCvDownload = isCvAttachmentFailure\(job\)/);
+  assert.match(panel, /const missingCv = planNoCv \|\| lastFailedCvDownload/);
   assert.match(panel, /data-testid="email-confirm-no-cv"/);
   assert.match(panel, /disabled=\{sending \|\| !state\.enabled \|\| \(missingCv && !confirmNoCv\)\}/);
   assert.match(panel, /if \(missingCv && !confirmNoCv\) return/);
   assert.match(panel, /allowWithoutCv: true/);
   assert.match(panel, /const changeConfirmation = \(next: boolean\) => \{\s*setConfirmNoCv\(false\);\s*setConfirming\(next\);/);
+});
+
+test("isCvAttachmentFailure mengenali galat gagal unduh/lampirkan CV pada percobaan terakhir saja", () => {
+  assert.equal(isCvAttachmentFailure(null), false);
+  assert.equal(isCvAttachmentFailure({ status: "completed", error_message: "cv_attachment_unavailable" }), false);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "Gmail not connected" }), false);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "Berkas CV pada persetujuan ini gagal diunduh untuk dilampirkan" }), true);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "CV pada persetujuan gagal dilampirkan" }), true);
+  assert.equal(isCvAttachmentFailure({ status: "failed", error_message: "cv_attachment_unavailable" }), true);
 });
