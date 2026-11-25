@@ -268,7 +268,7 @@ Requirements: ${JSON.stringify(job.requirements ?? [])}
 CANDIDATE
 Name: ${profile?.full_name ?? "Kandidat"}
 Current title: ${profile?.current_title ?? "-"}
-Experience years: ${profile?.experience_years ?? 0}
+Total work experience across all roles (years): ${profile?.experience_years ?? 0}. This is the TOTAL, never the length of one role; for a single role use only its own dates under Recent experience.
 Skills: ${skillList || "-"}
 Recent experience:
 ${workList || "-"}${achievementSection}

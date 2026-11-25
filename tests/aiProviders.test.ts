@@ -505,3 +505,9 @@ test("budgetForCandidate: kandidat sebelum Anthropic menyisakan cadangan; Anthro
   assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: 14_000, elapsedMs: 14_500 }), 0);
   assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: total, elapsedMs: 14_500 }), 19_500);
 });
+
+test("prompt surat: experience_years disebut total pengalaman, bukan lama satu jabatan (uji draf 25 Nov 2026)", () => {
+  const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  assert.match(src, /Total work experience across all roles \(years\)/);
+  assert.match(src, /never the length of one role/);
+});
