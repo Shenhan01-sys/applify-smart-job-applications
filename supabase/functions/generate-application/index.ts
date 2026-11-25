@@ -409,16 +409,6 @@ Return JSON exactly in this shape:
       return json({ error: "AI generation failed", detail: lastDetail, rejected: [...new Set(rejectedReasons)], budgetExhausted, elapsedMs: Date.now() - requestStarted, attempts, models: chain.map((m) => m.entry), quota }, 502);
     }
 
-    // 6b) Consume one monthly application only now that a draft exists, and only when Applify's key wrote it.
-    //     A draft written with the user's own key (BYOK) does not use the monthly quota.
-    if (mode !== "analyze" && keySource === "applify") {
-      const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
-      if (qErr) return json({ error: "Quota update failed", detail: qErr.message }, 500);
-      quota = parseQuotaStatus(q);
-      if (!quota.allowed) {
-        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
-      }
-    }
     // Soft checks on the accepted letter: wrong language, and numbers/percentages the profile does not support.
     // They are returned in analysis.warnings AND written into ai_notes, so the draft screen shows them.
     const warnings = [
@@ -453,7 +443,8 @@ Return JSON exactly in this shape:
 
     if (mode === "analyze") return json({ analysis: result, quota });
 
-    // 7) Persist draft (server-authoritative)
+    // 7) Persist draft (server-authoritative) BEFORE consuming monthly quota: concurrent duplicate requests
+    //    rejected by unique index (23505) or failed inserts will not charge quota twice or deduct on error.
     const { data: app, error: insErr } = await admin
       .from("ai_applications")
       .insert({
@@ -472,7 +463,7 @@ Return JSON exactly in this shape:
 
     if (isUniqueViolation(insErr)) {
       // Dua permintaan bersamaan lolos 3a; indeks unik (DRAFT_2026-11-24_ai_applications_one_active_per_job.sql) menolak
-      // yang kedua. Pemenangnya dikembalikan, bukan galat 500.
+      // yang kedua. Pemenangnya dikembalikan tanpa memotong kuota ganda, bukan galat 500.
       const { data: winners } = await admin
         .from("ai_applications").select("*, jobs(*)")
         .eq("user_id", userId).eq("job_id", jobId).neq("status", CLOSED_STATUS)
@@ -481,6 +472,23 @@ Return JSON exactly in this shape:
       if (winner) return json({ application: winner, reused: true, analysis: reusedAnalysis(winner), quota });
     }
     if (insErr) return json({ error: "Failed to save draft", detail: insErr.message, analysis: result, quota }, 500);
+
+    // 7b) Consume one monthly application only now that the draft row succeeded, and only when Applify's key wrote it.
+    //     A draft written with the user's own key (BYOK) does not use the monthly quota. If quota update fails or was
+    //     exhausted concurrently by another job, remove the newly inserted draft so no orphan draft remains.
+    if (mode !== "analyze" && keySource === "applify") {
+      const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
+      if (qErr) {
+        if (app?.id) await admin.from("ai_applications").delete().eq("id", app.id).eq("user_id", userId);
+        return json({ error: "Quota update failed", detail: qErr.message }, 500);
+      }
+      quota = parseQuotaStatus(q);
+      if (!quota.allowed) {
+        if (app?.id) await admin.from("ai_applications").delete().eq("id", app.id).eq("user_id", userId);
+        return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
+      }
+    }
+
     return json({ application: app, analysis: result, quota });
   } catch (e: any) {
     return json({ error: String(e?.message ?? e) }, 500);

@@ -104,6 +104,11 @@ test("Edge Function: dua permintaan bersamaan -> pelanggaran indeks unik mengemb
   assert.match(unique, /reused: true/);
   // baris yang dibuat tetap hanya satu: insert draf tunggal, status draft
   assert.equal(fn.split('.from("ai_applications")\n      .insert(').length - 1, 1);
+  // kuota dipotong sesudah insert berhasil (bukan sebelumnya), dan baris baru dibersihkan jika kuota gagal/habis
+  const consumeAt = fn.indexOf('rpc("consume_monthly_apply"');
+  assert.ok(insertAt < consumeAt, "insert draf terjadi sebelum consume_monthly_apply agar duplikat/gagal insert tidak memotong kuota");
+  const afterConsume = fn.slice(consumeAt);
+  assert.match(afterConsume, /\.from\("ai_applications"\)\.delete\(\)\.eq\("id", app\.id\)\.eq\("user_id", userId\)/);
 });
 
 test("Layar: server mengembalikan lamaran yang ada -> toast; tombol draf baru hanya bila lamaran terakhir sudah ditutup", () => {
