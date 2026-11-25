@@ -32,3 +32,24 @@ export function followUpBadge(
   const tanggal = due.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   return { kind: "scheduled", label: `Tindak lanjut ${tanggal}` };
 }
+
+/** Lencana konfirmasi bila pengguna sudah menandai tindak lanjut selesai. */
+export const FOLLOW_UP_DONE_LABEL = "Sudah ditindaklanjuti";
+
+/**
+ * Status baru sesudah pengguna menekan "Tandai: Sudah Kutindaklanjuti" (UX-P7-02).
+ * Kolom `follow_up` berarti "Perlu tindak lanjut", sehingga kartu `submitted` harus tetap di `submitted`
+ * dan kartu yang sedang di `follow_up` dikembalikan ke `submitted` agar tidak lagi masuk hitungan perlu
+ * tindak lanjut. Tahap lanjut (`responded`, `closed`) tidak diubah.
+ */
+export function nextStatusAfterFollowUpSent(status: string): string {
+  return status === "follow_up" ? "submitted" : status;
+}
+
+/** True bila lencana "Sudah ditindaklanjuti" layak tampil pada kartu atau detail lamaran. */
+export function showFollowUpDoneBadge(
+  app: { status?: string | null; follow_up_sent?: boolean | null } | null | undefined
+): boolean {
+  if (!app?.follow_up_sent) return false;
+  return app.status === "submitted" || app.status === "follow_up" || app.status === "responded";
+}

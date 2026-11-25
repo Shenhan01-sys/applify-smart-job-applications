@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FOLLOW_UP_DAYS, followUpBadge, followUpDueAt } from "../src/lib/followUp.ts";
+import { readFileSync } from "node:fs";
+import {
+  FOLLOW_UP_DAYS,
+  FOLLOW_UP_DONE_LABEL,
+  followUpBadge,
+  followUpDueAt,
+  nextStatusAfterFollowUpSent,
+  showFollowUpDoneBadge,
+} from "../src/lib/followUp.ts";
+import { summarizeApplications } from "../src/lib/dashboardStats.ts";
 
 test("follow-up: satu nilai, 4 hari (sama dengan worker)", () => {
   assert.equal(FOLLOW_UP_DAYS, 4);
@@ -24,4 +33,36 @@ test("lencana tindak lanjut: tanggal saran belum tiba bukan 'Perlu tindak lanjut
     const x = followUpBadge({ status: s, follow_up_scheduled: past }, now);
     assert.doesNotMatch(x?.label ?? "", /Perlu tindak lanjut/, "kata kolom tidak dipakai lencana");
   }
+});
+
+test("UX-P7-02: Sudah Kutindaklanjuti menjaga kartu tetap di Terkirim dan mengeluarkannya dari Perlu tindak lanjut", () => {
+  assert.equal(nextStatusAfterFollowUpSent("submitted"), "submitted");
+  assert.equal(nextStatusAfterFollowUpSent("follow_up"), "submitted");
+  assert.equal(nextStatusAfterFollowUpSent("responded"), "responded");
+  assert.equal(nextStatusAfterFollowUpSent("closed"), "closed");
+
+  // Kartu yang ditandai sudah ditindaklanjuti tidak lagi masuk hitungan followUp di ringkasan.
+  const afterMark = [
+    { status: nextStatusAfterFollowUpSent("submitted"), follow_up_sent: true },
+    { status: nextStatusAfterFollowUpSent("follow_up"), follow_up_sent: true },
+  ];
+  const stats = summarizeApplications(afterMark);
+  assert.equal(stats.followUp, 0);
+  assert.equal(stats.sent, 2);
+
+  assert.equal(FOLLOW_UP_DONE_LABEL, "Sudah ditindaklanjuti");
+  assert.equal(showFollowUpDoneBadge({ status: "submitted", follow_up_sent: true }), true);
+  assert.equal(showFollowUpDoneBadge({ status: "submitted", follow_up_sent: false }), false);
+  assert.equal(showFollowUpDoneBadge({ status: "closed", follow_up_sent: true }), false);
+
+  // Pastikan kabel layanan dan halaman tidak lagi memindahkan submitted -> follow_up.
+  const svc = readFileSync(new URL("../src/services/aiApplicationService.ts", import.meta.url), "utf8");
+  const markBlock = svc.slice(svc.indexOf("async markFollowUpSent"), svc.indexOf("async deleteApplication"));
+  assert.doesNotMatch(markBlock, /update\(\{\s*status:\s*"follow_up"/);
+  assert.match(markBlock, /update\(\{\s*status:\s*"submitted"/);
+  assert.match(markBlock, /\.eq\("status",\s*"follow_up"\)/);
+
+  const page = readFileSync(new URL("../src/routes/applications.tsx", import.meta.url), "utf8");
+  assert.match(page, /nextStatusAfterFollowUpSent\(a\.status\)/);
+  assert.doesNotMatch(page, /a\.status === "submitted" \? "follow_up"/);
 });
