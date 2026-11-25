@@ -129,7 +129,8 @@ test("Dashboard: kuota dari get_quota_status (bukan kolom monthly_quota/used_quo
   assert.match(page, /Tahap uji coba/);
   // ajakan lengkapi profil memakai aturan onboarding yang sama dengan login
   assert.match(page, /needsOnboarding\(x\)/);
-  assert.match(page, /to="\/profile"/);
+  // ajakan profil kini lewat checklist langkah (onboardingChecklist.ts), tujuan langkah dari step.to
+  assert.match(page, /<Link to=\{step\.to\}/);
   assert.match(page, /prefers-reduced-motion/);
   assert.doesNotMatch(page, /text-\[(8|9|10)px\]/);
   const sql = read("../../database/schema.sql");

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
-import { Bot, Zap, Send, Search, Leaf, Settings, ChevronRight, CheckCircle2, FileText, AlertCircle, ShieldCheck, UserCircle } from "lucide-react";
+import { Bot, Zap, Send, Search, Leaf, Settings, ChevronRight, CheckCircle2, FileText, AlertCircle, ShieldCheck, Circle, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 // Sample data is only for the explicit demo mode (VITE_MOCK_MODE=true). A real account sees its own rows
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { mockProfile as mockProfileData, mockSubscription, mockAIApplications } from "@/mocks/mockData";
 import { profileService } from "@/services/profileService";
 import { needsOnboarding } from "@/lib/onboarding";
+import { buildChecklist, type Checklist } from "@/lib/onboardingChecklist";
 import { describeError } from "@/lib/authErrors";
 import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
 import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
@@ -60,6 +61,9 @@ export function DashboardPage() {
   const [applications, setApplications] = useState<DashApplication[]>([]);
   // true bila profil belum lengkap; null = belum diketahui (jangan tampilkan ajakan yang bisa salah)
   const [profileIncomplete, setProfileIncomplete] = useState<boolean | null>(null);
+  // Fakta checklist pengguna baru: CV terunggah dan jumlah persetujuan yang disetujui. null = belum diketahui.
+  const [hasResume, setHasResume] = useState<boolean | null>(null);
+  const [approvedCount, setApprovedCount] = useState<number | null>(null);
   // null = unknown (the call failed or there is no data), so the ring shows a dash instead of a made-up number
   const [quota, setQuota] = useState<QuotaSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +78,8 @@ export function DashboardPage() {
         setProfile(mockProfileData);
         setApplications(mockAIApplications as unknown as DashApplication[]);
         setProfileIncomplete(false);
+        setHasResume(true);
+        setApprovedCount(1);
         setQuota({ quota: mockSubscription.monthly_quota, used: mockSubscription.used_quota, remaining: mockSubscription.monthly_quota - mockSubscription.used_quota, allowed: true });
         setLoading(false);
         return;
@@ -81,8 +87,8 @@ export function DashboardPage() {
       try {
         // Same sources as the rest of the app: drafts and their status live in ai_applications (joined to
         // jobs), the monthly draft quota comes from the get_quota_status function the Edge Function uses.
-        const [p, apps, q, summary] = await Promise.all([
-          supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+        const [p, apps, q, summary, approvedRes] = await Promise.all([
+          supabase.from("profiles").select("full_name, resume_url").eq("id", user.id).maybeSingle(),
           supabase
             .from("ai_applications")
             .select("id, status, submitted_at, created_at, jobs(title, company)")
@@ -92,11 +98,15 @@ export function DashboardPage() {
           supabase.rpc("get_quota_status", { p_user_id: user.id }),
           // Gagal membaca ringkasan profil tidak boleh memblokir dashboard: cukup tidak menampilkan ajakan.
           profileService.getSummary(user.id).then((x) => needsOnboarding(x), () => null),
+          // Langkah "Periksa dan setujui" di checklist: cukup jumlahnya. Galat = belum diketahui, bukan 0.
+          supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "approved"),
         ]);
         if (apps.error) throw new Error(apps.error.message);
         setProfile(p.data ?? null);
         setApplications((apps.data ?? []) as unknown as DashApplication[]);
         setProfileIncomplete(summary);
+        setHasResume(p.error ? null : !!(p.data as { resume_url?: string | null } | null)?.resume_url);
+        setApprovedCount(approvedRes.error ? null : approvedRes.count ?? 0);
         setQuota(q.error ? null : parseQuotaStatus(q.data));
       } catch (err) {
         console.error("Dashboard load failed:", err);
@@ -125,6 +135,13 @@ export function DashboardPage() {
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "Pengguna";
   const stats = summarizeApplications(applications);
+  const checklist = buildChecklist({
+    profileComplete: profileIncomplete === null ? null : !profileIncomplete,
+    hasResume,
+    drafts: stats.total,
+    approved: approvedCount,
+    sent: stats.sent,
+  });
   const activity = recentActivity(applications, 6);
 
   const C = 2 * Math.PI * 18;
@@ -165,18 +182,13 @@ export function DashboardPage() {
           </div>
         )}
 
-        {profileIncomplete === true && (
-          <div role="note" className="rounded-2xl border-2 border-[#0A5BE0]/40 bg-[#0A5BE0]/[6%] p-4 text-sm flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-start gap-2 text-neutral-800">
-              <UserCircle className="w-5 h-5 shrink-0 text-[#0A5BE0]" aria-hidden="true" />
-              <span><strong>Profilmu belum lengkap.</strong> Agen memakai profil untuk mencocokkan lowongan dan menyusun draf lamaran. Lengkapi dulu supaya kuota drafmu tidak terbuang.</span>
-            </span>
-            <Link to="/profile" className="min-h-11 inline-flex items-center px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold shrink-0">Lengkapi profil</Link>
-          </div>
-        )}
+        {/* Pengguna baru: satu daftar langkah berurutan dengan satu ajakan utama (catatan 41, ON-01). Hilang bila semua selesai. */}
+        {!loadError && !checklist.complete && <OnboardingChecklist checklist={checklist} />}
 
-        {/* Mission Control diorama */}
-        <MissionControlStage drafts={stats.drafts} ready={stats.ready} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={stats.total === 0 && !loadError} />
+        {/* Mission Control diorama. Akun tanpa lamaran tidak diberi tiga bulatan 0 (ON-18): checklist di atas yang menunjuk langkahnya. */}
+        {(stats.total > 0 || loadError) && (
+          <MissionControlStage drafts={stats.drafts} ready={stats.ready} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={false} />
+        )}
 
         {/* Bottom: activity log + quick actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 opacity-0 animate-dbFadeUp" style={{ animationDelay: "300ms" }}>
@@ -210,8 +222,7 @@ export function DashboardPage() {
               <div className="text-center py-10 text-sm text-muted-foreground">
                 {loadError ? "Aktivitas belum bisa dimuat." : (
                   <>
-                    <p>Belum ada lamaran di akunmu.</p>
-                    <Link to="/jobs" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90">Cari lowongan</Link>
+                    <p>Belum ada lamaran di akunmu. Lamaran pertamamu akan muncul di sini setelah kamu membuat draf dengan AI.</p>
                   </>
                 )}
               </div>
@@ -219,7 +230,7 @@ export function DashboardPage() {
           </div>
 
           <div className="lg:col-span-4 flex flex-col gap-3">
-            <h2 className="font-display text-lg font-bold text-neutral-900 mb-1">Langkah cepat</h2>
+            <h2 className="font-display text-lg font-bold text-neutral-900 mb-1">Pintasan</h2>
             <Link to="/jobs" className="w-full min-h-11 flex items-center gap-4 p-5 bg-[#16150F] text-white rounded-2xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl group">
               <div className="w-10 h-10 bg-[#A3E635] text-[#16150F] rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-sm" aria-hidden="true"><Search className="w-5 h-5" /></div>
               <div className="text-left">
@@ -252,6 +263,48 @@ export function DashboardPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function OnboardingChecklist({ checklist }: { checklist: Checklist }) {
+  const { steps, doneCount, total, next } = checklist;
+  return (
+    <section aria-labelledby="checklist-title" className="rounded-3xl border-2 border-[#0A5BE0]/30 bg-white p-5 sm:p-7 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="checklist-title" className="font-display text-xl font-bold text-neutral-900">Mulai melamar dengan Applify</h2>
+        <p className="text-sm font-semibold text-neutral-600">{doneCount} dari {total} langkah selesai</p>
+      </div>
+      <p className="mt-1 text-sm text-neutral-600">Ikuti langkah ini berurutan. Tidak ada lamaran yang dikirim sebelum kamu menekan Setujui.</p>
+      <div className="mt-3 h-2 w-full rounded-full bg-neutral-100" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={doneCount} aria-label="Kemajuan langkah awal">
+        <div className="h-2 rounded-full bg-[#0A5BE0] transition-all" style={{ width: `${(doneCount / total) * 100}%` }} />
+      </div>
+      <ol className="mt-5 space-y-3">
+        {steps.map((step, i) => {
+          const isNext = next?.id === step.id;
+          return (
+            <li key={step.id} className={`flex items-start gap-3 rounded-2xl border-2 p-3 sm:p-4 ${isNext ? "border-[#0A5BE0] bg-[#0A5BE0]/[5%]" : "border-neutral-200"}`}>
+              {step.done === true ? (
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
+              ) : (
+                <Circle className={`mt-0.5 h-5 w-5 shrink-0 ${isNext ? "text-[#0A5BE0]" : "text-neutral-400"}`} aria-hidden="true" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-bold ${step.done === true ? "text-neutral-500 line-through decoration-neutral-400" : "text-neutral-900"}`}>
+                  {i + 1}. {step.title}
+                  <span className="sr-only">{step.done === true ? " (selesai)" : step.done === null ? " (status belum terbaca)" : " (belum)"}</span>
+                </p>
+                {step.done !== true && <p className="mt-0.5 text-sm text-neutral-600">{step.detail}</p>}
+                {isNext && (
+                  <Link to={step.to} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:opacity-90">
+                    {step.cta} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
