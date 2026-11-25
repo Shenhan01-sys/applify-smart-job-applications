@@ -1029,7 +1029,7 @@ function HowItWorks() {
           </div>
           <div className="rounded-2xl border border-neutral-200 bg-white p-5">
             <h3 className="font-display font-bold text-neutral-900">Lamaran lewat email</h3>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Setelah kamu menekan Setujui, lamaran dikirim lewat akun Gmail yang sudah kamu hubungkan.</p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Setelah Setujui, pilih Kirim lewat Email di halaman Persetujuan, isi alamat rekruter, lalu konfirmasi. Email baru terkirim dari akun Gmail yang sudah kamu hubungkan sesudah konfirmasi itu.</p>
           </div>
         </div>
       </section>
@@ -1263,7 +1263,7 @@ function SubmissionPaths() {
     },
     {
       title: "Lamaran lewat email",
-      body: "Setelah kamu menekan Setujui, lamaran dikirim lewat akun Gmail yang sudah kamu hubungkan.",
+      body: "Setelah Setujui, pilih Kirim lewat Email di halaman Persetujuan, isi alamat rekruter, lalu konfirmasi. Email baru terkirim dari akun Gmail yang sudah kamu hubungkan sesudah konfirmasi itu.",
     },
   ];
   return (

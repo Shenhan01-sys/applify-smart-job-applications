@@ -14,7 +14,7 @@ const EVENT_LABELS: Array<{ key: "ready" | "submitted" | "awaiting_code" | "foll
   { key: "ready", label: "Formulir terisi & siap ditinjau" },
   { key: "submitted", label: "Lamaran berhasil terkirim" },
   { key: "awaiting_code", label: "Agen meminta kode keamanan email" },
-  { key: "follow_up", label: "Pengingat follow-up 4 hari" },
+  { key: "follow_up", label: "Pengingat follow-up 4 hari (belum aktif)" },
   { key: "locked_claim", label: "Klaim persetujuan terkunci / butuh cek" },
 ];
 

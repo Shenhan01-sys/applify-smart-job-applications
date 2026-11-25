@@ -49,6 +49,14 @@ test("kartu memakai keadaan Belum tersedia dan tidak menawarkan formulir saat fi
   assert.ok(unavailableAt > 0 && formAt > unavailableAt, "keadaan Belum tersedia harus dicek sebelum formulir");
 });
 
+test("pengingat tindak lanjut tidak dijanjikan ke pengguna selama worker hanya mengirimnya ke satu chat operator (U5-P2-07, BS-03, UX-P7-08)", () => {
+  const settings = read("../src/routes/settings.tsx");
+  const card = read("../src/components/NotificationSettingsCard.tsx");
+  assert.doesNotMatch(settings, /pengingat tindak lanjut lewat WhatsApp/i);
+  assert.match(settings, /Pengingat tindak lanjut ke akunmu belum aktif/);
+  assert.match(card, /label: "Pengingat follow-up 4 hari \(belum aktif\)"/);
+});
+
 test("kata 'belum aktif di database' hilang dari jawaban tersimpan dan dokumen tambahan", () => {
   for (const file of ["../src/lib/formQuestions.ts", "../src/lib/profileDocuments.ts"]) {
     assert.doesNotMatch(read(file), /belum aktif di database/);

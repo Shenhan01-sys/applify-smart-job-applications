@@ -129,7 +129,7 @@ function SettingsPage() {
         </Card>
 
         <Card icon={Bell} title="Notifikasi WhatsApp"
-          desc="Terima kabar status lamaran, permintaan kode keamanan, dan pengingat tindak lanjut lewat WhatsApp terverifikasi atau email.">
+          desc="Terima kabar status lamaran dan permintaan kode keamanan lewat WhatsApp terverifikasi atau email. Pengingat tindak lanjut ke akunmu belum aktif.">
           <NotificationSettingsCard />
         </Card>
 
