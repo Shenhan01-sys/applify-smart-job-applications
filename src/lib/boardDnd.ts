@@ -100,19 +100,19 @@ export function boardCollisionDetection(args: BoardCollisionArgs): { id: string 
 // ---- status "Terkirim" hanya lewat konfirmasi -------------------------------------------------------------
 
 /**
- * Menjatuhkan kartu di "Terkirim" harus dikonfirmasi: Applify belum mengirim apa pun pada tahap ini, jadi status itu
- * hanya benar bila pengguna sendiri sudah mengirim lamarannya. Pindah dari "Terkirim" ke kolom lain tidak perlu.
+ * Kartu tidak bisa dipindah ke "Terkirim" oleh pengguna (Hans, 25 November 2026). Sesi agen berjalan di peramban
+ * worker yang tidak bisa dibuka pengguna, jadi status Terkirim hanya datang dari log pengiriman agen atau email.
+ * Pindah dari "Terkirim" ke kolom lain tetap boleh.
  */
-export function dropNeedsConfirmation(fromStatus: string | undefined, toStatus: BoardStatus): boolean {
+export function dropIntoSubmittedBlocked(fromStatus: string | undefined, toStatus: BoardStatus | string): boolean {
   return toStatus === "submitted" && fromStatus !== "submitted";
 }
 
-export const SUBMITTED_CONFIRM_TEXT = {
-  title: "Tandai lamaran ini Terkirim?",
+export const SUBMITTED_BLOCKED_TEXT = {
+  title: "Status Terkirim diisi oleh Applify",
   description:
-    "Applify belum mengirim lamaran ini. Pilih \"Ya, sudah kukirim\" hanya bila kamu sendiri sudah mengirimnya. Agen tidak mengirim apa pun sebelum kamu menyetujuinya di halaman Persetujuan.",
-  confirm: "Ya, sudah kukirim",
-  cancel: "Batal",
+    "Kartu pindah ke Terkirim sendiri setelah agen benar-benar mengirim lamaran. Untuk mengirim, setujui lamarannya di halaman Persetujuan.",
+  ok: "Mengerti",
 } as const;
 
 // ---- teks pembaca layar (bawaan dnd-kit berbahasa Inggris) -------------------------------------------------

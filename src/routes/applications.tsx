@@ -34,11 +34,11 @@ import {
   BOARD_ROLE_DESCRIPTION,
   BOARD_SCREEN_READER_INSTRUCTIONS,
   BOARD_TOUCH_CONSTRAINT,
-  SUBMITTED_CONFIRM_TEXT,
+  SUBMITTED_BLOCKED_TEXT,
   boardAnnouncements,
   boardCollisionDetection,
   dragEndMove,
-  dropNeedsConfirmation,
+  dropIntoSubmittedBlocked,
 } from "@/lib/boardDnd";
 import {
   LayoutGrid,
@@ -255,7 +255,7 @@ export function AppsPage() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
-  // Id kartu yang dijatuhkan di "Terkirim" dan menunggu konfirmasi pengguna (lib/boardDnd.ts, dropNeedsConfirmation).
+  // Id kartu yang dicoba dipindah ke "Terkirim": dialog menjelaskan bahwa status itu diisi Applify (lib/boardDnd.ts).
   const [pendingSubmitted, setPendingSubmitted] = useState<string | null>(null);
   const [approvalUi, setApprovalUi] = useState<ApprovalUi>({ state: "idle" });
   const [approvalBusy, setApprovalBusy] = useState(false);
@@ -499,8 +499,8 @@ export function AppsPage() {
     const move = dragEndMove(event);
     if (!move) return;
     const from = applications.find((a) => a.id === move.appId)?.status;
-    // "Terkirim" lewat seret perlu konfirmasi: Applify belum mengirim apa pun, jadi statusnya harus pilihan sadar pengguna.
-    if (dropNeedsConfirmation(from, move.status)) {
+    // "Terkirim" tidak bisa dipilih pengguna: hanya agen atau email yang mengisinya. Tampilkan penjelasan saja.
+    if (dropIntoSubmittedBlocked(from, move.status)) {
       setPendingSubmitted(move.appId);
       return;
     }
@@ -686,26 +686,16 @@ export function AppsPage() {
       <Dialog open={!!pendingSubmitted} onOpenChange={(open) => { if (!open) setPendingSubmitted(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{SUBMITTED_CONFIRM_TEXT.title}</DialogTitle>
-            <DialogDescription>{SUBMITTED_CONFIRM_TEXT.description}</DialogDescription>
+            <DialogTitle>{SUBMITTED_BLOCKED_TEXT.title}</DialogTitle>
+            <DialogDescription>{SUBMITTED_BLOCKED_TEXT.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               type="button"
               onClick={() => setPendingSubmitted(null)}
-              className="min-h-11 rounded-xl border-2 border-[#999999] bg-white px-5 text-sm font-semibold hover:bg-black/[4%] transition"
-            >
-              {SUBMITTED_CONFIRM_TEXT.cancel}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (pendingSubmitted) moveApplication(pendingSubmitted, "submitted");
-                setPendingSubmitted(null);
-              }}
               className="min-h-11 rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:bg-[#0256d3] transition"
             >
-              {SUBMITTED_CONFIRM_TEXT.confirm}
+              {SUBMITTED_BLOCKED_TEXT.ok}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -740,7 +730,7 @@ export function AppsPage() {
                       value={selectedApp.status}
                       onChange={(e) => {
                         const target = e.target.value as ApplicationStatus;
-                        if (dropNeedsConfirmation(selectedApp.status, target)) {
+                        if (dropIntoSubmittedBlocked(selectedApp.status, target)) {
                           setPendingSubmitted(selectedApp.id);
                           return;
                         }
@@ -748,7 +738,11 @@ export function AppsPage() {
                       }}
                       className="min-h-11 rounded-lg border-2 border-[#999999] bg-white px-3 text-base md:text-sm"
                     >
-                      {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{applicationStatusLabel(s)}</option>)}
+                      {APPLICATION_STATUSES.map((s) => (
+                        <option key={s} value={s} disabled={dropIntoSubmittedBlocked(selectedApp.status, s)}>
+                          {applicationStatusLabel(s)}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>

@@ -7,12 +7,12 @@ import {
   BOARD_SCREEN_READER_INSTRUCTIONS,
   BOARD_STATUSES,
   BOARD_TOUCH_CONSTRAINT,
-  SUBMITTED_CONFIRM_TEXT,
+  SUBMITTED_BLOCKED_TEXT,
   boardAnnouncements,
   boardCollisionDetection,
   boardStatusOf,
   dragEndMove,
-  dropNeedsConfirmation,
+  dropIntoSubmittedBlocked,
 } from "../src/lib/boardDnd.ts";
 import { APPLICATION_STATUS_LABEL } from "../src/lib/statusLabels.ts";
 
@@ -142,22 +142,21 @@ test("temuan 21: overlay seret dirender lewat portal ke body dan tabrakan memaka
   assert.match(read("../src/styles.css"), /\.animate-slide-right \{\s*animation: slideInRight [^;]*both;/);
 });
 
-test("temuan 21: Terkirim lewat seret perlu konfirmasi; kolom lain dan pindah dari Terkirim tidak", () => {
-  for (const from of ["draft", "ready", "follow_up", "responded", "closed", undefined]) assert.equal(dropNeedsConfirmation(from, "submitted"), true, String(from));
-  assert.equal(dropNeedsConfirmation("submitted", "submitted"), false);
-  for (const to of BOARD_STATUSES.filter((s) => s !== "submitted")) assert.equal(dropNeedsConfirmation("draft", to), false, to);
-  assert.equal(dropNeedsConfirmation("submitted", "draft"), false);
-  assert.match(SUBMITTED_CONFIRM_TEXT.description, /belum mengirim/);
-  assert.match(SUBMITTED_CONFIRM_TEXT.description, /Persetujuan/);
-  assert.equal(SUBMITTED_CONFIRM_TEXT.confirm, "Ya, sudah kukirim");
+test("Terkirim tidak bisa dipilih pengguna lewat seret atau Ubah status; pindah dari Terkirim tetap boleh", () => {
+  for (const from of ["draft", "ready", "follow_up", "responded", "closed", undefined]) assert.equal(dropIntoSubmittedBlocked(from, "submitted"), true, String(from));
+  assert.equal(dropIntoSubmittedBlocked("submitted", "submitted"), false);
+  for (const to of BOARD_STATUSES.filter((s) => s !== "submitted")) assert.equal(dropIntoSubmittedBlocked("draft", to), false, to);
+  assert.equal(dropIntoSubmittedBlocked("submitted", "draft"), false);
+  assert.match(SUBMITTED_BLOCKED_TEXT.description, /Persetujuan/);
+  assert.doesNotMatch(JSON.stringify(SUBMITTED_BLOCKED_TEXT), /sudah kukirim/i);
 });
 
-test("temuan 21: handleDragEnd menunda perpindahan ke Terkirim sampai pengguna menekan konfirmasi", () => {
+test("halaman Lamaran: tidak ada jalan memindahkan kartu ke Terkirim secara manual", () => {
   const src = read("../src/routes/applications.tsx");
   const end = src.slice(src.indexOf("const handleDragEnd"), src.indexOf("const stats ="));
-  assert.match(end, /dropNeedsConfirmation\(from, move\.status\)/);
+  assert.match(end, /dropIntoSubmittedBlocked\(from, move\.status\)/);
   assert.match(end, /setPendingSubmitted\(move\.appId\);\s*return;/);
-  // moveApplication ke "submitted" hanya dipanggil dari tombol konfirmasi
-  assert.match(src, /moveApplication\(pendingSubmitted, "submitted"\)/);
-  assert.match(src, /\{SUBMITTED_CONFIRM_TEXT\.confirm\}/);
+  assert.doesNotMatch(src, /moveApplication\(pendingSubmitted, "submitted"\)/);
+  assert.doesNotMatch(src, /sudah kukirim/i);
+  assert.match(src, /disabled=\{dropIntoSubmittedBlocked\(selectedApp\.status, s\)\}/);
 });

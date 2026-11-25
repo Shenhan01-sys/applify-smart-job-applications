@@ -261,3 +261,14 @@ test("antrean ekstensi Fase 2 & jeda login (awaiting_login): status aktif, resol
   const expiredProcessing = describeAgentApply({ ...waitLoginRow, awaiting_until: "2020-01-01T00:00:00Z" }, Date.parse("2026-11-24T12:00:00Z"));
   assert.equal(expiredProcessing.label, "Batas waktu login habis (belum terkirim)");
 });
+
+test("page_mismatch: kartu menjelaskan halaman berpindah, bukan pengiriman belum diizinkan", () => {
+  const view = describeLogOutcome({ log_status: "incomplete", reason: "page_mismatch" } as any);
+  assert.ok(view);
+  assert.match(view!.label, /Halaman berpindah/);
+  assert.doesNotMatch(view!.hint, /belum diizinkan|uji coba/);
+});
+
+test("teks berhenti sebelum kirim tidak lagi menyebut uji coba", () => {
+  assert.doesNotMatch(AGENT_STOPPED_BEFORE_SUBMIT_TEXT, /uji coba|dimatikan/);
+});

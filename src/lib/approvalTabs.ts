@@ -62,6 +62,7 @@ export const STAGE_LABEL: Record<ApprovalStage, string> = {
 
 /** Persetujuan yang gagal dan masa berlakunya habis: tidak bisa dicoba lagi, jadi ditutup (tahap expired). */
 export const FAILED_CLOSED_LABEL = "Gagal, masa berlaku habis";
+export const EXPIRED_NOT_SENT_LABEL = "Kedaluwarsa, belum terkirim";
 
 /** Tahap yang masuk tab Riwayat. Selain ini, persetujuan ada di tab Menunggu. */
 const HISTORY_STAGES: ReadonlySet<ApprovalStage> = new Set(["sent", "rejected", "expired", "replaced"]);
@@ -118,6 +119,7 @@ const isEmailJobActive = (job: EmailQueueRow | null | undefined) => job?.status 
  *     4. menunggu kode, login, jawaban, atau izin               -> Menunggu, "Perlu tindakanmu"
  *     5. tugas agen atau email masih antre atau berjalan        -> Menunggu, "Sedang diproses"
  *     6. kirim belum terkonfirmasi atau klaim terkunci          -> Menunggu, "Perlu dicek, kirim belum terkonfirmasi"
+ *     6b. masa berlaku habis (tidak bisa dicoba lagi)           -> Riwayat, "Kedaluwarsa, belum terkirim"
  *     7. agen berhenti dan butuh tindakan (login, CAPTCHA, isian wajib kosong, dilewati, dan sejenisnya)
  *                                                               -> Menunggu, "Perlu tindakanmu"
  *     8. email tidak terkirim karena mode uji                   -> Menunggu, "Belum dikirim (mode uji)"
@@ -151,6 +153,11 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   if (waitingForUser) return place("needs_action");
   if (isAgentApplyActive(row) || isEmailJobActive(ctx.emailJob)) return place("processing");
   if (view.tone === "unverified") return place("unverified");
+  // Masa berlaku habis: agen tidak akan mencoba lagi dan tombol ulangi tidak ada, jadi kartu pindah ke Riwayat
+  // (Hans, 25 November 2026: enam kartu Datadog lama menumpuk di Menunggu tanpa bisa diapa-apakan).
+  if (row && isExpiredByTime(approval?.expires_at, now)) {
+    return view.tone === "failed" || ctx.emailJob?.status === "failed" ? place("expired", FAILED_CLOSED_LABEL) : place("expired", EXPIRED_NOT_SENT_LABEL);
+  }
   if (view.tone === "manual") return place("needs_action");
   if (ctx.testMode === true) return place("test_mode");
   if (view.tone === "ready") return place("filled_not_sent");

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   FAILED_CLOSED_LABEL,
+  EXPIRED_NOT_SENT_LABEL,
   STAGE_LABEL,
   placeApproval,
   splitApprovalTabs,
@@ -131,9 +132,10 @@ test("disetujui, agen gagal: bisa dicoba lagi tetap di Menunggu, masa berlaku ha
   expectPlace(place(approved({ expires_at: PAST }), { emailJob: { status: "failed" } }), "history", "expired", FAILED_CLOSED_LABEL);
   // yang sudah terkirim tidak pernah ikut tertutup karena kedaluwarsa
   expectPlace(place(approved({ expires_at: PAST }), { sent: true }), "history", "sent");
-  // masa berlaku habis tetapi agen masih bekerja, atau formulir sudah terisi: tetap Menunggu
+  // masa berlaku habis tetapi agen masih bekerja: tetap Menunggu
   expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("processing") }), "pending", "processing");
-  expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("completed", { status: "ready", details: { submit_blocked: "not_allowed" } }) }), "pending", "filled_not_sent");
+  // formulir terisi tetapi masa berlaku habis: tidak bisa dicoba lagi, pindah ke Riwayat (25 November 2026)
+  expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("completed", { status: "ready", details: { submit_blocked: "not_allowed" } }) }), "history", "expired", EXPIRED_NOT_SENT_LABEL);
 });
 
 test("temuan 22: disetujui tidak pernah berlabel Kedaluwarsa hanya karena waktu lewat", () => {

@@ -121,7 +121,7 @@ export const FILL_YOURSELF_LABEL = "Isi sendiri di situs";
  * Kalimatnya tetap benar saat ALLOW_REAL_SUBMIT dinyalakan, karena host yang tidak diizinkan juga berhenti di sini.
  */
 export const AGENT_STOPPED_BEFORE_SUBMIT_TEXT =
-  "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim karena pengiriman otomatis belum diizinkan (selama uji coba, pengiriman dimatikan). Lamaran tidak terkirim dan ada di kolom Siap dikirim. Bila pengiriman diizinkan, agen menekan kirim sendiri dan lamaran pindah ke Terkirim.";
+  "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim karena situs lowongan ini belum ada di daftar situs yang boleh dikirim otomatis. Lamaran tidak terkirim dan ada di kolom Siap dikirim.";
 
 export const NO_FIELDS_FILLED_TEXT =
   "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi sendiri di situs lowongan, atau ajukan lagi.";
