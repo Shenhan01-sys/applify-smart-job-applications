@@ -160,6 +160,27 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
     await expect(app.getByRole("dialog")).toHaveCount(0);
   });
 
+  test("berkas .pdf yang isinya bukan PDF ditolak sebelum diunggah: CV lama di Storage dan profil tidak berubah", async ({ app, backend }) => {
+    seed(backend);
+    await app.goto("/profile");
+    await app.locator("#resume-file").setInputFiles({ name: "cv-asli.pdf", mimeType: "application/pdf", buffer: PDF });
+    await expect(app.getByText(/cv-\d+\.pdf/)).toBeVisible();
+    const storedBefore = [...backend.state.storage];
+    const resumeBefore = backend.state.profiles[0].resume_url;
+    expect(storedBefore).toHaveLength(1);
+    const writesBefore = writesTo(backend, "profiles").length;
+
+    await app.locator("#resume-file").setInputFiles({ name: "cv-rusak.pdf", mimeType: "application/pdf", buffer: Buffer.from("PK\u0003\u0004 ini DOCX yang diganti nama") });
+    const error = app.locator("#resume-error");
+    await expect(error).toContainText("bukan PDF yang sah");
+    await expect(error).toContainText("CV yang sudah tersimpan tidak diubah");
+    await expect(error).toHaveAttribute("role", "alert");
+    expect(backend.state.storage).toEqual(storedBefore);
+    expect(backend.state.profiles[0].resume_url).toBe(resumeBefore);
+    expect(writesTo(backend, "profiles")).toHaveLength(writesBefore);
+    expect(importCalls(backend)).toEqual([]);
+  });
+
   test("kartu Impor dari PDF tetap bekerja sendiri: satu panggilan, dialog umum, dan teksnya menjelaskan bahwa satu unggahan sudah cukup", async ({ app, backend }) => {
     seed(backend);
     await app.goto("/profile");

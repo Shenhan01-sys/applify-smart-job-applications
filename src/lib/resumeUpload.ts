@@ -72,6 +72,32 @@ export function validateResumeFile(file: ResumeFileInfo): ResumeValidation {
   return { ok: true, ext, contentType };
 }
 
+/** Banyak byte awal berkas yang dibaca untuk memeriksa tanda pengenal isinya. */
+export const RESUME_HEAD_BYTES = 5;
+
+export const RESUME_REASON_NOT_PDF =
+  "Isi berkas ini bukan PDF yang sah (tidak diawali tanda %PDF-), jadi tidak diunggah dan CV yang sudah tersimpan tidak diubah. " +
+  "Pilih berkas PDF lain, atau ekspor ulang CV dari aplikasi tempat kamu membuatnya.";
+export const RESUME_REASON_UNREADABLE = "Berkas CV tidak bisa dibaca. Pilih berkas lain atau coba lagi.";
+
+const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
+
+/** True bila byte awal berkas adalah `%PDF-`. */
+export function hasPdfSignature(head: ArrayLike<number> | null | undefined): boolean {
+  if (!head || head.length < PDF_SIGNATURE.length) return false;
+  return PDF_SIGNATURE.every((byte, i) => head[i] === byte);
+}
+
+/**
+ * Memeriksa isi berkas dari byte awalnya, setelah `validateResumeFile` lolos dan sebelum apa pun diunggah. Berkas berekstensi
+ * atau bertipe PDF yang isinya bukan PDF (rusak, atau DOCX yang diganti nama) ditolak di sini, jadi CV lama tidak
+ * tergantikan berkas yang tidak sah. DOC dan DOCX tidak diperiksa isinya.
+ */
+export function validateResumeContent(ext: string, head: ArrayLike<number> | null | undefined): { ok: true } | { ok: false; reason: string } {
+  if (String(ext).toLowerCase() !== "pdf") return { ok: true };
+  return hasPdfSignature(head) ? { ok: true } : { ok: false, reason: RESUME_REASON_NOT_PDF };
+}
+
 /** Path objek untuk CV baru. Nama memuat waktu unggah, jadi CV baru tidak menimpa yang lama sebelum penggantian berhasil. */
 export function resumeObjectPath(userId: string, ext: string, now: number): string {
   return `${userId}/cv-${now}.${ext.toLowerCase()}`;

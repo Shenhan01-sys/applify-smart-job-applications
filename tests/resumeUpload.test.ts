@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   RESUME_ACCEPT,
+  RESUME_HEAD_BYTES,
   RESUME_MAX_BYTES,
+  RESUME_REASON_NOT_PDF,
   RESUME_TYPES,
+  hasPdfSignature,
   parseResumePath,
   resumeFileLabel,
   resumeObjectPath,
+  validateResumeContent,
   validateResumeFile,
 } from "../src/lib/resumeUpload.ts";
 
@@ -157,6 +161,47 @@ test("resumeService: unggahan dihapus lagi bila simpan ke profil gagal; CV lama 
   assert.match(svc, /previous && previous\.path !== path/);
   // pembersihan tidak boleh melempar
   assert.match(svc, /async function removeObjectQuietly[\s\S]*?try \{[\s\S]*?\.remove\(\[path\]\)[\s\S]*?\} catch/);
+});
+
+// ---- BS-U1-02 (audit 26 November 2026): isi PDF diperiksa sebelum unggah, jadi berkas rusak tidak menghapus CV yang sah ----
+
+const bytes = (s: string) => Array.from(Buffer.from(s, "latin1"));
+
+test("hasPdfSignature: hanya byte awal %PDF- yang lolos", () => {
+  assert.equal(hasPdfSignature(bytes("%PDF-1.7\n")), true);
+  assert.equal(hasPdfSignature(new Uint8Array(bytes("%PDF-"))), true);
+  for (const bad of ["%PDF", "%pdf-1.4", " %PDF-1.4", "PK\u0003\u0004", "<html>", "", "%PDX-"]) {
+    assert.equal(hasPdfSignature(bytes(bad)), false, JSON.stringify(bad));
+  }
+  assert.equal(hasPdfSignature(null), false);
+  assert.equal(hasPdfSignature(undefined), false);
+  assert.equal(RESUME_HEAD_BYTES, 5);
+});
+
+test("validateResumeContent: PDF tanpa tanda %PDF- ditolak dengan alasan yang menyebut CV lama tidak diubah; DOC dan DOCX tidak diperiksa", () => {
+  assert.deepEqual(validateResumeContent("pdf", bytes("%PDF-1.4")), { ok: true });
+  assert.deepEqual(validateResumeContent("PDF", bytes("%PDF-1.4")), { ok: true });
+  for (const head of [bytes("PK\u0003\u0004"), bytes("hello"), [], null]) {
+    assert.deepEqual(validateResumeContent("pdf", head as any), { ok: false, reason: RESUME_REASON_NOT_PDF });
+  }
+  assert.match(RESUME_REASON_NOT_PDF, /CV yang sudah tersimpan tidak diubah/);
+  assert.doesNotMatch(RESUME_REASON_NOT_PDF, /[—!]/);
+  assert.deepEqual(validateResumeContent("docx", bytes("PK\u0003\u0004")), { ok: true });
+  assert.deepEqual(validateResumeContent("doc", bytes("ÐÏ\u0011à")), { ok: true });
+});
+
+test("resumeService.uploadResume: isi PDF diperiksa sebelum Storage, profil, atau CV lama disentuh", () => {
+  const svc = read("../src/services/resumeService.ts");
+  const body = svc.slice(svc.indexOf("export async function uploadResume"), svc.indexOf("export async function removeResume"));
+  const contentAt = body.indexOf("validateResumeContent(check.ext, await readHead(file))");
+  const rejectAt = body.indexOf("throw new ResumeError(content.reason)");
+  assert.ok(contentAt > 0 && rejectAt > contentAt, "pemeriksaan isi ada dan menolak lewat ResumeError");
+  for (const touch of ["getResume(userId)", ".upload(path", 'from("profiles").update', "removeObjectQuietly("]) {
+    const at = body.indexOf(touch);
+    assert.ok(at > rejectAt, `${touch} hanya sesudah pemeriksaan isi`);
+  }
+  assert.match(svc, /file\.slice\(0, RESUME_HEAD_BYTES\)\.arrayBuffer\(\)/);
+  assert.match(svc, /throw new ResumeError\(RESUME_REASON_UNREADABLE, err\)/);
 });
 
 test("resumeService.removeResume: kolom dikosongkan dulu, baru objek dihapus; galat DB menghentikan proses", () => {

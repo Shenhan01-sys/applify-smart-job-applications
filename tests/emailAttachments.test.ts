@@ -233,7 +233,10 @@ test("kabel: layanan membaca profil dan lowongan dengan sesi pengguna sendiri da
 
 test("kontrak dengan worker: sumber CV, endpoint upload Gmail, bentuk log attachments dan dropped", () => {
   const handler = read("../../worker/src/handlers/emailApply.ts");
-  assert.match(handler, /resumeUrl: \(verdict\.row as any\)\.resume_url/);
+  // BS-U4-01: CV = CV profil saat ini (resolveCurrentResumeUrl), dengan resume_url persetujuan sebagai pembanding dan cadangan.
+  assert.match(handler, /approvalUrl: \(verdict\.row as any\)\.resume_url/);
+  assert.match(handler, /const resumeUrl = currentResume\.url \?\? ""/);
+  assert.match(handler, /resumeUrl,\n\s+profile,/);
   assert.match(handler, /upload\/gmail\/v1\/users\/me\/messages\/send\?uploadType=media/);
   assert.match(handler, /"Content-Type": "message\/rfc822"/);
   assert.match(handler, /attachments: files\.attachments, dropped: files\.dropped/);

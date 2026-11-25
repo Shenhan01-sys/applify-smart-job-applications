@@ -1,7 +1,15 @@
 import { supabase } from "@/lib/supabase";
 import { isMockMode } from "@/lib/appConfig";
 import { describeError } from "@/lib/authErrors";
-import { parseResumePath, resumeObjectPath, validateResumeFile, type ResumeRef } from "@/lib/resumeUpload";
+import {
+  RESUME_HEAD_BYTES,
+  RESUME_REASON_UNREADABLE,
+  parseResumePath,
+  resumeObjectPath,
+  validateResumeContent,
+  validateResumeFile,
+  type ResumeRef,
+} from "@/lib/resumeUpload";
 
 /** Bucket privat. Path objek `<user_id>/<nama-berkas>` disimpan di `profiles.resume_url`. */
 const BUCKET = "resumes";
@@ -28,6 +36,15 @@ async function removeObjectQuietly(path: string): Promise<void> {
   }
 }
 
+/** Byte awal berkas untuk pemeriksaan isi. Gagal membaca berkas dianggap galat, bukan lolos. */
+async function readHead(file: File): Promise<Uint8Array> {
+  try {
+    return new Uint8Array(await file.slice(0, RESUME_HEAD_BYTES).arrayBuffer());
+  } catch (err) {
+    throw new ResumeError(RESUME_REASON_UNREADABLE, err);
+  }
+}
+
 /** CV yang tersimpan di profil, atau null bila belum ada (atau nilainya bukan path CV yang sah). */
 export async function getResume(userId: string): Promise<ResumeRef | null> {
   if (isMockMode()) return demoResume;
@@ -37,12 +54,16 @@ export async function getResume(userId: string): Promise<ResumeRef | null> {
 }
 
 /**
- * Mengunggah CV baru, menyimpan path-nya di profil, lalu menghapus CV lama. Bila penyimpanan di profil gagal,
+ * Memeriksa isi berkas (PDF wajib diawali `%PDF-`), mengunggah CV baru, menyimpan path-nya di profil, lalu menghapus CV lama.
+ * Berkas yang isinya tidak sah ditolak sebelum apa pun berubah, jadi CV lama tidak pernah hilang karenanya. Bila penyimpanan di profil gagal,
  * berkas yang baru diunggah dihapus lagi supaya tidak ada berkas yatim.
  */
 export async function uploadResume(userId: string, file: File): Promise<ResumeRef> {
   const check = validateResumeFile(file);
   if (!check.ok) throw new ResumeError(check.reason);
+  // Isi PDF diperiksa sebelum apa pun diunggah, supaya berkas rusak tidak pernah menggantikan (dan menghapus) CV yang sah.
+  const content = validateResumeContent(check.ext, await readHead(file));
+  if (!content.ok) throw new ResumeError(content.reason);
   const path = resumeObjectPath(userId, check.ext, Date.now());
 
   if (isMockMode()) {
