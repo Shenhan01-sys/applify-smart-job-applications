@@ -104,11 +104,27 @@ test("pemilihan paket di kode hanya free/pro, jadi tidak ada panel model untuk p
   assert.match(workerAi, /tier === "pro" \? PRO_MODEL : FREE_MODEL/);
 });
 
-test("batas lamaran Pro di UI (20 per hari) sama dengan worker; Free 10", () => {
+test("batas lamaran di UI (Free 10, Pro 20 per hari) sama dengan worker dan backend", () => {
   const quota = read("worker/src/lib/quota.ts");
   assert.match(quota, /free:\s*10,\s*pro:\s*20/);
-  assert.ok(PRO_FEATURES.includes("Hingga 20 lamaran per hari"));
-  assert.ok(FREE_FEATURES.includes("10 AI Apply per bulan"));
+  assert.match(read("backend/services/rate-limit.service.ts"), /DAILY_APPLY_LIMIT = \{ free: 10, pro: 20 \}/);
+  assert.ok(PRO_FEATURES.some((f) => /^Hingga 20 lamaran terkirim per hari/.test(f)));
+  assert.ok(FREE_FEATURES.some((f) => /^Hingga 10 lamaran terkirim per hari/.test(f)));
+});
+
+test("UX-P7-07: satuan kuota di kartu paket sama dengan yang dijalankan kode (draf per bulan, kirim per hari)", () => {
+  // Draf AI dibatasi per BULAN (get_quota_status memakai period 'monthly'; bawaan 10 per akun).
+  assert.match(read("backend/services/quota-status.ts"), /DEFAULT_MONTHLY_QUOTA = 10/);
+  assert.ok(FREE_FEATURES.includes("10 draf AI per bulan (kuota bulanan)"));
+  // Tidak ada kode yang memberi Pro angka draf bulanan berbeda, jadi kartu Pro tidak menjanjikan angka itu.
+  assert.ok(PRO_FEATURES.includes("Kuota draf AI per bulan ditetapkan per akun (bawaan 10)"));
+  assert.equal(PRO_FEATURES.filter((f) => /draf.*per hari|per hari.*draf/i.test(f)).length, 0);
+  // Pengiriman dibatasi per HARI UTC (reset 00:00 UTC = 07:00 WIB), untuk kedua paket.
+  assert.match(read("worker/src/lib/quota.ts"), /resets 00:00 UTC = 07:00 WIB/);
+  for (const list of [FREE_FEATURES, PRO_FEATURES]) {
+    assert.ok(list.some((f) => /lamaran terkirim per hari.*07\.00 WIB/.test(f)));
+    assert.equal(list.filter((f) => /lamaran.*per bulan|AI Apply per bulan/i.test(f)).length, 0);
+  }
 });
 
 test("UX-P7-07: Green Career Track tidak dijual sebagai isi Pro selama halaman dan fungsinya tidak memeriksa paket", () => {

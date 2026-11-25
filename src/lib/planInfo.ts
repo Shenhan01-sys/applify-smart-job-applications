@@ -4,13 +4,18 @@
 //   - supabase/functions/generate-application/index.ts  (draft: FREE_MODELS / PRO_MODELS, chosen by plan)
 //   - worker/src/lib/ai.ts                               (form planning: FREE_MODEL / PRO_MODEL + fallbacks + Groq)
 //   - backend/services/ai-pipeline.service.ts            (backend AI calls: free chain + Groq, same for every plan)
-// Limits follow worker/src/lib/quota.ts and backend/services/rate-limit.service.ts (daily apply: free 10, pro 20).
+// Limits follow the code, and there are two of them with different periods:
+//   - Lamaran terkirim per HARI: worker/src/lib/quota.ts and backend/services/rate-limit.service.ts (free 10, pro 20,
+//     UTC day, reset 00:00 UTC = 07:00 WIB).
+//   - Draf AI per BULAN: get_quota_status / consume_monthly_apply (subscriptions.monthly_quota, default 10 for every
+//     account). No code sets a different monthly number for Pro, so no Pro monthly number is promised here.
 
 /** Golden Window Sniper is not built: there is no job-age detection, alert or early auto-apply in the code. */
 export const GOLDEN_WINDOW_LABEL = "Golden Window Sniper (segera hadir)";
 
 export const FREE_FEATURES = [
-  "10 AI Apply per bulan",
+  "10 draf AI per bulan (kuota bulanan)",
+  "Hingga 10 lamaran terkirim per hari (batas harian, direset pukul 07.00 WIB)",
   "AI Basic (draf surat memakai model gratis Numes, Gemini, dan OpenRouter; Claude hanya cadangan terakhir)",
   "Surat lamaran standar",
   "Skill radar dasar (untuk bidang teknologi)",
@@ -19,7 +24,8 @@ export const FREE_FEATURES = [
 ];
 
 export const PRO_FEATURES = [
-  "Hingga 20 lamaran per hari",
+  "Hingga 20 lamaran terkirim per hari (batas harian, direset pukul 07.00 WIB)",
+  "Kuota draf AI per bulan ditetapkan per akun (bawaan 10)",
   "AI Premium (model Numes dan Gemini 4; Claude hanya cadangan terakhir)",
 ];
 
