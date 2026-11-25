@@ -20,9 +20,11 @@ export const FREE_FEATURES = [
 export const PRO_FEATURES = [
   "Hingga 20 lamaran per hari",
   "AI Premium (model Numes dan Gemini 4; Claude hanya cadangan terakhir)",
-  GOLDEN_WINDOW_LABEL,
   "Green Career Track",
 ];
+
+/** Rencana fitur yang belum ada di kode. Ditampilkan terpisah dari daftar paket berbayar, bukan sebagai isi paket. */
+export const PLANNED_FEATURES: string[] = [GOLDEN_WINDOW_LABEL];
 
 export interface PlanModel {
   name: string;

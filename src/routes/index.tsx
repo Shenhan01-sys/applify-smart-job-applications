@@ -5,7 +5,7 @@ import {
   TrendingUp, Scale, Globe, BadgeCheck, Briefcase, GraduationCap,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
-import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
+import { FREE_FEATURES, PLANNED_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
 import { isBillingEnabled } from "@/lib/appConfig";
 import { useAuth } from "@/contexts/AuthContext";
 import { WaitinglistPopup } from "@/components/WaitinglistPopup";
@@ -1293,9 +1293,9 @@ function SubmissionPaths() {
 /* ─────────────────────────  Pricing  ───────────────────────── */
 
 function Pricing({ authLink }: { authLink: string }) {
-  const tiers = [
+  const tiers: Array<{ name: string; price: string; per: string; popular?: boolean; features: string[]; planned?: string[] }> = [
     { name: "Free", price: "Gratis", per: "selamanya", features: FREE_FEATURES },
-    { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: PRO_FEATURES },
+    { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: PRO_FEATURES, planned: PLANNED_FEATURES },
     { name: "Kampus", price: "Rp 50jt", per: "/semester", features: ["Hubungi tim Applify untuk membahas kebutuhan kampus."] },
   ];
   return (
@@ -1322,6 +1322,14 @@ function Pricing({ authLink }: { authLink: string }) {
                   </li>
                 ))}
               </ul>
+              {t.planned && t.planned.length > 0 && (
+                <div className="mt-5 rounded-xl bg-black/[3%] p-3 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">Rencana, belum tersedia:</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-1">
+                    {t.planned.map((f) => <li key={f}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
               {/* Pembayaran belum dibuka saat uji coba (VITE_ENABLE_BILLING mati): /subscription hanya mengalihkan ke Beranda.
                   Mulai Gratis langsung ke pendaftaran, dan paket Pro tidak menawarkan tombol yang tidak bisa dipakai. */}
               {t.name === "Free" ? (
