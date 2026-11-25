@@ -120,7 +120,7 @@ export function describeLinkedInImportError(err: unknown, fallback = "PDF belum 
     case "pdf_too_long":
       return "PDF terlalu panjang untuk CV atau profil LinkedIn. Pastikan itu PDF CV atau profilmu.";
     case "pdf_no_text":
-      return "PDF ini tidak berisi teks yang bisa dibaca, mungkin hasil pindai. Pakai PDF CV yang bisa diseleksi teksnya, atau unduh PDF dari LinkedIn: Lainnya, Simpan ke PDF.";
+      return "Teks di PDF ini tidak bisa dibaca karena isinya berupa gambar (hasil pindai, atau CV Canva yang diunduh dengan opsi Ratakan PDF). Unduh ulang dari Canva sebagai PDF Standar tanpa Ratakan PDF, atau dari LinkedIn: Lainnya, Simpan ke PDF.";
     case "nothing_found":
       return "Tidak ada data profil yang bisa dibaca dari PDF ini. Pastikan itu PDF CV atau PDF profil LinkedIn, dan bukan hasil pindai.";
     case "rate_limited":
