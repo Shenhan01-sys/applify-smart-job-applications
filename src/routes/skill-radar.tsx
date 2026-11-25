@@ -80,7 +80,7 @@ function SkillPage() {
     <AppShell>
       <header className="mb-6">
         <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight">Peta Skill</h1>
-        <p className="text-muted-foreground text-sm mt-1">Lihat skill di profilmu dibandingkan dengan patokan perkiraan untuk enam bidang.</p>
+        <p className="text-muted-foreground text-sm mt-1">Lihat skill di profilmu dibandingkan dengan patokan perkiraan untuk enam bidang teknologi. Peta ini belum mencakup bidang non-teknologi seperti akuntansi, perhotelan, atau kesehatan.</p>
       </header>
 
       {error ? (
@@ -94,7 +94,7 @@ function SkillPage() {
           <p className="mx-auto mt-1 max-w-md text-sm text-foreground/80">
             {built.status === "empty"
               ? "Tambahkan skill di Profil Saya, lalu peta ini akan terisi dari data kamu sendiri."
-              : "Peta ini membaca nama skill seperti React, Node, Figma, Docker, SQL, atau Scrum. Coba tambahkan skill dengan nama yang umum di Profil Saya."}
+              : "Peta ini dibuat untuk bidang teknologi dan membaca nama skill seperti React, Node, Figma, Docker, SQL, atau Scrum. Bila bidangmu di luar itu, skill-mu tetap tersimpan di profil dan dipakai untuk melamar. Hanya petanya yang belum bisa menggambarkannya."}
           </p>
           <Link to="/profile" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:opacity-90">
             Buka Profil Saya

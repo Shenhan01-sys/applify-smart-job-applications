@@ -131,6 +131,20 @@ test("temuan 11: halaman Peta Skill menampilkan bagian Skill di luar enam bidang
   assert.match(src, /Skill-mu belum ada di profil/);
 });
 
+test("UX-P7-01: Peta Skill, landing, dan paket jujur bahwa petanya untuk bidang teknologi", () => {
+  const page = read("../src/routes/skill-radar.tsx");
+  const landing = read("../src/routes/index.tsx");
+  const plan = read("../src/lib/planInfo.ts");
+  assert.match(page, /enam bidang teknologi\. Peta ini belum mencakup bidang non-teknologi/);
+  // keadaan "belum cocok" tidak lagi menyuruh pengguna non-IT mengganti nama skill-nya
+  assert.doesNotMatch(page, /Coba tambahkan skill dengan nama yang umum/);
+  assert.match(page, /Bila bidangmu di luar itu, skill-mu tetap tersimpan di profil/);
+  // kartu landing tidak mengaku membandingkan dengan lowongan: peta memakai patokan tetap
+  assert.doesNotMatch(landing, /kecocokan skill profil dengan kebutuhan lowongan/);
+  assert.match(landing, /patokan perkiraan di enam bidang teknologi/);
+  assert.match(plan, /"Skill radar dasar \(untuk bidang teknologi\)"/);
+});
+
 // Tindak lanjut temuan 11: kata kunci dicocokkan sebagai kata utuh, bukan potongan kata.
 const axisOf = (skill: { name: string; category?: string | null; proficiency_level?: number }) =>
   buildRadarData([{ proficiency_level: 4, ...skill }]).data.filter((d) => d.userLevel > 0).map((d) => d.name);

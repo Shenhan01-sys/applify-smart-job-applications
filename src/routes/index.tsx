@@ -1083,7 +1083,7 @@ function CapabilitiesBento() {
             <div className="flex-1">
               <span className="inline-flex items-center rounded-full bg-[#16150F] px-3 py-1 text-xs font-bold text-[#D2F801]">Profil</span>
               <h3 className="mt-3 font-display text-xl font-bold">Skill Radar</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-snug">Lihat ringkasan kecocokan skill profil dengan kebutuhan lowongan.</p>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-snug">Bandingkan skill profilmu dengan patokan perkiraan di enam bidang teknologi.</p>
             </div>
             <RadarMini />
           </div>

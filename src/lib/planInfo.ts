@@ -13,7 +13,7 @@ export const FREE_FEATURES = [
   "10 AI Apply per bulan",
   "AI Basic (draf surat memakai model gratis Numes, Gemini, dan OpenRouter; Claude hanya cadangan terakhir)",
   "Surat lamaran standar",
-  "Skill radar dasar",
+  "Skill radar dasar (untuk bidang teknologi)",
   "Human approval",
 ];
 
