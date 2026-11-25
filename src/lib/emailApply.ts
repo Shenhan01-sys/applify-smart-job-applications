@@ -104,6 +104,19 @@ export function isCvAttachmentFailure(job?: EmailQueueRow | null): boolean {
   return /gagal diunduh|gagal dilampirkan|cv_attachment_unavailable/i.test(job.error_message ?? "");
 }
 
+/** Tombol coba ulang yang tetap mewajibkan CV: tidak mengirim `allow_without_cv`, jadi tidak pernah mengirim email tanpa CV (BS-U4-03). */
+export const EMAIL_CV_RETRY_LABEL = "Coba kirim ulang (tetap wajib CV)";
+export const EMAIL_CV_RETRY_HINT =
+  "Kirim ulang dengan CV yang sama. Bila berkas CV masih gagal diunduh, email tidak dikirim dan kamu bisa mencoba lagi nanti.";
+
+/**
+ * True bila persetujuan punya CV (`planNoCv` salah) tetapi percobaan terakhir gagal mengunduhnya: gangguan sementara
+ * yang cukup diulang. Pengguna tidak perlu dipaksa memilih kirim tanpa CV hanya untuk mencoba lagi.
+ */
+export function canRetryWithCv(input: { planNoCv: boolean; lastFailedCvDownload: boolean }): boolean {
+  return !input.planNoCv && input.lastFailedCvDownload;
+}
+
 /** True bila tugas email_apply masih menunggu atau sedang diproses worker sehingga /approvals perlu polling. */
 export function isEmailApplyActive(job?: EmailQueueRow | null): boolean {
   return job?.status === "pending" || job?.status === "processing";

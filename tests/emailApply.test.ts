@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   EMAIL_APPLY_EXPLANATION,
+  EMAIL_CV_RETRY_HINT,
+  EMAIL_CV_RETRY_LABEL,
   buildEmailApplyRequest,
+  canRetryWithCv,
   describeQueueError,
   extractRecruiterEmails,
   getEmailApplyState,
@@ -292,6 +295,37 @@ test("konfirmasi email menampilkan akun Gmail yang dikembalikan status, dengan f
   assert.match(panel, /if \(missingCv && !confirmNoCv\) return/);
   assert.match(panel, /allowWithoutCv: true/);
   assert.match(panel, /const changeConfirmation = \(next: boolean\) => \{\s*setConfirmNoCv\(false\);\s*setConfirming\(next\);/);
+});
+
+test("BS-U4-03: canRetryWithCv hanya bila persetujuan punya CV dan percobaan terakhir gagal mengunduhnya", () => {
+  assert.equal(canRetryWithCv({ planNoCv: false, lastFailedCvDownload: true }), true);
+  assert.equal(canRetryWithCv({ planNoCv: false, lastFailedCvDownload: false }), false);
+  assert.equal(canRetryWithCv({ planNoCv: true, lastFailedCvDownload: true }), false, "tanpa CV sama sekali tidak ada yang bisa diulang");
+  assert.equal(canRetryWithCv({ planNoCv: true, lastFailedCvDownload: false }), false);
+  assert.equal(EMAIL_CV_RETRY_LABEL, "Coba kirim ulang (tetap wajib CV)");
+  for (const copy of [EMAIL_CV_RETRY_LABEL, EMAIL_CV_RETRY_HINT]) assert.doesNotMatch(copy, /[—!]/);
+});
+
+test("BS-U4-03: permintaan coba ulang tetap wajib CV tidak membawa allow_without_cv; hanya pilihan eksplisit yang membawanya", () => {
+  const withCv = approval({ resume_url: "https://x.supabase.co/storage/v1/object/sign/resumes/u/cv-1.pdf?token=t" });
+  const retry = buildEmailApplyRequest(withCv, "hrd@perusahaan.test");
+  assert.ok(retry);
+  assert.equal("allow_without_cv" in retry!.payload, false);
+  assert.equal("allow_without_cv" in buildEmailApplyRequest(withCv, "hrd@perusahaan.test", { allowWithoutCv: false })!.payload, false);
+  assert.equal(buildEmailApplyRequest(withCv, "hrd@perusahaan.test", { allowWithoutCv: true })!.payload.allow_without_cv, true);
+});
+
+test("BS-U4-03: panel menyediakan tombol Coba kirim ulang (tetap wajib CV) yang tidak mengirim allow_without_cv dan tidak butuh centang", () => {
+  const panel = read("../src/components/EmailApplyPanel.tsx");
+  assert.match(panel, /const retryWithCv = canRetryWithCv\(\{ planNoCv, lastFailedCvDownload \}\)/);
+  assert.match(panel, /\{retryWithCv && \(\s*<button[\s\S]*?data-testid="email-confirm-retry-with-cv"[\s\S]*?onClick=\{retryKeepingCv\}[\s\S]*?disabled=\{sending \|\| !state\.enabled\}/);
+  assert.match(panel, /\{EMAIL_CV_RETRY_LABEL\}/);
+  const retryFn = panel.slice(panel.indexOf("const retryKeepingCv"), panel.indexOf("return (", panel.indexOf("const retryKeepingCv")));
+  assert.match(retryFn, /await enqueue\(undefined, true\)/);
+  assert.doesNotMatch(retryFn, /allowWithoutCv|confirmNoCv/);
+  // kotak centang kirim tanpa CV tetap ada sebagai pilihan eksplisit terpisah
+  assert.match(panel, /retryWithCv \? "Kirim tanpa CV" : "Ya, masukkan ke antrean"/);
+  assert.match(panel, /disabled=\{sending \|\| !state\.enabled \|\| \(missingCv && !confirmNoCv\)\}/);
 });
 
 test("isCvAttachmentFailure mengenali galat gagal unduh/lampirkan CV pada percobaan terakhir saja", () => {

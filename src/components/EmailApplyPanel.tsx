@@ -9,6 +9,9 @@ import { describeApiError } from "@/lib/apiErrors";
 import { enqueueEmailApply } from "@/services/emailApplyService";
 import {
   EMAIL_APPLY_EXPLANATION,
+  EMAIL_CV_RETRY_HINT,
+  EMAIL_CV_RETRY_LABEL,
+  canRetryWithCv,
   describeQueueError,
   getEmailApplyState,
   isCvAttachmentFailure,
@@ -49,6 +52,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   const [confirming, setConfirming] = useState(false);
   const [confirmNoCv, setConfirmNoCv] = useState(false);
   const [sending, setSending] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,6 +83,8 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   const planNoCv = plan ? plan.noCv : !hasApprovalCv;
   const lastFailedCvDownload = isCvAttachmentFailure(job);
   const missingCv = planNoCv || lastFailedCvDownload;
+  // Percobaan terakhir hanya gagal mengunduh CV yang ada: sediakan ulangi-dengan-CV tanpa memaksa memilih kirim tanpa CV (BS-U4-03).
+  const retryWithCv = canRetryWithCv({ planNoCv, lastFailedCvDownload });
 
   const expires = approval.expires_at ? new Date(approval.expires_at) : null;
   const expiresLabel = expires && Number.isFinite(expires.getTime())
@@ -88,12 +94,11 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
   const sentText = used && sent && sent.attached.length > 0 ? describeSentAttachments(sent) : "";
   const notSentText = used && sent ? describeNotAttached(sent) : "";
 
-  const submit = async () => {
-    if (missingCv && !confirmNoCv) return;
+  const enqueue = async (options: { allowWithoutCv: true } | undefined, isRetry: boolean) => {
     setSending(true);
+    setRetrying(isRetry);
     setError("");
     try {
-      const options = missingCv && confirmNoCv ? { allowWithoutCv: true } : undefined;
       await enqueueEmailApply(approval, email, options);
       toast.success("Email masuk antrean. Agen akan memprosesnya.");
       changeConfirmation(false);
@@ -103,7 +108,19 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
       changeConfirmation(false);
     } finally {
       setSending(false);
+      setRetrying(false);
     }
+  };
+
+  const submit = async () => {
+    if (missingCv && !confirmNoCv) return;
+    await enqueue(missingCv && confirmNoCv ? { allowWithoutCv: true } : undefined, false);
+  };
+
+  // Tanpa allowWithoutCv: bila CV masih gagal diunduh, server atau worker menolak dan email tidak terkirim.
+  const retryKeepingCv = async () => {
+    if (!retryWithCv || !state.enabled) return;
+    await enqueue(undefined, true);
   };
 
   return (
@@ -251,7 +268,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
               )}
               {lastFailedCvDownload && !planNoCv && (
                 <p data-testid="email-confirm-cv-retry-note" className="text-xs text-amber-800 bg-amber-50 border-2 border-amber-200 rounded-lg p-2">
-                  Percobaan sebelumnya gagal mengunduh berkas CV. Kamu bisa mengunggah ulang CV di{" "}
+                  Percobaan sebelumnya gagal mengunduh berkas CV. {EMAIL_CV_RETRY_HINT} Kamu juga bisa mengunggah ulang CV di{" "}
                   <Link to="/profile" className="font-semibold underline underline-offset-2">Profil</Link>{" "}
                   lalu mengajukan draf baru, atau centang di bawah untuk tetap mengirim tanpa CV.
                 </p>
@@ -268,9 +285,27 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                   Saya sadar lamaran ini akan dikirim tanpa CV.
                 </label>
               )}
-              <div className="flex gap-2">
-                <button type="button" onClick={submit} disabled={sending || !state.enabled || (missingCv && !confirmNoCv)} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
-                  {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ya, masukkan ke antrean
+              <div className="flex flex-wrap gap-2">
+                {retryWithCv && (
+                  <button
+                    type="button"
+                    data-testid="email-confirm-retry-with-cv"
+                    onClick={retryKeepingCv}
+                    disabled={sending || !state.enabled}
+                    className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5"
+                  >
+                    {sending && retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {EMAIL_CV_RETRY_LABEL}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={sending || !state.enabled || (missingCv && !confirmNoCv)}
+                  className={`h-9 px-4 rounded-lg text-xs font-semibold disabled:opacity-60 inline-flex items-center gap-1.5 ${
+                    retryWithCv ? "border-2 border-black/[8%] bg-white hover:bg-black/[4%]" : "bg-[#0A5BE0] text-white hover:bg-[#0256d3]"
+                  }`}
+                >
+                  {sending && !retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {retryWithCv ? "Kirim tanpa CV" : "Ya, masukkan ke antrean"}
                 </button>
                 <button type="button" onClick={() => changeConfirmation(false)} disabled={sending} className="h-9 px-4 rounded-lg border-2 border-black/[8%] bg-white text-xs hover:bg-black/[4%]">Batal</button>
               </div>

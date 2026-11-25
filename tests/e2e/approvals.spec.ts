@@ -929,7 +929,7 @@ test.describe("Persetujuan: lampiran email", () => {
     expect((calls[0].body as any).payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test", allow_without_cv: true });
   });
 
-  test("resume_url ada tetapi percobaan sebelumnya gagal mengunduh CV: tampilkan catatan & centang kirim tanpa CV agar percobaan ulang tidak buntu", async ({ app, backend }) => {
+  const seedCvDownloadFailed = (backend: Parameters<typeof seed>[0]) => {
     seed(backend);
     backend.state.queue = [
       {
@@ -942,13 +942,39 @@ test.describe("Persetujuan: lampiran email", () => {
       },
     ];
     backend.override("POST /api/automation/queue", { status: 200, body: { id: "queue-cv-retry", status: "pending" } });
+  };
+
+  test("gangguan unduh CV sementara: Coba kirim ulang (tetap wajib CV) langsung aktif, tanpa centang dan tanpa allow_without_cv", async ({ app, backend }) => {
+    seedCvDownloadFailed(backend);
+    await openPanel(app);
+
+    await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
+    await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
+    await expect(app.getByTestId("email-confirm-cv-retry-note")).toContainText("Kirim ulang dengan CV yang sama");
+    const retry = app.getByRole("button", { name: "Coba kirim ulang (tetap wajib CV)" });
+    await expect(retry).toBeVisible();
+    await expect(retry).toBeEnabled();
+    await expect(app.getByTestId("email-confirm-no-cv")).not.toBeChecked();
+    // Kirim tanpa CV tetap pilihan eksplisit terpisah: terkunci sampai kotak centang dipilih.
+    await expect(app.getByRole("button", { name: "Kirim tanpa CV" })).toBeDisabled();
+    await retry.click();
+    await expect(app.getByText("dalam antrean")).toBeVisible();
+    const calls = backend.callsTo("POST", "/api/automation/queue");
+    expect(calls).toHaveLength(1);
+    const payload = (calls[0].body as any).payload;
+    expect(payload).toMatchObject({ approval_request_id: "apr-mail", apply_email: "hrd@perusahaan.test" });
+    expect("allow_without_cv" in payload).toBe(false);
+  });
+
+  test("resume_url ada tetapi percobaan sebelumnya gagal mengunduh CV: tampilkan catatan & centang kirim tanpa CV sebagai pilihan eksplisit terpisah", async ({ app, backend }) => {
+    seedCvDownloadFailed(backend);
     await openPanel(app);
 
     await app.getByLabel("Email rekruter (tujuan)").fill("hrd@perusahaan.test");
     await app.getByRole("button", { name: "Kirim lewat Email", exact: true }).click();
     await expect(app.getByTestId("email-confirm-cv-retry-note")).toContainText("gagal mengunduh berkas CV");
     const consent = app.getByTestId("email-confirm-no-cv");
-    const send = app.getByRole("button", { name: "Ya, masukkan ke antrean" });
+    const send = app.getByRole("button", { name: "Kirim tanpa CV" });
     await expect(consent).not.toBeChecked();
     await expect(send).toBeDisabled();
     await consent.check();
