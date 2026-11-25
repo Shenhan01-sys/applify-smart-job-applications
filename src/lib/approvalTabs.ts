@@ -15,6 +15,7 @@ import { awaitingLoginState, describeAgentApply, isAgentApplyActive, type AgentA
 import type { EmailQueueRow } from "./emailApply.ts";
 import { EMAIL_TEST_MODE_LABEL } from "./emailTestMode.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
+import type { NotQueuedRoute } from "./approveOutcome.ts";
 import { awaitingCodeState } from "./securityCode.ts";
 import { approvalStatusLabel, effectiveApprovalStatus } from "./statusLabels.ts";
 import { STATUS_TERM } from "./statusVocabulary.ts";
@@ -26,6 +27,8 @@ export type ApprovalStage =
   | "review"
   | "checking"
   | "not_started"
+  | "fill_yourself"
+  | "send_by_email"
   | "processing"
   | "needs_action"
   | "filled_not_sent"
@@ -49,6 +52,8 @@ export const STAGE_LABEL: Record<ApprovalStage, string> = {
   review: "Menunggu persetujuan",
   checking: "Status belum terbaca",
   not_started: STATUS_TERM.waitingTurn,
+  fill_yourself: STATUS_TERM.fillYourself,
+  send_by_email: STATUS_TERM.sendByEmail,
   processing: STATUS_TERM.processing,
   needs_action: "Perlu tindakanmu",
   filled_not_sent: "Terisi, belum terkirim",
@@ -88,6 +93,12 @@ export interface ApprovalPlacementContext {
   agentKnown?: boolean;
   /** Pengguna masih harus mengizinkan Ekstensi Browser sebelum lamaran diantre. */
   consentRequired?: boolean;
+  /**
+   * Persetujuan ini sengaja tidak diantre ke agen atau ekstensi (backend: queued false). "manual" = lowongan hanya bisa
+   * dilamar sendiri (LinkedIn), "email_direct" = dikirim lewat panel Email. Tanpa tugas apa pun, kartunya tidak boleh
+   * berlabel "Menunggu giliran", karena tidak ada giliran yang ditunggu.
+   */
+  notQueued?: NotQueuedRoute | null;
   now?: number;
 }
 
@@ -127,7 +138,9 @@ const isEmailJobActive = (job: EmailQueueRow | null | undefined) => job?.status 
  *     9. formulir terisi, berhenti sebelum kirim                -> Menunggu, "Terisi, belum terkirim"
  *    10. tugas agen atau email gagal, masa berlaku masih ada    -> Menunggu, "Gagal, bisa dicoba lagi"
  *        tugas gagal, masa berlaku habis (tidak bisa dicoba)    -> Riwayat, "Gagal, masa berlaku habis"
- *    11. belum ada tugas agen                                   -> Menunggu, "Disetujui, belum terkirim"
+ *    11. belum ada tugas, tidak diantre (LinkedIn atau email)   -> Menunggu, "Perlu diisi sendiri" atau "Kirim lewat panel Email";
+ *        masa berlaku habis                                     -> Riwayat, "Kedaluwarsa, belum terkirim"
+ *    12. belum ada tugas agen                                   -> Menunggu, "Menunggu giliran"
  *   status lain yang tidak dikenal                              -> Riwayat, label statusnya
  */
 export function placeApproval(approval: ApprovalPlacementInput | null | undefined, ctx: ApprovalPlacementContext = {}): ApprovalPlacement {
@@ -156,7 +169,10 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   if (view.tone === "unverified") return place("unverified");
   // Masa berlaku habis: agen tidak akan mencoba lagi dan tombol ulangi tidak ada, jadi kartu pindah ke Riwayat
   // (Hans, 25 November 2026: enam kartu Datadog lama menumpuk di Menunggu tanpa bisa diapa-apakan).
-  if (row && isExpiredByTime(approval?.expires_at, now)) {
+  // Tanpa tugas apa pun, persetujuan yang tidak diantre (LinkedIn, email langsung) juga ditutup saat masa berlakunya habis,
+  // karena tidak ada percobaan agen yang akan datang dan tidak ada tombol untuk menandainya terkirim.
+  const idleNotQueued = !!ctx.notQueued && !ctx.emailJob && ctx.testMode !== true;
+  if ((row || idleNotQueued) && isExpiredByTime(approval?.expires_at, now)) {
     return view.tone === "failed" || ctx.emailJob?.status === "failed" ? place("expired", FAILED_CLOSED_LABEL) : place("expired", EXPIRED_NOT_SENT_LABEL);
   }
   if (view.tone === "manual") return place("needs_action");
@@ -165,6 +181,8 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   if (view.tone === "failed" || ctx.emailJob?.status === "failed") {
     return isExpiredByTime(approval?.expires_at, now) ? place("expired", FAILED_CLOSED_LABEL) : place("failed_retry");
   }
+  if (ctx.notQueued === "manual") return place("fill_yourself");
+  if (ctx.notQueued === "email_direct") return place("send_by_email");
   return place("not_started");
 }
 

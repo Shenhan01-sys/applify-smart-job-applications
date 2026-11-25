@@ -63,7 +63,7 @@ test.describe("Persetujuan: menunggu", () => {
     await expect(dialog.getByRole("heading", { name: "Persetujuan Lamaran" })).toBeVisible();
     await dialog.getByRole("button", { name: /Setujui/ }).click();
 
-    await expect(app.getByText("Disetujui — lamaran masuk antrean agen.")).toBeVisible();
+    await expect(app.getByText("Disetujui. Lamaran masuk antrean agen.")).toBeVisible();
     // Disetujui belum berarti terkirim: kartunya tetap di Menunggu dengan label status, dan Riwayat tetap kosong.
     await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
     await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toHaveCount(0);
@@ -132,7 +132,7 @@ test.describe("Persetujuan: menunggu", () => {
 
     await expect.poll(() => backend.callsTo("POST", "/api/approvals/apr-1/approve").length).toBe(1);
     await expect(app.getByRole("dialog")).toBeVisible();
-    await expect(app.getByText("Disetujui — lamaran masuk antrean agen.")).toHaveCount(0);
+    await expect(app.getByText("Disetujui. Lamaran masuk antrean agen.")).toHaveCount(0);
   });
 });
 
@@ -1098,5 +1098,74 @@ test.describe("Persetujuan: pembagian tab Menunggu dan Riwayat", () => {
     await expect(app.getByText(/sudah mengirimnya sendiri/i)).toHaveCount(0);
     await expect(app.getByRole("button", { name: /Ya, tandai terkirim/ })).toHaveCount(0);
     expect(backend.callsTo("POST", "/api/approvals/apr-m/mark-sent")).toHaveLength(0);
+  });
+});
+
+test.describe("Persetujuan: disetujui tanpa antrean (LinkedIn, email langsung)", () => {
+  const LINKEDIN_URL = "https://www.linkedin.com/jobs/view/999";
+
+  async function approveFirst(app: import("@playwright/test").Page) {
+    await app.goto("/approvals");
+    await app.getByRole("button", { name: /Periksa/ }).click();
+    await app.getByRole("dialog").getByRole("button", { name: /Setujui/ }).click();
+  }
+
+  test("jawaban approve manual_only: toast jujur, kartu berlabel Perlu diisi sendiri, tanpa Menunggu giliran dan tanpa tombol sudah terkirim", async ({ app, backend }) => {
+    backend.state.pending = [approval("apr-li", { platform: "linkedin", job_title: "Frontend Engineer" })];
+    backend.state.jobs = [jobRow("job-apr-li", { platform_source: "linkedin", external_url: LINKEDIN_URL })];
+    backend.state.approveExtra = { apply_channel: "manual", queued: false, queue_job_id: null, manual_only: true };
+    await approveFirst(app);
+
+    await expect(app.getByText("Disetujui. Lamar sendiri di situs lowongan.")).toBeVisible();
+    await expect(app.getByText("Disetujui. Lamaran masuk antrean agen.")).toHaveCount(0);
+    await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    await expect(app.getByText("Perlu diisi sendiri", { exact: true })).toBeVisible();
+    await expect(app.getByText("Menunggu giliran")).toHaveCount(0);
+    await expect(app.getByText("Agen belum dijalankan")).toHaveCount(0);
+    const notice = app.getByTestId("not-queued-notice");
+    await expect(notice).toHaveAttribute("data-route", "manual");
+    await expect(notice.getByRole("link", { name: /Buka lowongan/ })).toHaveAttribute("href", LINKEDIN_URL);
+    await expect(app.getByRole("button", { name: /sudah (kukirim|mengirim)/i })).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
+    await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("0");
+    expect(backend.callsTo("POST", "/api/approvals/apr-li/mark-sent")).toHaveLength(0);
+  });
+
+  test("jawaban approve email_direct: toast menyebut panel Email dan kartu berlabel Kirim lewat panel Email", async ({ app, backend }) => {
+    backend.state.pending = [approval("apr-em", { platform: "jooble", job_title: "Data Analyst" })];
+    backend.state.approveExtra = { apply_channel: "email_direct", queued: false, queue_job_id: null };
+    await approveFirst(app);
+
+    await expect(app.getByText("Disetujui. Kirim lewat panel Email.", { exact: true })).toBeVisible();
+    await expect(app.getByText("Kirim lewat panel Email", { exact: true })).toBeVisible();
+    await expect(app.getByText("Menunggu giliran")).toHaveCount(0);
+    await expect(app.getByTestId("not-queued-notice")).toHaveAttribute("data-route", "email_direct");
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
+  });
+
+  test("dimuat ulang tanpa jawaban approve: jalurnya dibaca dari data lowongan, dan yang kedaluwarsa tanpa tugas pindah ke Riwayat", async ({ app, backend }) => {
+    backend.state.history = [
+      approvedApproval("apr-li", { platform: "linkedin", job_title: "Dari LinkedIn" }),
+      approvedApproval("apr-em", { platform: "jooble", job_title: "Lewat Email" }),
+      approvedApproval("apr-ws", { platform: "web", job_title: "Situs Biasa" }),
+      approvedApproval("apr-old", { platform: "linkedin", job_title: "LinkedIn Lama", expires_at: isoAgo(60 * 60_000) }),
+    ];
+    backend.state.jobs = [
+      jobRow("job-apr-li", { platform_source: "linkedin", external_url: LINKEDIN_URL }),
+      jobRow("job-apr-em", { platform_source: "jooble", external_url: "https://jooble.example.test/em", description: "Kirim CV ke hr@perusahaan-contoh.co.id" }),
+      jobRow("job-apr-ws", { platform_source: "web", external_url: "https://karier.example.test/ws" }),
+      jobRow("job-apr-old", { platform_source: "linkedin", external_url: LINKEDIN_URL }),
+    ];
+    await app.goto("/approvals");
+
+    const card = (title: string) => app.getByRole("heading", { name: title }).locator("xpath=ancestor::div[contains(@class,'group')][1]");
+    await expect(card("Dari LinkedIn").getByText("Perlu diisi sendiri", { exact: true })).toBeVisible();
+    await expect(card("Lewat Email").getByText("Kirim lewat panel Email", { exact: true })).toBeVisible();
+    // lowongan biasa tetap lewat jalur antrean: belum ada tugas = Menunggu giliran
+    await expect(card("Situs Biasa").getByText("Menunggu giliran")).toBeVisible();
+    await expect(app.getByRole("heading", { name: "LinkedIn Lama" })).toHaveCount(0);
+
+    await app.getByRole("button", { name: /Riwayat/ }).click();
+    await expect(card("LinkedIn Lama").getByText("Kedaluwarsa, belum terkirim")).toBeVisible();
   });
 });

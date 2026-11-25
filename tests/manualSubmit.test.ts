@@ -324,7 +324,7 @@ test("kabel: layanan membaca log manual lama dan alamat lowongan, dan memuat cov
   const svc = read("../src/services/emailApplyService.ts");
   assert.match(svc, /\.select\("action, details, created_at"\)\.eq\("status", "success"\)/);
   assert.match(svc, /details\?\.manual === true/);
-  assert.match(svc, /\.select\("id, title, description, requirements, responsibilities, external_url"\)/);
+  assert.match(svc, /\.select\("id, title, description, requirements, responsibilities, external_url, platform_source"\)/);
   assert.match(svc, /safeJobUrl\(/);
   const svc2 = read("../src/services/manualSubmitService.ts");
   assert.match(svc2, /automationApi\.getApproval\(approvalId\)/);

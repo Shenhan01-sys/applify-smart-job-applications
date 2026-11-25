@@ -154,6 +154,48 @@ test("disetujui, belum ada tugas agen: Menunggu, Disetujui belum terkirim; statu
   expectPlace(place(approved(), { agentKnown: false, sent: true }), "history", "sent");
 });
 
+// ---- E2E-01: disetujui tetapi sengaja tidak diantre (LinkedIn, email langsung) ----------------------
+
+test("disetujui tanpa antrean: LinkedIn berlabel Perlu diisi sendiri, email langsung Kirim lewat panel Email, bukan Menunggu giliran", () => {
+  expectPlace(place(approved(), { notQueued: "manual" }), "pending", "fill_yourself", "Perlu diisi sendiri");
+  expectPlace(place(approved(), { notQueued: "email_direct" }), "pending", "send_by_email", "Kirim lewat panel Email");
+  // tanpa petunjuk jalur, perilaku lama tetap: belum ada tugas = Menunggu giliran
+  expectPlace(place(approved(), { notQueued: null }), "pending", "not_started", "Menunggu giliran");
+  expectPlace(place(approved(), {}), "pending", "not_started", "Menunggu giliran");
+  assert.doesNotMatch(`${STAGE_LABEL.fill_yourself} ${STAGE_LABEL.send_by_email}`, /giliran|antre/i);
+});
+
+test("disetujui tanpa antrean: bukti nyata mengalahkan label jalur (terkirim, email berjalan, email gagal, mode uji)", () => {
+  expectPlace(place(approved(), { notQueued: "email_direct", sent: true }), "history", "sent");
+  expectPlace(place(approved(), { notQueued: "email_direct", emailJob: { status: "pending" } }), "pending", "processing");
+  expectPlace(place(approved(), { notQueued: "email_direct", emailJob: { status: "failed", error_message: "smtp" } }), "pending", "failed_retry");
+  expectPlace(place(approved(), { notQueued: "email_direct", testMode: true, emailJob: { status: "completed" } }), "pending", "test_mode");
+  expectPlace(place(approved(), { notQueued: "manual", agentKnown: false }), "pending", "checking");
+  expectPlace(place(approved(), { notQueued: "manual", agent: agentRow("completed", undefined, { claim_state: "abandoned" }) }), "history", "replaced");
+});
+
+test("disetujui tanpa antrean dan tanpa tugas: ditutup saat masa berlaku habis (tidak menumpuk di Menunggu tanpa tombol apa pun)", () => {
+  expectPlace(place(approved({ expires_at: PAST }), { notQueued: "manual" }), "history", "expired", EXPIRED_NOT_SENT_LABEL);
+  expectPlace(place(approved({ expires_at: PAST }), { notQueued: "email_direct" }), "history", "expired", EXPIRED_NOT_SENT_LABEL);
+  // email yang sedang berjalan, atau selesai dalam mode uji, tidak ikut ditutup
+  expectPlace(place(approved({ expires_at: PAST }), { notQueued: "email_direct", emailJob: { status: "processing" } }), "pending", "processing");
+  expectPlace(place(approved({ expires_at: PAST }), { notQueued: "email_direct", testMode: true, emailJob: { status: "completed" } }), "pending", "test_mode");
+  // jalur antrean biasa tanpa tugas tetap tidak ditutup hanya karena waktu (temuan 22)
+  expectPlace(place(approved({ expires_at: PAST }), {}), "pending", "not_started", "Menunggu giliran");
+  // yang sudah terkirim tidak pernah ikut tertutup
+  expectPlace(place(approved({ expires_at: PAST }), { notQueued: "manual", sent: true }), "history", "sent");
+});
+
+test("kabel: kartu tanpa antrean diganti penjelasan jalurnya, tanpa tombol sudah terkirim", () => {
+  const status = read("../src/components/AgentApplyStatus.tsx");
+  assert.match(status, /if \(notQueued && !row\) return <NotQueuedNotice/);
+  const notice = read("../src/components/NotQueuedNotice.tsx");
+  assert.doesNotMatch(notice, /markApprovalSent|mark-sent|<button/);
+  const page = read("../src/routes/approvals.tsx");
+  assert.match(page, /fill_yourself:\s+\{ icon: AlertCircle/);
+  assert.match(page, /send_by_email:\s+\{ icon: AlertCircle/);
+});
+
 test("klaim kirim dilepas karena pengguna membuat persetujuan baru: Riwayat, Diganti persetujuan baru", () => {
   expectPlace(place(approved(), { agent: agentRow("completed", undefined, { claim_state: "abandoned" }) }), "history", "replaced", "Diganti persetujuan baru");
   // tetapi bila ternyata sudah terkirim, Terkirim yang menang
@@ -168,6 +210,8 @@ test("Riwayat hanya memuat tahap terkirim, ditolak, kedaluwarsa, dan diganti; se
     ["review", place({ status: "pending", expires_at: FUTURE })],
     ["checking", place(approved(), { agentKnown: false })],
     ["not_started", place(approved())],
+    ["fill_yourself", place(approved(), { notQueued: "manual" })],
+    ["send_by_email", place(approved(), { notQueued: "email_direct" })],
     ["processing", place(approved(), { agent: agentRow("processing") })],
     ["needs_action", place(approved(), { consentRequired: true })],
     ["filled_not_sent", place(approved(), { agent: agentRow("completed", { status: "ready" }) })],

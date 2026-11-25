@@ -28,6 +28,9 @@ test("ON-10: satu keadaan, satu kata di Persetujuan, Antrean Agen, Lamaran Saya,
   assert.equal(FILL_YOURSELF_LABEL, QUEUE_NEEDS_MANUAL_LABEL);
   assert.equal(FAILED_CLOSED_LABEL, EXPIRED_NOT_SENT_LABEL);
   assert.equal(STAGE_LABEL.failed_retry, STATUS_TERM.retryable);
+  // Disetujui tetapi tidak diantre (LinkedIn): kata yang sama dengan Antrean Agen dan Lamaran Saya untuk "isi sendiri".
+  assert.equal(STAGE_LABEL.fill_yourself, FILL_YOURSELF_LABEL);
+  assert.equal(STAGE_LABEL.send_by_email, STATUS_TERM.sendByEmail);
   assert.equal(AGENT_PARTIAL_LABEL, STATUS_TERM.partlyFilled);
   assert.equal(AGENT_VALIDATION_LABEL, STATUS_TERM.rejectedByForm);
   // Kanban dan Beranda memakai kata yang sama untuk setiap status lamaran.

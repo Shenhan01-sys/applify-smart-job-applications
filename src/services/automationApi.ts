@@ -247,10 +247,20 @@ export const automationApi = {
   /**
    * Approve = consent to submit. `coverLetter` carries the user's edits from the review screen. For a login site
    * the answer carries `apply_channel: 'extension'` and `extension_consent_required: true`: the job was NOT
-   * queued, the user must allow the Browser Extension first (grantExtensionConsent).
+   * queued, the user must allow the Browser Extension first (grantExtensionConsent). For LinkedIn
+   * (`apply_channel: 'manual'`, `manual_only: true`) and direct-email postings (`apply_channel: 'email_direct'`) the
+   * answer has `queued: false`: nothing goes to the agent queue (see lib/approveOutcome.ts).
    */
   async approveApplication(id: string, coverLetter?: string) {
-    return apiFetch<{ success?: boolean; id?: string; status?: string; apply_channel?: string; extension_consent_required?: boolean }>(
+    return apiFetch<{
+      success?: boolean
+      id?: string
+      status?: string
+      apply_channel?: string
+      extension_consent_required?: boolean
+      queued?: boolean
+      manual_only?: boolean
+    }>(
       `${apiBase()}/api/approvals/${id}/approve`,
       {
         method: 'POST',

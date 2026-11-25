@@ -13,6 +13,8 @@ export const STATUS_TERM = {
   processing: "Sedang diproses",
   /** Agen tidak bisa mengisi formulir situs ini; pengguna membuka tautan dan mengirim sendiri. */
   fillYourself: "Perlu diisi sendiri",
+  /** Disetujui, tetapi tidak diantre ke agen atau ekstensi: lowongan email langsung, pengguna mengirim lewat panel Email. */
+  sendByEmail: "Kirim lewat panel Email",
   /** Formulir terisi sebagian, tombol kirim tidak ditekan. */
   partlyFilled: "Terisi sebagian, belum terkirim",
   /** Situs menolak isian (validasi); tidak ada yang terkirim. */

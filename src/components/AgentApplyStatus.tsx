@@ -12,6 +12,8 @@ import {
 import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
+import NotQueuedNotice from "@/components/NotQueuedNotice";
+import type { NotQueuedRoute } from "@/lib/approveOutcome";
 
 const TONE: Record<AgentApplyTone, string> = {
   waiting: "bg-amber-100 text-amber-900 border-amber-300",
@@ -41,11 +43,15 @@ export default function AgentApplyStatus({
   row,
   jobUrl,
   consentShown = false,
+  notQueued = null,
 }: {
   row: AgentApplyRow | null | undefined;
   jobUrl?: string | null;
   consentShown?: boolean;
+  /** Persetujuan ini sengaja tidak diantre (LinkedIn, email langsung). Tanpa percobaan agen, kartu ini diganti penjelasan jalurnya. */
+  notQueued?: NotQueuedRoute | null;
 }) {
+  if (notQueued && !row) return <NotQueuedNotice route={notQueued} jobUrl={jobUrl} />;
   const view = describeAgentApply(row);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.

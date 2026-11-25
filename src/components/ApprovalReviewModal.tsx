@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { automationApi } from '@/services/automationApi'
 import { describeApiError } from '@/lib/apiErrors'
-import { EXTENSION_CONSENT_REQUIRED_TOAST, consentRequiredFrom } from '@/lib/extensionConsent'
+import { consentRequiredFrom } from '@/lib/extensionConsent'
 import { HitlTrack } from '@/components/HitlTrack'
 import { platformLabel } from '@/lib/platforms'
-import { afterApproveText } from '@/lib/approveOutcome'
+import { afterApproveText, approvedToast, notQueuedRouteFrom, type NotQueuedRoute } from '@/lib/approveOutcome'
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from '@/lib/personalData'
 import {
   LEVEL_LABEL,
@@ -41,7 +41,7 @@ interface ApprovalReviewModalProps {
   open: boolean
   onClose: () => void
   /** `consentRequired`: lamaran belum diantre; pengguna harus mengizinkan Ekstensi Browser di kartu persetujuan (tab Menunggu). */
-  onApproved: (result?: { consentRequired: boolean }) => void
+  onApproved: (result?: { consentRequired: boolean; notQueued?: NotQueuedRoute | null }) => void
   onRejected: () => void
 }
 
@@ -146,8 +146,9 @@ export default function ApprovalReviewModal({
       setDraftSaved(false)
       // Situs yang perlu login: lamaran belum diantre sampai pengguna mengizinkan ekstensi (kartu di tab Menunggu).
       const consentRequired = consentRequiredFrom(result)
-      toast.success(consentRequired ? EXTENSION_CONSENT_REQUIRED_TOAST : 'Disetujui — lamaran masuk antrean agen.')
-      onApproved({ consentRequired })
+      // LinkedIn dan lowongan email langsung tidak diantre (queued false): toast dan kartu tidak boleh menjanjikan antrean agen.
+      toast.success(approvedToast(result))
+      onApproved({ consentRequired, notQueued: notQueuedRouteFrom(result) })
     } catch (error: any) {
       toast.error(describeApiError(error, 'Gagal menyetujui'))
     } finally {

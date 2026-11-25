@@ -9,6 +9,7 @@ import {
 import type { AgentApplyRow } from "@/lib/agentApplyStatus";
 import { buildAgentApplyRows, latestQueueJobIds } from "@/lib/agentApplyRows";
 import { manualSentRow, safeJobUrl } from "@/lib/manualSubmit";
+import { notQueuedRouteForJob, type NotQueuedRoute } from "@/lib/approveOutcome";
 import { isRealSubmitOffLog } from "@/lib/emailTestMode";
 import { jobPostingText, parseSentAttachments, planEmailAttachments, type AttachmentPlan, type SentAttachments } from "@/lib/emailAttachments";
 import { DOCUMENT_COLUMN, DOCUMENT_KINDS, isMissingDocumentColumn, parseDocumentPath, type DocumentKind } from "@/lib/profileDocuments";
@@ -39,11 +40,13 @@ export interface EmailApplyData {
   attachmentPlans: Record<string, AttachmentPlan>;
   /** Lampiran yang tercatat pada email yang sudah terkirim (log email_apply success), per id persetujuan. */
   sentAttachments: Record<string, SentAttachments>;
+  /** Persetujuan yang tidak diantre ke agen atau ekstensi (LinkedIn, email langsung), dibaca dari data lowongan. */
+  notQueued: Record<string, NotQueuedRoute>;
   /** Status agen sudah terbaca dari database. false = belum dimuat atau gagal, jadi "tidak ada tugas" belum berarti apa-apa. */
   agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, gmailEmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, agentKnown: false });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, gmailEmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, notQueued: {}, agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -159,7 +162,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       .eq("job_type", "email_apply")
       .in("payload->>approval_request_id", ids)
       .order("created_at", { ascending: false }),
-    jobIds.length > 0 ? supabase.from("jobs").select("id, title, description, requirements, responsibilities, external_url").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
+    jobIds.length > 0 ? supabase.from("jobs").select("id, title, description, requirements, responsibilities, external_url, platform_source").in("id", jobIds) : Promise.resolve({ data: [], error: null } as any),
     loadAgentApplyRows(ids)
       .then((res) => {
         agentKnown = res.complete;
@@ -224,7 +227,9 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   const descriptionByJob = new Map<string, string>();
   const textByJob = new Map<string, string>();
   const urlByJob = new Map<string, string>();
+  const jobById = new Map<string, Record<string, unknown>>();
   for (const j of jobs.data ?? []) {
+    jobById.set((j as any).id, j as Record<string, unknown>);
     descriptionByJob.set((j as any).id, String((j as any).description ?? ""));
     textByJob.set((j as any).id, jobPostingText(j as Record<string, unknown>));
     const url = safeJobUrl((j as any).external_url);
@@ -235,6 +240,15 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     if (found.length > 0) data.suggestions[a.id] = found;
     const url = a.job_id ? urlByJob.get(a.job_id) : undefined;
     if (url) data.jobUrls[a.id] = url;
+    const job = a.job_id ? jobById.get(a.job_id) : undefined;
+    if (job) {
+      const route = notQueuedRouteForJob({
+        platform: typeof job.platform_source === "string" && job.platform_source ? job.platform_source : a.platform,
+        external_url: job.external_url as string | null | undefined,
+        description: job.description as string | null | undefined,
+      });
+      if (route) data.notQueued[a.id] = route;
+    }
     // Pratinjau lampiran: butuh profil dan teks lowongan; tanpa salah satunya, panel tidak menampilkan daftar.
     if (profile && a.job_id && textByJob.has(a.job_id)) {
       data.attachmentPlans[a.id] = planEmailAttachments({

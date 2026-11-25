@@ -83,6 +83,8 @@ export function extractRecruiterEmails(text: unknown, max = 5): string[] {
 export interface ApprovalLike {
   id: string;
   status?: string | null;
+  /** approval_requests.platform; cadangan bila lowongan tidak punya platform_source. */
+  platform?: string | null;
   expires_at?: string | null;
   job_id?: string | null;
   application_id?: string | null;

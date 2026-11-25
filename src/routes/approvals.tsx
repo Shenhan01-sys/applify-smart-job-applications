@@ -19,6 +19,7 @@ import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode"
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
 import { splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
+import type { NotQueuedRoute } from "@/lib/approveOutcome";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { mockApprovals, mockApprovalHistory } from "@/mocks/mockData";
@@ -68,6 +69,8 @@ const STAGE_STYLE: Record<ApprovalStage, StageStyle> = {
   review:          { icon: Clock,        text: AMBER },
   checking:        { icon: AlertCircle,  text: GRAY },
   not_started:     { icon: Clock,        text: GRAY },
+  fill_yourself:   { icon: AlertCircle,  text: AMBER },
+  send_by_email:   { icon: AlertCircle,  text: AMBER },
   processing:      { icon: Loader2,      text: BLUE },
   needs_action:    { icon: AlertCircle,  text: AMBER },
   filled_not_sent: { icon: AlertCircle,  text: AMBER },
@@ -95,6 +98,8 @@ function ApprovalsPage() {
   // Persetujuan yang jawaban approve-nya meminta izin ekstensi (lamaran belum diantre). Hanya ingatan halaman ini:
   // sesudah dimuat ulang, blok izin tampil karena persetujuan itu belum punya tugas agen.
   const [consentIds, setConsentIds] = useState<Set<string>>(() => new Set());
+  // Persetujuan yang jawaban approve-nya queued false (LinkedIn, email langsung). Setelah dimuat ulang, jalurnya dibaca dari data lowongan.
+  const [notQueuedIds, setNotQueuedIds] = useState<Map<string, NotQueuedRoute>>(() => new Map());
 
   const tabOrder: ('pending' | 'history')[] = ['pending', 'history'];
   const handleTabChange = (tab: 'pending' | 'history') => {
@@ -188,7 +193,7 @@ function ApprovalsPage() {
     setModalOpen(true);
   };
 
-  const handleApproved = (result?: { consentRequired: boolean }) => {
+  const handleApproved = (result?: { consentRequired: boolean; notQueued?: NotQueuedRoute | null }) => {
     const approvedId = selectedRequest?.id;
     setModalOpen(false);
     setSelectedRequest(null);
@@ -196,6 +201,10 @@ function ApprovalsPage() {
     // dan blok "Izinkan ekstensi" langsung terlihat di kartunya.
     if (result?.consentRequired && approvedId) {
       setConsentIds((ids) => new Set(ids).add(approvedId));
+    }
+    if (result?.notQueued && approvedId) {
+      const route = result.notQueued;
+      setNotQueuedIds((m) => new Map(m).set(approvedId, route));
     }
     loadData(); // the modal already confirmed the approval with a toast
   };
@@ -229,6 +238,7 @@ function ApprovalsPage() {
   }
 
   // Menunggu memuat yang belum selesai (termasuk yang sudah disetujui tetapi belum terkirim). Riwayat hanya yang terkirim atau ditutup.
+  const notQueuedFor = (id: string): NotQueuedRoute | null => notQueuedIds.get(id) ?? emailData.notQueued[id] ?? null;
   const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) => ({
     agent: emailData.agent[a.id],
     sent: emailData.used.has(a.id),
@@ -236,6 +246,7 @@ function ApprovalsPage() {
     testMode: emailData.testMode.has(a.id),
     agentKnown: emailData.agentKnown,
     consentRequired: consentIds.has(a.id),
+    notQueued: notQueuedFor(a.id),
   }));
   const displayApprovals = activeTab === 'pending' ? tabs.pending : tabs.history;
 
@@ -368,7 +379,7 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {approved && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />

@@ -125,7 +125,7 @@ test("galat izin: 409 berarti sudah aktif (bukan galat), 410 kedaluwarsa, 404 da
 test("wiring: modal membaca jawaban approve, halaman Persetujuan menampilkan blok izin sesudah status agen, API memanggil endpoint izin", () => {
   const modal = read("../src/components/ApprovalReviewModal.tsx");
   assert.match(modal, /consentRequiredFrom\(result\)/);
-  assert.match(modal, /onApproved\(\{ consentRequired \}\)/);
+  assert.match(modal, /onApproved\(\{ consentRequired, notQueued: notQueuedRouteFrom\(result\) \}\)/);
 
   const page = read("../src/routes/approvals.tsx");
   assert.match(page, /import ExtensionConsent from "@\/components\/ExtensionConsent"/);
