@@ -317,6 +317,53 @@ const WORKPLACE_COPY: Record<string, { title: string; label: string }> = {
   onsite: { title: "Belum ada lowongan di kantor", label: "Di kantor" },
 };
 
+// ---- Penyaring jenjang karier: Magang, Fresh Grad, SMA/SMK (47.3 P2-06, GAP-09) -------------------------------
+
+export type CareerLevelKey = "internship" | "fresh-grad" | "sma-smk";
+
+export interface CareerLevelFields {
+  type?: unknown;
+  title?: unknown;
+  description?: unknown;
+  requirements?: unknown;
+}
+
+const INTERNSHIP_RE = /\b(magang|intern|internship|kerja\s+praktik|pkl|kampus\s+merdeka|msib)\b/i;
+const FRESH_GRAD_RE =
+  /\b(fresh\s*grad(?:uate)?|lulusan\s+baru|entry[\s-]*level|junior|0\s*[-–]\s*[12]\s*tahun|tanpa\s+pengalaman|pengalaman\s+minimal\s+0|open\s+for\s+fresh|terbuka\s+untuk\s+fresh)\b/i;
+const SMA_SMK_RE =
+  /\b(sma\s*\/?\s*smk|smk\s*\/?\s*sma|lulusan\s+sma|lulusan\s+smk|minimal\s+sma|minimal\s+smk|sederajat|slta|diploma\s*\/?\s*sma)\b/i;
+
+function careerLevelText(job: CareerLevelFields): string {
+  const req = Array.isArray(job.requirements)
+    ? job.requirements.filter((x): x is string => typeof x === "string").join(" ")
+    : "";
+  return `${typeof job.title === "string" ? job.title : ""} ${typeof job.description === "string" ? job.description : ""} ${req}`;
+}
+
+/** Deteksi deterministik jenjang karier dari kolom `type`, judul, deskripsi, dan syarat (tanpa kolom DB baru). */
+export function detectCareerLevels(job: CareerLevelFields): CareerLevelKey[] {
+  const levels: CareerLevelKey[] = [];
+  const text = careerLevelText(job);
+  const jobType = typeof job.type === "string" ? job.type.trim().toLowerCase() : "";
+  if (jobType === "internship" || INTERNSHIP_RE.test(text)) levels.push("internship");
+  if (FRESH_GRAD_RE.test(text)) levels.push("fresh-grad");
+  if (SMA_SMK_RE.test(text)) levels.push("sma-smk");
+  return levels;
+}
+
+/** True bila lowongan cocok dengan kunci penyaring jenjang karier (`internship`, `fresh-grad`, `sma-smk`). */
+export function matchesCareerLevelFilter(job: CareerLevelFields, filter: string): boolean {
+  if (filter !== "internship" && filter !== "fresh-grad" && filter !== "sma-smk") return false;
+  return detectCareerLevels(job).includes(filter);
+}
+
+const CAREER_LEVEL_COPY: Record<CareerLevelKey, { title: string; label: string }> = {
+  internship: { title: "Belum ada lowongan Magang", label: "Magang" },
+  "fresh-grad": { title: "Belum ada lowongan Fresh Grad", label: "Fresh Grad" },
+  "sma-smk": { title: "Belum ada lowongan SMA/SMK", label: "SMA/SMK" },
+};
+
 /** Label tombol pemindai di halaman Lowongan; teks lain menyebutnya dengan nama ini, bukan dengan letaknya. */
 export const SCANNER_BUTTON_LABEL = "Cari lowongan baru dari banyak situs";
 
@@ -383,6 +430,15 @@ export function jobsEmptyState(input: JobsEmptyInput): JobsEmptyState {
     return {
       title: `Belum ada kecocokan ${HIGH_MATCH_THRESHOLD}% ke atas`,
       text: `${basis} Penyaring ini hanya menghitung lowongan yang dimuat di layar${limitNote}. Coba cari nama skill atau posisi di kotak cari, atau lengkapi skill di Profil.`,
+      action: null,
+    };
+  }
+
+  const levelCopy = CAREER_LEVEL_COPY[input.filter as CareerLevelKey];
+  if (levelCopy) {
+    return {
+      title: levelCopy.title,
+      text: `Dari ${among}, belum ada yang menyebut kategori ${levelCopy.label}. Coba pilih "Semua", cari kata kunci seperti "${levelCopy.label}", atau pindai lowongan baru.`,
       action: null,
     };
   }

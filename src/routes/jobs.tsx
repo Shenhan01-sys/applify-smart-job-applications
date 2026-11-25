@@ -19,6 +19,7 @@ import {
   jobSearchFilters,
   matchesJobSearch,
   matchesWorkplaceFilter,
+  matchesCareerLevelFilter,
   workplaceQueryFilter,
   jobsEmptyState,
   jobsEmptySubtitle,
@@ -58,6 +59,9 @@ const FILTERS = [
   { key: "remote", label: "Remote" },
   { key: "hybrid", label: "Hybrid" },
   { key: "onsite", label: "Di kantor" },
+  { key: "internship", label: "Magang" },
+  { key: "fresh-grad", label: "Fresh Grad" },
+  { key: "sma-smk", label: "SMA/SMK" },
   { key: "high-match", label: "Kecocokan 80% ke atas" },
   { key: "saved", label: "Tersimpan" },
 ] as const;
@@ -268,6 +272,7 @@ function JobsPage() {
       activeFilter === "all" ||
       // Remote, Hybrid, Di kantor: dibaca dari workplace_type dengan normalisasi yang sama seperti label kartu.
       matchesWorkplaceFilter(job, activeFilter) ||
+      matchesCareerLevelFilter(job, activeFilter) ||
       (activeFilter === "high-match" && (scoreOf(job) ?? -1) >= HIGH_MATCH_THRESHOLD) ||
       (activeFilter === "saved" && savedJobs.has(job.id));
 
