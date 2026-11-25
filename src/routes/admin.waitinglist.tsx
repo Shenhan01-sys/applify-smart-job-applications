@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { csvCell } from "@/lib/csvSafe";
 import { toast } from "sonner";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -157,18 +158,11 @@ function AdminWaitinglistPage() {
       "created_at", "full_name", "university", "age", "major", "work_status",
       "job_goal", "location_goal", "email", "user_id", "referrer",
     ];
-    const escape = (v: any): string => {
-      if (v === null || v === undefined) return "";
-      const s = String(v);
-      if (s.includes(",") || s.includes("\"") || s.includes("\n")) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
-      return s;
-    };
+    // csvCell menetralkan sel yang diawali = + - @ tab atau CR supaya isian publik tidak jadi rumus di Excel (BS-06).
     const lines = [
       headers.join(","),
       ...filtered.map((r) =>
-        headers.map((h) => escape((r as any)[h])).join(",")
+        headers.map((h) => csvCell((r as any)[h])).join(",")
       ),
     ];
     const csv = lines.join("\n");
