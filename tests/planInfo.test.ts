@@ -135,6 +135,10 @@ test("UX-P7-07: Green Career Track tidak dijual sebagai isi Pro selama halaman d
   for (const src of gated) assert.doesNotMatch(src, /ai_model_tier|isPro|subscriptions?\b/);
   assert.equal(PRO_FEATURES.filter((f) => /Green Career/i.test(f)).length, 0);
   assert.ok(FREE_FEATURES.some((f) => /Green Career Track.*semua paket/.test(f)));
+  // Kartu sorotan di beranda ikut jujur: tidak ada lencana "Premium" untuk fitur yang tidak memeriksa paket.
+  const landing = read("applify-smart-job-applications/src/routes/index.tsx");
+  assert.doesNotMatch(landing, /Fitur Premium/);
+  assert.match(landing, /Terbuka untuk semua paket/);
 });
 
 test("Golden Window Sniper belum ada di kode, jadi di UI berlabel segera hadir", () => {

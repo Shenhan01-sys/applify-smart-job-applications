@@ -1208,7 +1208,7 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
           <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wider">
-                <Leaf className="h-3.5 w-3.5" /> Fitur Premium
+                <Leaf className="h-3.5 w-3.5" /> Terbuka untuk semua paket
               </span>
               <h2 className="mt-5 font-display text-3xl md:text-4xl font-extrabold leading-tight">Green Career Track</h2>
               <p className="mt-4 text-white/85 leading-relaxed max-w-lg">
