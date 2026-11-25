@@ -69,7 +69,14 @@ export function NotificationSettingsCard() {
         setEmailEnabled(Boolean(prefs.emailEnabled));
         if (prefs.notifyEvents) setEvents(prefs.notifyEvents);
       } catch (err) {
-        if (active) setError(describeApiError(err, "Gagal memuat pengaturan notifikasi."));
+        if (active) {
+          setError(
+            describeApiError(
+              err,
+              "Pengaturan notifikasi belum bisa dimuat. Periksa koneksi internetmu lalu muat ulang halaman ini. Pengaturanmu tetap tersimpan.",
+            ),
+          );
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -89,7 +96,12 @@ export function NotificationSettingsCard() {
       setOtpSent(true);
       setNotice(`Kode OTP 6 digit telah dikirim ke WhatsApp ${res.phone}.`);
     } catch (err) {
-      setError(describeApiError(err, "Gagal mengirim kode OTP WhatsApp."));
+      setError(
+        describeApiError(
+          err,
+          "Kode OTP WhatsApp belum bisa dikirim. Pastikan nomormu aktif dan periksa koneksi internetmu lalu coba lagi. Pengaturanmu tidak hilang.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -126,7 +138,12 @@ export function NotificationSettingsCard() {
       });
       setNotice("Preferensi notifikasi disimpan.");
     } catch (err) {
-      setError(describeApiError(err, "Gagal menyimpan preferensi notifikasi."));
+      setError(
+        describeApiError(
+          err,
+          "Preferensi notifikasi belum tersimpan. Periksa koneksi internetmu lalu tekan Simpan lagi. Pilihanmu di layar belum hilang.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -140,7 +157,12 @@ export function NotificationSettingsCard() {
       await automationApi.testWhatsappNotification();
       setNotice("Pesan uji WhatsApp terkirim. Cek WhatsApp-mu.");
     } catch (err) {
-      setError(describeApiError(err, "Gagal mengirim pesan uji WhatsApp."));
+      setError(
+        describeApiError(
+          err,
+          "Pesan uji WhatsApp belum bisa dikirim. Periksa koneksi internetmu dan pastikan nomormu aktif lalu coba lagi.",
+        ),
+      );
     } finally {
       setSaving(false);
     }

@@ -56,7 +56,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
       const url = await automationApi.startGmailOAuth();
       if (url) window.location.assign(url);
     } catch (e: any) {
-      setError(describeApiError(e, "Gagal memulai koneksi Gmail."));
+      setError(describeApiError(e, "Koneksi Gmail belum bisa dimulai. Periksa koneksi internetmu lalu coba Hubungkan Gmail lagi. Draf dan persetujuanmu tidak hilang."));
     } finally {
       setConnectingGmail(false);
     }

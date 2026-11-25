@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   EXTENSION_COPY_FAILED_TEXT,
+  EXTENSION_GUIDE_HREF,
   EXTENSION_INSTALL_STEPS,
   copyToClipboard,
   describeTokenExpiry,
@@ -47,9 +48,14 @@ test("kartu ekstensi: langkah pasang, salin dengan cadangan, dan masa berlaku da
   assert.match(card, /describeTokenExpiry\(issued\.expiresAt\)/);
 });
 
-test("langkah pasang menyebut panduan dan tidak memuat istilah pengembang", () => {
+test("langkah pasang menegaskan khusus laptop, menaut ke panduan nyata, dan tidak memuat istilah pengembang", () => {
   assert.equal(EXTENSION_INSTALL_STEPS.length, 3);
-  assert.match(EXTENSION_INSTALL_STEPS[0], /Pasang ekstensi Applify .*\(lihat panduan\)/);
+  assert.match(EXTENSION_INSTALL_STEPS[0], /Pasang ekstensi Applify khusus laptop \(Chrome atau Edge\)/);
+  assert.match(EXTENSION_INSTALL_STEPS[0], /tidak bisa dipasang di HP/i);
+  assert.doesNotMatch(EXTENSION_INSTALL_STEPS[0], /\(lihat panduan\)/);
+  assert.equal(EXTENSION_GUIDE_HREF, "/bantuan#ekstensi");
+  const card = read("../src/components/ExtensionConnectCard.tsx");
+  assert.match(card, /href=\{EXTENSION_GUIDE_HREF\}/);
   assert.doesNotMatch(EXTENSION_INSTALL_STEPS.join(" ") + EXTENSION_COPY_FAILED_TEXT, /administrator|env|localhost|scope|manifest/i);
 });
 

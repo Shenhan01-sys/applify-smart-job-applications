@@ -213,5 +213,8 @@ export function buildEmailApplyRequest(approval: ApprovalLike, applyEmail: strin
 
 /** Turn what apiFetch throws into a message for the user (the server's own text is never shown). */
 export function describeQueueError(err: unknown): string {
-  return describeApiError(err, "Gagal memasukkan ke antrean.");
+  return describeApiError(
+    err,
+    "Lamaran belum bisa masuk ke antrean. Periksa koneksi internetmu lalu coba kirim ulang. Surat dan persetujuanmu tidak hilang.",
+  );
 }

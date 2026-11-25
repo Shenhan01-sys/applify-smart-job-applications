@@ -106,6 +106,43 @@ export function matchesJobSearch(job: { title?: string | null; company?: string 
 /** Kata cari untuk lowongan uji Applify ("[UJI] Staf Uji Coba"). Diisi agen tanpa Ekstensi Browser. */
 export const TEST_LISTING_QUERY = "[UJI]";
 
+/** Kunci penyimpanan lokal agar banner panduan ekstensi di halaman Lowongan bisa ditutup permanen oleh pengguna. */
+export const EXTENSION_BANNER_DISMISSED_KEY = "applify_jobs_extension_banner_dismissed";
+
+export interface BannerStorageLike {
+  getItem?: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+}
+
+function getBrowserBannerStorage(): BannerStorageLike | null {
+  try {
+    const host = globalThis as { localStorage?: BannerStorageLike };
+    return host.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Baca status tutup banner panduan ekstensi dari localStorage dengan try/catch agar aman di mode privat. */
+export function isExtensionBannerDismissed(storage: BannerStorageLike | null | undefined = getBrowserBannerStorage()): boolean {
+  try {
+    return storage?.getItem?.(EXTENSION_BANNER_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Simpan status tutup banner panduan ekstensi ke localStorage dengan try/catch. */
+export function dismissExtensionBanner(storage: BannerStorageLike | null | undefined = getBrowserBannerStorage()): boolean {
+  try {
+    if (typeof storage?.setItem !== "function") return false;
+    storage.setItem(EXTENSION_BANNER_DISMISSED_KEY, "1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** True bila kotak cari sudah memuat penanda lowongan uji ("uji" atau "[uji]", tanpa membedakan huruf). */
 export function isTestListingQuery(raw: string): boolean {
   return searchTerms(raw).some((t) => t.replace(/[[\]]/g, "").toLowerCase() === "uji");
@@ -248,7 +285,7 @@ export function jobsEmptyState(input: JobsEmptyInput): JobsEmptyState {
   if (input.loadedCount === 0 && !query) {
     return {
       title: "Belum ada lowongan",
-      text: "Tekan tombol biru di atas untuk mencari lowongan dari JobStreet, Glints, Kalibrr, dan papan karier perusahaan.",
+      text: `Tekan "${SCANNER_BUTTON_LABEL}" untuk mencari lowongan dari JobStreet, Glints, Kalibrr, Dealls, dan situs karier perusahaan.`,
       action: "scanner",
     };
   }

@@ -121,7 +121,7 @@ function SettingsPage() {
         </Card>
 
         <Card id="ekstensi" icon={Chrome} title="Ekstensi Browser (Chrome & Edge)"
-          desc="Gunakan Ekstensi Browser Applify di Chrome atau Edge untuk membantu mengisi formulir pada portal yang butuh masuk dengan akunmu sendiri.">
+          desc="Khusus laptop (Chrome atau Edge), tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir pada portal yang butuh masuk akunmu sendiri dan berhenti sebelum kirim sehingga kamu yang menekan Kirim.">
           <ExtensionConnectCard />
           <div className="mt-3">
             <SoonButton>Pasang untuk Firefox</SoonButton>

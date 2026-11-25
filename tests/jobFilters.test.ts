@@ -367,9 +367,22 @@ test("pencarian UJI dan [UJI] menemukan lowongan uji, baik di saringan server ma
   assert.equal(isTestListingQuery("ujian"), false);
 });
 
-test("halaman Lowongan menawarkan jalan pintas [UJI] dan peringatan portal butuh ekstensi", () => {
+test("halaman Lowongan menampilkan banner ekstensi khusus laptop yang bisa ditutup, tanpa tombol [UJI] atau jargon ATS publik", () => {
   const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
-  assert.match(src, /setSearchQuery\(TEST_LISTING_QUERY\)/);
+  assert.doesNotMatch(src, /Tampilkan lowongan \[UJI\]/);
+  assert.doesNotMatch(src, /ATS publik/);
   assert.match(src, /Portal · Butuh Ekstensi/);
-  assert.match(src, /Tampilkan lowongan \[UJI\]/);
+  assert.match(src, /khusus laptop \(Chrome atau Edge\)/);
+  assert.match(src, /tidak bisa dipasang di HP/);
+  assert.match(src, /situs karier perusahaan/);
+  assert.match(src, /hasPortalJobs && !extensionBannerDismissed/);
+  assert.match(src, /dismissExtensionBanner\(\)/);
+  assert.match(src, /to="\/settings"[\s\S]*?hash="ekstensi"/);
+  assert.match(src, /href=\{EXTENSION_GUIDE_HREF\}/);
+});
+
+test("empty state belum ada lowongan menyebut nama tombol pemindai, bukan tombol biru di atas", () => {
+  const none = jobsEmptyState({ ...emptyBase, loadedCount: 0, scoredCount: 0, topScore: null });
+  assert.doesNotMatch(none.text, /tombol biru/i);
+  assert.match(none.text, new RegExp(SCANNER_BUTTON_LABEL));
 });

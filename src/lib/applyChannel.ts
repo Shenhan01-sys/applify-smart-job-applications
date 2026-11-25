@@ -237,7 +237,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       manualOnly: false,
       badgeLabel: "Formulir ATS · Agen",
       badgeTone: "ats",
-      reason: "Formulir ATS publik; agen Applify maupun Ekstensi Chrome/Edge siap membantu pengisian.",
+      reason: "Situs karier perusahaan yang diizinkan. Agen server mengisi dan mengirimnya setelah kamu menekan Setujui.",
     };
   }
 
@@ -254,7 +254,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       manualOnly: false,
       badgeLabel: "Email Gmail",
       badgeTone: "email",
-      reason: `Alamat rekruter (${applyEmail}) tersedia — dapat dikirim lewat Gmail Applify setelah persetujuan.`,
+      reason: `Alamat rekruter (${applyEmail}) tersedia. Lamaran dapat dikirim lewat Gmail kamu setelah kamu menekan Setujui.`,
     };
   }
 
@@ -275,7 +275,8 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       manualOnly: false,
       badgeLabel: "Portal · Butuh Ekstensi",
       badgeTone: "extension",
-      reason: "Portal meminta masuk akun pelamar, jadi butuh Ekstensi Browser Chrome/Edge yang sudah terpasang. Tanpa ekstensi, pilih lowongan berlabel [UJI] atau lowongan dari ATS publik.",
+      reason:
+        "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan.",
     };
   }
 
@@ -292,7 +293,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     badgeLabel: "Situs Web · Ekstensi",
     badgeTone: "extension",
     reason: primaryUrl
-      ? "Situs karier eksternal; lebih andal menggunakan Ekstensi Browser Chrome/Edge untuk pengisian terpandu."
+      ? "Situs karier eksternal. Lebih andal diisi lewat Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP untuk pengisian terpandu."
       : "Belum ada tautan lamaran eksternal pada lowongan ini.",
   };
 }

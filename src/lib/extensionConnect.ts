@@ -2,10 +2,17 @@
  * Teks dan pembantu kartu "Ekstensi Browser" di Pengaturan, murni supaya bisa dites dengan `node --test`.
  */
 
-/** Langkah singkat menghubungkan ekstensi. Panduan lengkap ada di berkas README ekstensi. */
+/** Tautan menuju panduan pemasangan ekstensi di halaman Bantuan. */
+export const EXTENSION_GUIDE_HREF = "/bantuan#ekstensi";
+export const EXTENSION_GUIDE_LINK_LABEL = "Baca panduan pasang ekstensi";
+
+export const EXTENSION_LAPTOP_ONLY_NOTE =
+  "Ekstensi ini khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP.";
+
+/** Langkah singkat menghubungkan ekstensi. Panduan lengkap ada di halaman Bantuan. */
 export const EXTENSION_INSTALL_STEPS: readonly string[] = [
-  "Pasang ekstensi Applify di Chrome atau Edge (lihat panduan).",
-  "Klik Hubungkan Ekstensi di bawah, lalu salin token yang muncul.",
+  "Pasang ekstensi Applify khusus laptop (Chrome atau Edge). Ekstensi tidak bisa dipasang di HP.",
+  "Klik Hubungkan Ekstensi Chrome/Edge di bawah, lalu salin token yang muncul.",
   "Buka panel samping ekstensi Applify dan tempel tokennya di sana.",
 ];
 
@@ -13,7 +20,7 @@ export const EXTENSION_COPY_FAILED_TEXT =
   "Token belum bisa disalin otomatis. Pilih tokennya di kotak di bawah, lalu salin sendiri (Ctrl+C, atau Cmd+C di Mac).";
 
 export const EXTENSION_TOKEN_PASTE_WARNING =
-  "Tempel token ini hanya ke panel samping Ekstensi Browser Applify (Chrome/Edge), jangan pernah ke situs lain.";
+  "Tempel token ini hanya ke panel samping Ekstensi Browser Applify khusus laptop (Chrome atau Edge), jangan pernah ke situs lain.";
 
 export interface ClipboardLike {
   clipboard?: { writeText?: (text: string) => Promise<void> } | null;
