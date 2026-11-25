@@ -13,6 +13,7 @@ import {
   CV_IMPORT_SKIPPED_BLOCKED,
   CV_IMPORT_SKIPPED_BUSY,
   CV_IMPORT_SKIPPED_NOT_PDF,
+  AI_CV_CONSENT_TEXT,
   LINKEDIN_PDF_CV_NOTE,
   LINKEDIN_PDF_HINT,
   LINKEDIN_PDF_PRIVACY,
@@ -61,7 +62,7 @@ export interface LinkedInImportHandle {
    * Tidak ada yang ditulis sebelum pengguna menekan Tambahkan ke profil. Dilewati (dengan pesan singkat) bila bukan PDF,
    * profil belum termuat penuh, atau impor lain sedang berjalan, supaya satu unggahan tidak memanggil AI dua kali.
    */
-  startFromCv(file: File): Promise<void>;
+  startFromCv(file: File, consented: boolean): Promise<void>;
 }
 
 const SECTIONS: Array<{ key: SectionKey; title: string }> = [
@@ -85,6 +86,7 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [aiConsent, setAiConsent] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   // true sejak impor dimulai sampai dialog ditutup: satu impor (satu panggilan AI) pada satu waktu. Ref, bukan state,
   // supaya dua pemicu dalam satu putaran render tidak lolos bersamaan.
@@ -111,7 +113,13 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
     toast.error(message);
   };
 
-  const runImport = async (file: File, from: ImportSource) => {
+  const runImport = async (file: File, from: ImportSource, consented: boolean) => {
+    if (!consented) {
+      const message = "Centang persetujuan pemrosesan CV oleh layanan AI sebelum memulai impor.";
+      setError(message);
+      if (from === "cv") toast.info(message);
+      return;
+    }
     active.current = true;
     setError("");
     setPreview(null);
@@ -135,7 +143,7 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
       if (!hasPdfMagic(await file.slice(0, 5).text())) {
         return giveUp("Berkas ini bukan PDF yang sah. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.");
       }
-      const result = await automationApi.importLinkedInPdf(file);
+      const result = await automationApi.importLinkedInPdf(file, consented);
       const nextPlan = buildImportPlan(result, existingRef.current);
       setPreview(result);
       setPlan(nextPlan);
@@ -152,13 +160,15 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || active.current) return;
-    await runImport(file, "card");
+    const consented = aiConsent;
+    setAiConsent(false);
+    await runImport(file, "card", consented);
   };
 
   useImperativeHandle(
     ref,
     () => ({
-      async startFromCv(file: File) {
+      async startFromCv(file: File, consented: boolean) {
         if (!cvImportEligibility(file).eligible) {
           toast.info(CV_IMPORT_SKIPPED_NOT_PDF);
           return;
@@ -167,11 +177,15 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
           toast.info(CV_IMPORT_SKIPPED_BLOCKED);
           return;
         }
+        if (!consented) {
+          toast.info("CV tersimpan, tetapi belum dikirim ke layanan AI karena persetujuan belum diberikan.");
+          return;
+        }
         if (active.current) {
           toast.info(CV_IMPORT_SKIPPED_BUSY);
           return;
         }
-        await runImport(file, "cv");
+        await runImport(file, "cv", consented);
       },
     }),
     // runImport hanya memakai ref dan setter state yang stabil
@@ -224,6 +238,18 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
           </h2>
           <p id="li-import-hint" className="mt-1 text-sm text-muted-foreground">{LINKEDIN_PDF_HINT}</p>
           <p className="mt-1 text-xs text-muted-foreground">{LINKEDIN_PDF_PRIVACY}</p>
+          <div className="mt-3 flex items-start gap-2 text-sm">
+            <Checkbox
+              id="li-import-ai-consent"
+              checked={aiConsent}
+              onCheckedChange={(checked) => setAiConsent(checked === true)}
+              disabled={reading || blocked}
+              aria-describedby="li-import-ai-consent-copy"
+            />
+            <label id="li-import-ai-consent-copy" htmlFor="li-import-ai-consent" className="cursor-pointer leading-relaxed">
+              {AI_CV_CONSENT_TEXT}
+            </label>
+          </div>
           <p id="li-import-cv-note" className="mt-1 text-xs text-muted-foreground" data-testid="li-import-cv-note">{LINKEDIN_PDF_CV_NOTE}</p>
           {!secondary && (
             <p className="mt-1 text-xs">
@@ -238,14 +264,14 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
             type="file"
             accept="application/pdf,.pdf"
             onChange={onPick}
-            disabled={reading || blocked || phase !== "idle"}
+            disabled={reading || blocked || phase !== "idle" || !aiConsent}
             aria-describedby={error ? "li-import-hint li-import-error" : "li-import-hint"}
             className="peer sr-only"
           />
           <label
             htmlFor="li-import-file"
             className={`${btnBase} w-full md:w-auto border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] hover:bg-[#0A5BE0]/10 peer-focus-visible:ring-2 peer-focus-visible:ring-[#0A5BE0] ${
-              reading || blocked || phase !== "idle" ? "opacity-60 pointer-events-none" : "cursor-pointer"
+              reading || blocked || phase !== "idle" || !aiConsent ? "opacity-60 pointer-events-none" : "cursor-pointer"
             }`}
           >
             {reading ? spinner : <FileUp className="h-4 w-4" aria-hidden="true" />}

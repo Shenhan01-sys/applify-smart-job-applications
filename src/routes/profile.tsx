@@ -4,6 +4,7 @@ import AppShell from "@/components/app/AppShell";
 import { FileCheck2, ChevronRight, ChevronLeft, Loader2, Save, Briefcase, GraduationCap, Award, Wrench, Target, CheckCircle2, AlertCircle, User, MapPin, Phone, Link2, Mail, Calendar, DollarSign, Clock, Layers, Sparkles, Paperclip, Eye, RefreshCw, Trash2, Upload, Trophy } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Checkbox } from "@/components/ui/checkbox";
 // Sample profile data is only used in the explicit demo mode (VITE_MOCK_MODE=true). A real user starts empty.
 import {
   mockProfile as mockProfileData,
@@ -50,7 +51,7 @@ import {
 import { ExperienceEditor, EducationEditor, SkillsEditor, AchievementEditor } from "@/components/profile/ProfileEditors";
 import LinkedInImportCard, { type LinkedInImportHandle } from "@/components/profile/LinkedInImportCard";
 import ProfileDocumentsCard from "@/components/profile/ProfileDocumentsCard";
-import { RESUME_IMPORT_HINT, applyProfilePatch, cvImportEligibility, type CommitResult } from "@/lib/linkedinImport";
+import { AI_CV_CONSENT_TEXT, RESUME_IMPORT_HINT, applyProfilePatch, cvImportEligibility, type CommitResult } from "@/lib/linkedinImport";
 import {
   achievementDetails,
   buildProfileRow,
@@ -76,6 +77,7 @@ import {
   type SkillRow,
 } from "@/lib/profileForms";
 import { toast } from "sonner";
+import { numberToText, parseIndonesianSalary } from "@/lib/settingsForm";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -274,7 +276,7 @@ function ProfilePage() {
       toast.error("Periksa kolom profil dasar yang ditandai merah.");
       return false;
     }
-    const prefProblems = validatePreferences(preferences);
+    const prefProblems = { ...validatePreferences(preferences), ...prefErrors };
     if (Object.keys(prefProblems).length > 0) {
       setPrefErrors(prefProblems);
       setDirection('next');
@@ -555,7 +557,7 @@ function ProfilePage() {
       {/* Aksi pertama: satu titik unggah CV. Impor PDF LinkedIn jadi opsi kedua di bawahnya. */}
       {user && (
         <div className="mb-6">
-          <ResumeCard userId={user.id} onUploaded={(file) => { void importRef.current?.startFromCv(file); }} />
+          <ResumeCard userId={user.id} onUploaded={(file, consented) => { void importRef.current?.startFromCv(file, consented); }} />
         </div>
       )}
 
@@ -678,6 +680,12 @@ function ProfilePage() {
                 preferences={preferences}
                 setPreferences={setPreferences}
                 errors={prefErrors}
+                onSalaryError={(key, message) => setPrefErrors((prev) => {
+                  const next = { ...prev };
+                  if (message) next[key] = message;
+                  else delete next[key];
+                  return next;
+                })}
                 state={prefsState}
                 loadError={prefsError}
                 onRetry={loadPreferences}
@@ -890,12 +898,13 @@ type ResumeBusy = "" | "load" | "upload" | "view" | "remove";
 
 // Kartu ini hidup di luar stepper, jadi tampil di semua langkah. Berkasnya disimpan di Storage privat `resumes`
 // dan path-nya di profiles.resume_url (lihat services/resumeService.ts); agen melampirkannya saat mengisi formulir.
-function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file: File) => void }) {
+function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file: File, consented: boolean) => void }) {
   const [resume, setResume] = useState<ResumeRef | null>(null);
   const [busy, setBusy] = useState<ResumeBusy>("load");
   const [error, setError] = useState("");
   // Catatan netral (bukan galat) sesudah unggah: mis. berkas DOC tersimpan tetapi tidak dibaca otomatis.
   const [note, setNote] = useState("");
+  const [aiConsent, setAiConsent] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -947,8 +956,10 @@ function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file
     // dan hanya sekali per unggahan; kartu impor yang memutuskan, menampilkan pratinjau, dan menunggu persetujuan.
     if (saved) {
       const eligible = cvImportEligibility(file);
-      if (eligible.eligible) onUploaded?.(file);
+      if (eligible.eligible && aiConsent) onUploaded?.(file, true);
+      else if (eligible.eligible) setNote("CV tersimpan dan tetap bisa dilampirkan. Belum dikirim ke layanan AI. Centang persetujuan lalu unggah ulang jika ingin membuat pratinjau profil otomatis.");
       else setNote(eligible.message);
+      setAiConsent(false);
     }
   };
 
@@ -1005,6 +1016,18 @@ function ResumeCard({ userId, onUploaded }: { userId: string; onUploaded?: (file
       <p id="resume-import-hint" className="mt-0.5 text-xs text-muted-foreground" data-testid="resume-import-hint">
         {RESUME_IMPORT_HINT}
       </p>
+      <div className="mt-3 flex items-start gap-2 text-sm">
+        <Checkbox
+          id="resume-ai-consent"
+          checked={aiConsent}
+          onCheckedChange={(checked) => setAiConsent(checked === true)}
+          disabled={working}
+          aria-describedby="resume-ai-consent-copy"
+        />
+        <label id="resume-ai-consent-copy" htmlFor="resume-ai-consent" className="cursor-pointer leading-relaxed">
+          {AI_CV_CONSENT_TEXT} Persetujuan ini tidak diperlukan untuk menyimpan atau melampirkan berkas.
+        </label>
+      </div>
 
       <div className="mt-4" aria-busy={working}>
         <input
@@ -1126,14 +1149,26 @@ function Step1Basic({ formData, setFormData, errors }: {
   );
 }
 
-function Step4Preferences({ preferences, setPreferences, errors, state, loadError, onRetry }: {
+function Step4Preferences({ preferences, setPreferences, errors, onSalaryError, state, loadError, onRetry }: {
   preferences: PreferencesForm,
   setPreferences: React.Dispatch<React.SetStateAction<PreferencesForm>>,
   errors: PreferencesErrors,
+  onSalaryError: (key: "desired_salary" | "current_ctc", message: string) => void,
   state: "loading" | "ready" | "failed",
   loadError: string,
   onRetry: () => void,
 }) {
+  const [salaryDrafts, setSalaryDrafts] = useState({
+    desired_salary: numberToText(preferences.desired_salary),
+    current_ctc: numberToText(preferences.current_ctc),
+  });
+  const salaryDirty = useRef({ desired_salary: false, current_ctc: false });
+  useEffect(() => {
+    setSalaryDrafts((current) => ({
+      desired_salary: salaryDirty.current.desired_salary ? current.desired_salary : numberToText(preferences.desired_salary),
+      current_ctc: salaryDirty.current.current_ctc ? current.current_ctc : numberToText(preferences.current_ctc),
+    }));
+  }, [preferences.desired_salary, preferences.current_ctc]);
   if (state === "loading") {
     return (
       <div className="flex items-center justify-center gap-3 py-10 text-muted-foreground" role="status" aria-live="polite">
@@ -1173,19 +1208,55 @@ function Step4Preferences({ preferences, setPreferences, errors, state, loadErro
                 {field.prefix && (
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground" aria-hidden="true">{field.prefix}</span>
                 )}
-                <input
-                  id={id}
-                  type="number"
-                  inputMode="numeric"
-                  value={preferences[field.key] || ''}
-                  placeholder="Kosongkan bila tidak ingin diisi"
-                  onChange={(e) => setPreferences({ ...preferences, [field.key]: Math.max(0, parseInt(e.target.value) || 0) })}
-                  min={0}
-                  step={field.step}
-                  aria-invalid={!!errors[field.key]}
-                  aria-describedby={`${id}-hint`}
-                  className={`w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all aria-[invalid=true]:border-red-400 ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
-                />
+                {field.key === "desired_salary" || field.key === "current_ctc" ? (
+                  <input
+                    id={id}
+                    type="text"
+                    inputMode="decimal"
+                    value={salaryDrafts[field.key]}
+                    placeholder="Contoh: 5.000.000 atau 6,5 jt"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const key = field.key as "desired_salary" | "current_ctc";
+                      const parsed = raw.trim() ? parseIndonesianSalary(raw) : 0;
+                      salaryDirty.current[key] = true;
+                      setSalaryDrafts((current) => ({ ...current, [key]: raw }));
+                      if (raw.trim() && parsed === null) onSalaryError(key, "Format gaji belum dikenali. Contoh: 5.000.000 atau 6,5 jt.");
+                      else {
+                        onSalaryError(key, "");
+                        setPreferences((current) => ({ ...current, [key]: parsed ?? 0 }));
+                      }
+                    }}
+                    onBlur={() => {
+                      const key = field.key as "desired_salary" | "current_ctc";
+                      const raw = salaryDrafts[key];
+                      const parsed = raw.trim() ? parseIndonesianSalary(raw) : 0;
+                      if (raw.trim() && parsed === null) return;
+                      const value = parsed ?? 0;
+                      salaryDirty.current[key] = false;
+                      setSalaryDrafts((current) => ({ ...current, [key]: value ? String(value) : "" }));
+                      setPreferences((current) => ({ ...current, [key]: value }));
+                      onSalaryError(key, "");
+                    }}
+                    aria-invalid={!!errors[field.key]}
+                    aria-describedby={`${id}-hint`}
+                    className={`w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all aria-[invalid=true]:border-red-400 ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
+                  />
+                ) : (
+                  <input
+                    id={id}
+                    type="number"
+                    inputMode="numeric"
+                    value={preferences[field.key] || ''}
+                    placeholder="Kosongkan bila tidak ingin diisi"
+                    onChange={(e) => setPreferences({ ...preferences, [field.key]: Math.max(0, parseInt(e.target.value) || 0) })}
+                    min={0}
+                    step={field.step}
+                    aria-invalid={!!errors[field.key]}
+                    aria-describedby={`${id}-hint`}
+                    className={`w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all aria-[invalid=true]:border-red-400 ${field.prefix ? 'pl-10' : 'pl-4'} pr-4`}
+                  />
+                )}
               </div>
               <p id={`${id}-hint`} className="mt-1 text-xs text-muted-foreground">{field.hint}</p>
               {errors[field.key] && <p className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}

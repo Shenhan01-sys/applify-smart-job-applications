@@ -14,7 +14,7 @@ import {
 
 import { getApiBaseUrl, isMockMode } from '@/lib/appConfig'
 import type { EnrichJobResult, SalaryBenchmarkResult } from '@/lib/jobDetail'
-import { LINKEDIN_IMPORT_TIMEOUT_MS, parseImportPreview, type ImportPreview } from '@/lib/linkedinImport'
+import { aiCvConsentHeaders, LINKEDIN_IMPORT_TIMEOUT_MS, parseImportPreview, type ImportPreview } from '@/lib/linkedinImport'
 import {
   parseDeleteResponse,
   parseLlmKeysResponse,
@@ -484,13 +484,14 @@ export const automationApi = {
    * dilakukan setelah pengguna menyetujui pratinjau (services/linkedinImportService.ts). PDF dikirim mentah
    * sebagai badan permintaan (Content-Type: application/pdf), bukan multipart. Tidak memakai kuota draf AI.
    */
-  async importLinkedInPdf(file: File): Promise<ImportPreview> {
+  async importLinkedInPdf(file: File, consented = false): Promise<ImportPreview> {
+    if (!consented) throw new ApiError(400, JSON.stringify({ code: 'ai_consent_required' }))
     const auth = await getAuthHeaders()
     const body = await apiFetch<unknown>(
       `${apiBase()}/api/profile/import/linkedin-pdf`,
       {
         method: 'POST',
-        headers: { ...auth, 'Content-Type': 'application/pdf' },
+        headers: { ...auth, ...aiCvConsentHeaders(consented), 'Content-Type': 'application/pdf' },
         body: file,
         signal: AbortSignal.timeout(LINKEDIN_IMPORT_TIMEOUT_MS),
       },

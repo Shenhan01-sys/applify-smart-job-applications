@@ -50,12 +50,28 @@ test("Kartu impor: judul, petunjuk Lainnya > Simpan ke PDF, pemilih hanya PDF, d
   assert.match(src, /\{ key: "certifications", title: "Sertifikasi" \},\s*\{ key: "achievements", title: "Penghargaan dan publikasi" \},\s*\{ key: "skills", title: "Skill dan bahasa" \}/);
 });
 
+test("impor CV meminta consent unchecked sebelum OCR dan meneruskan consent pada dua jalur unggah", () => {
+  const card = read(CARD);
+  const profile = read("../src/routes/profile.tsx");
+  const api = read("../src/services/automationApi.ts");
+  assert.match(card, /const \[aiConsent, setAiConsent\] = useState\(false\)/);
+  assert.match(card, /id="li-import-ai-consent"[\s\S]*?checked=\{aiConsent\}/);
+  assert.match(card, /disabled=\{reading \|\| blocked \|\| phase !== "idle" \|\| !aiConsent\}/);
+  assert.match(card, /if \(!consented\)[\s\S]*?Centang persetujuan/);
+  assert.match(card, /importLinkedInPdf\(file, consented\)/);
+  assert.match(profile, /id="resume-ai-consent"[\s\S]*?checked=\{aiConsent\}/);
+  assert.match(profile, /if \(eligible\.eligible && aiConsent\) onUploaded\?\.\(file, true\)/);
+  assert.match(profile, /startFromCv\(file, consented\)/);
+  assert.match(api, /if \(!consented\) throw new ApiError\(400, JSON\.stringify\(\{ code: 'ai_consent_required' \}\)\)/);
+  assert.match(api, /\.\.\.aiCvConsentHeaders\(consented\)/);
+});
+
 test("Kartu impor: tidak ada yang ditulis sebelum konfirmasi; penulisan hanya dari onConfirm dengan item yang dicentang", () => {
   const src = read(CARD);
   assert.equal(src.match(/commitLinkedInImport\(/g)?.length, 1, "satu-satunya pemanggil penulisan");
   const pick = src.slice(src.indexOf("const runImport"), src.indexOf("const onConfirm"));
   assert.doesNotMatch(pick, /commitLinkedInImport|profileService|upsert|onImported/);
-  assert.match(pick, /automationApi\.importLinkedInPdf\(file\)/);
+  assert.match(pick, /automationApi\.importLinkedInPdf\(file, consented\)/);
   assert.equal(src.match(/automationApi\.importLinkedInPdf\(/g)?.length, 1, "satu-satunya pemanggil AI: pemilih berkas dan unggahan CV memakai runImport yang sama");
   assert.match(pick, /validateLinkedInPdfFile\(file\)/);
   assert.match(pick, /hasPdfMagic\(/);
@@ -73,7 +89,8 @@ test("API: PDF dikirim mentah ke /api/profile/import/linkedin-pdf dengan token d
   const fn = src.slice(src.indexOf("async importLinkedInPdf"), src.indexOf("// Sessions"));
   assert.match(fn, /\/api\/profile\/import\/linkedin-pdf/);
   assert.match(fn, /method: 'POST'/);
-  assert.match(fn, /\.\.\.auth, 'Content-Type': 'application\/pdf'/);
+  assert.match(fn, /\.\.\.auth, \.\.\.aiCvConsentHeaders\(consented\), 'Content-Type': 'application\/pdf'/);
+  assert.match(fn, /if \(!consented\) throw new ApiError\(400, JSON\.stringify\(\{ code: 'ai_consent_required' \}\)\)/);
   assert.match(fn, /body: file/);
   assert.match(fn, /AbortSignal\.timeout\(LINKEDIN_IMPORT_TIMEOUT_MS\)/);
   assert.match(fn, /mockLinkedInImportPreview/, "mode demo tidak memanggil server");
