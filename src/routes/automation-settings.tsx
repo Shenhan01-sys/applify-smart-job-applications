@@ -260,12 +260,14 @@ function AutomationSettingsPage() {
                 <Settings className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Perilaku Agen
               </h2>
               {/* "Selalu pakai jawaban terbaru" tidak ditampilkan: tidak ada bagian server, agen, atau ekstensi yang membacanya. */}
-              <ToggleField 
-                label="Berhenti sebelum mengirim" 
-                description="Agen berhenti sebelum menekan tombol kirim, supaya kamu bisa memeriksa dulu"
-                checked={settings.pause_before_submit ?? true}
-                onChange={(v: boolean) => updateField('pause_before_submit', v)}
-              />
+              {/* pause_before_submit tidak lagi ditampilkan sebagai saklar (25 Nov 2026): worker selalu meminta
+                  persetujuan sebelum kirim, jadi saklar yang bisa dimatikan menyesatkan. */}
+              <div className="rounded-lg border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 p-4" data-testid="always-approve-note">
+                <p className="font-semibold text-sm">Selalu minta persetujuan sebelum mengirim</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Agen tidak pernah mengirim lamaran sebelum kamu menekan Setujui. Pengaturan ini tidak bisa dimatikan.
+                </p>
+              </div>
               <ToggleField 
                 label="Berhenti saat ada pertanyaan yang tak bisa dijawab" 
                 description="Agen berhenti bila menemukan pertanyaan formulir yang tidak bisa dijawab dari datamu"

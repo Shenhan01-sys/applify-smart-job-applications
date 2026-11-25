@@ -148,7 +148,8 @@ test.describe("Pengaturan Agen", () => {
     await expect(app.getByRole("switch", { name: /Easy Apply/ })).toHaveCount(0);
     await app.getByRole("tab", { name: "Perilaku Agen" }).click();
     await expect(app.getByRole("switch", { name: /jawaban terbaru/ })).toHaveCount(0);
-    // Yang dipakai worker tetap ada.
-    await expect(app.getByRole("switch", { name: "Berhenti sebelum mengirim" })).toBeVisible();
+    // Persetujuan sebelum kirim selalu wajib: tidak ada saklar, hanya keterangan tetap.
+    await expect(app.getByRole("switch", { name: "Berhenti sebelum mengirim" })).toHaveCount(0);
+    await expect(app.getByTestId("always-approve-note")).toBeVisible();
   });
 });

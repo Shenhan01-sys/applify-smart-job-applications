@@ -106,6 +106,7 @@ test("pengaturan yang tidak dibaca server, worker, maupun ekstensi tidak ditampi
   assert.doesNotMatch(settingsPage, /Easy Apply|Selalu pakai jawaban terbaru/);
   assert.doesNotMatch(profilePage, />\s*Tipe pekerjaan\s*</);
   assert.doesNotMatch(profilePage, /JOB_TYPE_OPTIONS/);
-  // Yang dibaca worker tetap tampil: pause_before_submit dipakai worker/src/handlers/apply.ts
-  assert.match(settingsPage, /pause_before_submit/);
+  // Persetujuan selalu wajib (worker maySubmitApply): tidak ada saklar yang bisa mematikan jeda sebelum kirim.
+  assert.doesNotMatch(settingsPage, /updateField\('pause_before_submit'/);
+  assert.match(settingsPage, /Selalu minta persetujuan sebelum mengirim/);
 });
