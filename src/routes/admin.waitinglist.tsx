@@ -11,12 +11,9 @@ import { toast } from "sonner";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
-// Whitelist email yang boleh akses admin (demo Solve-It).
-// TODO production: ganti dengan profiles.is_admin atau custom JWT claim.
-const ADMIN_EMAILS = new Set<string>([
-  "hansgunawan775@gmail.com",
-  "demo@applify.id",
-]);
+// Akses admin dibaca dari kolom profiles.is_admin milik pengguna yang sedang login (lihat SQL audit 43).
+// Tidak ada daftar email di kode klien. Selama cek belum lulus, data waitinglist tidak diminta sama sekali.
+type AdminState = "checking" | "admin" | "forbidden";
 
 interface WaitinglistEntry {
   id: string;
@@ -47,15 +44,14 @@ export const Route = createFileRoute("/admin/waitinglist")({
 });
 
 function AdminWaitinglistPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [adminState, setAdminState] = useState<AdminState>("checking");
   const [rows, setRows] = useState<WaitinglistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
-
-  const isAdmin = user?.email ? ADMIN_EMAILS.has(user.email) : false;
 
   const load = async () => {
     setRefreshing(true);
@@ -72,9 +68,37 @@ function AdminWaitinglistPage() {
     setRefreshing(false);
   };
 
+  // Cek peran dulu. Tanpa konfirmasi is_admin === true, kueri waitinglist tidak pernah dijalankan.
   useEffect(() => {
+    if (authLoading) return;
+    if (isMockMode() || !user) {
+      setAdminState("forbidden");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || data?.is_admin !== true) {
+        setAdminState("forbidden");
+        return;
+      }
+      setAdminState("admin");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    if (adminState !== "admin") return;
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminState]);
 
   // Stats
   const stats = useMemo(() => {
@@ -158,7 +182,16 @@ function AdminWaitinglistPage() {
     toast.success(`Berhasil export ${filtered.length} baris`);
   };
 
-  if (!isAdmin) {
+  if (adminState === "checking") {
+    return (
+      <div className="min-h-screen bg-[#F4F1E8] flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0A5BE0]" aria-hidden="true" />
+        <span className="ml-3 text-muted-foreground">Memeriksa akses admin...</span>
+      </div>
+    );
+  }
+
+  if (adminState === "forbidden") {
     return (
       <div className="min-h-screen bg-[#F4F1E8] flex items-center justify-center px-4">
         <div className="max-w-md w-full glass rounded-2xl p-8 text-center">
