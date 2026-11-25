@@ -10,8 +10,11 @@
  *   /api/sessions/*, /api/linkedin/import|verify
  *              -> 503 { error, code:'session_encryption_not_configured' }       server has no encryption key
  *                 422 { error, code:'session_undecryptable' }                    stored session cannot be read
- *   /api/automation/queue, /api/queue/apply
+ *   /api/automation/queue, /api/queue/apply, /api/approvals/:id/approve (services/queue-guard.ts, queue.service.ts)
  *              -> 403 { error, code:'approval_required' }
+ *                 409 { error, code:'channel_conflict' }                         persetujuan sudah punya antrean aktif, sudah diklaim, atau milik kanal lain
+ *                 429 { error, code:'platform_limit_reached' }                   batas lamaran per jam per situs (tanpa Retry-After)
+ *   /api/profile/import*  -> 400 { error, code:'ai_consent_required' }          header x-ai-consent tidak ada
  *   /api/notifications/whatsapp/*
  *              -> 429 { error, code:'otp_daily_limit' | 'otp_cooldown' | 'otp_too_many_attempts' }
  *                 400 { error, code:'otp_mismatch' | 'otp_expired' | 'otp_not_found' | 'invalid_otp' | 'invalid_whatsapp_phone' }
@@ -85,6 +88,11 @@ function waitText(sec: number | undefined): string {
   return `${Math.ceil(sec / 60)} menit`;
 }
 
+/** Kalimat saran tunggu: pakai detik dari Retry-After bila ada, kalau tidak minta pengguna menunggu sebentar. */
+function retryHint(sec: number | undefined): string {
+  return sec && sec > 0 ? `Coba lagi dalam ${waitText(sec)}.` : "Tunggu beberapa saat lagi, lalu coba lagi.";
+}
+
 /** Jalur email lewat Gmail belum bisa dipakai karena Google belum disiapkan di server. */
 export const GMAIL_UNAVAILABLE_MESSAGE = "Kirim lewat Gmail belum tersedia.";
 
@@ -128,7 +136,7 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return `Kuota draf AI bulan ini sudah habis${used}. Kuota dihitung per bulan dan akan direset bulan depan. Sementara itu kamu masih bisa melihat lowongan dan mengelola lamaran yang sudah ada.`;
     }
     case "rate_limited":
-      return `Terlalu banyak permintaan AI dalam waktu singkat. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
+      return `Terlalu banyak permintaan AI dalam waktu singkat. ${retryHint(e.retryAfterSec)}`;
     case "quota_check_failed":
       return "Kuota AI tidak dapat diperiksa saat ini, jadi permintaan ditolak agar kuota tidak terlewati. Coba lagi nanti.";
     case "rate_limit_check_failed":
@@ -179,6 +187,16 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return "Lamaran ini sudah tercatat terkirim, jadi tidak perlu dipulihkan lagi.";
     case "approval_required":
       return "Persetujuan tidak sah, belum disetujui, atau sudah kedaluwarsa. Muat ulang halaman dan periksa statusnya.";
+    case "channel_conflict":
+      return "Persetujuan ini sudah punya pengiriman yang sedang berjalan atau sudah terpakai. Jangan tekan Setujui dua kali. Muat ulang halaman dan periksa statusnya.";
+    case "platform_limit_reached":
+      return `Batas lamaran per jam ke situs ini sudah tercapai, jadi lamaran belum dimasukkan ke antrean. ${
+        e.retryAfterSec && e.retryAfterSec > 0
+          ? retryHint(e.retryAfterSec)
+          : "Batas dihitung per jam: tunggu sampai satu jam, lalu kirim lagi, atau lamar ke situs lain dulu."
+      }`;
+    case "ai_consent_required":
+      return "Centang persetujuan pemrosesan CV oleh layanan AI dulu, lalu coba lagi.";
     case "gmail_not_configured":
       return GMAIL_UNAVAILABLE_MESSAGE;
     case "keywords_required":
@@ -187,7 +205,7 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
 
   if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;
   if (e.status === 401) return "Sesi login berakhir atau belum masuk. Masuk lagi, lalu ulangi.";
-  if (e.status === 429) return `Terlalu banyak permintaan. Coba lagi dalam ${waitText(e.retryAfterSec)}.`;
+  if (e.status === 429) return `Terlalu banyak permintaan. ${retryHint(e.retryAfterSec)}`;
   // Server lama belum mengirim kode untuk Gmail yang belum dikonfigurasi: kenali dari statusnya, lalu tampilkan pesan buatan sendiri.
   if (e.status === 503 && e.serverMessage && /gmail not configured/i.test(e.serverMessage)) return GMAIL_UNAVAILABLE_MESSAGE;
   // Teks galat server (sering berbahasa Inggris atau memuat nama pengaturan) bukan untuk pengguna: hanya ke konsol.

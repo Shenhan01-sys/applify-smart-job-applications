@@ -132,6 +132,42 @@ test("halaman sesi LinkedIn menampilkan galat konfigurasi di layar dan tidak men
   assert.match(page, /const imported = await importSession\(parsed\.cookies\);\s*\n\s*if \(imported\) setCookiesText\(""\);/);
 });
 
+test("UX-P7-10: channel_conflict (409) dijelaskan, bukan jatuh ke teks cadangan layar", () => {
+  const msg = describeApiError(new ApiError(409, body({ error: "Approval already has an active queue job", code: "channel_conflict" })), "Gagal menyetujui.");
+  assert.match(msg, /sudah punya pengiriman yang sedang berjalan/);
+  assert.match(msg, /Jangan tekan Setujui dua kali/);
+  assert.doesNotMatch(msg, /Approval|queue|Gagal menyetujui/);
+});
+
+test("UX-P7-10: platform_limit_reached (429) menyebut batas per jam, bukan 'beberapa saat'; Retry-After dipakai bila ada", () => {
+  const msg = describeApiError(new ApiError(429, body({ error: "Batas lamaran ke jobstreet sudah tercapai untuk saat ini.", code: "platform_limit_reached" })));
+  assert.match(msg, /per jam/);
+  assert.match(msg, /satu jam/);
+  assert.match(msg, /situs lain/);
+  assert.doesNotMatch(msg, /jobstreet|undefined|NaN/);
+  const withHeader = describeApiError(new ApiError(429, body({ code: "platform_limit_reached" }), 1800));
+  assert.match(withHeader, /Coba lagi dalam 30 menit/);
+  assert.notEqual(msg, describeApiError(new ApiError(429, body({ code: "rate_limited" }))));
+});
+
+test("UX-P7-10: ai_consent_required (400) minta centang persetujuan CV", () => {
+  assert.match(describeApiError(new ApiError(400, body({ success: false, code: "ai_consent_required", error: "x" }))), /Centang persetujuan pemrosesan CV/);
+});
+
+test("UX-P7-10: 429 umum memakai detik dari Retry-After, atau saran tunggu yang tidak janggal", () => {
+  assert.match(describeApiError(new ApiError(429, "slow down", 45)), /Terlalu banyak permintaan\. Coba lagi dalam 45 detik\./);
+  const none = describeApiError(new ApiError(429, "slow down"));
+  assert.match(none, /Terlalu banyak permintaan\. Tunggu beberapa saat lagi, lalu coba lagi\./);
+  assert.doesNotMatch(none, /dalam beberapa saat lagi/);
+  assert.doesNotMatch(describeApiError(new ApiError(429, body({ code: "rate_limited" }))), /dalam beberapa saat lagi/);
+});
+
+test("UX-P7-10: kode channel_conflict, platform_limit_reached, dan ai_consent_required memang dikirim backend (dibaca, tidak diubah)", () => {
+  const guard = read("../../backend/services/queue-guard.ts");
+  for (const c of ["channel_conflict", "platform_limit_reached"]) assert.match(guard, new RegExp(`'${c}'`));
+  assert.match(read("../../backend/api/routes/profile-import.ts"), /code: 'ai_consent_required'/);
+});
+
 test("kontrak backend yang dipakai pesan ini memang ada di kode backend (dibaca, tidak diubah)", () => {
   const ai = read("../../backend/api/routes/ai.ts");
   assert.match(ai, /code: error\.code/);
