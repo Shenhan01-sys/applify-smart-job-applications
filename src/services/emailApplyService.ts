@@ -19,6 +19,8 @@ const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 export interface EmailApplyData {
   /** null = status could not be checked */
   gmail: boolean | null;
+  /** Email sender address returned by the connected Gmail status endpoint; never inferred from the login account. */
+  gmailEmail: string | null;
   /** approval ids that a successful submission already consumed */
   used: Set<string>;
   /** latest email_apply queue row per approval id */
@@ -41,7 +43,7 @@ export interface EmailApplyData {
   agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, agentKnown: false });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, gmailEmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -180,6 +182,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;
+  data.gmailEmail = typeof gmail?.email === "string" && gmail.email.trim() ? gmail.email.trim() : null;
   for (const [aid, info] of Object.entries(claimRes?.claims ?? {})) {
     if (!info || info.state === "none") continue;
     const base = agent[aid] ?? { status: "completed", fields_filled: null };
@@ -251,8 +254,8 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
  * Put an email_apply job on the queue through the backend (POST /api/automation/queue). The backend checks
  * the approval; this function never sends an `approved` flag.
  */
-export async function enqueueEmailApply(approval: ApprovalLike, applyEmail: string): Promise<unknown> {
-  const req = buildEmailApplyRequest(approval, applyEmail);
+export async function enqueueEmailApply(approval: ApprovalLike, applyEmail: string, options: { allowWithoutCv?: boolean } = {}): Promise<unknown> {
+  const req = buildEmailApplyRequest(approval, applyEmail, options);
   if (!req) throw new Error("Persetujuan atau alamat email belum lengkap.");
   return automationApi.addToQueue(req.job_type, req.payload);
 }

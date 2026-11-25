@@ -42,6 +42,8 @@ export interface BackendState {
   /** GET /api/approvals/:id */
   approvalDetail: Record<string, Row>;
   gmail: boolean;
+  /** Connected Gmail sender returned by GET /api/oauth/status; never inferred from TEST_USER_EMAIL. */
+  gmailEmail?: string | null;
   /** Bidang tambahan di jawaban POST /api/approvals/:id/approve, mis. { apply_channel: "extension", extension_consent_required: true }. */
   approveExtra: Row;
   /** Pengaturan agen (GET dan PUT /api/automation/settings). */
@@ -133,6 +135,7 @@ export class MockBackend {
       applications: [],
       approvalDetail: {},
       gmail: false,
+      gmailEmail: null,
       approveExtra: {},
       settings: {},
       llmKeys: { enabled: false, providers: [], keys: [] },
@@ -212,7 +215,7 @@ export class MockBackend {
     const s = this.state;
     if (method === "GET" && path === "/api/approvals/pending") return route.fulfill(json(200, s.pending));
     if (method === "GET" && path === "/api/approvals/history") return route.fulfill(json(200, s.history));
-    if (method === "GET" && path === "/api/oauth/status") return route.fulfill(json(200, { gmail: s.gmail }));
+    if (method === "GET" && path === "/api/oauth/status") return route.fulfill(json(200, { gmail: s.gmail, email: s.gmailEmail ?? null }));
     if (method === "GET" && path === "/api/llm-keys") return route.fulfill(json(200, s.llmKeys));
     if (method === "GET" && path === "/api/notifications/status") return route.fulfill(json(200, s.notificationStatus));
     if (method === "GET" && path === "/api/notifications/preferences") return route.fulfill(json(200, s.notificationPrefs));

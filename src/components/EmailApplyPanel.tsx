@@ -19,6 +19,7 @@ import { describeNotAttached, describeSentAttachments, type AttachmentPlan, type
 interface Props {
   approval: ApprovalLike & { job_title?: string; company?: string };
   gmailConnected: boolean | null;
+  gmailEmail: string | null;
   used: boolean;
   job?: EmailQueueRow | null;
   suggestions?: string[];
@@ -39,15 +40,21 @@ interface Props {
  * (see getEmailApplyState). It shows the exact letter that will be sent, asks for the recruiter address,
  * and asks once more before it enqueues an email_apply job; the backend and worker enforce the rest.
  */
-export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, plan = null, sent = null, agentBlockedReason = null, onQueued }: Props) {
+export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, used, job, suggestions = [], testMode = false, plan = null, sent = null, agentBlockedReason = null, onQueued }: Props) {
   const { user } = useAuth();
   const uid = useId();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [confirmNoCv, setConfirmNoCv] = useState(false);
   const [sending, setSending] = useState(false);
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [error, setError] = useState("");
+
+  const changeConfirmation = (next: boolean) => {
+    setConfirmNoCv(false);
+    setConfirming(next);
+  };
 
   const handleConnectGmail = async () => {
     setConnectingGmail(true);
@@ -74,16 +81,18 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
   const notSentText = used && sent ? describeNotAttached(sent) : "";
 
   const submit = async () => {
+    if (plan?.noCv && !confirmNoCv) return;
     setSending(true);
     setError("");
     try {
-      await enqueueEmailApply(approval, email);
+      const options = plan?.noCv && confirmNoCv ? { allowWithoutCv: true } : undefined;
+      await enqueueEmailApply(approval, email, options);
       toast.success("Email masuk antrean. Agen akan memprosesnya.");
-      setConfirming(false);
+      changeConfirmation(false);
       onQueued(approval.id);
     } catch (err) {
       setError(describeQueueError(err));
-      setConfirming(false);
+      changeConfirmation(false);
     } finally {
       setSending(false);
     }
@@ -170,7 +179,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
               inputMode="email"
               autoComplete="off"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); setConfirming(false); setError(""); }}
+              onChange={(e) => { setEmail(e.target.value); changeConfirmation(false); setError(""); }}
               placeholder="hrd@perusahaan.com"
               aria-invalid={!!state.emailError}
               list={suggestions.length > 0 ? `${uid}-sugg` : undefined}
@@ -180,7 +189,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span>Ditemukan di lowongan:</span>
                 {suggestions.map((s) => (
-                  <button key={s} type="button" onClick={() => { setEmail(s); setConfirming(false); setError(""); }} className="px-2 py-0.5 rounded-md border-2 border-black/[8%] bg-white hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0]">{s}</button>
+                  <button key={s} type="button" onClick={() => { setEmail(s); changeConfirmation(false); setError(""); }} className="px-2 py-0.5 rounded-md border-2 border-black/[8%] bg-white hover:border-[#0A5BE0]/40 hover:text-[#0A5BE0]">{s}</button>
                 ))}
                 <datalist id={`${uid}-sugg`}>{suggestions.map((s) => <option key={s} value={s} />)}</datalist>
               </div>
@@ -218,8 +227,13 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
           {confirming ? (
             <div className="rounded-lg border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/[4%] p-3 space-y-2">
               <p className="text-xs leading-relaxed">
-                Masukkan ke antrean: surat yang disetujui akan dikirim apa adanya ke <b className="break-all">{email.trim()}</b> dari akun Gmail-mu untuk lowongan
+                Masukkan ke antrean: surat yang disetujui akan dikirim apa adanya ke <b className="break-all">{email.trim()}</b> untuk lowongan
                 {" "}<b>{approval.job_title ?? "ini"}</b>{approval.company ? <> di <b>{approval.company}</b></> : null}. Email yang sudah terkirim tidak bisa ditarik kembali.
+              </p>
+              <p data-testid="email-confirm-sender" className="text-xs leading-relaxed">
+                <b>Pengirim:</b> {gmailEmail
+                  ? <b className="break-all">{gmailEmail}</b>
+                  : <>akun Gmail yang terhubung (sambungkan ulang Gmail di Pengaturan agar alamat pengirim tampil di sini)</>}.
               </p>
               {plan && (
                 <p data-testid="email-confirm-attachments" className="text-xs leading-relaxed">
@@ -227,17 +241,29 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
                   {plan.noCv ? <> (tanpa CV)</> : null}.
                 </p>
               )}
+              {plan?.noCv === true && (
+                <label className="flex min-h-11 items-center gap-2 text-xs leading-relaxed">
+                  <input
+                    data-testid="email-confirm-no-cv"
+                    type="checkbox"
+                    checked={confirmNoCv}
+                    onChange={(e) => setConfirmNoCv(e.target.checked)}
+                    className="h-4 w-4 shrink-0 accent-[#0A5BE0]"
+                  />
+                  Saya sadar lamaran ini akan dikirim tanpa CV.
+                </label>
+              )}
               <div className="flex gap-2">
-                <button type="button" onClick={submit} disabled={sending || !state.enabled} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
+                <button type="button" onClick={submit} disabled={sending || !state.enabled || (plan?.noCv === true && !confirmNoCv)} className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5">
                   {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ya, masukkan ke antrean
                 </button>
-                <button type="button" onClick={() => setConfirming(false)} disabled={sending} className="h-9 px-4 rounded-lg border-2 border-black/[8%] bg-white text-xs hover:bg-black/[4%]">Batal</button>
+                <button type="button" onClick={() => changeConfirmation(false)} disabled={sending} className="h-9 px-4 rounded-lg border-2 border-black/[8%] bg-white text-xs hover:bg-black/[4%]">Batal</button>
               </div>
             </div>
           ) : (
             <button
               type="button"
-              onClick={() => setConfirming(true)}
+              onClick={() => changeConfirmation(true)}
               disabled={!state.enabled}
               className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
