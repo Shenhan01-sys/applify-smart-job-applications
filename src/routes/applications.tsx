@@ -23,7 +23,12 @@ import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { awaitingCodeState } from "@/lib/securityCode";
 import { questionsToAnswer } from "@/lib/formQuestions";
-import { followUpBadge } from "@/lib/followUp";
+import {
+  FOLLOW_UP_DONE_LABEL,
+  followUpBadge,
+  nextStatusAfterFollowUpSent,
+  showFollowUpDoneBadge,
+} from "@/lib/followUp";
 import { isManualSent, manualSubmitState } from "@/lib/manualSubmit";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -157,6 +162,12 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
           >
             {followUp.kind === "due" ? <AlertCircle className="h-3 w-3" aria-hidden="true" /> : <Clock className="h-3 w-3" aria-hidden="true" />}
             {followUp.label}
+          </div>
+        )}
+        {showFollowUpDoneBadge(app) && (
+          <div className="mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 bg-green-100 text-green-800">
+            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+            {FOLLOW_UP_DONE_LABEL}
           </div>
         )}
         <button
@@ -450,11 +461,13 @@ export function AppsPage() {
   const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attemptOf(app));
 
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
-  // mengirim email follow-up. Pengingat Telegram worker memakai satu chat milik pengelola (TELEGRAM_CHAT_ID),
-  // bukan chat pengguna, jadi layar tidak menjanjikan pengingat ke pengguna.
+  // mengirim email follow-up. Status `submitted` tetap di kolom Terkirim, dan kartu di `follow_up`
+  // dikembalikan ke `submitted` agar tidak lagi masuk hitungan "Perlu tindak lanjut" (UX-P7-02).
   const handleFollowUp = async (appId: string) => {
     const markDone = (a: AIApplicationData): AIApplicationData =>
-      a.id === appId ? { ...a, follow_up_sent: true, status: a.status === "submitted" ? "follow_up" : a.status } : a;
+      a.id === appId
+        ? { ...a, follow_up_sent: true, status: nextStatusAfterFollowUpSent(a.status) as ApplicationStatus }
+        : a;
     try {
       if (isMockMode()) {
         setApplications(prev => prev.map(markDone));
@@ -940,6 +953,12 @@ export function AppsPage() {
                       <Mail className="h-4 w-4" aria-hidden="true" />
                       Tandai: Sudah Kutindaklanjuti
                     </button>
+                  </div>
+                )}
+                {showFollowUpDoneBadge(selectedApp) && (
+                  <div className="rounded-xl bg-green-50 border-2 border-green-200 p-4 flex items-center gap-2 text-sm font-medium text-green-800">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {FOLLOW_UP_DONE_LABEL}
                   </div>
                 )}
               </div>

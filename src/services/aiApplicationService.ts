@@ -284,19 +284,28 @@ export const aiApplicationService = {
     return data;
   },
 
-  // The user says she/he sent the follow-up herself/himself (Applify never sends it). A still-"submitted"
-  // application moves to "follow_up"; later stages (responded, closed) are left alone.
+  // Pengguna menandai bahwa ia sendiri sudah menindaklanjuti (Applify tidak mengirim email follow-up).
+  // Kolom `follow_up` berarti "Perlu tindak lanjut" (UX-P7-02), sehingga status `submitted` dibiarkan tetap
+  // `submitted`, sedangkan kartu yang sebelumnya berada di `follow_up` dikembalikan ke `submitted` agar keluar
+  // dari hitungan perlu tindak lanjut. Tahap lanjut (`responded`, `closed`) tidak diubah.
   async markFollowUpSent(id: string) {
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("ai_applications")
-      .update({ follow_up_sent: true })
+      .update({ follow_up_sent: true, updated_at: now })
       .eq("id", id)
       .select()
       .single();
 
     if (error) throw error;
-    await supabase.from("ai_applications").update({ status: "follow_up" }).eq("id", id).eq("status", "submitted");
-    return data;
+    const { data: moved } = await supabase
+      .from("ai_applications")
+      .update({ status: "submitted", updated_at: now })
+      .eq("id", id)
+      .eq("status", "follow_up")
+      .select()
+      .maybeSingle();
+    return moved ?? data;
   },
 
   // Delete application
