@@ -67,7 +67,10 @@ export function manualSubmitState(row: AgentApplyRow | null | undefined): Manual
   // Log "incomplete" page_mismatch (25 November 2026, Datadog): halaman berpindah sebelum kirim. Alamat lowongan bisa
   // diperbaiki di server, jadi pengguna perlu tombol coba lagi; sebelumnya kartu hanya berkata "coba ajukan lagi".
   const pageMismatch = row.log_status === "incomplete" && row.reason === "page_mismatch";
-  if (row.log_status !== "ready" && !pageMismatch) return null;
+  // Log "incomplete" dengan submit_blocked not_allowed (contoh: iframe dari host yang belum diizinkan, sebelum isian
+  // terisi). Daftar izin di server bisa berubah, jadi tombol coba lagi tetap ditawarkan.
+  const notAllowedEarly = row.log_status === "incomplete" && row.submit_blocked === "not_allowed";
+  if (row.log_status !== "ready" && !pageMismatch && !notAllowedEarly) return null;
   if (isAgentApplyActive(row)) return null;
   // Tugas yang gagal atau dilewati setelah log itu punya penjelasan sendiri. Fakta tanpa status tugas (jendela detail) lolos.
   if (row.status && row.status !== "completed") return null;

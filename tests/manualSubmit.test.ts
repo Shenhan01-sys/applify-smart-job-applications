@@ -182,7 +182,9 @@ test("manualSubmitState: alur yang sudah punya komponen sendiri tidak ikut tampi
 });
 
 test("manualSubmitState: bukan log ready, agen masih bekerja, atau tugas tidak selesai: tidak tampil", () => {
-  for (const log_status of ["success", "submit_unverified", "incomplete", "awaiting_code", "skipped", undefined, null]) {
+  // incomplete + not_allowed sekarang menawarkan coba lagi (tes di bawah); incomplete lain tetap null.
+  assert.equal(manualSubmitState({ log_status: "incomplete", reason: "no_fields_filled" }), null);
+  for (const log_status of ["success", "submit_unverified", "awaiting_code", "skipped", undefined, null]) {
     assert.equal(manualSubmitState({ log_status, submit_blocked: "not_allowed" }), null, String(log_status));
   }
   assert.equal(manualSubmitState({ log_status: "ready", manual: true, submit_blocked: "not_allowed" }), null);
@@ -367,4 +369,10 @@ test("manualSubmitState: log incomplete page_mismatch menawarkan coba kirim otom
   // incomplete lain tetap punya penjelasan sendiri, tanpa panel ini
   assert.equal(manualSubmitState({ status: "completed", log_status: "incomplete", reason: "captcha_blocked" }), null);
   assert.equal(manualSubmitState({ status: "processing", log_status: "incomplete", reason: "page_mismatch" }), null);
+});
+
+test("manualSubmitState: log incomplete not_allowed tanpa isian (iframe belum diizinkan) tetap menawarkan coba lagi", () => {
+  const s = manualSubmitState({ status: "completed", log_status: "incomplete", reason: "no_fields_filled", submit_blocked: "not_allowed" });
+  assert.equal(s?.kind, "not_allowed");
+  assert.equal(s?.canRerun, true);
 });
