@@ -15,12 +15,17 @@ import { DEFAULT_FREE_MODELS, numesKeysFromEnv, parseModelList, platformChain } 
 import { runChain } from "../_shared/chat-chain.ts";
 import { DEFAULT_NUMES_CALL_TIMEOUT_MS } from "../_shared/numes-keys.ts";
 import {
+  MSG_ALREADY_SCORED,
   MSG_GENERATE_FAILED,
   MSG_SAVE_FAILED,
   MSG_SCORE_FAILED,
   MSG_SERVER_ERROR,
+  buildGeneratePrompts,
+  buildScorePrompts,
+  checkAssessmentRateLimit,
   parseQuestionsReply,
   parseScoreReply,
+  validateAndBindAnswers,
 } from "../_shared/green-assessment.ts";
 
 const TAG = "[green-career-assessment]";
@@ -49,8 +54,11 @@ const AI_CHAIN_BUDGET_MS = Number(Deno.env.get("AI_CHAIN_BUDGET_MS") ?? 100000);
 // dalam satu permintaan berbagi jatah paling banyak 40% AI_CHAIN_BUDGET_MS atau 15 detik (NumesBudget di runChain).
 const NUMES_TIMEOUT_MS = Number(Deno.env.get("NUMES_TIMEOUT_MS")) > 0 ? Number(Deno.env.get("NUMES_TIMEOUT_MS")) : DEFAULT_NUMES_CALL_TIMEOUT_MS;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json", ...(extraHeaders ?? {}) },
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -75,6 +83,30 @@ Deno.serve(async (req: Request) => {
     if (mode === "generate") {
       const jobId = body?.jobId;
       if (!jobId) return json({ error: "jobId required" }, 400);
+
+      // Batas laju per pengguna pada tabel green_career_assessments (UX-P7-03): mencegah pemanggilan tanpa batas.
+      const nowMs = Date.now();
+      const hourAgo = new Date(nowMs - 3_600_000).toISOString();
+      const dayAgo = new Date(nowMs - 86_400_000).toISOString();
+      const [hourRes, dayRes] = await Promise.all([
+        admin.from("green_career_assessments").select("id", { count: "exact", head: true })
+          .eq("user_id", userId).gte("created_at", hourAgo),
+        admin.from("green_career_assessments").select("id", { count: "exact", head: true })
+          .eq("user_id", userId).gte("created_at", dayAgo),
+      ]);
+      if (hourRes.error || dayRes.error) {
+        console.error(`${TAG} rate_limit_failed code=${hourRes.error?.code ?? dayRes.error?.code ?? "none"}`);
+        return json({ error: MSG_SERVER_ERROR }, 503);
+      }
+      const limitCheck = checkAssessmentRateLimit(hourRes.count ?? 0, dayRes.count ?? 0);
+      if (!limitCheck.allowed) {
+        return json(
+          { error: limitCheck.message, code: "rate_limited", retryAfterSec: limitCheck.retryAfterSec },
+          429,
+          { "Retry-After": String(limitCheck.retryAfterSec) },
+        );
+      }
+
       const { data: job } = await admin.from("jobs").select("*").eq("id", jobId).maybeSingle();
       if (!job) return json({ error: "Job not found" }, 404);
       if (!job.is_green) return json({ error: "Job bukan Green Career role" }, 400);
@@ -82,8 +114,7 @@ Deno.serve(async (req: Request) => {
       const { data: profile } = await admin.from("profiles")
         .select("full_name, current_title, experience_years, skills").eq("id", userId).maybeSingle();
 
-      const sys = `Kamu perekrut untuk peran "green economy". Buat 5 soal asesmen KESIAPAN (readiness) yang DISESUAIKAN konteks perusahaan & peran. Campur tipe "mcq" (4 opsi) dan "text". Nilai kompetensi inti + kesadaran keberlanjutan yang relevan. Jawab HANYA JSON: {"questions":[{"id":"q1","type":"mcq","question":"..","options":["..","..","..",".."]},{"id":"q2","type":"text","question":".."}]}`;
-      const user = `PERAN: ${job.title} @ ${job.company}\nLokasi: ${job.location ?? "-"}\nDeskripsi: ${job.description ?? ""}\nRequirements: ${JSON.stringify(job.requirements ?? [])}\nKonteks perusahaan (green): ${JSON.stringify(job.company_insight ?? {})}\nKandidat: ${profile?.full_name ?? "-"} · ${profile?.current_title ?? "-"} · ${profile?.experience_years ?? 0} th · skills ${JSON.stringify(profile?.skills ?? [])}`;
+      const { sys, user } = buildGeneratePrompts(job, profile ?? null);
 
       const made = await runChain(MODELS, {
         tag: TAG,
@@ -114,15 +145,22 @@ Deno.serve(async (req: Request) => {
 
     if (mode === "score") {
       const assessmentId = body?.assessmentId;
-      const answers = body?.answers;
-      if (!assessmentId || !Array.isArray(answers)) return json({ error: "assessmentId & answers required" }, 400);
+      const rawAnswers = body?.answers;
+      if (!assessmentId || !Array.isArray(rawAnswers)) return json({ error: "assessmentId & answers required" }, 400);
       const { data: asmt } = await admin.from("green_career_assessments")
         .select("*, jobs(*)").eq("id", assessmentId).eq("user_id", userId).maybeSingle();
       if (!asmt) return json({ error: "Assessment not found" }, 404);
+      if (asmt.status !== "interviewing") {
+        return json({ error: MSG_ALREADY_SCORED, code: "already_scored" }, 409);
+      }
+      const bound = validateAndBindAnswers(rawAnswers, asmt.assessment?.questions);
+      if (!bound.ok) {
+        return json({ error: bound.error, code: bound.code }, 400);
+      }
+      const answers = bound.answers;
       const job = asmt.jobs ?? {};
 
-      const sys = `Kamu penilai asesmen kesiapan untuk peran green economy. Nilai jawaban kandidat secara OBJEKTIF berbasis kompetensi & kesesuaian (BUKAN latar belakang pribadi). Beri skor readiness 0-100. Jika <70, JANGAN menolak — beri jalur pengembangan yang membangun. Jawab HANYA JSON: {"readinessScore":0-100,"verdict":"ready|needs_development","feedback":{"strengths":[".."],"gaps":[".."],"developmentPath":["langkah konkret.."]}}`;
-      const user = `PERAN: ${job.title ?? "-"} @ ${job.company ?? "-"}\nKonteks: ${JSON.stringify(job.company_insight ?? {})}\nJAWABAN KANDIDAT:\n${answers.map((a: any, i: number) => `${i + 1}. Q: ${a.question}\n   A: ${a.answer}`).join("\n")}`;
+      const { sys, user } = buildScorePrompts(job, answers);
 
       const scored = await runChain(MODELS, {
         tag: TAG,
@@ -142,7 +180,9 @@ Deno.serve(async (req: Request) => {
 
       const { error: updErr } = await admin.from("green_career_assessments")
         .update({ status, readiness_score: score, transcript: answers, feedback, updated_at: new Date().toISOString() })
-        .eq("id", assessmentId);
+        .eq("id", assessmentId)
+        .eq("user_id", userId)
+        .eq("status", "interviewing");
       // Skor sudah dihitung, jadi pengguna tetap menerimanya; hanya penyimpanannya yang dicatat gagal.
       if (updErr) console.error(`${TAG} update_failed table=green_career_assessments code=${updErr.code ?? "none"}`);
 
