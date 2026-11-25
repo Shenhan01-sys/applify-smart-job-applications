@@ -919,19 +919,6 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
             >
               {application ? "Tutup (draf tersimpan)" : "Tutup"}
             </button>
-            {editable && jobData?.external_url && !channelInfo.manualOnly && !needsExtension && (
-              <button
-                type="button"
-                onClick={handleAutoApply}
-                disabled={enqueuing}
-                aria-describedby="apply-fill-hint"
-                title="Agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim."
-                className="min-h-11 px-4 rounded-xl border-2 border-[#0A5BE0] text-[#0A5BE0] text-sm font-semibold hover:bg-[#0A5BE0]/5 transition disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {enqueuing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Bot className="h-4 w-4" aria-hidden="true" />}
-                Isi Formulir Saja
-              </button>
-            )}
             {approvalId ? (
               <Link
                 to="/approvals"
@@ -962,8 +949,20 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
           {editable && (
             <p id="apply-fill-hint" className="text-xs text-muted-foreground">
               <strong className="font-semibold text-foreground">Ajukan ke Persetujuan</strong> untuk tinjau &amp; kirim lewat halaman Persetujuan.
+              {/* Satu aksi utama di footer (ON-12, catatan 41). Uji isi tanpa kirim tetap ada sebagai tautan kecil. */}
               {jobData?.external_url && !channelInfo.manualOnly && !needsExtension && (
-                <> Tombol <strong className="font-semibold text-foreground">Isi Formulir Saja</strong> hanya mengisi formulir di server lalu berhenti sebelum mengirim (pantau di Antrean Agen).</>
+                <> Tombol{" "}
+                  <button
+                    type="button"
+                    onClick={handleAutoApply}
+                    disabled={enqueuing}
+                    title="Agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim."
+                    className="inline-flex min-h-11 items-center gap-1 font-semibold text-[#0A5BE0] underline underline-offset-2 disabled:opacity-60"
+                  >
+                    {enqueuing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                    Isi Formulir Saja
+                  </button>{" "}
+                  hanya mengisi formulir di server lalu berhenti sebelum mengirim, untuk melihat hasil isiannya (pantau di Antrean Agen).</>
               )}
             </p>
           )}

@@ -7,7 +7,7 @@ import { Sparkles, ShieldCheck, Layers, Bot, Building2, FileText } from "lucide-
 const STEPS = [
   { key: "draft", label: "Draf AI", icon: Sparkles },
   { key: "gate", label: "Persetujuanmu", icon: ShieldCheck },
-  { key: "queue", label: "Antrean", icon: Layers },
+  { key: "queue", label: "Menunggu giliran", icon: Layers },
   { key: "agent", label: "Agen isi form", icon: Bot },
   { key: "sent", label: "Terkirim", icon: Building2 },
 ] as const;
@@ -85,6 +85,12 @@ export function HitlTrack({ stage, caption, className = "" }: HitlTrackProps) {
           })}
         </ol>
       </div>
+      {/* Layar sempit hanya memberi label langkah aktif di bawah ikonnya; kalimat ini memberi konteks urutannya (ON-09). */}
+      {current >= 0 && (
+        <p className="mt-3 text-center text-xs font-semibold text-[#16150F] sm:hidden">
+          Langkah {current + 1} dari {STEPS.length}: {STEPS[current].label}
+        </p>
+      )}
       {caption && <p className="mt-3 text-center text-xs text-[#16150F]/70">{caption}</p>}
     </div>
   );
