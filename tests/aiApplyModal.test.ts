@@ -18,7 +18,7 @@ test("tab CV tidak menampilkan optimizedCV.summary sebagai Ringkasan Profesional
 
 test("pengajuan persetujuan yang gagal: galat tampil di footer dekat tombol dan lewat toast.error", () => {
   const src = read("../src/components/AIApplyModal.tsx");
-  const fn = src.slice(src.indexOf("const handleRequestApproval"), src.indexOf("// The user sent this application outside Applify"));
+  const fn = src.slice(src.indexOf("const handleRequestApproval"), src.indexOf("// Fill-only run:"));
   // galat tidak lagi masuk ke setError (area isi yang bisa tergulir keluar layar)
   assert.doesNotMatch(fn, /setError\(`/);
   assert.match(fn, /setApprovalError\(message\)/);
@@ -82,7 +82,7 @@ test("klik ganda: buat draf, ajukan persetujuan, dan isi formulir dijaga ref sin
   assert.match(src, /useRef\(\{ generate: false, request: false, enqueue: false \}\)/);
   for (const [fn, key, end] of [
     ["const generate = async", "generate", "// Free preview-style regeneration"],
-    ["const handleRequestApproval", "request", "// The user sent this application outside Applify"],
+    ["const handleRequestApproval", "request", "// Fill-only run:"],
     ["const handleAutoApply", "enqueue", "const tabs = ["],
   ] as const) {
     const body = src.slice(src.indexOf(fn), src.indexOf(end));
@@ -96,16 +96,24 @@ test("Isi Formulir Saja disembunyikan untuk portal login yang butuh ekstensi, da
   const src = read("../src/components/AIApplyModal.tsx");
   assert.match(src, /needsBrowserExtension\(channelInfo\)/);
   assert.match(src, /!channelInfo\.manualOnly && !needsExtension && \(/);
-  assert.match(src, /\{editable && jobData\?\.external_url && !needsExtension && \(\s*<p id="apply-fill-hint"/);
+  assert.match(src, /<p id="apply-fill-hint"/);
+  assert.match(src, /jobData\?\.external_url && !channelInfo\.manualOnly && !needsExtension && \(\s*<>\s*Tombol/);
   assert.match(src, /Portal ini butuh Ekstensi Browser/);
   assert.match(src, /lowongan berlabel \[UJI\]/);
 });
 
-test("tab CV Hasil AI menjelaskan bahwa isinya saran skill, bukan berkas PDF baru", () => {
+test("tab CV menjelaskan bahwa isinya saran skill, bukan berkas PDF baru", () => {
   const src = read("../src/components/AIApplyModal.tsx");
   const cv = src.slice(src.indexOf('activeTab === "cv"'), src.indexOf('activeTab === "strategy"'));
   assert.match(cv, /saran untuk CV/);
   assert.match(cv, /Bukan berkas PDF baru/);
+});
+
+test("UX AIApplyModal: tombol tandai kirim manual dihapus, Batal edit mereset surat, dan tulis ulang menjaga editan manual", () => {
+  const src = read("../src/components/AIApplyModal.tsx");
+  assert.doesNotMatch(src, /Sudah kukirim sendiri|handleMarkSentManually|submitApplication/);
+  assert.match(src, /const handleCancelEdit = \(\) => \{\s*setEditedCoverLetter/);
+  assert.match(src, /setConfirmRewrite\(true\)/);
 });
 
 test("sisa istilah Inggris di Persetujuan dan kartu profil sudah dirapikan", () => {

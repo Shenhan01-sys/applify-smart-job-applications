@@ -341,10 +341,18 @@ function ApprovalsPage() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{request.company}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Berlaku sampai {new Date(request.expires_at).toLocaleDateString('id-ID')}
-                      </span>
+                      {(placement.tab === 'pending' || placement.stage === 'expired') && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Berlaku sampai {new Date(request.expires_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                      {placement.tab === 'history' && request.reviewed_at && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Ditinjau {new Date(request.reviewed_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-1">
                         <History className="h-3 w-3" />
                         Dibuat {new Date(request.created_at).toLocaleDateString('id-ID')}
@@ -356,7 +364,7 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {approved && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />
@@ -379,21 +387,31 @@ function ApprovalsPage() {
                     {approved && (
                       <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={loadData} />
                     )}
-                    {approved && (
-                      <EmailApplyPanel
-                        approval={request}
-                        gmailConnected={emailData.gmail}
-                        used={emailData.used.has(request.id)}
-                        job={emailData.jobs[request.id]}
-                        suggestions={emailData.suggestions[request.id]}
-                        testMode={emailData.testMode.has(request.id)}
-                        plan={emailData.attachmentPlans[request.id]}
-                        sent={emailData.sentAttachments[request.id]}
-                        onQueued={(id) =>
-                          setEmailData((d) => ({ ...d, jobs: { ...d.jobs, [id]: { status: 'pending', error_message: null } } }))
-                        }
-                      />
-                    )}
+                    {approved && (() => {
+                      const agentRow = emailData.agent[request.id];
+                      const blockedByAgent =
+                        agentRow?.claim_state === 'locked_stuck'
+                          ? 'locked_stuck' as const
+                          : agentRow?.log_status === 'submit_unverified' || agentRow?.submit_blocked === 'prior_unverified'
+                            ? 'submit_unverified' as const
+                            : null;
+                      return (
+                        <EmailApplyPanel
+                          approval={request}
+                          gmailConnected={emailData.gmail}
+                          used={emailData.used.has(request.id)}
+                          job={emailData.jobs[request.id]}
+                          suggestions={emailData.suggestions[request.id]}
+                          testMode={emailData.testMode.has(request.id)}
+                          plan={emailData.attachmentPlans[request.id]}
+                          sent={emailData.sentAttachments[request.id]}
+                          agentBlockedReason={blockedByAgent}
+                          onQueued={(id) =>
+                            setEmailData((d) => ({ ...d, jobs: { ...d.jobs, [id]: { status: 'pending', error_message: null } } }))
+                          }
+                        />
+                      );
+                    })()}
                   </div>
                   {placement.stage === 'review' && (
                     <button

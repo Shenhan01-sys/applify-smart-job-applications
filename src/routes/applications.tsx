@@ -738,7 +738,14 @@ export function AppsPage() {
                     <span className="text-muted-foreground">Ubah status</span>
                     <select
                       value={selectedApp.status}
-                      onChange={(e) => moveApplication(selectedApp.id, e.target.value as ApplicationStatus)}
+                      onChange={(e) => {
+                        const target = e.target.value as ApplicationStatus;
+                        if (dropNeedsConfirmation(selectedApp.status, target)) {
+                          setPendingSubmitted(selectedApp.id);
+                          return;
+                        }
+                        moveApplication(selectedApp.id, target);
+                      }}
                       className="min-h-11 rounded-lg border-2 border-[#999999] bg-white px-3 text-base md:text-sm"
                     >
                       {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{applicationStatusLabel(s)}</option>)}

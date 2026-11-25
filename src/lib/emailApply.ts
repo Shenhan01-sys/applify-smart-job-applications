@@ -106,6 +106,8 @@ export interface EmailApplyContext {
   gmailConnected: boolean | null;
   /** What the user typed. */
   applyEmail: string;
+  /** Locked claim or unverified previous attempt on the agent side: hold email apply to prevent double submission. */
+  agentBlockedReason?: "locked_stuck" | "submit_unverified" | null;
 }
 
 export type EmailApplyBlock =
@@ -113,6 +115,7 @@ export type EmailApplyBlock =
   | "no_job"
   | "no_letter"
   | "used"
+  | "agent_review"
   | "queued"
   | "do_not_resend"
   | "gmail_off"
@@ -154,6 +157,12 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
     return off("no_letter", "Surat lamaran pada persetujuan ini kosong. Email tidak dibuat dari AI, jadi tidak ada yang bisa dikirim.");
   }
   if (ctx.used) return off("used", "Persetujuan ini sudah dipakai untuk satu pengiriman. Satu persetujuan hanya berlaku untuk satu pengiriman.");
+  if (ctx.agentBlockedReason === "locked_stuck" || ctx.agentBlockedReason === "submit_unverified") {
+    return off(
+      "agent_review",
+      "Percobaan kirim agen sebelumnya masih terkunci atau belum terkonfirmasi. Cek email dan statusnya di atas sebelum mengirim lewat email agar tidak terkirim ganda."
+    );
+  }
 
   const job = ctx.job;
   if (job && (job.status === "pending" || job.status === "processing")) {

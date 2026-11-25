@@ -91,7 +91,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   // Detik sejak "Buat draf" ditekan, untuk teks kemajuan selama menunggu Edge Function. 0 saat tidak menunggu.
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
   const [regenerating, setRegenerating] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [confirmRewrite, setConfirmRewrite] = useState(false);
   const [enqueuing, setEnqueuing] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [approvalId, setApprovalId] = useState<string | null>(null);
@@ -300,10 +300,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   };
 
   // Free preview-style regeneration (mode "analyze" — does NOT consume quota)
-  const regenerate = async () => {
+  const performRegenerate = async () => {
     if (!application) return;
     try {
       setRegenerating(true);
+      setConfirmRewrite(false);
       setError("");
       const insights = await aiApplicationService.getJobInsights(jobId);
       setSkillGaps(insights.skillGaps);
@@ -317,11 +318,21 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setRawSkills(insights.tailoredSkills);
       await aiApplicationService.updateCoverLetter(application.id, insights.coverLetter);
       setApplication({ ...application, cover_letter: insights.coverLetter });
+      setIsEditing(false);
     } catch (err: any) {
       setError(describeError(err, "Surat belum bisa ditulis ulang. Coba lagi."));
     } finally {
       setRegenerating(false);
     }
+  };
+
+  const regenerate = () => {
+    if (!application) return;
+    if (editedCoverLetter !== (application.cover_letter ?? "")) {
+      setConfirmRewrite(true);
+      return;
+    }
+    void performRegenerate();
   };
 
   const handleSaveEdit = async () => {
@@ -333,6 +344,11 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     } catch (err: any) {
       setError(describeError(err, "Perubahan belum tersimpan. Coba lagi."));
     }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedCoverLetter(application?.cover_letter ?? aiGenerated?.coverLetter ?? "");
+    setIsEditing(false);
   };
 
   const persistPendingEdit = async () => {
@@ -385,22 +401,6 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
     }
   };
 
-  // The user sent this application outside Applify; record it without any automated sending.
-  const handleMarkSentManually = async () => {
-    if (!application) return;
-    try {
-      setSubmitting(true);
-      await persistPendingEdit();
-      await aiApplicationService.submitApplication(application.id);
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      setError(describeError(err, "Lamaran belum bisa ditandai terkirim. Coba lagi."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // Fill-only run: the worker fills the external form and stops before Submit (no approval yet).
   const handleAutoApply = async () => {
     if (inFlight.current.enqueue) return; // klik ganda: satu tugas antrean saja
@@ -422,7 +422,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
 
   const tabs = [
     { key: "cover", label: "Surat Lamaran", icon: FileText },
-    { key: "cv", label: "CV Hasil AI", icon: Eye },
+    { key: "cv", label: "Saran Skill CV", icon: Eye },
     { key: "strategy", label: "Strategi AI", icon: Zap },
   ] as const;
 
@@ -764,7 +764,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setIsEditing(!isEditing)}
+                          onClick={isEditing ? handleCancelEdit : () => setIsEditing(true)}
                           className="min-h-11 px-3 rounded-lg border border-[#999999] text-sm font-medium hover:border-[#0A5BE0] transition flex items-center gap-1"
                         >
                           <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -781,6 +781,28 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                         </button>
                       </div>
                     </div>
+                    {confirmRewrite && (
+                      <div role="alert" className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-2">
+                        <p className="font-semibold">Kamu punya editan manual pada surat lamaran. Menulis ulang akan mengganti isi yang belum diajukan.</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { void performRegenerate(); }}
+                            disabled={regenerating}
+                            className="min-h-10 rounded-lg bg-[#0A5BE0] px-3 font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                          >
+                            Ya, tulis ulang
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRewrite(false)}
+                            className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {isEditing ? (
                       <div className="space-y-2">
                         <label htmlFor="apply-cover-edit" className="sr-only">Isi surat lamaran</label>
@@ -867,6 +889,14 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
 
         {/* Footer Actions */}
         <div className="p-5 border-t border-[#E0E0E0] space-y-3">
+          {error && application && (
+            <div role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{error}</span>
+              </p>
+            </div>
+          )}
           {approvalError && (
             <div role="alert" id="apply-approval-error" className="rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
               <p className="flex items-start gap-2">
@@ -929,22 +959,13 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
               </button>
             )}
           </div>
-          {editable && jobData?.external_url && !needsExtension && (
-            <p id="apply-fill-hint" className="text-xs text-muted-foreground">
-              "Isi Formulir Saja": agen membuka formulir lowongan dan mengisinya, lalu berhenti sebelum tombol kirim. Pantau di Lamaran Saya, bagian Antrean Agen.
-            </p>
-          )}
           {editable && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleMarkSentManually}
-                disabled={submitting}
-                className="min-h-11 px-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-[#16150F] hover:underline disabled:opacity-60"
-              >
-                {submitting ? "Menyimpan..." : "Sudah kukirim sendiri di luar Applify: tandai terkirim"}
-              </button>
-            </div>
+            <p id="apply-fill-hint" className="text-xs text-muted-foreground">
+              <strong className="font-semibold text-foreground">Ajukan ke Persetujuan</strong> untuk tinjau &amp; kirim lewat halaman Persetujuan.
+              {jobData?.external_url && !channelInfo.manualOnly && !needsExtension && (
+                <> Tombol <strong className="font-semibold text-foreground">Isi Formulir Saja</strong> hanya mengisi formulir di server lalu berhenti sebelum mengirim (pantau di Antrean Agen).</>
+              )}
+            </p>
           )}
         </div>
       </DialogContent>

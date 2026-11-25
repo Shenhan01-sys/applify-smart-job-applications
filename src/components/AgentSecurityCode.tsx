@@ -269,6 +269,9 @@ function CodeForm({
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {busy ? SECURITY_CODE_SENDING_LABEL : SECURITY_CODE_SEND_LABEL}
           </button>
+          {!busy && !check.ok && !showCheck && value.length > 0 && (
+            <p className="text-xs text-muted-foreground">{check.message}</p>
+          )}
         </form>
       )}
     </section>

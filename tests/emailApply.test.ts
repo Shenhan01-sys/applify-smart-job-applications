@@ -110,6 +110,17 @@ test("persetujuan yang sudah dipakai satu pengiriman: nonaktif", () => {
   assert.equal(s.block, "used");
 });
 
+test("agen terkunci atau belum terverifikasi: email ikut ditahan untuk cegah kirim ganda", () => {
+  for (const reason of ["locked_stuck", "submit_unverified"] as const) {
+    const s = getEmailApplyState(approval(), ctx({ agentBlockedReason: reason }));
+    assert.equal(s.visible, true);
+    assert.equal(s.enabled, false);
+    assert.equal(s.block, "agent_review");
+    assert.match(s.message ?? "", /terkirim ganda/);
+  }
+  assert.equal(getEmailApplyState(approval(), ctx({ agentBlockedReason: null })).enabled, true);
+});
+
 test("pekerjaan email yang menunggu atau berjalan: nonaktif (cegah klik ganda dan antrean ganda)", () => {
   for (const status of ["pending", "processing"]) {
     const s = getEmailApplyState(approval(), ctx({ job: { status } }));
@@ -234,9 +245,10 @@ test("kontrak: layar memakai addToQueue lewat /api/automation/queue dan tidak pe
 
 test("halaman Approvals: panel email hanya untuk baris berstatus approved", () => {
   const page = read("../src/routes/approvals.tsx");
-  assert.match(page, /\{approved && \(\s*<EmailApplyPanel/);
+  assert.match(page, /\{approved &&[\s\S]*?<EmailApplyPanel/);
+  assert.match(page, /agentBlockedReason=\{blockedByAgent\}/);
   const panel = read("../src/components/EmailApplyPanel.tsx");
-  assert.match(panel, /getEmailApplyState\(approval, \{ used, job, gmailConnected, applyEmail: email \}\)/);
+  assert.match(panel, /getEmailApplyState\(approval, \{ used, job, gmailConnected, applyEmail: email, agentBlockedReason \}\)/);
   assert.match(panel, /if \(!state\.visible\) return null/);
   assert.match(panel, /EMAIL_APPLY_EXPLANATION/);
 });

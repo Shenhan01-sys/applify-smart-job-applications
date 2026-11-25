@@ -239,7 +239,7 @@ test("kabel: halaman Persetujuan membagi tab lewat splitApprovalTabs dan memasan
   assert.doesNotMatch(page, /activeTab === 'history' && request\.status === 'approved'/);
   assert.doesNotMatch(page, /handleTabChange\('history'\)/);
   assert.match(page, /\{approved && \(\s*<AgentApplyStatus/);
-  assert.match(page, /\{approved && \(\s*<EmailApplyPanel/);
+  assert.match(page, /\{approved &&[\s\S]*?<EmailApplyPanel/);
 });
 
 test("kabel: toast izin ekstensi menyebut tab Menunggu, tempat kartunya berada", () => {

@@ -379,11 +379,14 @@ test("queueDisplayLabel: 'Selesai' hanya bila agen tidak mengaku gagal mengisi; 
 test("QueuePanel: tugas apply tanpa isian tampil kuning dengan ikon peringatan, bukan hijau", () => {
   const src = read("../src/components/QueuePanel.tsx");
   assert.match(src, /needs_manual: "bg-amber-100 text-amber-900 border-amber-300"/);
-  assert.match(src, /status === "needs_manual"\) return <AlertCircle/);
-  assert.match(src, /const shown = testMode \|\| isQueueNeedsManual\(q\.status, q\.job_type, fieldsFilled\) \? "needs_manual" : q\.status;/);
+  assert.match(src, /filled_only: "bg-amber-100 text-amber-900 border-amber-300"/);
+  assert.match(src, /status === "needs_manual" \|\| status === "filled_only"\) return <AlertCircle/);
+  assert.match(src, /const needsManual = isQueueNeedsManual\(q\.status, q\.job_type, fieldsFilled\);/);
+  assert.match(src, /const shown = testMode \|\| needsManual \? "needs_manual" : isFilledBeforeSubmit \? "filled_only" : q\.status;/);
   assert.match(src, /TONE\[shown\]/);
   assert.match(src, /<StatusIcon status=\{shown\} \/>/);
   assert.match(src, /queueDisplayLabel\(q\.status, q\.error_message, q\.job_type, fieldsFilled(, q\.email_test_mode)?\)/);
-  // warna hijau tetap hanya milik "completed" yang sungguh selesai
+  assert.match(src, /\(belum terkirim\)/);
+  // warna hijau tetap hanya milik "completed" yang sungguh selesai (non-apply / non-test-mode)
   assert.match(src, /completed: "bg-green-100 text-green-900 border-green-300"/);
 });

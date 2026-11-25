@@ -28,6 +28,8 @@ interface Props {
   plan?: AttachmentPlan | null;
   /** Lampiran yang tercatat pada email yang sudah terkirim. */
   sent?: SentAttachments | null;
+  /** Agen sedang locked_stuck atau submit_unverified: cegah kirim ganda lewat email sebelum dicek. */
+  agentBlockedReason?: "locked_stuck" | "submit_unverified" | null;
   /** Called after the backend accepted the job, so the parent can show it as queued. */
   onQueued: (approvalId: string) => void;
 }
@@ -37,7 +39,7 @@ interface Props {
  * (see getEmailApplyState). It shows the exact letter that will be sent, asks for the recruiter address,
  * and asks once more before it enqueues an email_apply job; the backend and worker enforce the rest.
  */
-export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, plan = null, sent = null, onQueued }: Props) {
+export default function EmailApplyPanel({ approval, gmailConnected, used, job, suggestions = [], testMode = false, plan = null, sent = null, agentBlockedReason = null, onQueued }: Props) {
   const { user } = useAuth();
   const uid = useId();
   const [open, setOpen] = useState(false);
@@ -60,7 +62,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, used, job, s
     }
   };
 
-  const state = getEmailApplyState(approval, { used, job, gmailConnected, applyEmail: email });
+  const state = getEmailApplyState(approval, { used, job, gmailConnected, applyEmail: email, agentBlockedReason });
   if (!state.visible) return null;
 
   const expires = approval.expires_at ? new Date(approval.expires_at) : null;

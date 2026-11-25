@@ -11,6 +11,7 @@ const TONE: Record<string, string> = {
   pending: "bg-amber-100 text-amber-900 border-amber-300",
   processing: "bg-blue-100 text-blue-900 border-blue-300",
   completed: "bg-green-100 text-green-900 border-green-300",
+  filled_only: "bg-amber-100 text-amber-900 border-amber-300",
   failed: "bg-red-100 text-red-900 border-red-300",
   // Tugas apply yang selesai tanpa mengisi apa pun (isQueueNeedsManual): bukan sukses, bukan galat. Kuning, sama
   // dengan lencana "Isi sendiri di situs" pada kartu lamaran.
@@ -18,7 +19,7 @@ const TONE: Record<string, string> = {
 };
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === "needs_manual") return <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />;
+  if (status === "needs_manual" || status === "filled_only") return <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />;
   if (status === "processing") return <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />;
   if (status === "completed") return <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />;
   if (status === "failed") return <XCircle className="h-3.5 w-3.5" aria-hidden="true" />;
@@ -98,7 +99,7 @@ export function QueuePanel({
         </button>
       </div>
       <p className="mt-0.5 text-sm text-muted-foreground">
-        Tugas yang kamu serahkan ke agen, misalnya mengisi formulir lowongan. Agen tidak menekan tombol kirim sendiri.
+        Tugas yang dijalankan agen, misalnya mengisi formulir lowongan. Pengisian tanpa persetujuan berhenti sebelum tombol kirim; untuk mengirim akhir, gunakan halaman Persetujuan.
       </p>
 
       {error && (
@@ -109,11 +110,15 @@ export function QueuePanel({
 
       <ul className="mt-3 space-y-2" aria-live="polite">
         {(items ?? []).map((q) => {
-          // Status yang tampil: "completed" milik tugas apply tanpa isian terisi tidak ditampilkan sebagai sukses.
+          // Status yang tampil: "completed" milik tugas apply tanpa isian terisi tidak ditampilkan sebagai sukses,
+          // dan tugas apply/extension_apply yang berhenti sebelum kirim memakai warna amber agar tidak dikira terkirim.
           const fieldsFilled = fieldsFilledByQueue?.[q.id];
           // Email yang tidak dikirim karena mode uji juga tidak tampil hijau.
           const testMode = isEmailTestMode(q.status, q.job_type, q.email_test_mode);
-          const shown = testMode || isQueueNeedsManual(q.status, q.job_type, fieldsFilled) ? "needs_manual" : q.status;
+          const needsManual = isQueueNeedsManual(q.status, q.job_type, fieldsFilled);
+          const isFilledBeforeSubmit =
+            q.status === "completed" && !needsManual && (q.job_type === "apply" || q.job_type === "extension_apply");
+          const shown = testMode || needsManual ? "needs_manual" : isFilledBeforeSubmit ? "filled_only" : q.status;
           return (
           <li key={q.id} className="rounded-xl border-2 border-[#E0E0E0] bg-[#F5F5F5] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -122,7 +127,7 @@ export function QueuePanel({
                 {q.job && <p className="truncate text-sm text-muted-foreground">{q.job.title} · {q.job.company}</p>}
               </div>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[shown] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}>
-                <StatusIcon status={shown} /> {queueDisplayLabel(q.status, q.error_message, q.job_type, fieldsFilled, q.email_test_mode)}
+                <StatusIcon status={shown} /> {queueDisplayLabel(q.status, q.error_message, q.job_type, fieldsFilled, q.email_test_mode)}{isFilledBeforeSubmit ? " (belum terkirim)" : ""}
               </span>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">

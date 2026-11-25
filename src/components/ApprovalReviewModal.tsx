@@ -42,6 +42,13 @@ interface ApprovalReviewModalProps {
   onRejected: () => void
 }
 
+const REJECT_PRESETS = [
+  "Posisi kurang cocok",
+  "Gaji belum sesuai",
+  "Lokasi atau model kerja tidak cocok",
+  "Butuh skill yang belum kupunya",
+] as const;
+
 export default function ApprovalReviewModal({
   request,
   open,
@@ -57,8 +64,17 @@ export default function ApprovalReviewModal({
   const [isEditing, setIsEditing] = useState(false)
   // Peringatan dari penjaga mutu backend setelah "Tulis ulang": angka yang tidak ada di surat asli.
   const [regenWarnings, setRegenWarnings] = useState<string[]>([])
+  const [now, setNow] = useState(() => Date.now())
 
-  const timeRemaining = new Date(request.expires_at).getTime() - Date.now()
+  useEffect(() => {
+    if (!open) return
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000)
+    return () => window.clearInterval(timer)
+  }, [open, request.expires_at])
+
+  const timeRemaining = new Date(request.expires_at).getTime() - now
+  const isExpired = Number.isFinite(timeRemaining) && timeRemaining <= 0
   const isExpiringSoon = timeRemaining < 15 * 60 * 1000 // 15 minutes
   const minutesLeft = Math.max(0, Math.round(timeRemaining / 60000))
   const timeLeft = minutesLeft >= 120
@@ -144,13 +160,13 @@ export default function ApprovalReviewModal({
             <DialogTitle className="font-display text-2xl text-[#16150F]">Persetujuan Lamaran</DialogTitle>
             <span
               className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border-2 px-2.5 py-1 text-xs font-semibold ${
-                isExpiringSoon
+                isExpired || isExpiringSoon
                   ? 'border-red-300 bg-red-50 text-red-700'
                   : 'border-[#16150F]/15 bg-[#F4F1E8] text-[#16150F]'
               }`}
             >
               <Clock className="h-3 w-3" />
-              <span className="font-mono">{timeLeft.value}</span> {timeLeft.unit} lagi
+              {isExpired ? 'Sudah kedaluwarsa' : <><span className="font-mono">{timeLeft.value}</span> {timeLeft.unit} lagi</>}
             </span>
           </div>
           <DialogDescription className="text-sm text-[#16150F]/70">
@@ -324,8 +340,24 @@ export default function ApprovalReviewModal({
                 Kenapa ditolak? <span className="text-xs font-normal">(wajib diisi)</span>
               </h4>
               <p className="mb-2 text-xs text-red-700">
-                Alasanmu disimpan di riwayat persetujuan. Belum dipakai untuk mengubah hasil AI secara otomatis.
+                Alasanmu disimpan di riwayat persetujuan sebagai catatan keputusanmu.
               </p>
+              <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Pilihan alasan cepat">
+                {REJECT_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectReason(preset)}
+                    className={`min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                      rejectReason === preset
+                        ? 'border-red-600 bg-red-600 text-white'
+                        : 'border-red-200 bg-white text-red-800 hover:border-red-400'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <textarea
                 ref={rejectReasonRef}
                 aria-labelledby="reject-reason-label"
@@ -365,12 +397,12 @@ export default function ApprovalReviewModal({
                 </button>
                 <button
                   onClick={handleApprove}
-                  disabled={loading}
+                  disabled={loading || isExpired}
                   className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:hover:translate-y-0"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4 text-[#D2F801]" />}
-                  <span className="sm:hidden">Setujui</span>
-                  <span className="hidden sm:inline">Setujui &amp; Masukkan Antrean</span>
+                  <span className="sm:hidden">{isExpired ? 'Kedaluwarsa' : 'Setujui'}</span>
+                  <span className="hidden sm:inline">{isExpired ? 'Masa Berlaku Habis' : 'Setujui & Masukkan Antrean'}</span>
                 </button>
               </>
             ) : (

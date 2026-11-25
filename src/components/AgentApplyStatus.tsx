@@ -40,14 +40,20 @@ function ToneIcon({ tone }: { tone: AgentApplyTone }) {
 export default function AgentApplyStatus({
   row,
   jobUrl,
+  consentShown = false,
 }: {
   row: AgentApplyRow | null | undefined;
   jobUrl?: string | null;
+  consentShown?: boolean;
 }) {
   const view = describeAgentApply(row);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
   const showHint = !!view.hint && manualSubmitState(row)?.kind !== "not_allowed";
+  const effectiveHint =
+    consentShown && row?.reason === "auth_required"
+      ? "Situs ini mewajibkan akun pelamar. Klik Izinkan pada kartu Ekstensi Browser di bawah untuk membuka tab masuk."
+      : view.hint;
   // Hanya log Ekstensi Browser yang mencatat berkas terpasang (details.documents_attached). Hanya jenisnya, tanpa nama atau jalur berkas.
   const documents = row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
   const openLoginUrl = awaitingLoginState(row).waiting ? resolveLoginTabUrl(row, jobUrl) : null;
@@ -67,10 +73,10 @@ export default function AgentApplyStatus({
           data-wait-reason={view.waitReason}
           className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
         >
-          {view.hint}
+          {effectiveHint}
         </p>
       )}
-      {showHint && !view.waitReason && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{view.hint}</p>}
+      {showHint && !view.waitReason && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{effectiveHint}</p>}
       {awaitingLoginState(row).waiting && (
         <div className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2" data-testid="login-tab-guide">
           <p className="text-xs leading-relaxed text-amber-900">{LOGIN_TAB_INSTRUCTION}</p>

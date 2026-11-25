@@ -333,6 +333,7 @@ test("kabel: layanan membaca log manual lama dan alamat lowongan, dan memuat cov
 
 test("tombol tandai terkirim sendiri sudah tidak ada di layar, komponen, layanan, atau klien API", () => {
   const files = [
+    "../src/components/AIApplyModal.tsx",
     "../src/components/AgentManualSubmit.tsx",
     "../src/routes/approvals.tsx",
     "../src/routes/applications.tsx",

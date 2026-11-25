@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
 /**
@@ -63,6 +63,20 @@ function UjiPortalPage() {
         <p className="mt-3 text-sm text-muted-foreground">
           Ini Portal Uji Applify, bukan lowongan sungguhan. Tidak ada data yang disimpan atau diteruskan ke perusahaan.
         </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to="/applications"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0A5BE0] px-5 text-sm font-semibold text-white hover:opacity-90 transition"
+          >
+            Kembali ke Lamaran Saya
+          </Link>
+          <Link
+            to="/approvals"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-black/15 bg-white px-5 text-sm font-semibold hover:bg-black/[3%] transition"
+          >
+            Buka Persetujuan
+          </Link>
+        </div>
       </main>
     );
   }

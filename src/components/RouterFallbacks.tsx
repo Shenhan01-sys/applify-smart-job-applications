@@ -34,6 +34,12 @@ export function DefaultErrorComponent({ error, reset }: { error: Error; reset: (
             Coba lagi
           </button>
           <a
+            href="/dashboard"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Ke Dashboard
+          </a>
+          <a
             href="/"
             className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
