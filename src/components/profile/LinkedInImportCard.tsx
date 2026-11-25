@@ -41,6 +41,8 @@ import {
 
 interface Props {
   userId: string;
+  /** Opsi kedua di bawah kartu unggah CV: judul dan tampilan lebih ringkas, supaya tidak tumpang tindih dengan unggah CV. */
+  secondary?: boolean;
   /** Isi profil saat ini, untuk mendeteksi duplikat. */
   existing: ExistingProfile;
   /** Terisi bila impor sebaiknya tidak dipakai dulu (mis. profil belum termuat penuh, duplikat tidak bisa dicek). */
@@ -76,7 +78,7 @@ const btnBase = "min-h-11 px-4 rounded-lg border-2 text-sm font-medium inline-fl
 // Kartu ini hidup di luar stepper, jadi tampil di semua langkah. PDF dikirim ke server hanya untuk dibaca; tidak
 // ada yang ditulis sebelum pengguna mencentang item di dialog pratinjau dan menekan "Tambahkan ke profil".
 // Alur yang sama dipakai saat CV diunggah di kartu CV untuk Dilampirkan (startFromCv).
-const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function LinkedInImportCard({ userId, existing, disabledReason, onImported }, ref) {
+const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function LinkedInImportCard({ userId, secondary = false, existing, disabledReason, onImported }, ref) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [source, setSource] = useState<ImportSource>("card");
   const [error, setError] = useState("");
@@ -214,18 +216,20 @@ const LinkedInImportCard = forwardRef<LinkedInImportHandle, Props>(function Link
   const spinner = <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />;
 
   return (
-    <section aria-labelledby="li-import-heading" className="glass mb-6 rounded-2xl p-5 md:p-6">
+    <section aria-labelledby="li-import-heading" className={secondary ? "mb-6 rounded-2xl border-2 border-dashed border-black/[12%] bg-black/[2%] p-4" : "glass mb-6 rounded-2xl p-5 md:p-6"}>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <h2 id="li-import-heading" ref={heading} tabIndex={-1} className="font-semibold flex items-center gap-2 focus:outline-none">
-            <FileUp className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> Impor dari PDF LinkedIn
+          <h2 id="li-import-heading" ref={heading} tabIndex={-1} className={`${secondary ? "text-sm " : ""}font-semibold flex items-center gap-2 focus:outline-none`}>
+            <FileUp className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> {secondary ? "Opsi lain: " : ""}Impor dari PDF LinkedIn
           </h2>
           <p id="li-import-hint" className="mt-1 text-sm text-muted-foreground">{LINKEDIN_PDF_HINT}</p>
           <p className="mt-1 text-xs text-muted-foreground">{LINKEDIN_PDF_PRIVACY}</p>
           <p id="li-import-cv-note" className="mt-1 text-xs text-muted-foreground" data-testid="li-import-cv-note">{LINKEDIN_PDF_CV_NOTE}</p>
-          <p className="mt-1 text-xs">
-            <a href="#resume-section" className="font-semibold text-[#0A5BE0] underline underline-offset-2">Punya CV biasa? Unggah di kartu CV untuk Dilampirkan</a>
-          </p>
+          {!secondary && (
+            <p className="mt-1 text-xs">
+              <a href="#resume-section" className="font-semibold text-[#0A5BE0] underline underline-offset-2">Punya CV biasa? Unggah di kartu CV untuk Dilampirkan</a>
+            </p>
+          )}
         </div>
 
         <div className="shrink-0" aria-busy={reading}>

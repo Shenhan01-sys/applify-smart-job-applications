@@ -709,6 +709,36 @@ export interface ProfileGapsInput {
 }
 
 /**
+ * Pesan saat menyimpan entri profil (pengalaman, pendidikan, skill, penghargaan) gagal: sebab yang mungkin dan langkah
+ * berikutnya. Isian di formulir tidak hilang, jadi pengguna cukup menekan Simpan lagi.
+ */
+export function saveFailureMessage(err: unknown): string {
+  const detail = typeof (err as { message?: unknown } | null)?.message === "string" ? String((err as { message: string }).message).trim().replace(/[.\s]+$/, "") : "";
+  const next = "Isianmu masih ada di formulir ini. Periksa koneksi internetmu, lalu tekan Simpan lagi.";
+  if (detail) return `Belum tersimpan: ${detail}. ${next}`;
+  return `Belum tersimpan. Koneksimu mungkin terputus atau server sedang sibuk. ${next}`;
+}
+
+/** Kolom jabatan di langkah 1: wajib untuk draf AI (lihat `applyBlockers` di onboarding.ts), tetapi lulusan baru boleh menulis bidang yang dituju. */
+export const TITLE_FIELD_LABEL = "Jabatan terakhir atau bidang yang kamu tuju";
+export const TITLE_FIELD_PLACEHOLDER = "Contoh: Fresh graduate Akuntansi atau Staf Admin";
+export const TITLE_FIELD_HINT = "Wajib diisi sebelum membuat draf lamaran AI. Lulusan baru boleh menulis bidang yang dituju. Dipakai juga sebagai target pencarian lowongan.";
+export const TITLE_MISSING_MESSAGE = "Jabatan terakhir atau bidang yang kamu tuju belum diisi.";
+
+/**
+ * Keterangan di atas tombol Simpan footer. Tombol itu menyimpan data dasar dan preferensi; pengalaman, pendidikan, skill,
+ * dan penghargaan tersimpan sendiri lewat tombol di kartunya.
+ */
+export function saveHintFor(step: number): string {
+  if (step === 2 || step === 3) {
+    return "Pengalaman, pendidikan, skill, dan penghargaan tersimpan lewat tombol Simpan di kartunya. Tombol Simpan di bawah menyimpan data dasar dan preferensi.";
+  }
+  if (step === 4) return "Langkah ini opsional. Kamu boleh langsung lanjut tanpa mengisi preferensi.";
+  if (step === 5) return "Simpan & Selesai menyimpan data dasar dan preferensi, lalu menunjukkan langkah berikutnya.";
+  return "Tombol Simpan menyimpan data dasar dan preferensi. Kamu bisa lanjut dulu dan menyimpan di akhir.";
+}
+
+/**
  * What the review step tells the user. `missing` blocks "Profil siap" (the draft prompt always uses name,
  * title and skills); `tips` never blocks: a fresh graduate may have no work experience.
  */
@@ -716,7 +746,7 @@ export function profileGaps(p: ProfileGapsInput): { missing: string[]; tips: str
   const missing: string[] = [];
   const tips: string[] = [];
   if (!trim(p.full_name)) missing.push("Nama lengkap belum diisi.");
-  if (!trim(p.current_title)) missing.push("Posisi atau jabatan belum diisi.");
+  if (!trim(p.current_title)) missing.push(TITLE_MISSING_MESSAGE);
   if (p.skills === 0) missing.push("Belum ada skill. Draf lamaran memakai daftar skill.");
   if (p.experiences === 0) tips.push("Belum ada pengalaman kerja. Boleh dikosongkan bila belum pernah bekerja; magang atau kerja paruh waktu tetap membantu.");
   if (p.education === 0) tips.push("Belum ada riwayat pendidikan. CV hasil AI memakainya.");
