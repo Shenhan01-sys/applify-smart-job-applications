@@ -184,7 +184,7 @@ function PaymentSuccessPage() {
             </li>
             <li className="flex items-start gap-2.5">
               <span className="mt-0.5 h-5 w-5 rounded-full bg-[#0A5BE0] text-white text-xs font-bold grid place-items-center shrink-0">3</span>
-              <span>Pantau status lamaran di tab <span className="font-semibold text-foreground">Applications</span>. Pengingat follow-up dikirim lewat Telegram bila notifikasi Telegram aktif.</span>
+              <span>Pantau status lamaran di halaman <Link to="/applications" className="font-semibold text-[#0A5BE0] hover:underline">Lamaran Saya</Link> atau tinjau pengajuan kirim di <Link to="/approvals" className="font-semibold text-[#0A5BE0] hover:underline">Persetujuan</Link>.</span>
             </li>
           </ol>
         </div>

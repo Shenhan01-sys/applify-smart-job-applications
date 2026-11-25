@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { describeAuthError } from "@/lib/authErrors";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({ meta: [{ title: "Kata Sandi Baru — Applify" }] }),
@@ -15,6 +15,8 @@ function ResetPasswordPage() {
   const [state, setState] = useState<"checking" | "ready" | "invalid">("checking");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -85,16 +87,34 @@ function ResetPasswordPage() {
                 <label htmlFor="new-password" className="block text-sm font-medium mb-1.5">Kata sandi baru</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <input id="new-password" name="password" type="password" autoComplete="new-password" minLength={6} required
-                    value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 6 karakter" className={inputClass} />
+                  <input id="new-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required
+                    value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 6 karakter" className={`${inputClass} pr-12`} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Sembunyikan kata sandi baru" : "Tampilkan kata sandi baru"}
+                    aria-pressed={showPassword}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
                 </div>
               </div>
               <div>
                 <label htmlFor="confirm-password" className="block text-sm font-medium mb-1.5">Ulangi kata sandi baru</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <input id="confirm-password" name="confirm" type="password" autoComplete="new-password" minLength={6} required
-                    value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Ketik sekali lagi" className={inputClass} />
+                  <input id="confirm-password" name="confirm" type={showConfirm ? "text" : "password"} autoComplete="new-password" minLength={6} required
+                    value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Ketik sekali lagi" className={`${inputClass} pr-12`} />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((v) => !v)}
+                    aria-label={showConfirm ? "Sembunyikan ulangan kata sandi" : "Tampilkan ulangan kata sandi"}
+                    aria-pressed={showConfirm}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
                 </div>
               </div>
               {error && (
@@ -109,9 +129,17 @@ function ResetPasswordPage() {
           )}
 
           {done && (
-            <p role="status" className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
-              Kata sandi sudah diganti. Kamu akan dibawa ke dashboard.
-            </p>
+            <div className="space-y-4">
+              <p role="status" className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
+                Kata sandi sudah diganti. Kamu akan dibawa ke dashboard.
+              </p>
+              <Link
+                to="/dashboard"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition"
+              >
+                Buka Dashboard sekarang
+              </Link>
+            </div>
           )}
         </div>
       </div>

@@ -401,6 +401,19 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+function cleanJobDescription(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Ids whose full detail was already requested in this page load; a card used on its own gets this fallback. */
 const DETAIL_ATTEMPTS_FALLBACK = new Set<string>();
 
@@ -426,6 +439,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   detailAttempts?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showAllRequirements, setShowAllRequirements] = useState(false);
   const [detail, setDetail] = useState<DetailState>({ phase: "idle" });
   const [detailRetry, setDetailRetry] = useState(0);
   const [bench, setBench] = useState<BenchmarkState>({ phase: "idle" });
@@ -513,6 +527,10 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   const skillGaps = listOrEmpty<SkillGap>(job.skill_gaps);
   const aiActions = listOrEmpty<AIAction>(job.ai_actions);
   const requirements = listOrEmpty<string>(job.requirements);
+  const responsibilities = listOrEmpty<string>(job.responsibilities);
+  const benefits = listOrEmpty<string>(job.benefits);
+  const cleanedDescription = cleanJobDescription(job.description);
+  const visibleRequirements = showAllRequirements ? requirements : requirements.slice(0, 4);
   // The score is per user (skills in the profile against skills the posting names), never jobs.match_score, which is
   // one global number. Acceptance, culture and growth scores are not shown: no flow measures them for anyone.
   const matchScore = match?.score ?? null;
@@ -531,7 +549,7 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
               {matchScore !== null && matchScore >= HIGH_MATCH_THRESHOLD && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-[#D2F801] text-[#16150F] px-2 py-0.5 rounded-full font-semibold">
                   <Sparkles className="h-3 w-3" aria-hidden="true" />
-                  {JOB_LABELS.card.matchBadge}
+                  {isProvisionalMatch(job) ? "Cocok (perkiraan)" : JOB_LABELS.card.matchBadge}
                 </span>
               )}
             </div>
@@ -681,6 +699,45 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
             </p>
           )}
 
+          {/* Ringkasan & detail lowongan */}
+          {(cleanedDescription || responsibilities.length > 0 || benefits.length > 0) && (
+            <div className="space-y-4">
+              {cleanedDescription && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1.5">Deskripsi Pekerjaan</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {cleanedDescription}
+                  </p>
+                </div>
+              )}
+              {responsibilities.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1.5">Tanggung Jawab</h4>
+                  <ul className="space-y-1">
+                    {responsibilities.map((item, i) => (
+                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#0A5BE0] shrink-0" aria-hidden="true" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {benefits.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1.5">Benefit &amp; Fasilitas</h4>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {benefits.map((b, i) => (
+                      <li key={i} className="text-xs rounded-full border border-[#E0E0E0] bg-[#F5F5F5] px-2.5 py-1 text-[#16150F]">
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* AI Strategy */}
           {job.ai_strategy && (
             <div className="rounded-xl bg-[#0A5BE0]/5 border border-[#0A5BE0]/20 p-4">
@@ -815,13 +872,22 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
             <div>
               <h4 className="text-sm font-semibold mb-2">{JOB_LABELS.card.requirements}</h4>
               <ul className="space-y-1.5">
-                {requirements.slice(0, 4).map((req, i) => (
+                {visibleRequirements.map((req, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5 text-[#0A5BE0] mt-0.5 shrink-0" />
                     {req}
                   </li>
                 ))}
               </ul>
+              {requirements.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRequirements((v) => !v)}
+                  className="mt-2 min-h-11 inline-flex items-center text-xs font-semibold text-[#0A5BE0] hover:underline"
+                >
+                  {showAllRequirements ? "Tampilkan lebih sedikit" : `Lihat semua persyaratan (${requirements.length})`}
+                </button>
+              )}
             </div>
           )}
         </div>

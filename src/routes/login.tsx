@@ -60,6 +60,8 @@ function LoginPage() {
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendNote, setResendNote] = useState("");
   // Mencegah dua navigasi sekaligus: efek "sudah masuk" dan hasil kirim formulir bisa terjadi hampir bersamaan.
   const routing = useRef(false);
 
@@ -69,7 +71,28 @@ function LoginPage() {
     setIsSignUp(mode === "daftar");
     setError("");
     setSuccessMsg("");
+    setResendNote("");
   }, [mode]);
+
+  const handleResendVerification = async () => {
+    if (resendBusy || !email.trim()) return;
+    setResendBusy(true);
+    setResendNote("");
+    setError("");
+    try {
+      const { error: err } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: { emailRedirectTo: window.location.origin + "/auth/callback" },
+      });
+      if (err) throw err;
+      setResendNote("Email verifikasi baru sudah dikirim. Cek inbox dan folder spam.");
+    } catch (err: any) {
+      setError(describeAuthError(err, "Belum bisa mengirim ulang email verifikasi. Tunggu sebentar lalu coba lagi."));
+    } finally {
+      setResendBusy(false);
+    }
+  };
 
   // Setelah masuk: profil kosong ke /profile dengan banner sambutan, selain itu ke /dashboard.
   const goAfterLogin = async (userId: string) => {
@@ -190,6 +213,27 @@ function LoginPage() {
         </div>
 
         <div className="glass rounded-3xl p-6 sm:p-8">
+          <div role="tablist" aria-label="Pilih mode autentikasi" className="mb-5 grid grid-cols-2 gap-1.5 rounded-xl bg-black/[5%] p-1">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!isSignUp}
+              onClick={() => { setIsSignUp(false); setError(""); setSuccessMsg(""); setResendNote(""); }}
+              className={`min-h-11 rounded-lg text-sm font-semibold transition ${!isSignUp ? "bg-white text-[#16150F] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Masuk
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isSignUp}
+              onClick={() => { setIsSignUp(true); setError(""); setSuccessMsg(""); setResendNote(""); }}
+              className={`min-h-11 rounded-lg text-sm font-semibold transition ${isSignUp ? "bg-white text-[#16150F] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Daftar
+            </button>
+          </div>
+
           {/* Google OAuth Button */}
           <button
             type="button"
@@ -218,6 +262,9 @@ function LoginPage() {
             )}
             {isSignUp ? "Daftar dengan LinkedIn" : "Masuk dengan LinkedIn"}
           </button>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            LinkedIn hanya mengambil identitas akun; impor pengalaman &amp; skill dilakukan lewat PDF di halaman Profil.
+          </p>
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -286,26 +333,45 @@ function LoginPage() {
                 {error}
               </div>
             )}
-            {successMsg && (
-              <div role="status" className="rounded-xl bg-teal/10 border-2 border-teal/20 p-3 text-sm text-primary">
-                {successMsg}
+            {successMsg ? (
+              <div role="status" className="rounded-xl bg-teal/10 border-2 border-teal/20 p-4 text-sm text-[#16150F] space-y-3">
+                <p>{successMsg}</p>
+                {resendNote && <p className="text-xs font-medium text-[#1C9656]">{resendNote}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendBusy}
+                    className="min-h-11 px-4 rounded-xl bg-[#0A5BE0] text-white text-xs font-semibold hover:opacity-90 transition disabled:opacity-60 inline-flex items-center gap-1.5"
+                  >
+                    {resendBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    Kirim ulang email verifikasi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSuccessMsg(""); setResendNote(""); setError(""); }}
+                    className="min-h-11 px-4 rounded-xl border-2 border-border bg-white text-xs font-semibold hover:bg-black/[3%] transition"
+                  >
+                    Ganti email
+                  </button>
+                </div>
               </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full min-h-12 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isSignUp ? "Daftar Sekarang" : "Masuk"}
+              </button>
             )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full min-h-12 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-              {isSignUp ? "Daftar Sekarang" : "Masuk"}
-            </button>
           </form>
 
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccessMsg(""); }}
+              onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccessMsg(""); setResendNote(""); }}
               className="min-h-11 px-3 text-sm text-primary hover:underline"
             >
               {isSignUp ? "Sudah punya akun? Masuk" : "Belum punya akun? Daftar"}
@@ -314,8 +380,9 @@ function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Dengan masuk atau mendaftar, kamu menyetujui <Link to="/terms" className="underline hover:text-foreground">Ketentuan &amp; Privasi</Link> Applify.
-          {" "}Baca juga <Link to="/privacy" className="underline hover:text-foreground">Kebijakan Privasi</Link>.
+          Dengan masuk atau mendaftar, kamu menyetujui{" "}
+          <Link to="/terms" className="underline hover:text-foreground">Ketentuan Layanan</Link>{" "}
+          dan <Link to="/privacy" className="underline hover:text-foreground">Kebijakan Privasi</Link> Applify.
         </p>
       </div>
     </div>

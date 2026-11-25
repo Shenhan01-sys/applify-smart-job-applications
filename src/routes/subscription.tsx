@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-ro
 import { isBillingEnabled } from "@/lib/appConfig";
 import { Check, Sparkles, ArrowRight, ArrowLeft, Building2, GraduationCap, Zap, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
 import { PLAN_PRICE, type PlanTier } from "@/lib/subscriptionStore";
@@ -69,9 +70,14 @@ function SubscriptionPage() {
   const current = useSubscription();
   const navigate = useNavigate();
   const [busyTier, setBusyTier] = useState<PlanTier | null>(null);
+  const [kampusOpen, setKampusOpen] = useState(false);
 
   const onSelect = async (tier: PlanTier) => {
     if (tier === current.tier) return;
+    if (tier === "kampus") {
+      setKampusOpen(true);
+      return;
+    }
     setBusyTier(tier);
     if (tier === "free") {
       navigate({ to: "/dashboard" });
@@ -217,7 +223,7 @@ function SubscriptionPage() {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground max-w-2xl mx-auto">
-          Harga final mengikuti proposal bisnis · margin kontribusi Pro 91% · BEP ±159 pengguna Pro/bulan.
+          Harga final transparan sesuai paket yang dipilih.
           {" "}Pembayaran diproses secara aman via <span className="font-semibold">Midtrans Snap</span> (rencana integrasi).
         </p>
       </section>
@@ -241,6 +247,35 @@ function SubscriptionPage() {
           </div>
         </div>
       </section>
+
+      <Dialog open={kampusOpen} onOpenChange={setKampusOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" />
+              Kemitraan Paket Kampus (B2B2C)
+            </DialogTitle>
+            <DialogDescription>
+              Lisensi kampus tidak dibeli lewat e-wallet satuan. Daftarkan minat kampusmu atau hubungi tim Applify untuk onboarding, co-branding, dan pelaporan penempatan kerja mahasiswa.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setKampusOpen(false)}
+              className="min-h-11 rounded-xl border-2 border-[#999999] px-4 text-sm font-semibold hover:bg-black/[4%] transition"
+            >
+              Tutup
+            </button>
+            <Link
+              to="/waitinglist"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
+            >
+              Ajukan Kemitraan
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

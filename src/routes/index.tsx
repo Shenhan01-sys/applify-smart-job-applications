@@ -202,7 +202,11 @@ function Navbar({ authLink }: { authLink: string }) {
               <Link to={authLink} className="hidden md:inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground hover:text-foreground">
                 <LogIn className="h-3.5 w-3.5" /> Masuk
               </Link>
-              <Link to={authLink} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#16150F] px-4 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition">
+              <Link
+                to={authLink}
+                search={authLink === "/login" ? { mode: "daftar" } : undefined}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#16150F] px-4 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
+              >
                 <UserPlus className="h-3.5 w-3.5" /> Daftar Gratis
               </Link>
             </>
@@ -238,7 +242,11 @@ function Hero({ authLink }: { authLink: string }) {
             Apply Smarter. <span className="text-[#0A5BE0]">Fairer.</span> Together.
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to={authLink} className="inline-flex h-12 items-center rounded-xl bg-[#16150F] px-6 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition">
+            <Link
+              to={authLink}
+              search={authLink === "/login" ? { mode: "daftar" } : undefined}
+              className="inline-flex h-12 items-center rounded-xl bg-[#16150F] px-6 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
+            >
               Aktifkan Agen Gratis <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <a href="#cara-kerja" className="inline-flex h-12 items-center rounded-xl border-2 border-[color:var(--border)] bg-white px-6 text-sm font-semibold hover:bg-black/[3%] transition">
@@ -1278,7 +1286,11 @@ function GreenCareerSpotlight({ authLink }: { authLink: string }) {
                   </span>
                 ))}
               </div>
-              <Link to={authLink} className="mt-8 inline-flex h-11 items-center rounded-xl bg-[#D2F801] px-6 text-sm font-semibold text-[#16150F] hover:opacity-90 transition">
+              <Link
+                to={authLink}
+                search={authLink === "/login" ? { mode: "daftar" } : undefined}
+                className="mt-8 inline-flex h-11 items-center rounded-xl bg-[#D2F801] px-6 text-sm font-semibold text-[#16150F] hover:opacity-90 transition"
+              >
                 Jelajahi Green Career <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
@@ -1388,13 +1400,16 @@ function Pricing({ authLink }: { authLink: string }) {
                   </li>
                 ))}
               </ul>
-              <Link to="/subscription" className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}>
+              <Link
+                to={t.name === "Kampus" ? "/waitinglist" : "/subscription"}
+                className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}
+              >
                 {t.name === "Free" ? "Mulai Gratis" : t.name === "Kampus" ? "Hubungi Kami" : "Pilih Paket"}
               </Link>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-center text-xs text-muted-foreground">Harga final mengikuti proposal bisnis · margin kontribusi Pro 91% · BEP ±159 pengguna Pro/bulan.</p>
+        <p className="mt-6 text-center text-xs text-muted-foreground">Harga transparan sesuai paket yang dipilih · tanpa biaya tersembunyi.</p>
       </section>
     </ScrollReveal>
   );
@@ -1448,7 +1463,11 @@ function FinalCTA({ authLink }: { authLink: string }) {
               Sudah saatnya AI bekerja untuk <span className="text-[#D2F801]">kariermu.</span>
             </h2>
             <p className="mt-4 text-[#C9C4B2] max-w-xl mx-auto">Gabung 12.400+ pencari kerja Indonesia yang sudah membiarkan agen melakukan kerja berat.</p>
-            <Link to={authLink} className="mt-8 inline-flex h-14 items-center rounded-2xl bg-[#D2F801] px-8 text-base font-semibold text-[#16150F] hover:opacity-90 transition">
+            <Link
+              to={authLink}
+              search={authLink === "/login" ? { mode: "daftar" } : undefined}
+              className="mt-8 inline-flex h-14 items-center rounded-2xl bg-[#D2F801] px-8 text-base font-semibold text-[#16150F] hover:opacity-90 transition"
+            >
               Aktifkan Agen Sekarang <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </div>
@@ -1472,14 +1491,45 @@ function Footer() {
           <p className="mt-3 text-sm text-muted-foreground max-w-xs">Agen AI Otonom untuk akses kerja yang setara. Apply Smarter. Fairer. Together.</p>
         </div>
         {[
-          { h: "Produk", l: ["Fitur", "Harga", "Green Career", "Roadmap"] },
-          { h: "Perusahaan", l: ["Tentang", "Dampak & SDG", "Blog", "Kontak"] },
-          { h: "Sosial", l: ["Twitter", "LinkedIn", "Instagram", "Discord"] },
+          {
+            h: "Produk",
+            l: [
+              { label: "Fitur", href: "#fitur" },
+              { label: "Cara Kerja", href: "#cara-kerja" },
+              { label: "Harga", href: "#harga" },
+              { label: "Green Career", to: "/green-career" as const },
+            ],
+          },
+          {
+            h: "Perusahaan",
+            l: [
+              { label: "Tentang", href: "#tentang" },
+              { label: "Dampak & SDG", href: "#dampak" },
+              { label: "Ketentuan", to: "/terms" as const },
+              { label: "Kebijakan Privasi", to: "/privacy" as const },
+            ],
+          },
+          {
+            h: "Akses",
+            l: [
+              { label: "Masuk", to: "/login" as const },
+              { label: "Daftar Gratis", to: "/login" as const, search: { mode: "daftar" as const } },
+              { label: "Daftar Tunggu", to: "/waitinglist" as const },
+            ],
+          },
         ].map((c) => (
           <div key={c.h}>
             <p className="text-sm font-display font-bold mb-3">{c.h}</p>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              {c.l.map((x) => <li key={x}><a className="hover:text-foreground transition" href="#">{x}</a></li>)}
+              {c.l.map((x) => (
+                <li key={x.label}>
+                  {"href" in x ? (
+                    <a className="hover:text-foreground transition" href={x.href}>{x.label}</a>
+                  ) : (
+                    <Link className="hover:text-foreground transition" to={x.to} search={"search" in x ? x.search : undefined}>{x.label}</Link>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         ))}
@@ -1493,7 +1543,13 @@ function MobileStickyBar({ authLink }: { authLink: string }) {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong px-4 py-3 flex gap-2">
       <Link to={authLink} className="flex-1 h-11 rounded-xl border-2 border-[color:var(--border)] bg-white grid place-items-center text-sm font-semibold hover:bg-black/[3%] transition">Masuk</Link>
-      <Link to={authLink} className="flex-[2] h-11 rounded-xl bg-[#16150F] grid place-items-center text-sm font-semibold text-[#F4F1E8] hover:bg-black transition">Aktifkan Agen Gratis</Link>
+      <Link
+        to={authLink}
+        search={authLink === "/login" ? { mode: "daftar" } : undefined}
+        className="flex-[2] h-11 rounded-xl bg-[#16150F] grid place-items-center text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
+      >
+        Aktifkan Agen Gratis
+      </Link>
     </div>
   );
 }

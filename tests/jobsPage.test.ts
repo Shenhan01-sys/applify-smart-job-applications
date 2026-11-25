@@ -84,3 +84,38 @@ test("waitinglist: tanpa janji bonus atau kuota karangan, label terhubung ke kol
   assert.match(src, /role="radiogroup"/);
   // WaitinglistPopup dipulihkan bersama landing page desain asli (keputusan Hans 2026-11-19).
 });
+
+test("UX Wave 2: beranda ke mode daftar, kampus tidak ke payment, dan JobCard menampilkan detail lowongan", () => {
+  const landing = read("../src/routes/index.tsx");
+  assert.doesNotMatch(landing, /margin kontribusi Pro 91%|href="#"/);
+  assert.match(landing, /search=\{authLink === "\/login" \? \{ mode: "daftar" \} : undefined\}/);
+
+  const sub = read("../src/routes/subscription.tsx");
+  assert.match(sub, /if \(tier === "kampus"\) \{\s*setKampusOpen\(true\)/);
+  assert.doesNotMatch(sub, /margin kontribusi Pro 91%/);
+
+  const success = read("../src/routes/payment.success.tsx");
+  assert.doesNotMatch(success, /tab <span[^>]*>Applications<\/span>|dikirim lewat Telegram/);
+
+  const login = read("../src/routes/login.tsx");
+  assert.match(login, /role="tablist"/);
+  assert.match(login, /supabase\.auth\.resend\(/);
+
+  const reset = read("../src/routes/reset-password.tsx");
+  assert.match(reset, /showPassword/);
+  assert.match(reset, /to="\/dashboard"/);
+
+  const card = read("../src/components/JobCard.tsx");
+  assert.match(card, /Deskripsi Pekerjaan/);
+  assert.match(card, /Cocok \(perkiraan\)/);
+  assert.match(card, /Lihat semua persyaratan/);
+
+  const jobs = read("../src/routes/jobs.tsx");
+  assert.match(jobs, /validateSearch:/);
+  assert.match(jobs, /Memperbarui daftar lowongan\.\.\./);
+
+  const scanner = read("../src/components/AIJobScanner.tsx");
+  assert.match(scanner, /Portal Karir/);
+  assert.match(scanner, /Situs Karir Perusahaan \(ATS\)/);
+  assert.match(scanner, /prev\.filter\(\(s\) => s\.type === 'error'\)/);
+});

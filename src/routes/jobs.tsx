@@ -26,6 +26,8 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { mockJobs as mockJobsData, mockSavedJobIds } from "@/mocks/mockData";
 
 export const Route = createFileRoute("/jobs")({
+  validateSearch: (search: Record<string, unknown>): { cari?: string } =>
+    typeof search.cari === "string" && search.cari.trim() ? { cari: search.cari } : {},
   beforeLoad: async () => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
@@ -45,6 +47,7 @@ const FILTERS = [
 ] as const;
 
 function JobsPage() {
+  const { cari } = Route.useSearch();
   const [jobs, setJobs] = useState<JobData[]>([]);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   // Gagal memuat daftar tersimpan: filter "Tersimpan" yang kosong belum tentu berarti belum ada yang disimpan.
@@ -53,8 +56,12 @@ function JobsPage() {
   // Ada kueri yang sedang berjalan (pencarian atau penyaring berubah). Hasil lama tidak boleh menimpa yang lebih baru.
   const [fetching, setFetching] = useState(false);
   const fetchSeq = useRef(0);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(cari ?? "");
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+
+  useEffect(() => {
+    if (cari !== undefined) setSearchQuery(cari);
+  }, [cari]);
   const [showScanner, setShowScanner] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
@@ -336,22 +343,6 @@ function JobsPage() {
             />
           </div>
         </div>
-        {/* Penanda untuk responden tanpa ekstensi: portal login (JobStreet, Glints, Kalibrr, Dealls) butuh Ekstensi Browser. */}
-        {!isTestListingQuery(searchQuery) && (
-          <div role="note" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-[#16150F]">
-            <span>
-              Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) hanya bisa diisi lewat Ekstensi Browser.
-              Belum memasang ekstensi? Coba lowongan uji berlabel [UJI] atau lowongan dari ATS publik.
-            </span>
-            <button
-              type="button"
-              onClick={() => setSearchQuery(TEST_LISTING_QUERY)}
-              className="min-h-9 rounded-lg border-2 border-[#0A5BE0] px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/10"
-            >
-              Tampilkan lowongan [UJI]
-            </button>
-          </div>
-        )}
         <div role="group" aria-label="Saring lowongan" className="mt-4 flex flex-wrap gap-2">
           {FILTERS.map((filter) => (
             <button
@@ -369,6 +360,22 @@ function JobsPage() {
             </button>
           ))}
         </div>
+        {/* Penanda untuk responden tanpa ekstensi: portal login (JobStreet, Glints, Kalibrr, Dealls) butuh Ekstensi Browser. */}
+        {!isTestListingQuery(searchQuery) && (
+          <div role="note" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-[#16150F]">
+            <span>
+              Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) hanya bisa diisi lewat Ekstensi Browser.
+              Belum memasang ekstensi? Coba lowongan uji berlabel [UJI] atau lowongan dari ATS publik.
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchQuery(TEST_LISTING_QUERY)}
+              className="min-h-11 rounded-lg border-2 border-[#0A5BE0] px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/10"
+            >
+              Tampilkan lowongan [UJI]
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Daftar lowongan */}
@@ -385,6 +392,12 @@ function JobsPage() {
         />
       ) : shownJobs.length > 0 ? (
         <>
+          {fetching && (
+            <p role="status" className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-3 py-1.5 text-xs font-medium text-[#0A5BE0]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              Memperbarui daftar lowongan...
+            </p>
+          )}
           {skillsError && (
             <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-700">
               <span className="min-w-0 flex-1">{skillsError}</span>

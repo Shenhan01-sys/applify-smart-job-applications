@@ -26,13 +26,19 @@ const PLATFORMS: Platform[] = [
   { name: 'Glints', icon: '✨', id: 'glints' },
   { name: 'Kalibrr', icon: '🇮🇩', id: 'kalibrr' },
   { name: 'Dealls', icon: '🤝', id: 'dealls' },
+  { name: 'LinkedIn', icon: '💼', id: 'linkedin' },
   { name: 'Greenhouse', icon: '🌱', id: 'greenhouse' },
   { name: 'Lever', icon: '🔄', id: 'lever' },
   { name: 'Ashby', icon: '⚡', id: 'ashby' },
   { name: 'SmartRecruiters', icon: '🧩', id: 'smartrecruiters' },
   { name: 'Workable', icon: '🔧', id: 'workable' },
-  { name: 'LinkedIn', icon: '💼', id: 'linkedin' },
 ]
+
+const PORTAL_IDS = new Set(['jobstreet', 'glints', 'kalibrr', 'dealls', 'linkedin'])
+const PLATFORM_HINTS: Record<string, string> = {
+  linkedin: 'Butuh sesi ekstensi',
+  workable: 'Perlu papan perusahaan',
+}
 
 // Default: sumber yang bisa diakses tanpa login dan punya papan default di backend.
 // LinkedIn butuh sesi browser; Workable belum punya papan default (config/job-boards.json).
@@ -76,7 +82,13 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   }, [waitingSince])
 
   const addStage = useCallback((message: string, type: ScanStage['type'] = 'info') => {
-    setStages((prev) => [...prev.slice(-4), { message, type }])
+    setStages((prev) => {
+      const errs = prev.filter((s) => s.type === 'error')
+      const others = prev.filter((s) => s.type !== 'error')
+      const nextOthers = type === 'error' ? others : [...others, { message, type }].slice(-5)
+      const nextErrs = type === 'error' ? [...errs, { message, type }] : errs
+      return [...nextOthers, ...nextErrs]
+    })
   }, [])
 
   const togglePlatform = (platformId: string) => {
@@ -204,23 +216,38 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       {/* Platform Selection */}
       <div className="mb-6">
         <p id="label-situs" className="text-sm font-medium mb-3">Pilih situs lowongan:</p>
-        <div role="group" aria-labelledby="label-situs" className="flex flex-wrap gap-2">
-          {PLATFORMS.map((platform) => (
-            <button
-              key={platform.id}
-              type="button"
-              onClick={() => togglePlatform(platform.id)}
-              disabled={isScanning}
-              aria-pressed={selectedPlatforms.includes(platform.id)}
-              className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                selectedPlatforms.includes(platform.id)
-                  ? 'bg-[#0A5BE0] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              } disabled:opacity-50`}
-            >
-              <span aria-hidden="true">{platform.icon}</span>
-              <span>{platform.name}</span>
-            </button>
+        <div role="group" aria-labelledby="label-situs" className="space-y-3">
+          {([
+            { key: 'portal', title: 'Portal Karir' },
+            { key: 'ats', title: 'Situs Karir Perusahaan (ATS)' },
+          ] as const).map((group) => (
+            <div key={group.key}>
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">{group.title}</p>
+              <div className="flex flex-wrap gap-2">
+                {PLATFORMS.filter((p) => (group.key === 'portal' ? PORTAL_IDS.has(p.id) : !PORTAL_IDS.has(p.id))).map((platform) => {
+                  const hint = PLATFORM_HINTS[platform.id]
+                  return (
+                    <button
+                      key={platform.id}
+                      type="button"
+                      onClick={() => togglePlatform(platform.id)}
+                      disabled={isScanning}
+                      aria-pressed={selectedPlatforms.includes(platform.id)}
+                      title={hint}
+                      className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        selectedPlatforms.includes(platform.id)
+                          ? 'bg-[#0A5BE0] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      } disabled:opacity-50`}
+                    >
+                      <span aria-hidden="true">{platform.icon}</span>
+                      <span>{platform.name}</span>
+                      {hint && <span className="text-xs opacity-75">({hint})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -285,7 +312,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
           </div>
 
           {/* Scan stages log */}
-          <div role="status" aria-live="polite" className="rounded-xl bg-[#F5F5F5] p-4 h-40 overflow-hidden">
+          <div role="status" aria-live="polite" className="rounded-xl bg-[#F5F5F5] p-4 min-h-36 max-h-64 overflow-y-auto">
             <div className="space-y-2">
               {stages.map((stage, i) => (
                 <div
