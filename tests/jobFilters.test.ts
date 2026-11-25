@@ -109,6 +109,26 @@ test("pencarian lowongan: per kata, setiap kata wajib ada, karakter sintaks dibu
   assert.equal(matchesJobSearch(job, ""), true);
 });
 
+test("pencarian lokasi memperluas alias kota Indonesia di kueri server dan pencocokan klien", () => {
+  const cases = [
+    ["Jogja", "DI Yogyakarta"], ["Yogyakarta", "Jogja"], ["DIY", "Yogyakarta"],
+    ["Jaksel", "Jakarta Selatan"], ["Jakarta Selatan", "Jaksel"],
+    ["Jakpus", "Jakarta Pusat"], ["Jakbar", "Jakarta Barat"], ["Jaktim", "Jakarta Timur"], ["Jakut", "Jakarta Utara"],
+    ["Jabodetabek", "Bekasi"], ["Jakarta", "Jabodetabek"], ["Bogor", "Jabodetabek"],
+    ["Depok", "Jabodetabek"], ["Tangerang", "Jabodetabek"],
+    ["Sby", "Surabaya"], ["Surabaya", "Sby"], ["Bdg", "Bandung"], ["Bandung", "Bdg"],
+    ["Smg", "Semarang"], ["Semarang", "Smg"], ["Solo", "Surakarta"], ["Surakarta", "Solo"],
+  ] as const;
+  for (const [query, location] of cases) {
+    assert.equal(matchesJobSearch({ title: "Staff", company: "Acme", location }, query), true, `${query} -> ${location}`);
+    const filters = jobSearchFilters(query);
+    assert.equal(filters.length, 1, query);
+    assert.match(filters[0], /location\.ilike\./, query);
+  }
+  assert.equal(matchesJobSearch({ title: "Staff", company: "Acme", location: "Bandung" }, "Jaksel"), false);
+  assert.equal(matchesJobSearch({ title: "Frontend", company: "Acme", location: "Jakarta Selatan" }, "Frontend Jaksel"), true);
+});
+
 test("halaman Lowongan mencari di server, bukan hanya di 100 baris terbaru", () => {
   const src = readFileSync(new URL("../src/routes/jobs.tsx", import.meta.url), "utf8");
   assert.match(src, /jobSearchFilters\(search\)/);

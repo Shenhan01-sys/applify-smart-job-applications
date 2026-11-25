@@ -87,6 +87,59 @@ export function searchTerms(raw: string): string[] {
   return raw.replace(/[,():"'\\%*]/g, " ").split(/\s+/).map((t) => t.trim()).filter(Boolean).slice(0, 5).map((t) => t.slice(0, 40));
 }
 
+/** Alias lokasi umum di Indonesia; seluruh anggota satu grup dianggap setara saat mencari. */
+export const LOCATION_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ["jogja", "yogyakarta", "diy", "daerah istimewa yogyakarta"],
+  ["jaksel", "jakarta selatan"],
+  ["jakpus", "jakarta pusat"],
+  ["jakbar", "jakarta barat"],
+  ["jaktim", "jakarta timur"],
+  ["jakut", "jakarta utara"],
+  ["jabodetabek", "jakarta", "bogor", "depok", "tangerang", "bekasi"],
+  ["sby", "surabaya"],
+  ["bdg", "bandung"],
+  ["smg", "semarang"],
+  ["solo", "surakarta"],
+];
+
+const normalizeLocationPhrase = (value: string): string => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim()
+  .replace(/\s+/g, " ");
+
+const locationAliasByPhrase = new Map<string, readonly string[]>();
+for (const group of LOCATION_ALIAS_GROUPS) {
+  for (const phrase of group) locationAliasByPhrase.set(normalizeLocationPhrase(phrase), group);
+}
+
+interface SearchGroup { terms: string[]; locationOnly: boolean }
+
+/** Pecah query menjadi syarat AND; frasa alias terpanjang menjadi satu syarat lokasi dengan beberapa pilihan OR. */
+function jobSearchGroups(raw: string): SearchGroup[] {
+  const terms = searchTerms(raw);
+  const aliases = [...locationAliasByPhrase.entries()].sort((a, b) => b[0].split(" ").length - a[0].split(" ").length);
+  const groups: SearchGroup[] = [];
+  for (let index = 0; index < terms.length;) {
+    let matched: { length: number; group: readonly string[] } | undefined;
+    for (const [phrase, group] of aliases) {
+      const phraseTerms = phrase.split(" ");
+      const candidate = terms.slice(index, index + phraseTerms.length).map(normalizeLocationPhrase).join(" ");
+      if (candidate === phrase) { matched = { length: phraseTerms.length, group }; break; }
+    }
+    if (matched) {
+      groups.push({ terms: [...matched.group], locationOnly: true });
+      index += matched.length;
+    } else {
+      groups.push({ terms: [terms[index]], locationOnly: false });
+      index += 1;
+    }
+  }
+  return groups;
+}
+
 /**
  * Saringan PostgREST untuk pencarian Lowongan di server. Satu saringan `or` per kata: setiap kata harus muncul
  * di judul, perusahaan, atau lokasi. Memanggil `.or()` beberapa kali berarti DAN di antara saringan.
@@ -94,13 +147,21 @@ export function searchTerms(raw: string): string[] {
  * (koma dibuang sehingga frasa tidak lagi sama dengan judul; uji klik 19 November 2026).
  */
 export function jobSearchFilters(raw: string): string[] {
-  return searchTerms(raw).map((t) => ["title", "company", "location"].map((col) => `${col}.ilike.*${t}*`).join(","));
+  return jobSearchGroups(raw).map(({ terms, locationOnly }) => {
+    if (locationOnly) return terms.map((term) => `location.ilike.*${term}*`).join(",");
+    const term = terms[0];
+    return ["title", "company", "location"].map((col) => `${col}.ilike.*${term}*`).join(",");
+  });
 }
 
 /** Pencocokan yang sama di klien: setiap kata ada di judul, perusahaan, atau lokasi (tanpa membedakan huruf besar). */
 export function matchesJobSearch(job: { title?: string | null; company?: string | null; location?: string | null }, raw: string): boolean {
-  const hay = `${job.title ?? ""} ${job.company ?? ""} ${job.location ?? ""}`.toLowerCase();
-  return searchTerms(raw).every((t) => hay.includes(t.toLowerCase()));
+  const hay = normalizeLocationPhrase(`${job.title ?? ""} ${job.company ?? ""} ${job.location ?? ""}`);
+  const location = ` ${normalizeLocationPhrase(job.location ?? "")} `;
+  return jobSearchGroups(raw).every(({ terms, locationOnly }) => {
+    if (!locationOnly) return hay.includes(normalizeLocationPhrase(terms[0]));
+    return terms.some((term) => location.includes(` ${normalizeLocationPhrase(term)} `));
+  });
 }
 
 /** Kata cari untuk lowongan uji Applify ("[UJI] Staf Uji Coba"). Diisi agen tanpa Ekstensi Browser. */
