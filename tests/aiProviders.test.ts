@@ -497,11 +497,11 @@ test("Edge Function: anggaran total dihitung sejak permintaan masuk, rantai berh
 });
 
 test("budgetForCandidate: kandidat sebelum Anthropic menyisakan cadangan; Anthropic memakai anggaran penuh (insiden 25 Nov 2026)", () => {
-  const total = 34_000, reserve = 12_000;
-  assert.deepEqual(budgetForCandidate({ index: 0, firstReservedIndex: 4, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: 22_000, reserveAhead: true });
+  const total = 34_000, reserve = 20_000;
+  assert.deepEqual(budgetForCandidate({ index: 0, firstReservedIndex: 4, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: 14_000, reserveAhead: true });
   assert.deepEqual(budgetForCandidate({ index: 4, firstReservedIndex: 4, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: total, reserveAhead: false });
   assert.deepEqual(budgetForCandidate({ index: 2, firstReservedIndex: -1, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: total, reserveAhead: false });
-  // Sesudah 22 detik model gratis, OpenRouter tidak boleh mulai lagi, tetapi Anthropic masih punya 12 detik.
-  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: 22_000, elapsedMs: 22_500 }), 0);
-  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: total, elapsedMs: 22_500 }), 11_500);
+  // Sesudah 14 detik model gratis, OpenRouter tidak boleh mulai lagi, tetapi Anthropic masih punya 19,5 detik.
+  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: 14_000, elapsedMs: 14_500 }), 0);
+  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: total, elapsedMs: 14_500 }), 19_500);
 });

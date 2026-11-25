@@ -255,7 +255,9 @@ export function nextCallTimeoutMs(input: { perCallMs: number; totalBudgetMs: num
 }
 
 /** Cadangan waktu untuk kandidat Anthropic (berbayar, paling andal) di akhir rantai. */
-export const DEFAULT_AI_RESERVE_MS = 12_000;
+// 20 detik dari 34: uji 25 Nov 2026 menunjukkan Claude Haiku habis waktu pada 12 detik saat menulis surat lengkap.
+// Model gratis tinggal 14 detik; anggaran total tetap 34 detik supaya pesan gagal muncul sekitar 40 detik.
+export const DEFAULT_AI_RESERVE_MS = 20_000;
 
 /**
  * Anggaran total untuk kandidat ke-`index`. Insiden 25 November 2026: model gratis (Numes, Gemini, Gemma, OpenRouter)
