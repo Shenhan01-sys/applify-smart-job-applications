@@ -392,7 +392,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       );
       onSuccess();
     } catch (err: any) {
-      const message = `${describeApprovalError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di Lamaran Saya.`;
+      const message = `${describeApprovalError(err, "Draf belum bisa diajukan.")} Draf tetap tersimpan di menu Lamaran.`;
       setApprovalError(message);
       toast.error(message);
     } finally {
@@ -409,7 +409,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       setEnqueuing(true);
       setError("");
       await automationQueue.enqueueAutoApply(jobId);
-      toast.success("Tugas masuk antrean. Agen akan mengisi formulir tanpa menekan kirim. Pantau di Lamaran Saya, bagian Antrean Agen.");
+      toast.success("Tugas masuk antrean. Agen akan mengisi formulir tanpa menekan kirim. Pantau di menu Lamaran, bagian Antrean Agen.");
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -606,7 +606,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                   {canApply && canStartNewDraft(application.status) && confirmNewDraft && (
                     <div role="alert" className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-amber-900">
                       <p>
-                        Draf baru memakai 1 kuota (sisa {quotaText}). Draf yang lama tetap tersimpan di Lamaran Saya. Lanjutkan?
+                        Draf baru memakai 1 kuota (sisa {quotaText}). Draf yang lama tetap tersimpan di menu Lamaran. Lanjutkan?
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button type="button" onClick={generate} className="min-h-11 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white">

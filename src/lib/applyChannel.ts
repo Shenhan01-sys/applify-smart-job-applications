@@ -276,7 +276,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       badgeLabel: "Portal · Butuh Ekstensi",
       badgeTone: "extension",
       reason:
-        "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan.",
+        "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan.",
     };
   }
 

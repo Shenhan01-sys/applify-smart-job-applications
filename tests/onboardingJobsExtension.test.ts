@@ -43,7 +43,7 @@ test("ON-05: panduan ekstensi punya tautan nyata /bantuan#ekstensi, anchor #ekst
   assert.match(extCard, /href=\{EXTENSION_GUIDE_HREF\}/);
   assert.match(extCard, /khusus laptop \(Chrome atau Edge\)/);
   assert.match(extCard, /tidak bisa dipasang di HP/);
-  assert.match(extCard, /berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri/);
+  assert.match(extCard, /berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi/);
 });
 
 test("ON-05: alasan kanal di applyChannel mengikuti perilaku nyata tanpa jargon ATS publik atau [UJI]", () => {
@@ -57,7 +57,7 @@ test("ON-05: alasan kanal di applyChannel mengikuti perilaku nyata tanpa jargon 
   const portal = classifyJobChannel({ platform_source: "jobstreet", external_url: "https://id.jobstreet.com/id/job/1" });
   assert.match(portal.reason, /khusus laptop \(Chrome atau Edge/);
   assert.match(portal.reason, /tidak bisa dipasang di HP/);
-  assert.match(portal.reason, /berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri/);
+  assert.match(portal.reason, /berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi/);
 
   const web = classifyJobChannel({ platform_source: "other", external_url: "https://karier.contoh.id/loker/1" });
   assert.match(web.reason, /khusus laptop \(Chrome atau Edge/);

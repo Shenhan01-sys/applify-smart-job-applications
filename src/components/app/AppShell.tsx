@@ -3,7 +3,7 @@ import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, User, 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { MOBILE_TAB_ITEMS, NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
+import { HELP_NAV_ITEM, MOBILE_TAB_ITEMS, NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
 
 const ICONS: Record<NavItem["to"], typeof Bot> = {
   "/dashboard": LayoutDashboard,
@@ -169,6 +169,10 @@ function AgentNote({ onNavigate }: { onNavigate?: () => void }) {
           Persetujuan
         </Link>.
       </p>
+      {/* Halaman Bantuan (cara kerja, glosarium, FAQ "kenapa belum terkirim") dari menu di semua layar. */}
+      <Link to={HELP_NAV_ITEM.to} onClick={onNavigate} className="mt-2 inline-flex min-h-11 items-center font-semibold text-primary underline-offset-2 hover:underline">
+        {HELP_NAV_ITEM.label}: cara kerja dan tanya jawab
+      </Link>
     </div>
   );
 }

@@ -282,7 +282,7 @@ function AutomationSettingsPage() {
               />
               <ToggleField
                 label="Pakai ekstensi browser otomatis untuk situs yang perlu login"
-                description="Bila aktif, ekstensi langsung mulai mengisi formulir setelah kamu menyetujui lamaran, tanpa bertanya lagi. Ekstensi tetap berhenti sebelum kirim: kamu yang menekan Kirim."
+                description="Bila aktif, ekstensi langsung mulai mengisi formulir setelah kamu menyetujui lamaran, tanpa bertanya lagi. Ekstensi tetap berhenti sebelum kirim: kamu yang menekan Kirim Sekarang di panel ekstensi."
                 checked={settings.extension_auto_use ?? false}
                 onChange={(v: boolean) => updateField('extension_auto_use', v)}
               />

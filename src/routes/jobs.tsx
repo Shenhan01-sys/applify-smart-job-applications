@@ -390,7 +390,7 @@ function JobsPage() {
             <div className="min-w-0 flex-1 space-y-1.5 leading-relaxed">
               <p>
                 Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) diisi lewat Ekstensi Browser{" "}
-                <strong>khusus laptop (Chrome atau Edge)</strong> dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri.
+                <strong>khusus laptop (Chrome atau Edge)</strong> dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi.
               </p>
               <p className="text-muted-foreground">
                 Memakai HP atau belum memasang ekstensi? Pilih lowongan dari <strong>situs karier perusahaan</strong> (diisi dan dikirim agen server setelah kamu menekan Setujui) atau lamaran <strong>Email Gmail</strong> (dikirim lewat Gmail kamu setelah Setujui).

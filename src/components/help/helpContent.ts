@@ -33,7 +33,7 @@ export const HELP_EXTENSION = {
   intro: "Ekstensi Browser hanya dipakai di Chrome atau Edge di laptop. Ekstensi tidak bisa dipasang di HP.",
   use: "Ekstensi membantu mengisi formulir pada portal yang mewajibkan masuk dengan akunmu sendiri, seperti JobStreet, Glints, Kalibrr, dan Dealls.",
   token: "Buka Pengaturan, bagian Ekstensi Browser, lalu salin token ekstensi. Tempel token itu di panel ekstensi untuk menyambungkan laptopmu ke akun Applify.",
-  stop: "Ekstensi berhenti sebelum kirim. Kamu yang memeriksa isian, lalu menekan Kirim sendiri.",
+  stop: "Ekstensi berhenti sebelum kirim. Kamu yang memeriksa isian, lalu menekan Kirim Sekarang di panel ekstensi.",
 } as const;
 
 export interface HelpTerm {
@@ -75,7 +75,7 @@ export const HELP_FAQ: readonly { question: string; answer: string }[] = [
   },
   {
     question: "Lamaran masih menunggu giliran",
-    answer: "Pekerjaan ada di daftar tugas agen. Agen mengerjakan satu tugas pada satu waktu.",
+    answer: "Pekerjaan ada di daftar tugas agen. Agen mengerjakan beberapa tugas sekaligus menurut urutan masuk, jadi tugasmu mungkin menunggu giliran sebentar.",
   },
   {
     question: "Agen sedang mengisi lowongan di situs karier perusahaan",
@@ -83,7 +83,7 @@ export const HELP_FAQ: readonly { question: string; answer: string }[] = [
   },
   {
     question: "Lowongan portal menunggu Ekstensi Browser",
-    answer: "Portal seperti JobStreet, Glints, Kalibrr, dan Dealls diisi ekstensi di laptop. Setelah itu agen berhenti dan kamu yang menekan Kirim sendiri.",
+    answer: "Portal seperti JobStreet, Glints, Kalibrr, dan Dealls diisi ekstensi di laptop. Setelah itu ekstensi berhenti dan kamu yang menekan Kirim Sekarang di panel ekstensi.",
   },
   {
     question: "Kirim lewat email belum siap",

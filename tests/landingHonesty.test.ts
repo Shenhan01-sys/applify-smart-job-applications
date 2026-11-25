@@ -31,7 +31,7 @@ test("hero dan cara kerja menjelaskan persetujuan dan ketiga jalur pengiriman", 
   assert.match(landing, /Tidak ada lamaran yang dikirim sebelum kamu menekan Setujui di halaman Persetujuan/);
   assert.ok(landing.includes("Untuk situs yang didukung seperti Greenhouse, Lever, Ashby, dan Workable, agen server mengisi dan mengirim lamaran setelah kamu menekan Setujui."));
   assert.match(landing, /JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti/);
-  assert.match(landing, /Kamu menekan Kirim sendiri/);
+  assert.match(landing, /Kamu yang menekan Kirim Sekarang di panel ekstensi/);
   assert.match(landing, /Setelah kamu menekan Setujui, lamaran dikirim lewat akun Gmail yang sudah kamu hubungkan/);
   assert.doesNotMatch(landing, /melamar otomatis 24\/7|kirim otomatis tanpa persetujuan/i);
 });

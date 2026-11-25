@@ -92,7 +92,7 @@ export function ExtensionConnectCard() {
           Untuk portal yang butuh masuk akun pelamar (JobStreet, Glints, Kalibrr, Dealls, Workday):
         </p>
         <p>
-          Ekstensi berjalan khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir di tabmu lalu berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri. Kata sandi dan cookie portal tetap tinggal di browser-mu, dan setiap lamaran tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap harus dilamar manual.
+          Ekstensi berjalan khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir di tabmu lalu berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Kata sandi dan cookie portal tetap tinggal di browser-mu, dan setiap lamaran tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap harus dilamar manual.
         </p>
         <ol data-testid="extension-install-steps" className="list-decimal space-y-0.5 pl-4 pt-0.5">
           {EXTENSION_INSTALL_STEPS.map((step, index) => (

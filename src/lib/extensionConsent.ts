@@ -6,7 +6,7 @@
  * Pengguna mengizinkan lewat POST /api/approvals/:id/extension-consent { always? } (tugas extension_apply masuk
  * antrean; 409 bila sudah aktif). Bila `always` true, backend juga menyalakan pengaturan `extension_auto_use`,
  * dan persetujuan berikutnya langsung diantre tanpa bertanya. Ekstensi hanya mengisi dan berhenti sebelum
- * tombol kirim: pengguna sendiri yang menekan Kirim di tab itu.
+ * tombol kirim: pengguna menekan Kirim Sekarang di panel ekstensi.
  *
  * Fungsi murni tanpa React atau Supabase, supaya bisa dites dengan `node --test`.
  */
@@ -20,7 +20,7 @@ export const EXTENSION_CONSENT_BUTTON = "Izinkan";
 export const EXTENSION_CONSENT_BUSY_LABEL = "Memproses...";
 export const EXTENSION_CONSENT_ALWAYS_LABEL = "Selalu izinkan tanpa bertanya";
 export const EXTENSION_CONSENT_EXPLAIN =
-  "Ekstensi membuka tab baru di browser kamu, mengisi formulir di sana, lalu berhenti sebelum mengirim. Kamu sendiri yang menekan Kirim di tab itu.";
+  "Ekstensi membuka tab baru di browser kamu, mengisi formulir di sana, lalu berhenti sebelum mengirim. Kamu yang menekan Kirim Sekarang di panel ekstensi.";
 export const EXTENSION_CONSENT_LOGIN_NOTE =
   "Situs ini meminta kamu masuk ke akun pelamar. Ekstensi membuka situsnya dan menunggu kamu login di tab itu.";
 export const EXTENSION_CONSENT_CONNECT_PREFIX = "Pastikan ekstensi sudah terhubung.";

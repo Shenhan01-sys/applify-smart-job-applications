@@ -7,7 +7,7 @@
  * persetujuan, sama seperti pembagian di lib/applyChannel.ts:
  *   1. ATS publik (Greenhouse, Lever, Ashby, dan sejenisnya): agen server mengisi dan menekan kirim sendiri.
  *   2. Portal berakun yang didukung ekstensi (JobStreet, Glints, Kalibrr, Dealls): ekstensi di laptop mengisi,
- *      pengguna yang menekan Kirim.
+ *      pengguna yang menekan Kirim Sekarang di panel ekstensi.
  *   3. Lainnya: penjelasan umum yang tetap benar (lamaran bisa terkirim sungguhan, tidak bisa ditarik).
  */
 
@@ -27,7 +27,7 @@ export const AFTER_APPROVE_TEXT: Record<ApproveRoute, string> = {
   server_agent:
     "Setelah kamu setujui, agen Applify membuka formulir lowongan ini di server, mengisinya, lalu menekan kirim. Lamaran benar-benar terkirim ke perusahaan atas namamu dan tidak bisa ditarik. Bila agen butuh jawabanmu, kartunya muncul lagi di halaman ini.",
   extension:
-    "Setelah kamu setujui, Ekstensi Browser Applify di laptopmu (Chrome atau Edge) membuka situs ini, menunggu kamu masuk ke akun pelamar, lalu mengisi formulir. Ekstensi berhenti sebelum kirim: kamu sendiri yang menekan Kirim di situs itu.",
+    "Setelah kamu setujui, Ekstensi Browser Applify di laptopmu (Chrome atau Edge) membuka situs ini, menunggu kamu masuk ke akun pelamar, lalu mengisi formulir. Ekstensi berhenti sebelum kirim: kamu yang menekan Kirim Sekarang di panel ekstensi.",
   other:
     "Setujui berarti lamaran ini boleh dikirim ke perusahaan atas namamu, dan lamaran yang sudah terkirim tidak bisa ditarik. Tekan Tolak bila kamu tidak ingin melamar.",
 };

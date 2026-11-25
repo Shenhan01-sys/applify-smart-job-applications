@@ -121,7 +121,7 @@ function SettingsPage() {
         </Card>
 
         <Card id="ekstensi" icon={Chrome} title="Ekstensi Browser (Chrome & Edge)"
-          desc="Khusus laptop (Chrome atau Edge), tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir pada portal yang butuh masuk akunmu sendiri dan berhenti sebelum kirim sehingga kamu yang menekan Kirim.">
+          desc="Khusus laptop (Chrome atau Edge), tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir pada portal yang butuh masuk akunmu sendiri dan berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi.">
           <ExtensionConnectCard />
           <div className="mt-3">
             <SoonButton>Pasang untuk Firefox</SoonButton>

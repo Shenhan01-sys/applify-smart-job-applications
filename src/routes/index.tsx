@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from "react";
 import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
+import { isBillingEnabled } from "@/lib/appConfig";
 import { useAuth } from "@/contexts/AuthContext";
 import { WaitinglistPopup } from "@/components/WaitinglistPopup";
 
@@ -1024,7 +1025,7 @@ function HowItWorks() {
           </div>
           <div className="rounded-2xl border border-neutral-200 bg-white p-5">
             <h3 className="font-display font-bold text-neutral-900">Portal akun pelamar</h3>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu menekan Kirim sendiri.</p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu yang menekan Kirim Sekarang di panel ekstensi.</p>
           </div>
           <div className="rounded-2xl border border-neutral-200 bg-white p-5">
             <h3 className="font-display font-bold text-neutral-900">Lamaran lewat email</h3>
@@ -1258,7 +1259,7 @@ function SubmissionPaths() {
     },
     {
       title: "Portal akun pelamar",
-      body: "Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu menekan Kirim sendiri.",
+      body: "Untuk JobStreet, Glints, Kalibrr, dan Dealls, Ekstensi Browser di laptop dengan Chrome atau Edge mengisi formulir lalu berhenti. Kamu yang menekan Kirim Sekarang di panel ekstensi.",
     },
     {
       title: "Lamaran lewat email",
@@ -1321,12 +1322,27 @@ function Pricing({ authLink }: { authLink: string }) {
                   </li>
                 ))}
               </ul>
-              <Link
-                to={t.name === "Kampus" ? "/waitinglist" : "/subscription"}
-                className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}
-              >
-                {t.name === "Free" ? "Mulai Gratis" : t.name === "Kampus" ? "Hubungi Kami" : "Pilih Paket"}
-              </Link>
+              {/* Pembayaran belum dibuka saat uji coba (VITE_ENABLE_BILLING mati): /subscription hanya mengalihkan ke Beranda.
+                  Mulai Gratis langsung ke pendaftaran, dan paket Pro tidak menawarkan tombol yang tidak bisa dipakai. */}
+              {t.name === "Free" ? (
+                <a
+                  href={authLink === "/login" ? "/login?mode=daftar" : authLink}
+                  className="mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"
+                >
+                  Mulai Gratis
+                </a>
+              ) : t.name === "Pro" && !isBillingEnabled() ? (
+                <p className="mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold border-2 border-dashed border-[color:var(--border)] text-muted-foreground">
+                  Belum dibuka selama uji coba
+                </p>
+              ) : (
+                <Link
+                  to={t.name === "Kampus" ? "/waitinglist" : "/subscription"}
+                  className={`mt-7 inline-flex justify-center items-center h-11 rounded-xl text-sm font-semibold transition ${t.popular ? "bg-[#16150F] text-[#F4F1E8] hover:bg-black" : "border-2 border-[color:var(--border)] bg-white hover:bg-black/[3%]"}`}
+                >
+                  {t.name === "Kampus" ? "Hubungi Kami" : "Pilih Paket"}
+                </Link>
+              )}
             </div>
           ))}
         </div>
