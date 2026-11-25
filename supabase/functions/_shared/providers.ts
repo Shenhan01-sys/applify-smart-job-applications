@@ -16,7 +16,7 @@
 // Urutan: entri "anthropic:" selalu dijalankan paling akhir, apa pun urutan di FREE_MODELS / PRO_MODELS (platformChain).
 // Pemilik ingin menghemat kredit Anthropic, jadi Claude hanya cadangan terakhir (keputusan 24 Nov 2026). Key Anthropic
 // milik pengguna sendiri (BYOK) tidak terpengaruh: rantai BYOK dibuat terpisah di byok.ts dan tetap berjalan lebih dulu.
-import { numesErrorType, numesPoolFor, parseNumesKeys, runWithNumesKeys, type NumesKeyPool } from "./numes-keys.ts";
+import { numesErrorType, numesPoolFor, parseNumesKeys, runWithNumesKeys, type NumesBudget, type NumesKeyPool } from "./numes-keys.ts";
 
 export type ProviderName = "openrouter" | "gemini" | "anthropic" | "numes" | "openai";
 
@@ -138,6 +138,10 @@ export interface PostChatOptions {
   body: string;
   /** Batas waktu (ms) satu percobaan, dihitung ulang tiap percobaan. 0 = waktu habis: tidak ada percobaan tambahan. */
   timeoutMs: () => number;
+  /** Hanya Numes: batas waktu satu percobaan (ms). Bawaan 12 detik (DEFAULT_NUMES_CALL_TIMEOUT_MS), env NUMES_TIMEOUT_MS. */
+  numesTimeoutMs?: number;
+  /** Hanya Numes: anggaran waktu bersama semua entri Numes dalam satu permintaan (buat satu per permintaan). */
+  numesBudget?: NumesBudget;
   /** Boleh mencoba kunci berikutnya? Bawaan: masih ada waktu (timeoutMs() > 0). */
   canRetry?: () => boolean;
   /** "manual" untuk key milik pengguna (jangan ikuti redirect ke host lain). Bawaan "follow". */
@@ -149,25 +153,27 @@ export interface PostChatOptions {
 
 /**
  * Kirim satu permintaan chat. Target biasa: satu fetch dengan headers-nya. Target Numes (ada `pool`): kunci dicoba
- * berurutan lewat kolam kunci (numes-keys.ts); 401/402/403/429, 5xx, dan batas waktu berganti ke kunci berikutnya
- * untuk model yang sama. Mengembalikan Response terakhir (2xx bila ada kunci yang berhasil) agar pemanggil
- * memperlakukannya seperti penyedia lain, atau melempar galat jaringan terakhir.
+ * berurutan lewat kolam kunci (numes-keys.ts); hanya 401/402/403/429 yang berganti ke kunci berikutnya untuk model
+ * yang sama. Batas waktu atau galat sambungan melepas modelnya saat itu juga (modelnya yang lambat, bukan kuncinya),
+ * dan batas waktu mendinginkan model 5 menit. Tiap percobaan Numes dibatasi `numesTimeoutMs` dan `numesBudget`.
+ * Mengembalikan Response terakhir (2xx bila ada kunci yang berhasil) agar pemanggil memperlakukannya seperti
+ * penyedia lain, melempar galat jaringan terakhir, atau 503 buatan bila Numes dilewati tanpa percobaan.
  */
 export async function postChat(target: PostableTarget, opts: PostChatOptions): Promise<Response> {
   const doFetch = opts.fetchFn ?? fetch;
-  const send = (headers: Record<string, string>) =>
+  const send = (headers: Record<string, string>, timeoutMs?: number) =>
     doFetch(target.url, {
       method: "POST",
       headers,
-      signal: AbortSignal.timeout(Math.max(1, opts.timeoutMs())),
+      signal: AbortSignal.timeout(Math.max(1, timeoutMs ?? opts.timeoutMs())),
       redirect: opts.redirect ?? "follow",
       body: opts.body,
     });
   if (!target.pool) return await send(target.headers);
   const run = await runWithNumesKeys(
     target.pool,
-    async (key) => {
-      const resp = await send({ ...target.headers, Authorization: `Bearer ${key}` });
+    async (key, _index, timeoutMs) => {
+      const resp = await send({ ...target.headers, Authorization: `Bearer ${key}` }, timeoutMs);
       if (resp.ok) return { status: resp.status, resp };
       let errorType: string | null = null;
       try {
@@ -177,12 +183,21 @@ export async function postChat(target: PostableTarget, opts: PostChatOptions): P
       }
       return { status: resp.status, retryAfter: resp.headers.get("retry-after"), errorType, resp };
     },
-    { label: target.entry, canContinue: opts.canRetry ?? (() => opts.timeoutMs() > 0), log: opts.log ?? ((line) => console.warn(line)) },
+    {
+      label: target.entry,
+      canContinue: opts.canRetry ?? (() => opts.timeoutMs() > 0),
+      log: opts.log ?? ((line) => console.warn(line)),
+      callTimeoutMs: opts.numesTimeoutMs,
+      limitMs: opts.timeoutMs,
+      budget: opts.numesBudget,
+    },
   );
   if (run.reply) return run.reply.resp;
   if (run.error) throw run.error;
-  // Tidak ada kunci yang bisa dipakai (semua didinginkan): jawaban 503 buatan, supaya dicatat seperti galat penyedia lain.
-  return new Response(JSON.stringify({ error: "no_numes_key_available" }), { status: 503, headers: { "Content-Type": "application/json" } });
+  // Tidak ada percobaan (semua kunci didinginkan, model sedang didinginkan karena lambat, atau anggaran Numes habis):
+  // jawaban 503 buatan, supaya dicatat seperti galat penyedia lain dan rantai lanjut ke penyedia berikutnya.
+  const reason = run.skipped === "model_cooling" ? "numes_model_cooling" : run.skipped === "budget" ? "numes_budget_spent" : "no_numes_key_available";
+  return new Response(JSON.stringify({ error: reason }), { status: 503, headers: { "Content-Type": "application/json" } });
 }
 
 /** Batas bawah max_tokens untuk Claude, karena penalaran tersembunyinya ikut memakai jatah ini. */
@@ -217,6 +232,10 @@ export function chatBody(
 // lambat bisa menahan pengguna lebih dari 50 detik tanpa jawaban (uji E2E klik 20 November 2026, temuan 13).
 // Kini seluruh rantai berbagi satu anggaran waktu yang dihitung sejak permintaan masuk, dan klien menyerah
 // sedikit sesudahnya (src/lib/draftProgress.ts DRAFT_CLIENT_TIMEOUT_MS), jadi galat dari server tiba lebih dulu.
+
+// Numes (model gratis, sering lambat) punya jatah sendiri di numes-keys.ts: 12 detik per percobaan (secret NUMES_TIMEOUT_MS),
+// dan seluruh entri Numes dalam satu permintaan paling banyak 40% anggaran total atau 15 detik, mana yang lebih kecil
+// (NumesBudget). Insiden 25 Nov 2026: Numes menghabiskan seluruh anggaran 34 detik, Gemini tidak pernah dipanggil, balasan 502.
 
 /** Batas satu panggilan model bila secret AI_CALL_TIMEOUT_MS tidak diisi. */
 export const DEFAULT_AI_CALL_TIMEOUT_MS = 20_000;

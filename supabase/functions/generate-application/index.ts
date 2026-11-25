@@ -10,6 +10,7 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
+import { DEFAULT_NUMES_CALL_TIMEOUT_MS, NumesBudget } from "../_shared/numes-keys.ts";
 import {
   DEFAULT_AI_CALL_TIMEOUT_MS,
   DEFAULT_AI_TOTAL_BUDGET_MS,
@@ -81,6 +82,10 @@ const PRO_MODELS = platformChain(
 // after about 35 seconds instead of after every model in the chain has timed out.
 const AI_CALL_TIMEOUT_MS = positiveMs(Deno.env.get("AI_CALL_TIMEOUT_MS"), DEFAULT_AI_CALL_TIMEOUT_MS);
 const AI_TOTAL_BUDGET_MS = positiveMs(Deno.env.get("AI_TOTAL_BUDGET_MS"), DEFAULT_AI_TOTAL_BUDGET_MS);
+// Numes (model gratis) sering lambat: satu percobaan paling lama NUMES_TIMEOUT_MS (12 detik), dan semua entri Numes
+// dalam satu permintaan berbagi NumesBudget (paling banyak 40% AI_TOTAL_BUDGET_MS atau 15 detik). Insiden 25 Nov 2026:
+// timeout Numes menghabiskan seluruh anggaran, Gemini dan OpenRouter tidak pernah dicoba, dan semua draf gagal 502.
+const NUMES_TIMEOUT_MS = positiveMs(Deno.env.get("NUMES_TIMEOUT_MS"), DEFAULT_NUMES_CALL_TIMEOUT_MS);
 // BYOK (rancangan NextRoadMap/19): key LLM milik pengguna, disimpan terenkripsi di tabel user_llm_keys oleh
 // backend. Mati bila secret BYOK_ENABLED bukan "true", sehingga perilaku lama tidak berubah sebelum migrasi
 // DRAFT_2026-11-23_user_llm_keys.sql dijalankan.
@@ -297,6 +302,7 @@ Return JSON exactly in this shape:
     };
     let budgetExhausted = false;
     const invalidatedProviders = new Set<string>();
+    const numesBudget = new NumesBudget({ totalBudgetMs: AI_TOTAL_BUDGET_MS });
     for (const candidate of chain) {
       model = candidate.entry;
       // Key pengguna yang sudah ditolak penyedia di permintaan ini tidak dicoba lagi untuk model berikutnya.
@@ -317,9 +323,12 @@ Return JSON exactly in this shape:
       }
       let aiResp: Response;
       try {
-        // Numes memakai kolam kunci: kunci berikutnya mencoba model yang sama, selama anggaran waktu masih ada.
+        // Numes memakai kolam kunci: kunci berikutnya hanya dicoba untuk 401/402/403/429. Batas waktu Numes melepas
+        // modelnya (didinginkan 5 menit) dan rantai lanjut ke kandidat berikutnya, dalam jatah waktu Numes saja.
         aiResp = await postChat(candidate, {
           timeoutMs: () => nextCallTimeoutMs({ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - requestStarted }),
+          numesTimeoutMs: NUMES_TIMEOUT_MS,
+          numesBudget,
           // Key pengguna dan isi CV tidak boleh ikut redirect ke host lain: 3xx dianggap gagal.
           redirect: candidate.source === "byok" ? "manual" : "follow",
           body: JSON.stringify(requestBody(candidate, [

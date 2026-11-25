@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolveChain } from "../supabase/functions/_shared/providers.ts";
+import { resetNumesPools } from "../supabase/functions/_shared/numes-keys.ts";
 import { runChain } from "../supabase/functions/_shared/chat-chain.ts";
 import {
   MAX_QUESTIONS,
@@ -35,6 +36,9 @@ test("green-career-assessment: memakai rantai penyedia bersama, bukan satu model
   assert.match(src, /GEMINI_API_KEY/);
   assert.match(src, /ANTHROPIC_API_KEY/);
   assert.match(src, /numes: numesKeysFromEnv\(\(name\) => Deno\.env\.get\(name\)\)/);
+  // batas waktu Numes (NUMES_TIMEOUT_MS, bawaan 12 detik) dikirim ke kedua panggilan runChain
+  assert.match(src, /DEFAULT_NUMES_CALL_TIMEOUT_MS/);
+  assert.equal([...src.matchAll(/numesTimeoutMs: NUMES_TIMEOUT_MS,/g)].length, 2);
   // dua mode sama-sama lewat runChain
   assert.equal([...src.matchAll(/await runChain\(MODELS/g)].length, 2);
   // tidak ada lagi panggilan langsung ke OpenRouter atau model gratis yang sudah dicabut
@@ -214,6 +218,84 @@ test("runChain: Numes memakai kolam kunci: kunci 1 kena 429, kunci 2 menjawab mo
   const all = [...errors, ...logs].join("\n");
   assert.match(all, /key 1\/2 -> HTTP 429/);
   assert.ok(!all.includes(K1) && !all.includes(K2));
+});
+
+test("runChain: Numes lambat (batas waktu) di kunci 1 = kunci 2 tidak dicoba, model Numes berikutnya dilewati, Gemini tetap dipanggil dan menang", async () => {
+  resetNumesPools();
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  const spy = AbortSignal.timeout;
+  const timeouts: number[] = [];
+  AbortSignal.timeout = ((ms: number) => (timeouts.push(ms), spy.call(AbortSignal, ms))) as typeof AbortSignal.timeout;
+  try {
+    const K1 = "nk-one-not-real";
+    const K2 = "nk-two-not-real";
+    const chain = resolveChain(
+      ["numes:z-ai/glm-5.3-flash:free", "numes:deepseek/deepseek-v4.1-flash:free", "gemini:model-a"],
+      { gemini: "g-secret", numes: [K1, K2] },
+    );
+    const seen: string[] = [];
+    const errors: string[] = [];
+    const fetchFn = (async (url: string, init: RequestInit) => {
+      const host = new URL(url).hostname;
+      seen.push(`${host} ${(init.headers as Record<string, string>).Authorization}`);
+      if (host === "api.numes.ai") {
+        skew += timeouts.at(-1)!; // menggantung sampai batas waktunya
+        throw new DOMException("The operation timed out.", "TimeoutError");
+      }
+      return okBody("OK dari gemini");
+    }) as unknown as typeof fetch;
+    const r = await runChain(chain, {
+      tag: "[t]", messages, temperature: 0.4, maxTokens: 900, timeoutMs: 30_000, budgetMs: 34_000,
+      accept: (t: string) => (t.includes("OK") ? t : null), fetchFn, logger: { error: (l) => errors.push(l), log: () => {} },
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.model, "gemini:model-a");
+    // Numes dicoba sekali (kunci 1, 12 detik), kunci 2 dan model Numes kedua tidak disentuh, Gemini mendapat batas penuh
+    assert.deepEqual(seen, [`api.numes.ai Bearer ${K1}`, "generativelanguage.googleapis.com Bearer g-secret"]);
+    assert.equal(timeouts[0], 12_000);
+    assert.equal(timeouts.at(-1), 30_000);
+    assert.ok(skew <= 13_600);
+    assert.deepEqual(r.attempts.map((a) => a.outcome), ["timeout", "http_503", "accepted"]);
+    const all = errors.join("\n");
+    assert.match(all, /key 1\/2 -> timeout, giving up on this model/);
+    assert.match(all, /Numes time budget used up, skipping/);
+    assert.ok(!all.includes(K1) && !all.includes(K2) && !all.includes("g-secret"));
+  } finally {
+    AbortSignal.timeout = spy;
+    Date.now = realNow;
+  }
+});
+
+test("runChain: model Numes yang baru kena batas waktu dilewati di permintaan berikutnya, Gemini langsung dipanggil", async () => {
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  try {
+    resetNumesPools();
+    const chain = resolveChain(["numes:z-ai/glm-5.3-flash:free", "gemini:model-a"], { gemini: "g-secret", numes: ["nk-one-not-real"] });
+    const hosts: string[] = [];
+    const fetchFn = (async (url: string) => {
+      const host = new URL(url).hostname;
+      hosts.push(host);
+      if (host === "api.numes.ai") throw new DOMException("The operation timed out.", "TimeoutError");
+      return okBody("OK");
+    }) as unknown as typeof fetch;
+    const go = () =>
+      runChain(chain, { tag: "[t]", messages, temperature: 0.4, maxTokens: 900, timeoutMs: 30_000, accept: (t: string) => t, fetchFn, logger: { error: () => {}, log: () => {} } });
+    assert.equal((await go()).ok, true);
+    assert.deepEqual(hosts, ["api.numes.ai", "generativelanguage.googleapis.com"]);
+    hosts.length = 0;
+    assert.equal((await go()).ok, true);
+    assert.deepEqual(hosts, ["generativelanguage.googleapis.com"], "Numes dilewati tanpa panggilan selama pendinginan 5 menit");
+    skew += 5 * 60_000 + 1;
+    hosts.length = 0;
+    await go();
+    assert.deepEqual(hosts, ["api.numes.ai", "generativelanguage.googleapis.com"], "dicoba lagi sesudah pendinginan");
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 test("runChain: rantai kosong atau batas total waktu habis berhenti tanpa memanggil model berikutnya", async () => {

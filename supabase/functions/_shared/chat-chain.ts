@@ -10,6 +10,7 @@
 // dan kunci tidak pernah dicatat.
 import { chatBody, postChat, type ResolvedModel } from "./providers.ts";
 import { stripReasoning } from "./output-guard.ts";
+import { NumesBudget } from "./numes-keys.ts";
 
 export interface ChainAttempt {
   model: string;
@@ -37,6 +38,8 @@ export interface ChainOptions<T> {
   timeoutMs: number;
   /** Total waktu rantai; kandidat berikutnya tidak dicoba bila sudah lewat. Tanpa batas bila kosong. */
   budgetMs?: number;
+  /** Batas waktu satu percobaan Numes (ms), terpisah dari `timeoutMs`. Bawaan 12 detik (secret NUMES_TIMEOUT_MS). */
+  numesTimeoutMs?: number;
   /** Ubah teks jawaban (tanpa rantai pikir) menjadi nilai, atau null bila tidak layak dipakai. */
   accept: (text: string) => T | null;
   fetchFn?: typeof fetch;
@@ -61,6 +64,9 @@ export async function runChain<T>(models: ResolvedModel[], opts: ChainOptions<T>
   const now = opts.now ?? Date.now;
   const attempts: ChainAttempt[] = [];
   const chainStart = now();
+  // Semua entri Numes berbagi satu jatah waktu (paling banyak 40% budgetMs dan 15 detik), supaya Numes yang lambat
+  // tidak menghabiskan waktu yang dicadangkan untuk Gemini dan penyedia lain.
+  const numesBudget = new NumesBudget({ totalBudgetMs: opts.budgetMs });
 
   for (const candidate of models) {
     if (opts.budgetMs !== undefined && attempts.length > 0 && now() - chainStart >= opts.budgetMs) {
@@ -76,10 +82,13 @@ export async function runChain<T>(models: ResolvedModel[], opts: ChainOptions<T>
 
     let resp: Response;
     try {
-      // Numes memakai kolam kunci: kunci berikutnya mencoba model yang sama selama anggaran rantai belum habis.
+      // Numes memakai kolam kunci: kunci berikutnya hanya dicoba untuk 401/402/403/429 selama anggaran rantai belum habis.
+      // Batas waktu Numes melepas modelnya dan mendinginkannya (numes-keys.ts), lalu rantai lanjut ke kandidat berikutnya.
       resp = await postChat(candidate, {
         fetchFn: doFetch,
         timeoutMs: () => opts.timeoutMs,
+        numesTimeoutMs: opts.numesTimeoutMs,
+        numesBudget,
         canRetry: () => opts.budgetMs === undefined || now() - chainStart < opts.budgetMs,
         body: JSON.stringify(
           chatBody(candidate, opts.messages, { temperature: opts.temperature, maxTokens: opts.maxTokens }),

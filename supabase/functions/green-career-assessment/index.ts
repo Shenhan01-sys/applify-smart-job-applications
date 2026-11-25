@@ -13,6 +13,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { DEFAULT_FREE_MODELS, numesKeysFromEnv, parseModelList, platformChain } from "../_shared/providers.ts";
 import { runChain } from "../_shared/chat-chain.ts";
+import { DEFAULT_NUMES_CALL_TIMEOUT_MS } from "../_shared/numes-keys.ts";
 import {
   MSG_GENERATE_FAILED,
   MSG_SAVE_FAILED,
@@ -44,6 +45,9 @@ const MODELS = platformChain(
 // dan rantai berhenti mencoba model berikutnya bila total waktunya sudah lewat batas Edge Function.
 const AI_CALL_TIMEOUT_MS = Number(Deno.env.get("AI_CALL_TIMEOUT_MS") ?? 30000);
 const AI_CHAIN_BUDGET_MS = Number(Deno.env.get("AI_CHAIN_BUDGET_MS") ?? 100000);
+// Numes (model gratis) sering lambat: satu percobaan paling lama NUMES_TIMEOUT_MS (12 detik), dan semua entri Numes
+// dalam satu permintaan berbagi jatah paling banyak 40% AI_CHAIN_BUDGET_MS atau 15 detik (NumesBudget di runChain).
+const NUMES_TIMEOUT_MS = Number(Deno.env.get("NUMES_TIMEOUT_MS")) > 0 ? Number(Deno.env.get("NUMES_TIMEOUT_MS")) : DEFAULT_NUMES_CALL_TIMEOUT_MS;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -88,6 +92,7 @@ Deno.serve(async (req: Request) => {
         maxTokens: 1400,
         timeoutMs: AI_CALL_TIMEOUT_MS,
         budgetMs: AI_CHAIN_BUDGET_MS,
+        numesTimeoutMs: NUMES_TIMEOUT_MS,
         accept: parseQuestionsReply,
       });
       if (!made.ok) {
@@ -126,6 +131,7 @@ Deno.serve(async (req: Request) => {
         maxTokens: 900,
         timeoutMs: AI_CALL_TIMEOUT_MS,
         budgetMs: AI_CHAIN_BUDGET_MS,
+        numesTimeoutMs: NUMES_TIMEOUT_MS,
         accept: parseScoreReply,
       });
       if (!scored.ok) {

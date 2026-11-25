@@ -18,7 +18,7 @@ import {
   resolveChain,
   resolveModel,
 } from "../supabase/functions/_shared/providers.ts";
-import { NUMES_COOLDOWN_RATE_MS, resetNumesPools } from "../supabase/functions/_shared/numes-keys.ts";
+import { DEFAULT_NUMES_CALL_TIMEOUT_MS, NUMES_COOLDOWN_RATE_MS, NUMES_MODEL_COOLDOWN_MS, NumesBudget, resetNumesPools } from "../supabase/functions/_shared/numes-keys.ts";
 
 // ---- penyedia model Edge Function: Gemini, Anthropic, dan OpenRouter dalam satu rantai ----------------
 
@@ -182,8 +182,6 @@ for (const [name, step] of [
   ["402", 402],
   ["401", 401],
   ["403", 403],
-  ["503", 503],
-  ["batas waktu", new DOMException("t", "TimeoutError")],
 ] as Array<[string, Step]>) {
   test(`postChat: ${name} pada kunci 1 = model yang sama dengan kunci 2`, async () => {
     const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK1}` ? step : 200));
@@ -193,10 +191,138 @@ for (const [name, step] of [
   });
 }
 
-test("postChat: semua kunci gagal mengembalikan jawaban gagal terakhir (bisa dibaca), pemanggil lanjut ke model berikutnya", async () => {
-  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK1}` ? 429 : auth === `Bearer ${NK2}` ? 402 : 503));
+test("postChat: 503 (galat server) pada kunci 1 melepas model itu, kunci 2 tidak dicoba", async () => {
+  const h = numesHarness([NK1, NK2, NK3], () => 503);
   const resp = await h.post();
   assert.equal(resp.status, 503);
+  assert.deepEqual(h.calls.map((c) => c.auth), [`Bearer ${NK1}`]);
+});
+
+test("postChat: batas waktu pada kunci 1 melempar galat langsung, kunci 2 tidak dicoba, dan modelnya didinginkan 5 menit", async () => {
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  try {
+    const h = numesHarness([NK1, NK2, NK3], () => new DOMException("t", "TimeoutError"));
+    await assert.rejects(h.post(), (e: any) => e.name === "TimeoutError");
+    assert.deepEqual(h.calls.map((c) => c.auth), [`Bearer ${NK1}`], "tidak ada percobaan dengan kunci 2");
+    assert.match(h.logs.join("\n"), /key 1\/3 -> timeout, giving up on this model/);
+    assert.doesNotMatch(h.logs.join("\n"), /trying next key/);
+    // permintaan berikutnya: model yang sama dilewati tanpa panggilan jaringan, 503 buatan supaya rantai lanjut
+    h.calls.length = 0;
+    const skipped = await h.post();
+    assert.equal(skipped.status, 503);
+    assert.match(await skipped.text(), /numes_model_cooling/);
+    assert.equal(h.calls.length, 0, "model yang baru kena batas waktu dilewati langsung");
+    assert.match(h.logs.at(-1)!, /too slow, cooling down/);
+    // sesudah 5 menit dicoba lagi
+    skew += NUMES_MODEL_COOLDOWN_MS + 1;
+    await assert.rejects(h.post(), (e: any) => e.name === "TimeoutError");
+    assert.equal(h.calls.length, 1);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("postChat: batas waktu satu percobaan Numes 12 detik (numesTimeoutMs menimpanya), tidak terikat batas 20 detik pemanggil", async () => {
+  const sendMs = async (extra: Record<string, unknown>) => {
+    const h = numesHarness([NK1], () => 200);
+    const spy = AbortSignal.timeout;
+    const asked: number[] = [];
+    AbortSignal.timeout = ((ms: number) => (asked.push(ms), spy.call(AbortSignal, ms))) as typeof AbortSignal.timeout;
+    try {
+      await h.post(extra);
+    } finally {
+      AbortSignal.timeout = spy;
+    }
+    return asked;
+  };
+  assert.equal(DEFAULT_NUMES_CALL_TIMEOUT_MS, 12_000);
+  assert.deepEqual(await sendMs({}), [12_000]);
+  assert.deepEqual(await sendMs({ numesTimeoutMs: 5_000 }), [5_000]);
+  assert.deepEqual(await sendMs({ timeoutMs: () => 8_000 }), [8_000], "sisa anggaran total yang lebih kecil tetap menang");
+});
+
+test("postChat: jatah Numes habis = 503 buatan tanpa panggilan jaringan, penyedia berikutnya yang dipakai", async () => {
+  const budget = new NumesBudget({ totalBudgetMs: 34_000 });
+  budget.spend(budget.limitMs - 1_000);
+  const h = numesHarness([NK1, NK2], () => 200);
+  const resp = await h.post({ numesBudget: budget });
+  assert.equal(resp.status, 503);
+  assert.match(await resp.text(), /numes_budget_spent/);
+  assert.equal(h.calls.length, 0);
+});
+
+test("rantai gaya generate-application: Numes lambat di semua entri, Gemini tetap dipanggil dalam anggaran 34 detik dan tidak kena time_budget", async () => {
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  try {
+    resetNumesPools();
+    const chain = resolveChain(
+      ["numes:z-ai/glm-5.3-flash:free", "numes:deepseek/deepseek-v4.1-flash:free", "gemini:gemini-3.5-flash-lite", "anthropic:claude-haiku-5-5"],
+      { gemini: "g-key", anthropic: "a-key", numes: [NK1, NK2, NK3, "nk-four-not-real"] },
+    );
+    const started = Date.now();
+    const hosts: string[] = [];
+    const timeouts: number[] = [];
+    const spy = AbortSignal.timeout;
+    AbortSignal.timeout = ((ms: number) => (timeouts.push(ms), spy.call(AbortSignal, ms))) as typeof AbortSignal.timeout;
+    const fetchFn = (async (url: string, init: RequestInit) => {
+      const host = new URL(url).hostname;
+      hosts.push(`${host} ${(init.headers as Record<string, string>).Authorization}`);
+      if (host === "api.numes.ai") {
+        skew += timeouts.at(-1)!; // Numes menggantung sampai batas waktunya
+        throw new DOMException("t", "TimeoutError");
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: "OK" } }] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const numesBudget = new NumesBudget({ totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS });
+    const outcomes: string[] = [];
+    let winner = "";
+    for (const candidate of chain) {
+      const callTimeout = nextCallTimeoutMs({ perCallMs: DEFAULT_AI_CALL_TIMEOUT_MS, totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - started });
+      if (callTimeout === 0) {
+        outcomes.push(`${candidate.entry} time_budget`);
+        break;
+      }
+      let resp: Response;
+      try {
+        resp = await postChat(candidate, {
+          timeoutMs: () => nextCallTimeoutMs({ perCallMs: DEFAULT_AI_CALL_TIMEOUT_MS, totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - started }),
+          numesTimeoutMs: DEFAULT_NUMES_CALL_TIMEOUT_MS,
+          numesBudget,
+          fetchFn,
+          body: "{}",
+          log: () => {},
+        });
+      } catch (e) {
+        outcomes.push(`${candidate.entry} ${(e as Error).name}`);
+        continue;
+      }
+      if (!resp.ok) {
+        outcomes.push(`${candidate.entry} http_${resp.status}`);
+        continue;
+      }
+      winner = candidate.entry;
+      break;
+    }
+    AbortSignal.timeout = spy;
+    assert.equal(winner, "gemini:gemini-3.5-flash-lite", `urutan: ${outcomes.join(", ")}`);
+    assert.deepEqual(outcomes, ["numes:z-ai/glm-5.3-flash:free TimeoutError", "numes:deepseek/deepseek-v4.1-flash:free http_503"]);
+    // satu panggilan Numes saja (kunci 1), model Numes kedua dilewati karena jatah habis, lalu Gemini
+    assert.deepEqual(hosts, [`api.numes.ai Bearer ${NK1}`, "generativelanguage.googleapis.com Bearer g-key"]);
+    assert.ok(skew <= 13_600, `Numes memakai ${skew} ms dari jatah 13,6 detik`);
+    assert.ok(timeouts.at(-1)! >= 10_000, `Gemini mendapat batas waktu ${timeouts.at(-1)} ms`);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("postChat: semua kunci gagal mengembalikan jawaban gagal terakhir (bisa dibaca), pemanggil lanjut ke model berikutnya", async () => {
+  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK1}` ? 429 : auth === `Bearer ${NK2}` ? 402 : 401));
+  const resp = await h.post();
+  assert.equal(resp.status, 401);
   assert.equal(h.calls.length, 3);
   assert.match(await resp.text(), /error/);
 });
@@ -238,7 +364,7 @@ test("postChat: anggaran waktu habis (timeoutMs 0) menghentikan percobaan tambah
 });
 
 test("postChat: log hanya memuat nomor kunci, tidak pernah nilainya", async () => {
-  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK3}` ? 200 : auth === `Bearer ${NK1}` ? 429 : 503));
+  const h = numesHarness([NK1, NK2, NK3], (auth) => (auth === `Bearer ${NK3}` ? 200 : auth === `Bearer ${NK1}` ? 429 : 402));
   await h.post();
   const all = h.logs.join("\n");
   for (const key of [NK1, NK2, NK3]) assert.ok(!all.includes(key), `log memuat nilai kunci: ${all}`);
@@ -263,9 +389,13 @@ test("Edge Function memakai rantai penyedia dan batas waktu per panggilan yang d
   assert.match(src, /from "\.\.\/_shared\/providers\.ts"/);
   // Batas waktu per percobaan dihitung ulang dari sisa anggaran total dan dipasang di postChat (providers.ts).
   assert.match(src, /postChat\(candidate, \{\s*timeoutMs: \(\) => nextCallTimeoutMs\(\{ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date\.now\(\) - requestStarted \}\)/);
+  // Numes: batas 12 detik per percobaan (NUMES_TIMEOUT_MS) dan satu NumesBudget per permintaan, supaya Gemini tidak kena time_budget
+  assert.match(src, /const NUMES_TIMEOUT_MS = positiveMs\(Deno\.env\.get\("NUMES_TIMEOUT_MS"\), DEFAULT_NUMES_CALL_TIMEOUT_MS\)/);
+  assert.match(src, /const numesBudget = new NumesBudget\(\{ totalBudgetMs: AI_TOTAL_BUDGET_MS \}\)/);
+  assert.match(src, /numesTimeoutMs: NUMES_TIMEOUT_MS,\s*numesBudget,/);
   assert.doesNotMatch(src, /AbortSignal\.timeout\(AI_CALL_TIMEOUT_MS\)/);
   const providersSrc = readFileSync(new URL("../supabase/functions/_shared/providers.ts", import.meta.url), "utf8");
-  assert.match(providersSrc, /signal: AbortSignal\.timeout\(Math\.max\(1, opts\.timeoutMs\(\)\)\)/);
+  assert.match(providersSrc, /signal: AbortSignal\.timeout\(Math\.max\(1, timeoutMs \?\? opts\.timeoutMs\(\)\)\)/);
   assert.doesNotMatch(src, /fetch\("https:\/\/openrouter\.ai/);
   // kunci Numes (NUMES_API_KEY, _2, _3, NUMES_API_KEYS) dibaca dari secret, dan rantai Applify menaruh Anthropic paling akhir
   assert.match(src, /numes: numesKeysFromEnv\(\(name\) => Deno\.env\.get\(name\)\)/);
