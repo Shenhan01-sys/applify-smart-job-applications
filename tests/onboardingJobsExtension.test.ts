@@ -59,10 +59,14 @@ test("ON-05: alasan kanal di applyChannel mengikuti perilaku nyata tanpa jargon 
   assert.match(portal.reason, /tidak bisa dipasang di HP/);
   assert.match(portal.reason, /berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi/);
 
-  const web = classifyJobChannel({ platform_source: "other", external_url: "https://karier.contoh.id/loker/1" });
-  assert.match(web.reason, /khusus laptop \(Chrome atau Edge/);
+  const webExt = classifyJobChannel({ platform_source: "other", external_url: "https://acme.teamtailor.com/jobs/1" });
+  assert.match(webExt.reason, /khusus laptop \(Chrome atau Edge/);
 
-  for (const r of [ats.reason, email.reason, portal.reason, web.reason]) {
+  const webManual = classifyJobChannel({ platform_source: "other", external_url: "https://karier.contoh.id/loker/1" });
+  assert.equal(webManual.extensionSupported, false);
+  assert.match(webManual.reason, /lamar manual/);
+
+  for (const r of [ats.reason, email.reason, portal.reason, webExt.reason, webManual.reason]) {
     assert.doesNotMatch(r, /\[UJI\]|ATS publik|—|!/);
   }
 });

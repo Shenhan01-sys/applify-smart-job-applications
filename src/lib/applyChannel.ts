@@ -37,9 +37,13 @@ export interface ChannelClassification {
 
 import {
   EXTENSION_LOGIN_PORTAL_DOMAINS,
+  KNOWN_ATS_DOMAINS,
   OTHER_AUTH_PORTAL_DOMAINS,
   PUBLIC_ATS_DOMAINS,
 } from "./domainManifest.generated.ts";
+
+/** Host yang benar-benar diizinkan di manifest Ekstensi Browser (selaras backend/services/apply-channel.ts, J5-02). */
+export const EXTENSION_HOST_DOMAINS: readonly string[] = [...EXTENSION_LOGIN_PORTAL_DOMAINS, ...KNOWN_ATS_DOMAINS];
 
 const AUTH_PORTAL_DOMAINS = [
   "linkedin.com",
@@ -141,6 +145,13 @@ export function isPublicAtsUrl(rawUrl: unknown): boolean {
   return hostMatchesDomain(new URL(safe).hostname, PUBLIC_ATS_DOMAINS);
 }
 
+/** URL lamaran http(s) yang hostnya terdaftar pada daftar host Ekstensi Browser (LinkedIn tidak pernah masuk). */
+export function isExtensionUrl(rawUrl: unknown): boolean {
+  const safe = sanitizeHttpUrl(rawUrl);
+  if (!safe) return false;
+  return hostMatchesDomain(new URL(safe).hostname, EXTENSION_HOST_DOMAINS);
+}
+
 export function extractPublicAtsUrl(description: string): string | null {
   if (!description) return null;
   const matches = description.match(/https?:\/\/[^\s<>"'\])}`]+/gi) ?? [];
@@ -233,7 +244,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       applyEmail,
       autoWorkerSupported: Boolean(targetUrl),
       emailApplySupported: Boolean(applyEmail),
-      extensionSupported: Boolean(targetUrl),
+      extensionSupported: isExtensionUrl(targetUrl),
       manualOnly: false,
       badgeLabel: "Formulir ATS · Agen",
       badgeTone: "ats",
@@ -250,7 +261,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       applyEmail,
       autoWorkerSupported: false,
       emailApplySupported: true,
-      extensionSupported: Boolean(primaryUrl),
+      extensionSupported: isExtensionUrl(primaryUrl),
       manualOnly: false,
       badgeLabel: "Email Gmail",
       badgeTone: "email",
@@ -263,6 +274,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     (platform ? AUTH_PORTAL_PLATFORMS.has(platform) : false);
 
   if (isPortal) {
+    const viaExtension = isExtensionUrl(primaryUrl);
     return {
       channel: "auth_portal",
       platform: platform || primaryHost || "portal",
@@ -271,15 +283,17 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       applyEmail: null,
       autoWorkerSupported: false,
       emailApplySupported: false,
-      extensionSupported: Boolean(primaryUrl),
+      extensionSupported: viaExtension,
       manualOnly: false,
-      badgeLabel: "Portal · Butuh Ekstensi",
-      badgeTone: "extension",
-      reason:
-        "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan.",
+      badgeLabel: viaExtension ? "Portal · Butuh Ekstensi" : "Portal · Manual",
+      badgeTone: viaExtension ? "extension" : "manual",
+      reason: viaExtension
+        ? "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan."
+        : "Portal ini butuh masuk akun pelamar dan belum didukung Ekstensi Browser Applify, jadi silakan lamar manual di situsnya.",
     };
   }
 
+  const externalViaExtension = isExtensionUrl(primaryUrl);
   return {
     channel: "external_web",
     platform: platform || primaryHost || "web",
@@ -288,12 +302,14 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     applyEmail: null,
     autoWorkerSupported: false,
     emailApplySupported: false,
-    extensionSupported: Boolean(primaryUrl),
+    extensionSupported: externalViaExtension,
     manualOnly: false,
-    badgeLabel: "Situs Web · Ekstensi",
-    badgeTone: "extension",
-    reason: primaryUrl
-      ? "Situs karier eksternal. Lebih andal diisi lewat Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP untuk pengisian terpandu."
-      : "Belum ada tautan lamaran eksternal pada lowongan ini.",
+    badgeLabel: externalViaExtension ? "Situs Web · Ekstensi" : "Situs Web · Manual",
+    badgeTone: externalViaExtension ? "extension" : "manual",
+    reason: !primaryUrl
+      ? "Belum ada tautan lamaran eksternal pada lowongan ini."
+      : externalViaExtension
+        ? "Situs karier eksternal yang didukung Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP untuk pengisian terpandu."
+        : "Situs karier eksternal ini belum didukung Ekstensi Browser Applify, jadi silakan lamar manual langsung di situs perusahaannya.",
   };
 }

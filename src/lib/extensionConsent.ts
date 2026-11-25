@@ -106,6 +106,12 @@ export interface ConsentFailure {
 /** Galat POST /extension-consent -> pesan untuk pengguna (teks server tidak ditampilkan). */
 export function describeConsentError(err: unknown): ConsentFailure {
   const e = parseApiError(err);
+  if (e.code === "not_extension_channel") {
+    return {
+      alreadyActive: false,
+      message: "Situs lowongan ini belum didukung Ekstensi Browser. Buka situsnya dan lamar manual.",
+    };
+  }
   if (e.status === 409) {
     return { alreadyActive: true, message: EXTENSION_CONSENT_ALREADY_RUNNING_TEXT };
   }

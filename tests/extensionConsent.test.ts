@@ -39,8 +39,12 @@ test("teks blok izin: judul, tombol, centang, dan penjelasan sesuai permintaan p
 
 test("izin tampil: disetujui, situs portal login, belum ada tugas, belum terkirim", () => {
   assert.deepEqual(extensionConsentState(base()), { show: true, reason: "not_started" });
-  // situs karier lain (bukan portal) juga didukung ekstensi
-  assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://karier.perusahaan.test/lowongan/1" })).show, true);
+  // situs ATS terdaftar di EXTENSION_HOST_DOMAINS didukung ekstensi; host luar manifest tidak (J5-02)
+  assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://acme.teamtailor.com/jobs/1" })).show, true);
+  assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://karier.perusahaan.test/lowongan/1" })).show, false);
+  const notExt = describeConsentError(new ApiError(409, JSON.stringify({ code: "not_extension_channel" })));
+  assert.equal(notExt.alreadyActive, false);
+  assert.match(notExt.message, /belum didukung Ekstensi Browser/i);
 });
 
 test("izin tersembunyi: belum disetujui, LinkedIn (manual saja), tanpa tautan, atau sudah terkirim", () => {

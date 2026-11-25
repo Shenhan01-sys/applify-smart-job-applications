@@ -57,6 +57,38 @@ export function validateRecruiterEmail(raw: unknown): EmailCheck {
 
 const IMAGE_SUFFIX = /\.(png|jpe?g|gif|svg|webp)$/i;
 
+/** Daftar penolakan alamat email sistem/contoh — disamakan dengan backend/services/apply-channel.ts (P1-07, J5-09). */
+export const IGNORED_RECRUITER_LOCAL_PARTS = new Set([
+  "noreply",
+  "no-reply",
+  "donotreply",
+  "do-not-reply",
+  "mailer-daemon",
+  "notification",
+  "notifications",
+  "support",
+  "privacy",
+  "security",
+  "abuse",
+]);
+
+export const IGNORED_RECRUITER_DOMAINS: readonly string[] = [
+  "example.com",
+  "example.org",
+  "example.net",
+  "sentry.io",
+  "wixpress.com",
+  "w3.org",
+  "schema.org",
+];
+
+function isIgnoredRecruiterEmail(email: string): boolean {
+  const [local, domain] = email.toLowerCase().split("@");
+  if (!local || !domain) return true;
+  if (IGNORED_RECRUITER_LOCAL_PARTS.has(local)) return true;
+  return IGNORED_RECRUITER_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
+}
+
 /** Addresses written in a job posting, offered as suggestions (never filled in automatically). */
 export function extractRecruiterEmails(text: unknown, max = 5): string[] {
   if (typeof text !== "string" || !text) return [];
@@ -67,6 +99,7 @@ export function extractRecruiterEmails(text: unknown, max = 5): string[] {
     if (IMAGE_SUFFIX.test(candidate)) continue;
     const c = validateRecruiterEmail(candidate);
     if (!c.ok) continue;
+    if (isIgnoredRecruiterEmail(c.email)) continue;
     const key = c.email.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
