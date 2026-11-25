@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { platformLabel } from "@/lib/platforms";
 import { classifyJobChannel } from "@/lib/applyChannel";
+import { assessJobSafety } from "@/lib/jobSafety";
 import { listOrEmpty, postedDate, radarFromMatches, safeExternalHref } from "@/lib/jobCardData";
 import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { JOB_LABELS, jobTypeLabel, marketPositionLabel, workplaceLabel } from "@/lib/jobLabels";
@@ -513,6 +514,8 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   // external_url datang dari scraper dan klien MCP: hanya http(s) yang dijadikan tautan (BS-P1-02).
   const externalHref = safeExternalHref(job.external_url);
   const channelInfo = classifyJobChannel(job);
+  const safety = assessJobSafety(job);
+  const topSafetyFlag = safety.flags.find((f) => f.severity === "high") ?? safety.flags.find((f) => f.severity === "caution") ?? null;
   const channelPillClass =
     channelInfo.badgeTone === "ats"
       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -643,14 +646,28 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
             >
               {channelInfo.badgeLabel}
             </span>
+            {topSafetyFlag && safety.riskLevel !== "low" && (
+              <span
+                className={`text-xs font-medium border px-2 py-0.5 rounded-full ${
+                  safety.riskLevel === "high"
+                    ? "bg-red-50 text-red-800 border-red-200"
+                    : "bg-amber-50 text-amber-900 border-amber-200"
+                }`}
+                title={topSafetyFlag.detail}
+              >
+                {topSafetyFlag.label}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground bg-[#F5F5F5] px-2 py-1 rounded-full">
               {JOB_LABELS.card.sourcePrefix} {platformLabel(job.platform_source)}
             </span>
-            {posted && (
+            {posted ? (
               <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 {posted.toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
               </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Tanggal tayang tidak tercantum</span>
             )}
           </div>
         </div>

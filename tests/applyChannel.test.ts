@@ -81,10 +81,26 @@ test("Portal Uji Applify: diisi worker, bukan ekstensi, dan tidak memakai teks '
   // Halaman lain di host yang sama dan host mirip bukan portal uji.
   assert.equal(isTestPortalUrl("https://applify-smart-job-applications.vercel.app/jobs"), false);
   assert.equal(isTestPortalUrl("https://applify-smart-job-applications.vercel.app.evil.test/uji-portal"), false);
-  // Situs web biasa tetap memakai teks ekstensi.
+  // Host luar EXTENSION_HOST_DOMAINS (J5-02): jujur tidak didukung ekstensi, arahkan manual.
   const other = classifyJobChannel({ platform_source: "other", external_url: "https://careers.acme.example/apply" });
-  assert.equal(other.extensionSupported, true);
-  assert.match(other.reason, /Ekstensi Browser/);
+  assert.equal(other.extensionSupported, false);
+  assert.equal(other.badgeLabel, "Situs Web · Manual");
+  assert.equal(other.badgeTone, "manual");
+  assert.match(other.reason, /lamar manual/i);
+
+  // Host ATS terdaftar di EXTENSION_HOST_DOMAINS (mis. Teamtailor) tetap didukung ekstensi.
+  const tt = classifyJobChannel({ platform_source: "other", external_url: "https://acme.teamtailor.com/jobs/123" });
+  assert.equal(tt.channel, "external_web");
+  assert.equal(tt.extensionSupported, true);
+  assert.equal(tt.badgeLabel, "Situs Web · Ekstensi");
+  assert.match(tt.reason, /Ekstensi Browser/);
+
+  // Portal login yang belum ada di manifest ekstensi (mis. Indeed) tidak menjanjikan ekstensi.
+  const indeed = classifyJobChannel({ platform_source: "indeed", external_url: "https://id.indeed.com/viewjob?jk=abc" });
+  assert.equal(indeed.channel, "auth_portal");
+  assert.equal(indeed.extensionSupported, false);
+  assert.equal(indeed.badgeLabel, "Portal · Manual");
+  assert.equal(needsBrowserExtension(indeed), false);
 });
 
 test("portal login menjelaskan butuh ekstensi khusus laptop dan mengarahkan ke situs karier perusahaan; LinkedIn manual-only tidak butuh ekstensi", () => {

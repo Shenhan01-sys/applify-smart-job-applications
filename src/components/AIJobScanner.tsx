@@ -36,13 +36,12 @@ const PLATFORMS: Platform[] = [
 
 const PORTAL_IDS = new Set(['jobstreet', 'glints', 'kalibrr', 'dealls', 'linkedin'])
 const PLATFORM_HINTS: Record<string, string> = {
-  linkedin: 'Butuh sesi ekstensi',
-  workable: 'Perlu papan perusahaan',
+  linkedin: 'Sering butuh login; lamar manual',
 }
 
-// Default: sumber yang bisa diakses tanpa login dan punya papan default di backend.
-// LinkedIn butuh sesi browser; Workable belum punya papan default (config/job-boards.json).
-const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'dealls', 'greenhouse', 'lever', 'ashby', 'smartrecruiters']
+// Default: sumber yang bisa diakses tanpa login dan punya papan default di backend (config/job-boards.json).
+// LinkedIn butuh sesi browser dan dilamar manual.
+const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'dealls', 'greenhouse', 'lever', 'ashby', 'workable', 'smartrecruiters']
 
 interface ScanStage {
   message: string

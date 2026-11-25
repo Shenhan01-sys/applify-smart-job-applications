@@ -12,12 +12,14 @@ import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
 import { classifyJobChannel, needsBrowserExtension } from "@/lib/applyChannel";
+import { isHighRiskJob } from "@/lib/jobSafety";
 import { EXTENSION_GUIDE_HREF } from "@/lib/extensionConnect";
 import {
   visibleJobs,
   jobSearchFilters,
   matchesJobSearch,
   matchesWorkplaceFilter,
+  matchesCareerLevelFilter,
   workplaceQueryFilter,
   jobsEmptyState,
   jobsEmptySubtitle,
@@ -57,6 +59,9 @@ const FILTERS = [
   { key: "remote", label: "Remote" },
   { key: "hybrid", label: "Hybrid" },
   { key: "onsite", label: "Di kantor" },
+  { key: "internship", label: "Magang" },
+  { key: "fresh-grad", label: "Fresh Grad" },
+  { key: "sma-smk", label: "SMA/SMK" },
   { key: "high-match", label: "Kecocokan 80% ke atas" },
   { key: "saved", label: "Tersimpan" },
 ] as const;
@@ -73,6 +78,7 @@ function JobsPage() {
   const fetchSeq = useRef(0);
   const [searchQuery, setSearchQuery] = useState(cari ?? "");
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+  const [hideRiskyJobs, setHideRiskyJobs] = useState(false);
 
   useEffect(() => {
     if (cari !== undefined) setSearchQuery(cari);
@@ -259,12 +265,14 @@ function JobsPage() {
   const profileHasSkills = skillsReady ? hasUsableSkills(profileSkills) : null;
 
   const filteredJobs = jobs.filter((job) => {
+    if (hideRiskyJobs && isHighRiskJob(job)) return false;
     const matchesSearch = matchesJobSearch(job, searchQuery);
 
     const matchesFilter =
       activeFilter === "all" ||
       // Remote, Hybrid, Di kantor: dibaca dari workplace_type dengan normalisasi yang sama seperti label kartu.
       matchesWorkplaceFilter(job, activeFilter) ||
+      matchesCareerLevelFilter(job, activeFilter) ||
       (activeFilter === "high-match" && (scoreOf(job) ?? -1) >= HIGH_MATCH_THRESHOLD) ||
       (activeFilter === "saved" && savedJobs.has(job.id));
 
@@ -379,6 +387,18 @@ function JobsPage() {
               {filter.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setHideRiskyJobs((prev) => !prev)}
+            aria-pressed={hideRiskyJobs}
+            className={`min-h-11 text-sm px-4 py-2 rounded-full border-2 transition ${
+              hideRiskyJobs
+                ? "bg-red-700 text-white border-red-700"
+                : "border-[#999999] text-muted-foreground hover:text-foreground hover:border-red-700"
+            }`}
+          >
+            Sembunyikan indikasi berisiko
+          </button>
         </div>
         {/* Panduan kontekstual: hanya tampil bila daftar menampilkan lowongan portal yang butuh ekstensi dan belum ditutup pengguna. */}
         {!loading && hasPortalJobs && !extensionBannerDismissed && (
