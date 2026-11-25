@@ -41,9 +41,12 @@ function StatusIcon({ status }: { status: string }) {
 export function QueuePanel({
   onApplyFinished,
   fieldsFilledByQueue,
+  sentByQueue,
 }: {
   onApplyFinished?: () => void;
   fieldsFilledByQueue?: Record<string, number | null>;
+  /** Id tugas yang menurut log percobaan sudah terkirim: tidak pernah berlabel "belum terkirim". */
+  sentByQueue?: Record<string, true>;
 }) {
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [error, setError] = useState("");
@@ -116,8 +119,9 @@ export function QueuePanel({
           // Email yang tidak dikirim karena mode uji juga tidak tampil hijau.
           const testMode = isEmailTestMode(q.status, q.job_type, q.email_test_mode);
           const needsManual = isQueueNeedsManual(q.status, q.job_type, fieldsFilled);
+          const isSent = q.status === "completed" && sentByQueue?.[q.id] === true;
           const isFilledBeforeSubmit =
-            q.status === "completed" && !needsManual && (q.job_type === "apply" || q.job_type === "extension_apply");
+            q.status === "completed" && !needsManual && !isSent && (q.job_type === "apply" || q.job_type === "extension_apply");
           const shown = testMode || needsManual ? "needs_manual" : isFilledBeforeSubmit ? "filled_only" : q.status;
           return (
           <li key={q.id} className="rounded-xl border-2 border-[#E0E0E0] bg-[#F5F5F5] p-3">
@@ -127,11 +131,11 @@ export function QueuePanel({
                 {q.job && <p className="truncate text-sm text-muted-foreground">{q.job.title} · {q.job.company}</p>}
               </div>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[shown] ?? "bg-gray-100 text-gray-800 border-gray-300"}`}>
-                <StatusIcon status={shown} /> {queueDisplayLabel(q.status, q.error_message, q.job_type, fieldsFilled, q.email_test_mode)}{isFilledBeforeSubmit ? " (belum terkirim)" : ""}
+                <StatusIcon status={shown} /> {isSent ? "Terkirim" : <>{queueDisplayLabel(q.status, q.error_message, q.job_type, fieldsFilled, q.email_test_mode)}{isFilledBeforeSubmit ? " (belum terkirim)" : ""}</>}
               </span>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {relativeTime(q.created_at)} · {queueStatusHint(q.status, q.job_type, q.error_message, fieldsFilled, q.email_test_mode)}
+              {relativeTime(q.created_at)} · {isSent ? "Agen sudah menekan kirim dan lamaran terkirim. Buktinya ada di kartu lamaran." : queueStatusHint(q.status, q.job_type, q.error_message, fieldsFilled, q.email_test_mode)}
             </p>
             {q.status === "failed" && q.error_message && (
               <details className="mt-1.5 text-xs text-muted-foreground">

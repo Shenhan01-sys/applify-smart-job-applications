@@ -10,6 +10,7 @@ import {
   CheckCircle2, Send, GraduationCap, TrendingUp, ExternalLink, Briefcase,
 } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
+import { safeJobUrl } from "@/lib/manualSubmit";
 import { isMockMode } from "@/lib/appConfig";
 import { profileSkillList, sortByMatch } from "@/lib/matchScore";
 import { greenMatchView, type GreenMatchView } from "@/lib/greenMatch";
@@ -262,9 +263,9 @@ function JobCard({
           >
             <Briefcase className="h-3.5 w-3.5" aria-hidden="true" /> Buka di Lowongan
           </Link>
-          {job.external_url && (
+          {safeJobUrl(job.external_url) && (
             <a
-              href={job.external_url}
+              href={safeJobUrl(job.external_url) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="min-h-11 inline-flex items-center justify-center gap-1 rounded-lg border-2 border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:border-neutral-400 transition"
@@ -518,8 +519,8 @@ function ResultView({ result, job, onBack }: { result: AssessmentResult; job: Gr
         <Link to="/jobs" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-8 text-sm font-bold text-white shadow-md transition-colors hover:bg-neutral-800">
           <Briefcase className="h-4 w-4" aria-hidden="true" /> Lihat lowongan yang cocok
         </Link>
-        {job?.external_url && (
-          <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-brand-emerald px-6 text-sm font-bold text-brand-emerald transition-colors hover:bg-emerald-50">
+        {job && safeJobUrl(job.external_url) && (
+          <a href={safeJobUrl(job.external_url) ?? undefined} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-brand-emerald px-6 text-sm font-bold text-brand-emerald transition-colors hover:bg-emerald-50">
             Buka lowongan {job.title} (tab baru) <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
         )}

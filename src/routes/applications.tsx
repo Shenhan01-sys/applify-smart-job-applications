@@ -15,7 +15,7 @@ import { highlightedSkills, profileSkillList } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { duplicateApplications, duplicateLabel, jobDisplay, type DuplicateInfo } from "@/lib/applicationCards";
 import { PERSONAL_DATA_LINK_LABEL, personalDataHint } from "@/lib/personalData";
-import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
+import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, sentQueueJobIds, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { getApplyState } from "@/services/formGapService";
 import AgentEvidence from "@/components/AgentEvidence";
 import AgentManualSubmit from "@/components/AgentManualSubmit";
@@ -438,6 +438,7 @@ export function AppsPage() {
   // mengisi apa pun. Hanya percobaan terbaru per lowongan yang dikenal; tugas lama tidak diberi petunjuk khusus.
   // Dihitung dari aturan yang sama dengan lencana kartu (needsFillYourself): label antrean dan lencana tidak bisa berbeda.
   const fieldsFilledByQueue = useMemo(() => fieldsFilledByQueueJob(attempts), [attempts]);
+  const sentByQueue = useMemo(() => sentQueueJobIds(attempts), [attempts]);
   // Lencana "Isi sendiri di situs" hanya untuk lamaran yang belum dikirim dan yang percobaan agennya sungguh ada
   // dan tidak mengisi apa pun (log status incomplete dengan 0 isian terisi atau reason no_fields_filled). Percobaan dicari per lowongan, jadi
   // yang tercatat sebelum lamaran ini dibuat tidak dihitung (attemptForApplication): draf baru yang belum pernah
@@ -680,7 +681,7 @@ export function AppsPage() {
       {/* Antrean tugas agen: tempat memantau tombol "Isi Formulir Saja". Di bawah papan, bukan di atasnya: panel
           baru muncul beberapa detik setelah halaman terbuka dan tingginya berubah-ubah (kosong, satu tugas, sepuluh
           tugas), jadi di atas papan ia menggeser papan sekitar 230 px ke bawah (temuan 31, uji klik 21 November 2026). */}
-      <QueuePanel onApplyFinished={reloadAfterApply} fieldsFilledByQueue={fieldsFilledByQueue} />
+      <QueuePanel onApplyFinished={reloadAfterApply} fieldsFilledByQueue={fieldsFilledByQueue} sentByQueue={sentByQueue} />
 
       {/* Detail lamaran: dialog Radix (Esc menutup, fokus terkunci di dalam, dibaca pembaca layar sebagai dialog) */}
       <Dialog open={!!pendingSubmitted} onOpenChange={(open) => { if (!open) setPendingSubmitted(null); }}>

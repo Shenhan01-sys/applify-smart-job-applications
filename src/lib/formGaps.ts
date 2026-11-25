@@ -196,6 +196,18 @@ export function fieldsFilledByQueueJob(attempts: Record<string, ApplyAttempt>): 
 }
 
 /**
+ * Id tugas antrean yang percobaannya benar-benar terkirim (log success atau application_status submitted).
+ * Panel Antrean Agen memakainya supaya tugas yang sudah terkirim tidak berlabel "belum terkirim" (25 November 2026).
+ */
+export function sentQueueJobIds(attempts: Record<string, ApplyAttempt>): Record<string, true> {
+  const out: Record<string, true> = {};
+  for (const a of Object.values(attempts)) {
+    if (a.queueJobId && (a.status === "success" || a.applicationStatus === "submitted")) out[a.queueJobId] = true;
+  }
+  return out;
+}
+
+/**
  * Kekurangan isian pada percobaan agen terbaru untuk satu lowongan, atau null.
  * Hanya baris terbaru yang dihitung: bila percobaan terbaru bukan "ready" atau "incomplete" (misalnya sudah
  * terkirim atau gagal), kekurangan dari percobaan yang lebih lama tidak ditampilkan lagi.

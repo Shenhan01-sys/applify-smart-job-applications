@@ -62,7 +62,7 @@ test("Karier Hijau: tanpa biaya dan refund karangan, ada langkah berikutnya, gal
   assert.doesNotMatch(src, /Rp15\.000|refund|Commitment fee|Eksklusif|setError\(e\.message\)|setError\(e\?\.message\)/);
   assert.match(src, /Lihat lowongan yang cocok/);
   assert.match(src, /to="\/jobs"/);
-  assert.match(src, /job\?\.external_url/);
+  assert.match(src, /safeJobUrl\(job\.external_url\)/);
   assert.match(src, /describeError\(e,/);
   assert.match(src, /<ErrorState/);
   assert.match(src, /perkiraan AI/);

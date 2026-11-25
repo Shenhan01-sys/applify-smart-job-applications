@@ -160,3 +160,17 @@ test("halaman Lamaran: tidak ada jalan memindahkan kartu ke Terkirim secara manu
   assert.doesNotMatch(src, /sudah kukirim/i);
   assert.match(src, /disabled=\{dropIntoSubmittedBlocked\(selectedApp\.status, s\)\}/);
 });
+
+test("Antrean Agen: tugas yang sudah terkirim tidak berlabel belum terkirim; tautan situs asal Karier Hijau disaring", async () => {
+  const { sentQueueJobIds } = await import("../src/lib/formGaps.ts");
+  const ids = sentQueueJobIds({
+    a: { status: "success", at: "", reason: null, fieldsFilled: 3, applicationStatus: "submitted", queueJobId: "q1" },
+    b: { status: "ready", at: "", reason: null, fieldsFilled: 3, applicationStatus: "ready", queueJobId: "q2" },
+    c: { status: "success", at: "", reason: null, fieldsFilled: 3, applicationStatus: null, queueJobId: null },
+  } as any);
+  assert.deepEqual(ids, { q1: true });
+  const panel = read("../src/components/QueuePanel.tsx");
+  assert.match(panel, /!isSent && \(q\.job_type === "apply"/);
+  const green = read("../src/routes/green-career.tsx");
+  assert.doesNotMatch(green, /href=\{job\??\.external_url\}/);
+});
