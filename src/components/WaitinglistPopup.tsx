@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Sparkles, X, Rocket, Clock, ShieldCheck, ArrowRight } from "lucide-react";
+import { Sparkles, X, UserPlus, ShieldCheck } from "lucide-react";
 
 const DISMISSED_KEY = "applify:waitinglist-dismissed";
 const JOINED_KEY = "applify:waitinglist-joined";
@@ -47,9 +47,9 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
     } catch {}
   };
 
-  const onJoin = () => {
+  const onSignUp = () => {
     setOpen(false);
-    navigate({ to: "/waitinglist" });
+    navigate({ to: "/login", search: { mode: "daftar" } });
   };
 
   if (!open) return null;
@@ -83,7 +83,7 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
         <div className="p-6 md:p-7">
           {/* Badge */}
           <div className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[#D2F801] text-[#16150F] text-[10px] font-bold uppercase tracking-wider">
-            <Sparkles className="h-3 w-3" /> Early Access
+            <Sparkles className="h-3 w-3" /> Pendaftaran
           </div>
 
           {/* Heading */}
@@ -91,18 +91,18 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
             id="waitinglist-popup-title"
             className="mt-3 font-display text-2xl md:text-3xl font-extrabold tracking-tight leading-tight"
           >
-            Mau <span className="text-gradient-primary">akses duluan</span>?
+            Pendaftaran Applify sudah dibuka.
           </h2>
           <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            Applify lagi pre-launch. Daftarkan diri — dapat bonus 1 bulan Pro gratis saat kami rilis.
+            Kamu bisa membuat akun gratis lewat tombol di bawah. Formulir minat bersifat opsional.
           </p>
 
           {/* Benefits */}
           <ul className="mt-4 space-y-2 text-sm">
             {[
-              "Akses eksklusif sebelum publik",
-              "Bonus 1 bulan Pro gratis",
-              "Pilih lowongan yang sesuai goals",
+              "Lengkapi profil dan CV",
+              "Cari lowongan dan siapkan draf lamaran",
+              "Tinjau dan setujui sebelum dikirim",
             ].map((b) => (
               <li key={b} className="flex items-start gap-2">
                 <div className="mt-0.5 h-4 w-4 rounded-full bg-[#1C9656]/15 grid place-items-center shrink-0">
@@ -113,20 +113,14 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
             ))}
           </ul>
 
-          {/* Tiny urgency */}
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
-            Kuota early access terbatas untuk 500 pendaftar pertama.
-          </div>
-
           {/* CTAs */}
           <div className="mt-5 flex flex-col sm:flex-row gap-2">
             <button
-              onClick={onJoin}
+              onClick={onSignUp}
               className="flex-1 h-11 rounded-xl gradient-primary text-white font-semibold text-sm hover:opacity-90 transition inline-flex items-center justify-center gap-1.5"
             >
-              <Rocket className="h-4 w-4" />
-              Gabung Waitinglist
+              <UserPlus className="h-4 w-4" />
+              Daftar Gratis
             </button>
             <button
               onClick={dismiss}
@@ -137,7 +131,7 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
           </div>
 
           <p className="mt-3 text-[11px] text-muted-foreground text-center">
-            Klik "Gabung" untuk isi formulir singkat. 30 detik saja.
+            Kamu juga bisa menutup pesan ini dan tetap memakai beranda.
           </p>
         </div>
       </div>

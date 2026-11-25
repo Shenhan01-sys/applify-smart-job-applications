@@ -186,7 +186,7 @@ test("permintaan antrean tidak dibuat dari masukan yang belum cukup", () => {
 
 test("panel email tidak lagi menampilkan JSON mentah dari server atau catatan 'mode uji' untuk pengembang", () => {
   const panel = read("../src/components/EmailApplyPanel.tsx");
-  assert.match(panel, /describeApiError\(e, "Gagal memulai koneksi Gmail\."\)/);
+  assert.match(panel, /describeApiError\(e,\s*"Koneksi Gmail belum bisa dimulai\. Periksa koneksi internetmu/);
   assert.doesNotMatch(panel, /e\?\.message/);
   assert.doesNotMatch(panel, /Bila server berjalan dalam mode uji|EMAIL_APPLY_TEST_MODE_NOTE/);
   assert.doesNotMatch(read("../src/lib/emailApply.ts"), /Bila server berjalan dalam mode uji/);
@@ -198,12 +198,14 @@ test("galat antrean: kode approval_required, galat server berbentuk JSON, jaring
   assert.doesNotMatch(forbidden, /approval request has expired/);
   // teks server atau teks mentah tidak pernah ditempelkan ke pesan untuk pengguna
   const generic = describeQueueError(new Error(JSON.stringify({ error: "addGenericJob failed: boom" })));
-  assert.match(generic, /Gagal memasukkan ke antrean/);
+  assert.match(generic, /Lamaran belum bisa masuk ke antrean/);
+  assert.match(generic, /Periksa koneksi internetmu/);
+  assert.match(generic, /tidak hilang/);
   assert.doesNotMatch(generic, /addGenericJob|boom/);
   assert.match(describeQueueError(new TypeError("Failed to fetch")), /tidak dapat dihubungi/);
   assert.doesNotMatch(describeQueueError("kacau"), /kacau/);
   assert.equal(describeQueueError(new ApiError(503, JSON.stringify({ error: "Gmail not configured on server" }))), "Kirim lewat Gmail belum tersedia.");
-  assert.match(describeQueueError(undefined), /Gagal memasukkan ke antrean/);
+  assert.match(describeQueueError(undefined), /Lamaran belum bisa masuk ke antrean/);
 });
 
 test("penjelasan di layar: surat dikirim apa adanya, tanpa AI, satu persetujuan satu pengiriman", () => {

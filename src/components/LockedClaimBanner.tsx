@@ -36,7 +36,10 @@ export default function LockedClaimBanner({ approvalId, row, onResolved }: Props
       setDone(true);
       await onResolved();
     } catch (err) {
-      const failure = classifyClaimResolveError(err, "Gagal menyelesaikan status klaim terkunci.");
+      const failure = classifyClaimResolveError(
+        err,
+        "Status klaim terkunci belum bisa dipulihkan. Periksa koneksi internetmu lalu coba tekan tombol di bawah lagi. Data lamaran dan persetujuanmu tidak hilang.",
+      );
       if (failure.kind === "already_done") {
         // 409: klaim sudah diselesaikan (klik ganda atau tab lain). Sembunyikan banner dan muat ulang status.
         toast.info(failure.message);

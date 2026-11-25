@@ -118,7 +118,7 @@ export const aiApplicationService = {
     }
 
     const res = await invokeGenerate(input.jobId, "generate", input.tone || "professional");
-    if (!res?.application) throw new Error(res?.error || "Gagal membuat draft AI");
+    if (!res?.application) throw new Error(res?.error || "Draf AI belum bisa dibuat. Cek sisa kuota draf dan kelengkapan profilmu, lalu coba lagi.");
     return {
       application: res.application as AIApplicationData,
       analysis: {

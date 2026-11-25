@@ -11,7 +11,22 @@ import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
-import { visibleJobs, jobSearchFilters, matchesJobSearch, matchesWorkplaceFilter, workplaceQueryFilter, jobsEmptyState, jobsEmptySubtitle, freshJobsFilter, isTestListingQuery, JOBS_PAGE_LIMIT, SCANNER_BUTTON_LABEL, TEST_LISTING_QUERY } from "@/lib/jobFilters";
+import { classifyJobChannel, needsBrowserExtension } from "@/lib/applyChannel";
+import { EXTENSION_GUIDE_HREF } from "@/lib/extensionConnect";
+import {
+  visibleJobs,
+  jobSearchFilters,
+  matchesJobSearch,
+  matchesWorkplaceFilter,
+  workplaceQueryFilter,
+  jobsEmptyState,
+  jobsEmptySubtitle,
+  freshJobsFilter,
+  isExtensionBannerDismissed,
+  dismissExtensionBanner,
+  JOBS_PAGE_LIMIT,
+  SCANNER_BUTTON_LABEL,
+} from "@/lib/jobFilters";
 import {
   HIGH_MATCH_THRESHOLD,
   computeMatch,
@@ -63,6 +78,7 @@ function JobsPage() {
     if (cari !== undefined) setSearchQuery(cari);
   }, [cari]);
   const [showScanner, setShowScanner] = useState(false);
+  const [extensionBannerDismissed, setExtensionBannerDismissed] = useState<boolean>(() => isExtensionBannerDismissed());
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -258,6 +274,10 @@ function JobsPage() {
   const orderScoreOf = (job: JobData): number | null =>
     heldScores.has(job.id) ? (heldScores.get(job.id) as number | null) : scoreOf(job);
   const shownJobs = sortByMatch(filteredJobs, orderScoreOf);
+  const hasPortalJobs = useMemo(
+    () => shownJobs.some((job) => needsBrowserExtension(classifyJobChannel(job))),
+    [shownJobs],
+  );
 
   // Keadaan kosong khusus tiap penyaring: menyebut berapa lowongan yang dimuat dan dicari, lalu apa yang bisa dicoba.
   const loadedScores = jobs.map(scoreOf).filter((s): s is number => s !== null);
@@ -280,7 +300,7 @@ function JobsPage() {
       <header className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Cari Lowongan</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Lowongan</h1>
             <p className="text-muted-foreground text-sm mt-1">
               {loading
                 ? "Memuat lowongan..."
@@ -360,19 +380,47 @@ function JobsPage() {
             </button>
           ))}
         </div>
-        {/* Penanda untuk responden tanpa ekstensi: portal login (JobStreet, Glints, Kalibrr, Dealls) butuh Ekstensi Browser. */}
-        {!isTestListingQuery(searchQuery) && (
-          <div role="note" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-[#16150F]">
-            <span>
-              Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) hanya bisa diisi lewat Ekstensi Browser.
-              Belum memasang ekstensi? Coba lowongan uji berlabel [UJI] atau lowongan dari ATS publik.
-            </span>
+        {/* Panduan kontekstual: hanya tampil bila daftar menampilkan lowongan portal yang butuh ekstensi dan belum ditutup pengguna. */}
+        {!loading && hasPortalJobs && !extensionBannerDismissed && (
+          <div
+            role="note"
+            data-testid="jobs-extension-banner"
+            className="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#0A5BE0]/20 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-[#16150F]"
+          >
+            <div className="min-w-0 flex-1 space-y-1.5 leading-relaxed">
+              <p>
+                Lowongan berlabel <strong>Portal · Butuh Ekstensi</strong> (JobStreet, Glints, Kalibrr, Dealls) diisi lewat Ekstensi Browser{" "}
+                <strong>khusus laptop (Chrome atau Edge)</strong> dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri.
+              </p>
+              <p className="text-muted-foreground">
+                Memakai HP atau belum memasang ekstensi? Pilih lowongan dari <strong>situs karier perusahaan</strong> (diisi dan dikirim agen server setelah kamu menekan Setujui) atau lamaran <strong>Email Gmail</strong> (dikirim lewat Gmail kamu setelah Setujui).
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5">
+                <Link
+                  to="/settings"
+                  hash="ekstensi"
+                  className="inline-flex min-h-11 items-center font-semibold text-[#0A5BE0] underline underline-offset-2"
+                >
+                  Pasang dan hubungkan ekstensi
+                </Link>
+                <a
+                  href={EXTENSION_GUIDE_HREF}
+                  className="inline-flex min-h-11 items-center font-semibold text-[#0A5BE0] underline underline-offset-2"
+                >
+                  Lihat panduan ekstensi
+                </a>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={() => setSearchQuery(TEST_LISTING_QUERY)}
-              className="min-h-11 rounded-lg border-2 border-[#0A5BE0] px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/10"
+              onClick={() => {
+                dismissExtensionBanner();
+                setExtensionBannerDismissed(true);
+              }}
+              aria-label="Tutup panduan ekstensi"
+              className="min-h-11 shrink-0 rounded-lg border border-[#0A5BE0]/30 bg-white px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/10"
             >
-              Tampilkan lowongan [UJI]
+              Tutup
             </button>
           </div>
         )}
@@ -439,7 +487,7 @@ function JobsPage() {
               onClick={() => setShowScanner(true)}
               className="min-h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition"
             >
-              Cari lowongan sekarang
+              {SCANNER_BUTTON_LABEL}
             </button>
           )}
         </div>

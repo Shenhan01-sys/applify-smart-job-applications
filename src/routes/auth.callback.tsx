@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { profileService } from "@/services/profileService";
 import { describeAuthError, recallAuthProvider } from "@/lib/authErrors";
+import { backSearchFor, clearAuthMode, recallAuthMode } from "@/lib/authMode";
 import { waitForSession } from "@/lib/authSession";
 import { Loader2, AlertCircle } from "lucide-react";
 
@@ -14,6 +15,8 @@ function AuthCallbackPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+  // Mode halaman masuk yang dipakai sebelum ke penyedia: tombol kembali memakainya agar pengguna daftar tetap di formulir daftar.
+  const [backSearch] = useState(() => backSearchFor(recallAuthMode()));
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -42,6 +45,7 @@ function AuthCallbackPage() {
         }
         if (session?.user) {
           window.history.replaceState(null, "", window.location.pathname);
+          clearAuthMode();
           // Pengguna baru (profil masih kosong) langsung ke Profil dengan banner sambutan.
           const target = await profileService.resolvePostLoginTarget(session.user.id);
           if (controller.signal.aborted) return;
@@ -73,6 +77,7 @@ function AuthCallbackPage() {
         </div>
         <Link
           to="/login"
+          search={backSearch}
           className="inline-flex min-h-11 items-center px-6 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition"
         >
           Kembali ke halaman masuk

@@ -12,8 +12,7 @@ export const GOLDEN_WINDOW_LABEL = "Golden Window Sniper (segera hadir)";
 export const FREE_FEATURES = [
   "10 AI Apply per bulan",
   "AI Basic (draf surat memakai model gratis Numes, Gemini, dan OpenRouter; Claude hanya cadangan terakhir)",
-  "Cover letter standar",
-  "3 platform utama",
+  "Surat lamaran standar",
   "Skill radar dasar",
   "Human approval",
 ];
@@ -21,12 +20,8 @@ export const FREE_FEATURES = [
 export const PRO_FEATURES = [
   "Hingga 20 lamaran per hari",
   "AI Premium (model Numes dan Gemini 4; Claude hanya cadangan terakhir)",
-  "Semua 7 platform",
   GOLDEN_WINDOW_LABEL,
-  "CV Optimization AI",
-  "Blind Merit Mode",
   "Green Career Track",
-  "Prioritas dukungan",
 ];
 
 export interface PlanModel {

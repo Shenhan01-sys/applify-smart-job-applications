@@ -345,7 +345,7 @@ test("kotak sesudah Simpan & Selesai: hijau hanya bila ulasan tidak menemukan ya
   const complete = profileGaps({ full_name: "Budi", current_title: "Staf", skills: 3, experiences: 0, education: 1 });
   assert.equal(finishedKind(complete), "complete");
   const noTitle = profileGaps({ full_name: "Budi", current_title: "  ", skills: 3, experiences: 2, education: 1 });
-  assert.deepEqual(noTitle.missing, ["Posisi atau jabatan belum diisi."]);
+  assert.deepEqual(noTitle.missing, ["Jabatan terakhir atau bidang yang kamu tuju belum diisi."]);
   assert.equal(finishedKind(noTitle), "incomplete");
   assert.equal(finishedKind(profileGaps({ full_name: "Budi", current_title: "Staf", skills: 0, experiences: 1, education: 1 })), "incomplete");
   assert.notEqual(FINISHED_COMPLETE_HEADING, FINISHED_INCOMPLETE_HEADING);

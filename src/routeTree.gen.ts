@@ -26,6 +26,7 @@ import { Route as GreenCareerRouteImport } from './routes/green-career'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BlindModeRouteImport } from './routes/blind-mode'
+import { Route as BantuanRouteImport } from './routes/bantuan'
 import { Route as AutomationSettingsRouteImport } from './routes/automation-settings'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ApplicationsRouteImport } from './routes/applications'
@@ -119,6 +120,11 @@ const BlindModeRoute = BlindModeRouteImport.update({
   path: '/blind-mode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BantuanRoute = BantuanRouteImport.update({
+  id: '/bantuan',
+  path: '/bantuan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AutomationSettingsRoute = AutomationSettingsRouteImport.update({
   id: '/automation-settings',
   path: '/automation-settings',
@@ -160,6 +166,7 @@ export interface FileRoutesByFullPath {
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
   '/automation-settings': typeof AutomationSettingsRoute
+  '/bantuan': typeof BantuanRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
   '/automation-settings': typeof AutomationSettingsRoute
+  '/bantuan': typeof BantuanRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/applications': typeof ApplicationsRoute
   '/approvals': typeof ApprovalsRoute
   '/automation-settings': typeof AutomationSettingsRoute
+  '/bantuan': typeof BantuanRoute
   '/blind-mode': typeof BlindModeRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -241,6 +250,7 @@ export interface FileRouteTypes {
     | '/applications'
     | '/approvals'
     | '/automation-settings'
+    | '/bantuan'
     | '/blind-mode'
     | '/dashboard'
     | '/forgot-password'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/applications'
     | '/approvals'
     | '/automation-settings'
+    | '/bantuan'
     | '/blind-mode'
     | '/dashboard'
     | '/forgot-password'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/applications'
     | '/approvals'
     | '/automation-settings'
+    | '/bantuan'
     | '/blind-mode'
     | '/dashboard'
     | '/forgot-password'
@@ -320,6 +332,7 @@ export interface RootRouteChildren {
   ApplicationsRoute: typeof ApplicationsRoute
   ApprovalsRoute: typeof ApprovalsRoute
   AutomationSettingsRoute: typeof AutomationSettingsRoute
+  BantuanRoute: typeof BantuanRoute
   BlindModeRoute: typeof BlindModeRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -462,6 +475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlindModeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bantuan': {
+      id: '/bantuan'
+      path: '/bantuan'
+      fullPath: '/bantuan'
+      preLoaderRoute: typeof BantuanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/automation-settings': {
       id: '/automation-settings'
       path: '/automation-settings'
@@ -530,6 +550,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApplicationsRoute: ApplicationsRoute,
   ApprovalsRoute: ApprovalsRoute,
   AutomationSettingsRoute: AutomationSettingsRoute,
+  BantuanRoute: BantuanRoute,
   BlindModeRoute: BlindModeRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

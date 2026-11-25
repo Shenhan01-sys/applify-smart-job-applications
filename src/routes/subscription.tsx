@@ -52,16 +52,9 @@ const TIERS: Array<{
   {
     id: "kampus",
     name: "Kampus",
-    blurb: "Lisensi B2B2C untuk kemitraan kampus.",
+    blurb: "Untuk kampus yang ingin membahas kebutuhan kerja sama.",
     icon: GraduationCap,
-    features: [
-      "Lisensi B2B2C kampus",
-      "Dashboard karier kampus",
-      "Semua fitur Pro untuk mahasiswa",
-      "Laporan penempatan kerja",
-      "Onboarding & pelatihan",
-      "Co-branding kampus",
-    ],
+    features: ["Hubungi tim Applify untuk membahas kebutuhan kampus."],
   },
 ];
 
@@ -120,7 +113,7 @@ function SubscriptionPage() {
           Mulai gratis, <span className="text-gradient-primary">upgrade saat siap.</span>
         </h1>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          Pilih paket yang paling cocok. Pembayaran via GoPay, OVO, DANA, dan QRIS — tanpa kartu kredit.
+          Pilih paket yang paling cocok. Langkah berikutnya akan ditampilkan setelah kamu memilih paket.
         </p>
 
         {current.tier !== "free" && (
@@ -223,8 +216,7 @@ function SubscriptionPage() {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground max-w-2xl mx-auto">
-          Harga final transparan sesuai paket yang dipilih.
-          {" "}Pembayaran diproses secara aman via <span className="font-semibold">Midtrans Snap</span> (rencana integrasi).
+          Detail paket dan langkah berikutnya ditampilkan sebelum kamu melanjutkan.
         </p>
       </section>
 
@@ -232,19 +224,14 @@ function SubscriptionPage() {
       <section className="max-w-6xl mx-auto px-4 md:px-8 pb-20">
         <div className="glass rounded-2xl p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
           <div className="flex-1">
-            <p className="text-xs uppercase tracking-[0.22em] text-[#1C9656] font-bold">Pembayaran Lokal</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-[#1C9656] font-bold">Paket Kampus</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Dukung e-wallet favorit kamu: GoPay, OVO, DANA, dan QRIS. Tanpa kartu kredit, tanpa drama.
+              Paket Kampus belum bisa dipilih melalui pembayaran mandiri. Kamu dapat mengisi formulir minat untuk memberi tahu tim Applify tentang kebutuhan kampus.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {["GoPay", "OVO", "DANA", "QRIS"].map((m) => (
-              <span key={m} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white border border-[color:var(--border)] text-xs font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1C9656]" />
-                {m}
-              </span>
-            ))}
-          </div>
+          <Link to="/waitinglist" className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-[color:var(--border)] bg-white px-4 text-sm font-semibold hover:bg-black/[3%] transition">
+            Isi formulir minat
+          </Link>
         </div>
       </section>
 
@@ -253,10 +240,10 @@ function SubscriptionPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" />
-              Kemitraan Paket Kampus (B2B2C)
+              Informasi Paket Kampus
             </DialogTitle>
             <DialogDescription>
-              Lisensi kampus tidak dibeli lewat e-wallet satuan. Daftarkan minat kampusmu atau hubungi tim Applify untuk onboarding, co-branding, dan pelaporan penempatan kerja mahasiswa.
+              Paket Kampus belum bisa diaktifkan melalui pembayaran mandiri. Formulir minat mencatat kebutuhan kampus dan bukan pesanan.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
@@ -271,7 +258,7 @@ function SubscriptionPage() {
               to="/waitinglist"
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#16150F] px-5 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
             >
-              Ajukan Kemitraan
+              Isi formulir minat
             </Link>
           </DialogFooter>
         </DialogContent>

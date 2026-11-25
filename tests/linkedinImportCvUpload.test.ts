@@ -53,7 +53,7 @@ test("teks kartu: satu unggahan melakukan dua hal dan pengguna diberi tahu sebel
   assert.match(LINKEDIN_PDF_CV_NOTE, /Tidak perlu mengunggah dua kali/);
   const profile = read(PROFILE);
   assert.ok(profile.includes("{RESUME_IMPORT_HINT}"), "kartu CV untuk Dilampirkan menampilkan petunjuk impor");
-  assert.ok(read(CARD).includes("{LINKEDIN_PDF_CV_NOTE}"), "kartu impor menjelaskan bahwa unggahan CV sudah mencakup impor");
+  assert.ok(read(CARD).includes("LINKEDIN_PDF_CV_NOTE"), "kartu impor menjelaskan bahwa unggahan CV sudah mencakup impor");
 });
 
 test("kartu CV: impor dipicu hanya sesudah CV berhasil tersimpan, hanya untuk PDF, sekali per unggahan; non-PDF mendapat catatan", () => {

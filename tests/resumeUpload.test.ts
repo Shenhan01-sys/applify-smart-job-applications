@@ -237,8 +237,12 @@ test("profile.tsx: selama proses berjalan tombol dan input dinonaktifkan", () =>
   assert.ok((src.match(/disabled=\{working\}/g) ?? []).length >= 4);
 });
 
-test("profile.tsx: tombol Unduh PDF dan Cek ATS yang belum berfungsi tidak diubah", () => {
+test("profile.tsx: tombol Unduh PDF, Cek ATS, dan Mode Anonim yang belum berfungsi tidak ditampilkan", () => {
   const src = read("../src/routes/profile.tsx");
-  assert.match(src, /Unduh PDF <span className="text-xs">\(segera hadir\)<\/span>/);
-  assert.match(src, /Cek ATS <span className="text-xs font-normal">\(segera hadir\)<\/span>/);
+  assert.doesNotMatch(src, /\(segera hadir\)/);
+  assert.doesNotMatch(src, />\s*Unduh PDF/);
+  assert.doesNotMatch(src, /Cek ATS/);
+  assert.doesNotMatch(src, /Mode Anonim/);
+  assert.doesNotMatch(src, /setBlind/);
 });
+

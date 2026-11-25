@@ -39,7 +39,7 @@ import { RESUME_MAX_BYTES } from "./resumeUpload.ts";
 export const LINKEDIN_PDF_HINT = "Unggah PDF profil LinkedIn (buka profilmu, pilih Lainnya (More), lalu Simpan ke PDF (Save to PDF)) atau PDF CV biasa yang berisi teks, bukan hasil pindai.";
 export const LINKEDIN_PDF_PRIVACY = "PDF tidak disimpan di sini. Isinya dibaca AI, lalu kamu periksa dulu sebelum ada yang ditambahkan ke profil.";
 /** Satu unggahan melakukan dua hal: kartu ini menjelaskannya, supaya pengguna tidak mengunggah dua kali. */
-export const LINKEDIN_PDF_CV_NOTE = "Tidak perlu mengunggah dua kali: PDF yang kamu unggah di kartu CV untuk Dilampirkan (di bawah) otomatis dibaca juga di sini.";
+export const LINKEDIN_PDF_CV_NOTE = "Tidak perlu mengunggah dua kali: PDF yang kamu unggah di kartu CV untuk Dilampirkan otomatis dibaca juga di sini.";
 /** Tambahan petunjuk di kartu CV untuk Dilampirkan. */
 export const RESUME_IMPORT_HINT = "Bila berkasnya PDF, isinya juga dibaca AI untuk mengisi profilmu. Kamu periksa dulu hasilnya; belum ada yang masuk ke profil sebelum kamu setuju.";
 export const CV_IMPORT_DIALOG_TITLE = "Isi profil dari CV ini?";
@@ -807,7 +807,7 @@ export const emptyCommit = (): CommitResult => ({
   failed: [],
 });
 
-const messageOf = (e: unknown): string => (e instanceof Error && e.message ? e.message : typeof e === "string" && e ? e : "Gagal menyimpan.");
+const messageOf = (e: unknown): string => (e instanceof Error && e.message ? e.message : typeof e === "string" && e ? e : "Sebagian data impor belum tersimpan. Coba simpan lagi, lalu cek koneksi internetmu.");
 
 /** Jalankan `fn` untuk tiap item dengan paling banyak `limit` yang berjalan bersamaan. Hasil urut seperti `items`; galat tidak menghentikan item lain. */
 export async function runLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<Array<{ ok: true; value: R } | { ok: false; error: unknown }>> {

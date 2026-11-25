@@ -3,6 +3,8 @@ import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
 import {
   EXTENSION_COPY_FAILED_TEXT,
+  EXTENSION_GUIDE_HREF,
+  EXTENSION_GUIDE_LINK_LABEL,
   EXTENSION_INSTALL_STEPS,
   EXTENSION_TOKEN_PASTE_WARNING,
   copyToClipboard,
@@ -43,7 +45,12 @@ export function ExtensionConnectCard() {
       const res = await automationApi.createExtensionToken(14400);
       setIssued({ token: res.token, expiresAt: res.expiresAt, scope: res.scope });
     } catch (err) {
-      setError(describeApiError(err, "Gagal membuat token ekstensi."));
+      setError(
+        describeApiError(
+          err,
+          "Token ekstensi belum bisa dibuat. Periksa koneksi internetmu lalu tekan tombol hubungkan lagi. Pengaturan dan token lamamu tidak hilang.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -58,7 +65,12 @@ export function ExtensionConnectCard() {
       setIssued(null);
       setNotice("Semua token ekstensi lama telah dicabut. Perangkat lama harus terhubung ulang dengan token baru.");
     } catch (err) {
-      setError(describeApiError(err, "Gagal mencabut token ekstensi."));
+      setError(
+        describeApiError(
+          err,
+          "Token ekstensi lama belum bisa dicabut. Periksa koneksi internetmu lalu coba lagi. Pengaturan perangkatmu belum berubah.",
+        ),
+      );
     } finally {
       setRevoking(false);
     }
@@ -77,15 +89,27 @@ export function ExtensionConnectCard() {
     <div className="mt-4 space-y-3">
       <div className="rounded-xl border border-black/[8%] bg-[#F7F6F2] p-3 text-xs text-muted-foreground space-y-1.5">
         <p className="font-medium text-[#16150F]">
-          Untuk portal yang butuh masuk (JobStreet, Kalibrr, Glints, Workday):
+          Untuk portal yang butuh masuk akun pelamar (JobStreet, Glints, Kalibrr, Dealls, Workday):
         </p>
         <p>
-          Ekstensi berjalan di tab Chrome/Edge milikmu sendiri. Kata sandi dan cookie portal tetap tinggal di browser-mu,
-          dan setiap kiriman tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap harus dilamar manual.
+          Ekstensi berjalan khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi membantu mengisi formulir di tabmu lalu berhenti sebelum kirim sehingga kamu yang menekan Kirim sendiri. Kata sandi dan cookie portal tetap tinggal di browser-mu, dan setiap lamaran tetap meminta persetujuan di Applify. Lowongan LinkedIn tetap harus dilamar manual.
         </p>
         <ol data-testid="extension-install-steps" className="list-decimal space-y-0.5 pl-4 pt-0.5">
-          {EXTENSION_INSTALL_STEPS.map((step) => (
-            <li key={step}>{step}</li>
+          {EXTENSION_INSTALL_STEPS.map((step, index) => (
+            <li key={step}>
+              {step}
+              {index === 0 && (
+                <>
+                  {" "}
+                  <a
+                    href={EXTENSION_GUIDE_HREF}
+                    className="font-semibold text-[#0A5BE0] underline underline-offset-2"
+                  >
+                    {EXTENSION_GUIDE_LINK_LABEL}
+                  </a>
+                </>
+              )}
+            </li>
           ))}
         </ol>
       </div>

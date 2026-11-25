@@ -173,7 +173,7 @@ test("Profil: editor dipasang di langkah 3 dan menyimpan lewat profileService (m
   const del = src.slice(src.indexOf("const deleteAchievement"), src.indexOf("const saveSkill"));
   assert.match(del, /profileService\.deleteAchievement\(id\)/);
   assert.match(del, /setAchievements\(\(prev\) => prev\.filter/);
-  assert.match(src, /serta penghargaan dan publikasi\. Setiap perubahan langsung tersimpan/);
+  assert.match(src, /serta penghargaan dan publikasi\. Setiap entri langsung tersimpan saat kamu menekan Simpan di kartunya/);
 });
 
 test("achievementDetails: keterangan ikut ditampilkan, NULL atau spasi saja menjadi kosong", () => {

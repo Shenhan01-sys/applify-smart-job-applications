@@ -9,6 +9,7 @@ import {
   ACHIEVEMENT_ISSUER_MAX,
   ACHIEVEMENT_TITLE_MAX,
   DEGREE_SUGGESTIONS,
+  saveFailureMessage,
   EMPLOYMENT_TYPES,
   LIMITS,
   LOCATION_TYPES,
@@ -168,7 +169,7 @@ export function ExperienceEditor({ items, onSave, onDelete, now, onEditingChange
       await onSave(res.row, editing === "new" ? null : editing);
       setEditing(null);
     } catch (e: any) {
-      setFormError(e?.message ? `Gagal menyimpan: ${e.message}` : "Gagal menyimpan. Coba lagi.");
+      setFormError(saveFailureMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -315,7 +316,7 @@ export function EducationEditor({ items, onSave, onDelete, now, onEditingChange 
       await onSave(res.row, editing === "new" ? null : editing);
       setEditing(null);
     } catch (e: any) {
-      setFormError(e?.message ? `Gagal menyimpan: ${e.message}` : "Gagal menyimpan. Coba lagi.");
+      setFormError(saveFailureMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -437,7 +438,7 @@ export function SkillsEditor({ items, onSave, onDelete, onEditingChange }: {
       await onSave(res.row, editing === "new" ? null : editing);
       setEditing(null);
     } catch (e: any) {
-      setFormError(e?.message ? `Gagal menyimpan: ${e.message}` : "Gagal menyimpan. Coba lagi.");
+      setFormError(saveFailureMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -535,7 +536,7 @@ export function AchievementEditor({ items, onSave, onDelete, now, onEditingChang
       await onSave(res.row, editing === "new" ? null : editing);
       setEditing(null);
     } catch (e: any) {
-      setFormError(e?.message ? `Gagal menyimpan: ${e.message}` : "Gagal menyimpan. Coba lagi.");
+      setFormError(saveFailureMessage(e));
     } finally { setSaving(false); }
   };
 

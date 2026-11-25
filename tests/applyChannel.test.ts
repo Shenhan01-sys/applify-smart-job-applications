@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import { classifyJobChannel, isTestPortalUrl, needsBrowserExtension } from "../src/lib/applyChannel.ts";
 import { describeAgentApply, describeLogOutcome } from "../src/lib/agentApplyStatus.ts";
 
-test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekstensi, dan Email Gmail", () => {
+test("classifyJobChannel frontend: situs karier perusahaan, LinkedIn manual-only, Portal ekstensi, dan Email Gmail", () => {
   const gh = classifyJobChannel({ platform_source: "greenhouse", external_url: "https://boards.greenhouse.io/acme/jobs/1" });
   assert.equal(gh.channel, "public_ats");
   assert.equal(gh.badgeLabel, "Formulir ATS · Agen");
   assert.equal(gh.autoWorkerSupported, true);
+  assert.match(gh.reason, /Situs karier perusahaan/);
+  assert.doesNotMatch(gh.reason, /ATS publik/);
 
   const li = classifyJobChannel({ platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" });
   assert.equal(li.manualOnly, true);
@@ -20,7 +22,11 @@ test("classifyJobChannel frontend: ATS publik, LinkedIn manual-only, Portal ekst
   assert.equal(ks.extensionSupported, true);
   assert.equal(ks.badgeLabel, "Portal · Butuh Ekstensi");
   assert.equal(needsBrowserExtension(ks), true);
-  assert.match(ks.reason, /\[UJI\]/);
+  assert.match(ks.reason, /khusus laptop \(Chrome atau Edge\)/);
+  assert.match(ks.reason, /tidak bisa dipasang di HP/i);
+  assert.match(ks.reason, /berhenti sebelum kirim/);
+  assert.match(ks.reason, /situs karier perusahaan/);
+  assert.doesNotMatch(ks.reason, /\[UJI\]|ATS publik/);
   assert.equal(needsBrowserExtension(gh), false);
 
   // Domain lama Kalibrr (.id) sama dengan backend EXTENSION_LOGIN_PORTAL_DOMAINS: portal ekstensi, bukan web luar.
@@ -81,11 +87,12 @@ test("Portal Uji Applify: diisi worker, bukan ekstensi, dan tidak memakai teks '
   assert.match(other.reason, /Ekstensi Browser/);
 });
 
-test("portal login menjelaskan butuh ekstensi dan mengarahkan ke [UJI]; LinkedIn manual-only tidak butuh ekstensi", () => {
+test("portal login menjelaskan butuh ekstensi khusus laptop dan mengarahkan ke situs karier perusahaan; LinkedIn manual-only tidak butuh ekstensi", () => {
   for (const url of ["https://www.jobstreet.com/id/job/1", "https://glints.com/id/opportunities/jobs/1", "https://www.kalibrr.com/c/a/jobs/1", "https://dealls.com/loker/1"]) {
     const c = classifyJobChannel({ external_url: url });
     assert.equal(c.channel, "auth_portal", url);
     assert.equal(needsBrowserExtension(c), true, url);
+    assert.doesNotMatch(c.reason, /\[UJI\]|ATS publik|—|!/);
   }
   const li = classifyJobChannel({ platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" });
   assert.equal(needsBrowserExtension(li), false);
