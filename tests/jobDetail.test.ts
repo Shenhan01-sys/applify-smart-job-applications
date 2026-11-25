@@ -387,7 +387,8 @@ test("kartu: status pengambilan terbaca pembaca layar, kegagalan menyisakan taut
   assert.match(card, /detail\.phase === "failed" && \([\s\S]*?\{detail\.note\}[\s\S]*?Buka di situs asal/);
   assert.match(card, /needsGlintsNote\(job\) && \([\s\S]*?\{GLINTS_DETAIL_NOTE\}[\s\S]*?Buka di situs asal/);
   assert.equal([...card.matchAll(/>\s*Buka di situs asal\s*</g)].length, 2);
-  assert.match(card, /href=\{job\.external_url\} target="_blank" rel="noopener noreferrer"/);
+  // BS-P1-02: tautan memakai alamat yang sudah disaring (hanya http dan https), bukan external_url mentah
+  assert.match(card, /href=\{externalHref\} target="_blank" rel="noopener noreferrer"/);
 });
 
 test("kartu: gaji memakai salaryText (sisi tunggal, mata uang, satuan), tanpa rumus min dan max sendiri", () => {

@@ -85,3 +85,20 @@ export function cleanStringList(raw: unknown): string[] {
   }
   return out;
 }
+
+/**
+ * Alamat lowongan yang aman dipakai sebagai `href`: hanya http dan https. `external_url` berasal dari scraper dan
+ * klien MCP, jadi bisa berisi `javascript:` atau `data:` (temuan BS-P1-02). Selain itu hasilnya null dan kartu
+ * tidak menampilkan tautan.
+ */
+export function safeExternalHref(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const text = raw.trim();
+  if (!text || text.length > 2000) return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}

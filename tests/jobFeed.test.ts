@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cleanStringList, listOrEmpty, postedDate, radarFromMatches, scoreOrNull } from "../src/lib/jobCardData.ts";
+import { cleanStringList, listOrEmpty, postedDate, radarFromMatches, safeExternalHref, scoreOrNull } from "../src/lib/jobCardData.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -123,4 +123,40 @@ test("skor kecocokan per pengguna (lib/matchScore.ts): null tampil —, 0 tampil
   assert.match(page, /match=\{matchOf\(selectedJob\)\}/);
   // backend: kolom jobs.match_score diisi skor deterministik atau null (dibaca, tidak diubah)
   assert.match(read("../../backend/services/job-ingest.service.ts"), /match_score/);
+});
+
+test("BS-P1-02: safeExternalHref hanya meloloskan http dan https, selain itu null", () => {
+  assert.equal(safeExternalHref("https://id.jobstreet.com/job/123"), "https://id.jobstreet.com/job/123");
+  assert.equal(safeExternalHref("http://example.com/x?a=1"), "http://example.com/x?a=1");
+  assert.equal(safeExternalHref("  https://example.com/lowongan  "), "https://example.com/lowongan");
+  for (const bad of [
+    "javascript:alert(1)",
+    "JaVaScRiPt:alert(1)",
+    "  javascript:alert(1)",
+    "java\tscript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    "ftp://example.com/x",
+    "//example.com/x",
+    "example.com/lowongan",
+    "",
+    "   ",
+    null,
+    undefined,
+    42,
+    {},
+    `https://example.com/${"a".repeat(2100)}`,
+  ]) {
+    assert.equal(safeExternalHref(bad), null, String(bad));
+  }
+});
+
+test("BS-P1-02: JobCard tidak lagi memasang external_url mentah ke href, dan tidak merender tautan bila tidak aman", () => {
+  const card = read("../src/components/JobCard.tsx");
+  assert.match(card, /const externalHref = safeExternalHref\(job\.external_url\)/);
+  assert.doesNotMatch(card, /href=\{job\.external_url\}/);
+  assert.doesNotMatch(card, /\{job\.external_url && \(/);
+  assert.equal((card.match(/href=\{externalHref\}/g) ?? []).length, 3);
+  assert.equal((card.match(/\{externalHref && \(/g) ?? []).length, 3);
 });

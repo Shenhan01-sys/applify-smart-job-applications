@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { platformLabel } from "@/lib/platforms";
 import { classifyJobChannel } from "@/lib/applyChannel";
-import { listOrEmpty, postedDate, radarFromMatches } from "@/lib/jobCardData";
+import { listOrEmpty, postedDate, radarFromMatches, safeExternalHref } from "@/lib/jobCardData";
 import { HIGH_MATCH_THRESHOLD, NO_PROFILE_SKILLS_TEXT, matchCaption, type JobMatch } from "@/lib/matchScore";
 import { JOB_LABELS, jobTypeLabel, marketPositionLabel, workplaceLabel } from "@/lib/jobLabels";
 import {
@@ -510,6 +510,8 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
   const detailLoading = detail.phase === "loading";
   const thinDetail = isThinDetail(job);
   const closed = isClosedJob(job);
+  // external_url datang dari scraper dan klien MCP: hanya http(s) yang dijadikan tautan (BS-P1-02).
+  const externalHref = safeExternalHref(job.external_url);
   const channelInfo = classifyJobChannel(job);
   const channelPillClass =
     channelInfo.badgeTone === "ats"
@@ -675,10 +677,10 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
               <button type="button" onClick={retryDetail} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
                 Coba lagi
               </button>
-              {job.external_url && (
+              {externalHref && (
                 <>
                   {" "}
-                  <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+                  <a href={externalHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
                     Buka di situs asal
                   </a>
                 </>
@@ -688,10 +690,10 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
           {needsGlintsNote(job) && (
             <p className="rounded-xl bg-[#F5F5F5] p-3 text-sm text-muted-foreground">
               {GLINTS_DETAIL_NOTE}
-              {job.external_url && (
+              {externalHref && (
                 <>
                   {" "}
-                  <a href={job.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium text-[#0A5BE0] underline underline-offset-4">
+                  <a href={externalHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-medium text-[#0A5BE0] underline underline-offset-4">
                     Buka di situs asal
                   </a>
                 </>
@@ -922,9 +924,9 @@ export function JobCard({ job, match, matchUnavailable, isSaved, onToggleSave, o
           <Send className="h-4 w-4" />
           {closed ? JOB_LABELS.card.closed : JOB_LABELS.card.apply}
         </button>
-        {job.external_url && (
+        {externalHref && (
           <a
-            href={job.external_url}
+            href={externalHref}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Buka lowongan ${job.title} di situs asal (tab baru)`}
