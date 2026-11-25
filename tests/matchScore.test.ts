@@ -455,3 +455,9 @@ test("temuan 29: daftar kesenjangan hanya ada untuk draf yang baru dibuat atau d
   assert.match(src, /shownSkillGaps !== null && \(/);
   assert.match(src, /Model tidak melaporkan kesenjangan skill/);
 });
+
+test("skill berangka yang sah (standar dan sertifikasi) tidak dibuang; angka syarat lain tetap ditolak", async () => {
+  const { cleanSkillTerm } = await import("../src/lib/matchScore.ts");
+  for (const t of ["ISO 27001", "ISO 9001:2015", "SOC 2", "PCI DSS", "NIST 800-53", "ITIL 4"]) assert.equal(cleanSkillTerm(t), t, t);
+  for (const t of ["3 tahun", "S1", "IPK 3.0", "Min. 2 tahun", "2 years", "IT SYSTEM DEVELOPMENT"]) assert.equal(cleanSkillTerm(t), null, t);
+});

@@ -325,6 +325,14 @@ const NOT_A_SKILL = /\b(tahun|years?|pengalaman|berpengalaman|experienced?|exper
 // Kalimat persyaratan yang dipotong pendek ("Mampu bekerja mandiri", "Memiliki kemampuan analisa") bukan nama skill.
 const SENTENCE_START = /^(?:memiliki|mampu|dapat|bisa|bersedia|harus|wajib|mau|senang|suka|bertanggung jawab|able to|ability to|must|have|having|willing|responsible for)\b/i;
 
+/**
+ * Nama skill sah yang memuat angka: standar dan sertifikasi (ISO 27001, SOC 2, PCI DSS 4.0, NIST 800-53, ITIL 4, COBIT 2019)
+ * Versi teknologi (Web3, Vue 3) tetap ditangani lewat allowDigits untuk skill profil. Tanpa daftar ini syarat lowongan
+ * bidang compliance dan keamanan terbuang dari skor kecocokan (temuan audit 25 November 2026). Angka lain ("3 tahun", "S1", "IPK 3.0") tetap ditolak.
+ */
+const DIGIT_SKILL =
+  /^(?:iso(?:\/iec)?\s?\d{4,5}(?::\d{4})?|iec\s?\d{4,5}|soc\s?[123](?:\s?type\s?(?:i{1,2}|[12]))?|pci[\s-]?dss(?:\s?v?\d(?:\.\d)?)?|nist(?:\s?(?:sp|csf))?\s?\d{3}(?:-\d{1,3})?|nist\s?csf\s?\d(?:\.\d)?|itil\s?v?\d|cobit\s?(?:\d{1,4})|togaf\s?\d{1,2})$/i;
+
 function stripHtml(text: string): string {
   return text.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;|&#\d+;/gi, " ");
 }
@@ -344,11 +352,11 @@ export function cleanSkillTerm(raw: unknown, allowDigits = false): string | null
     .replace(/[.;:\s]+$/, "")
     .trim();
   if (!t || t.length > 40 || t.split(/\s+/).length > 4) return null;
-  if (!/[a-z]/i.test(t) || (!allowDigits && /\d/.test(t)) || NOT_A_SKILL.test(t) || SENTENCE_START.test(t)) return null;
+  if (!/[a-z]/i.test(t) || (!allowDigits && /\d/.test(t) && !DIGIT_SKILL.test(t)) || NOT_A_SKILL.test(t) || SENTENCE_START.test(t)) return null;
   // sisa kalimat seperti "atau bidang terkait" bukan skill
   if (/\bbidang terkait\b|\brelated (?:field|area)s?\b|\bsejenis\b/i.test(t)) return null;
   // judul bagian berhuruf kapital semua ("IT SYSTEM DEVELOPMENT") bukan skill; singkatan pendek (SQL, TKJ) tetap lolos
-  if (t.includes(" ") && t === t.toUpperCase()) return null;
+  if (t.includes(" ") && t === t.toUpperCase() && !DIGIT_SKILL.test(t) && !/^(?:PCI DSS|AWS IAM|GCP IAM)$/.test(t)) return null;
   // butir berkoma seperti "Responsible, proactive, and reliable" adalah kalimat sifat, bukan satu skill
   if (t.includes(",")) return null;
   return t;

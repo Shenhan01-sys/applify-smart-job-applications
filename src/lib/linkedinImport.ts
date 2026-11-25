@@ -119,6 +119,8 @@ export function describeLinkedInImportError(err: unknown, fallback = "PDF belum 
       return "PDF tidak bisa dibaca. PDF yang rusak atau dikunci kata sandi tidak didukung.";
     case "pdf_too_long":
       return "PDF terlalu panjang untuk CV atau profil LinkedIn. Pastikan itu PDF CV atau profilmu.";
+    case "ocr_unavailable":
+      return "PDF ini berupa gambar, dan pembaca teks gambar (OCR) sedang tidak tersedia. Coba lagi beberapa menit lagi. Bila tetap gagal, unduh ulang CV dari Canva sebagai PDF Standar tanpa opsi Ratakan PDF.";
     case "pdf_no_text":
       return "Teks di PDF ini tidak bisa dibaca karena isinya berupa gambar (hasil pindai, atau CV Canva yang diunduh dengan opsi Ratakan PDF). Unduh ulang dari Canva sebagai PDF Standar tanpa Ratakan PDF, atau dari LinkedIn: Lainnya, Simpan ke PDF.";
     case "nothing_found":

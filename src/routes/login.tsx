@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
 import { describeAuthError, rememberAuthProvider } from "@/lib/authErrors";
+import { detectInAppBrowser, inAppBrowserWarning } from "@/lib/inAppBrowser";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -57,6 +58,8 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Peramban bawaan WhatsApp/Instagram: Google menolak OAuth dari sana, jadi beri tahu sebelum tombol ditekan.
+  const [inApp] = useState(() => (typeof navigator === "undefined" ? null : detectInAppBrowser(navigator.userAgent)));
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -233,6 +236,12 @@ function LoginPage() {
               Daftar
             </button>
           </div>
+
+          {inApp && (
+            <p role="alert" className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+              {inAppBrowserWarning(inApp)}
+            </p>
+          )}
 
           {/* Google OAuth Button */}
           <button
