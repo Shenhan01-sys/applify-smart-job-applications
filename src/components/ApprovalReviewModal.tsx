@@ -188,7 +188,7 @@ export default function ApprovalReviewModal({
           <div className="mb-4">
             <div className="mb-2 flex items-center justify-between">
               <h4 className="flex items-center gap-1.5 text-sm font-semibold text-[#16150F]">
-                Cover Letter
+                Surat Lamaran
                 {edited && (
                   <span className="rounded-full bg-[#D2F801] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#16150F]">
                     diedit

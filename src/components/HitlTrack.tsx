@@ -36,7 +36,7 @@ export function HitlTrack({ stage, caption, className = "" }: HitlTrackProps) {
         >
           <div className="animate-dbBotIdle flex items-center gap-1 rounded-md border-2 border-[#16150F] bg-white px-1.5 py-0.5 shadow-[2px_2px_0_#16150F]">
             <FileText className="h-3 w-3 text-[#16150F]" />
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#16150F]">CL</span>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#16150F]">Surat</span>
           </div>
         </div>
 
