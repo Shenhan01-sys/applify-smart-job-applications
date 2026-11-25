@@ -24,7 +24,10 @@ const EVENT_NAME = "applify:subscription-change";
 export const PLAN_PRICE: Record<PlanTier, { amount: number; label: string; period: string }> = {
   free: { amount: 0, label: "Gratis", period: "selamanya" },
   pro: { amount: 69000, label: "Rp 69.000", period: "/bulan" },
-  kampus: { amount: 50_000_000, label: "Rp 50jt", period: "/semester" },
+  // Tarif Kampus tidak ada di kode maupun dokumen keuangan (Laporan-Keuangan-Applify memuat paket Silver, Gold, dan
+  // Platinum per jumlah mahasiswa, bukan satu angka tetap). Karena itu tidak ada harga yang ditampilkan: paket ini
+  // dibahas lewat tim Applify (UX-P7-07). amount 0 aman karena halaman pembayaran menolak paket kampus.
+  kampus: { amount: 0, label: "Hubungi kami", period: "" },
 };
 
 /**

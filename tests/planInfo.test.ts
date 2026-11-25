@@ -159,11 +159,20 @@ test("Golden Window Sniper belum ada di kode, jadi di UI berlabel segera hadir",
   assert.doesNotMatch(settings, /"Golden Window"/);
 });
 
-test("harga tidak berubah: Free gratis, Pro Rp 69.000/bulan, Kampus Rp 50jt/semester", () => {
+test("harga: Free gratis, Pro Rp 69.000/bulan (sesuai Laporan Keuangan); Kampus tanpa angka karena tarifnya tidak tercatat di mana pun", () => {
   assert.deepEqual(PLAN_PRICE.free, { amount: 0, label: "Gratis", period: "selamanya" });
   assert.deepEqual(PLAN_PRICE.pro, { amount: 69000, label: "Rp 69.000", period: "/bulan" });
-  assert.deepEqual(PLAN_PRICE.kampus, { amount: 50_000_000, label: "Rp 50jt", period: "/semester" });
   const landing = read("applify-smart-job-applications/src/routes/index.tsx");
   assert.match(landing, /price: "Rp 69\.000", per: "\/bulan"/);
-  assert.match(landing, /price: "Rp 50jt", per: "\/semester"/);
+
+  // UX-P7-07: "Rp 50jt/semester" tidak ada di kode maupun Laporan Keuangan (yang memuat Silver/Gold/Platinum per
+  // jumlah mahasiswa), jadi tidak boleh ditampilkan. Kampus memakai kalimat netral dan tidak bisa dibayar mandiri.
+  assert.deepEqual(PLAN_PRICE.kampus, { amount: 0, label: "Hubungi kami", period: "" });
+  assert.match(landing, /name: "Kampus", price: "Hubungi kami", per: ""/);
+  const payment = read("applify-smart-job-applications/src/routes/payment.tsx");
+  assert.match(payment, /plan === "kampus"[\s\S]{0,80}navigate\(\{ to: "\/subscription" \}\)/);
+  for (const f of ["routes/index.tsx", "routes/subscription.tsx", "routes/payment.tsx", "routes/settings.tsx", "lib/subscriptionStore.ts", "lib/planInfo.ts"]) {
+    const src = read(`applify-smart-job-applications/src/${f}`);
+    assert.doesNotMatch(src, /50\s?jt|50_000_000|50\.000\.000/i, `${f} masih memuat tarif Kampus yang tidak berdasar`);
+  }
 });

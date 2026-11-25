@@ -1296,7 +1296,7 @@ function Pricing({ authLink }: { authLink: string }) {
   const tiers: Array<{ name: string; price: string; per: string; popular?: boolean; features: string[]; planned?: string[] }> = [
     { name: "Free", price: "Gratis", per: "selamanya", features: FREE_FEATURES },
     { name: "Pro", price: "Rp 69.000", per: "/bulan", popular: true, features: PRO_FEATURES, planned: PLANNED_FEATURES },
-    { name: "Kampus", price: "Rp 50jt", per: "/semester", features: ["Hubungi tim Applify untuk membahas kebutuhan kampus."] },
+    { name: "Kampus", price: "Hubungi kami", per: "", features: ["Hubungi tim Applify untuk membahas kebutuhan kampus."] },
   ];
   return (
     <ScrollReveal delay={100}>

@@ -95,7 +95,8 @@ function PaymentPage() {
   const price = PLAN_PRICE[tier];
 
   useEffect(() => {
-    if (!plan) {
+    // Paket Kampus tidak punya harga tetap dan tidak dibayar mandiri: kembali ke halaman paket.
+    if (!plan || plan === "kampus") {
       navigate({ to: "/subscription" });
     }
   }, [plan, navigate]);
