@@ -316,9 +316,12 @@ test("Windows Server tidak dihitung ganda sebagai Windows; LAN dan WAN yang dipi
 });
 
 test("kamus administrasi, desain, pemasaran, dan data: skill terbaca dari deskripsi", () => {
+  // Temuan 43: kata peran di judul tidak dihitung sebagai skill bila tidak disebut di deskripsi atau requirements.
   const admin = computeMatch({ title: "Staf Administrasi", description: "Akuntansi dasar, Excel, dan komunikasi." }, ["Administrasi", "Excel"]);
-  assert.deepEqual(admin.matched.sort(), ["Administrasi", "Excel"]);
+  assert.deepEqual(admin.matched.sort(), ["Excel"]);
   assert.ok(admin.missing.includes("Akuntansi") && admin.missing.includes("Komunikasi"));
+  const adminSkill = computeMatch({ title: "Staf Administrasi", description: "Excel.", requirements: ["Administrasi"] }, ["Administrasi", "Excel"]);
+  assert.deepEqual(adminSkill.matched.sort(), ["Administrasi", "Excel"]);
 
   const design = computeMatch(
     { title: "Graphic Designer", description: "Menguasai Figma, Adobe Photoshop, Illustrator, Canva, dan CorelDraw." },

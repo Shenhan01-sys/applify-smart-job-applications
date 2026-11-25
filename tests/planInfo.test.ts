@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FREE_FEATURES, PRO_FEATURES, PLAN_MODELS, GOLDEN_WINDOW_LABEL } from "../src/lib/planInfo.ts";
+import { FREE_FEATURES, PRO_FEATURES, PLAN_MODELS, GOLDEN_WINDOW_LABEL, PLANNED_FEATURES } from "../src/lib/planInfo.ts";
 import { PLAN_PRICE } from "../src/lib/subscriptionStore.ts";
 
 // ---- halaman harga dan pengaturan AI hanya boleh memuat klaim yang sesuai kode ----------------------------
@@ -118,11 +118,17 @@ test("Golden Window Sniper belum ada di kode, jadi di UI berlabel segera hadir",
   assert.deepEqual(hits, []);
 
   assert.match(GOLDEN_WINDOW_LABEL, /segera hadir/);
-  assert.ok(PRO_FEATURES.includes(GOLDEN_WINDOW_LABEL));
-  assert.equal(PRO_FEATURES.filter((f) => /Golden Window/.test(f) && !/segera hadir/.test(f)).length, 0);
+  // Golden Window tidak lagi bagian paket berbayar; hanya tercantum sebagai rencana.
+  assert.ok(!PRO_FEATURES.includes(GOLDEN_WINDOW_LABEL));
+  assert.ok(PLANNED_FEATURES.includes(GOLDEN_WINDOW_LABEL));
+  assert.equal(PRO_FEATURES.filter((f) => /Golden Window/.test(f)).length, 0);
 
   const landing = read("applify-smart-job-applications/src/routes/index.tsx");
   assert.match(landing, /badge="Segera hadir"[^>]*title="Golden Window Sniper"/);
+  // Daftar rencana tampil terpisah dari fitur paket di beranda dan halaman langganan.
+  assert.match(landing, /Rencana, belum tersedia:/);
+  const subscriptionPage = read("applify-smart-job-applications/src/routes/subscription.tsx");
+  assert.match(subscriptionPage, /Rencana, belum tersedia:/);
   const settings = read("applify-smart-job-applications/src/routes/settings.tsx");
   assert.doesNotMatch(settings, /"Golden Window"/);
 });

@@ -37,11 +37,16 @@ import { RESUME_MAX_BYTES } from "./resumeUpload.ts";
 
 /** Petunjuk satu baris di kartu impor. */
 export const LINKEDIN_PDF_HINT = "Unggah PDF profil LinkedIn (buka profilmu, pilih Lainnya (More), lalu Simpan ke PDF (Save to PDF)) atau PDF CV biasa yang berisi teks, bukan hasil pindai.";
-export const LINKEDIN_PDF_PRIVACY = "PDF tidak disimpan di sini. Isinya dibaca AI, lalu kamu periksa dulu sebelum ada yang ditambahkan ke profil.";
+export const LINKEDIN_PDF_PRIVACY = "PDF dikirim ke server untuk membuat pratinjau profil. Belum ada yang ditambahkan sampai kamu memilih item dan menekan Tambahkan ke profil.";
+/** Consent is per action and intentionally never remembered in browser storage. */
+export const AI_CV_CONSENT_TEXT = "Saya setuju isi CV, termasuk PDF/gambar yang perlu OCR, diproses layanan AI untuk membuat pratinjau profil.";
+export function aiCvConsentHeaders(consented: boolean): Record<string, string> {
+  return consented ? { "x-ai-consent": "true" } : {};
+}
 /** Satu unggahan melakukan dua hal: kartu ini menjelaskannya, supaya pengguna tidak mengunggah dua kali. */
 export const LINKEDIN_PDF_CV_NOTE = "Tidak perlu mengunggah dua kali: PDF yang kamu unggah di kartu CV untuk Dilampirkan otomatis dibaca juga di sini.";
 /** Tambahan petunjuk di kartu CV untuk Dilampirkan. */
-export const RESUME_IMPORT_HINT = "Bila berkasnya PDF, isinya juga dibaca AI untuk mengisi profilmu. Kamu periksa dulu hasilnya; belum ada yang masuk ke profil sebelum kamu setuju.";
+export const RESUME_IMPORT_HINT = "PDF bisa diproses layanan AI setelah kamu mencentang persetujuan. Kamu memeriksa pratinjau sebelum menambahkan data; CV tetap dilampirkan jika proses AI dilewati.";
 export const CV_IMPORT_DIALOG_TITLE = "Isi profil dari CV ini?";
 export const CV_IMPORT_DIALOG_HINT = "CV kamu sudah tersimpan. Centang data yang mau ditambahkan ke profil. Data yang sudah ada tidak ditimpa, dan belum ada yang tersimpan sampai kamu menekan Tambahkan ke profil.";
 export const CV_IMPORT_READING = "CV tersimpan. Isinya sedang dibaca untuk mengisi profil...";
@@ -109,6 +114,8 @@ export function describeLinkedInImportError(err: unknown, fallback = "PDF belum 
   if (err instanceof Error && (err as { code?: unknown }).code === "api_not_configured") return err.message;
   const e = parseApiError(err);
   switch (e.code) {
+    case "ai_consent_required":
+      return "Centang persetujuan pemrosesan CV oleh layanan AI sebelum memulai impor.";
     case "not_pdf":
       return "Berkas ini bukan PDF. Pakai PDF profil LinkedIn (Lainnya, Simpan ke PDF) atau PDF CV biasa.";
     case "empty_file":

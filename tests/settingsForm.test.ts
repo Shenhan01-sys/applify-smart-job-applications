@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { listToText, numberToText, parseCommaList, parseOptionalNumber, sameList } from "../src/lib/settingsForm.ts";
+import { listToText, numberToText, parseCommaList, parseIndonesianSalary, parseOptionalNumber, sameList } from "../src/lib/settingsForm.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 /** Komentar JSX dibuang: yang dicek adalah yang tampil atau dikirim, bukan catatan pengembang. */
@@ -40,6 +40,22 @@ test("kolom angka kosong dikirim sebagai null, bukan 0", () => {
   assert.equal(parseOptionalNumber(" 30 "), 30);
 });
 
+test("parser gaji Indonesia membaca pemisah ribuan, Rp, desimal, dan satuan", () => {
+  for (const [input, expected] of [
+    ["5.000.000", 5_000_000],
+    ["6,5 jt", 6_500_000],
+    ["6.5 juta", 6_500_000],
+    ["Rp 8.500.000", 8_500_000],
+    ["7500000", 7_500_000],
+    ["6.500", 6_500],
+    ["Rp 1,25 juta", 1_250_000],
+    ["2 rb", 2_000],
+  ] as const) assert.equal(parseIndonesianSalary(input), expected, input);
+  for (const input of ["", "   ", "Rp", "enam juta", "5,5jt++", "-5000", "Infinity"]) {
+    assert.equal(parseIndonesianSalary(input), null, input);
+  }
+});
+
 test("masa pemberitahuan tanpa nilai tersimpan tampil kosong, tidak 30", () => {
   assert.equal(numberToText(null), "");
   assert.equal(numberToText(undefined), "");
@@ -56,11 +72,21 @@ test("halaman Pengaturan Agen memakai kolom daftar dengan teks mentah dan angka 
   assert.doesNotMatch(settingsPage, /\.join\(', '\)/);
   assert.doesNotMatch(settingsPage, /v\.split\(','\)/);
   assert.doesNotMatch(settingsPage, /updateField\('(desired_salary|current_ctc|notice_period)', Number\(v\)\)/);
-  assert.match(settingsPage, /updateField\('desired_salary', parseOptionalNumber\(v\)\)/);
-  assert.match(settingsPage, /updateField\('current_ctc', parseOptionalNumber\(v\)\)/);
+  assert.match(settingsPage, /parseIndonesianSalary\(salaryText\.desired_salary\)/);
+  assert.match(settingsPage, /parseIndonesianSalary\(salaryText\.current_ctc\)/);
+  assert.match(settingsPage, /label="Gaji yang diharapkan \(Rp, sesuai isian formulir\)" type="text" inputMode="decimal"/);
+  assert.match(settingsPage, /Contoh: 5\.000\.000 atau 6,5 jt/);
   assert.match(settingsPage, /updateField\('notice_period', parseOptionalNumber\(v\)\)/);
   // teks mentah dirapikan saat kolom ditinggalkan
   assert.match(settingsPage, /onBlur=\{\(\) => setText\(listToText\(parseCommaList\(text\)\)\)\}/);
+});
+
+test("langkah Preferensi Profil menerima format gaji Rupiah dan mencegah simpan dengan format salah", () => {
+  assert.match(profilePage, /type="text"[\s\S]*?inputMode="decimal"/);
+  assert.match(profilePage, /parseIndonesianSalary\(raw\)/);
+  assert.match(profilePage, /onSalaryError\(key, "Format gaji belum dikenali/);
+  assert.match(profilePage, /\.\.\.validatePreferences\(preferences\), \.\.\.prefErrors/);
+  assert.match(profilePage, /Contoh: 5\.000\.000 atau 6,5 jt/);
 });
 
 test("sakelar ekstensi otomatis ada di tab Perilaku Agen, bawaannya mati", () => {

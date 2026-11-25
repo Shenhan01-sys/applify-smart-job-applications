@@ -4,7 +4,7 @@ import { Check, Sparkles, ArrowRight, ArrowLeft, Building2, GraduationCap, Zap, 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { FREE_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
+import { FREE_FEATURES, PLANNED_FEATURES, PRO_FEATURES } from "@/lib/planInfo";
 import { PLAN_PRICE, type PlanTier } from "@/lib/subscriptionStore";
 import { useSubscription } from "@/hooks/useSubscription";
 
@@ -31,6 +31,7 @@ const TIERS: Array<{
   icon: typeof Zap;
   popular?: boolean;
   features: string[];
+  planned?: string[];
   highlight?: string;
 }> = [
   {
@@ -48,6 +49,7 @@ const TIERS: Array<{
     popular: true,
     highlight: "Paling Populer",
     features: PRO_FEATURES,
+    planned: PLANNED_FEATURES,
   },
   {
     id: "kampus",
@@ -178,6 +180,15 @@ function SubscriptionPage() {
                     </li>
                   ))}
                 </ul>
+
+                {t.planned && t.planned.length > 0 && (
+                  <div className="mt-5 rounded-xl bg-black/[3%] p-3 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground">Rencana, belum tersedia:</p>
+                    <ul className="mt-1 list-disc pl-4 space-y-1">
+                      {t.planned.map((f) => <li key={f}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
 
                 <button
                   onClick={() => onSelect(t.id)}

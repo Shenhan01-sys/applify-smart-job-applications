@@ -49,7 +49,7 @@ test("teks kartu: satu unggahan melakukan dua hal dan pengguna diberi tahu sebel
   assert.match(CV_IMPORT_DIALOG_HINT, /belum ada yang tersimpan sampai kamu menekan Tambahkan ke profil/);
   assert.match(RESUME_IMPORT_HINT, /PDF/);
   assert.match(RESUME_IMPORT_HINT, /AI/);
-  assert.match(RESUME_IMPORT_HINT, /periksa dulu/);
+  assert.match(RESUME_IMPORT_HINT, /memeriksa pratinjau/);
   assert.match(LINKEDIN_PDF_CV_NOTE, /Tidak perlu mengunggah dua kali/);
   const profile = read(PROFILE);
   assert.ok(profile.includes("{RESUME_IMPORT_HINT}"), "kartu CV untuk Dilampirkan menampilkan petunjuk impor");
@@ -62,9 +62,9 @@ test("kartu CV: impor dipicu hanya sesudah CV berhasil tersimpan, hanya untuk PD
   const pick = card.slice(card.indexOf("const onPick"), card.indexOf("const onView"));
   // pemicu berada sesudah uploadResume berhasil, bukan di dalam blok try yang bisa gagal sebelum tersimpan
   assert.ok(pick.indexOf("uploadResume(userId, file)") < pick.indexOf("saved = true"));
-  assert.ok(pick.indexOf("saved = true") < pick.indexOf("onUploaded?.(file)"));
-  assert.equal(pick.match(/onUploaded\?\.\(file\)/g)?.length, 1, "satu unggahan, satu pemicu");
-  assert.match(pick, /if \(saved\) \{[\s\S]*cvImportEligibility\(file\)[\s\S]*onUploaded\?\.\(file\)[\s\S]*setNote\(eligible\.message\)/);
+  assert.ok(pick.indexOf("saved = true") < pick.indexOf("onUploaded?.(file, true)"));
+  assert.equal(pick.match(/onUploaded\?\.\(file, true\)/g)?.length, 1, "satu unggahan dengan persetujuan, satu pemicu");
+  assert.match(pick, /if \(saved\) \{[\s\S]*cvImportEligibility\(file\)[\s\S]*eligible && aiConsent\) onUploaded\?\.\(file, true\)[\s\S]*setNote\(eligible\.message\)/);
   assert.match(pick, /fail\(err, "CV belum terunggah\. Coba lagi\."\)/, "gagal unggah tetap dilaporkan seperti semula");
   // catatan non-PDF bukan galat: role=status, bukan alert
   assert.match(src, /role="status" data-testid="resume-note"/);
@@ -76,7 +76,7 @@ test("halaman Profil: kartu impor dipegang lewat ref dan dipicu dari kartu CV; t
   const src = read(PROFILE);
   assert.match(src, /const importRef = useRef<LinkedInImportHandle>\(null\)/);
   assert.match(src, /<LinkedInImportCard\s+ref=\{importRef\}/);
-  assert.match(src, /<ResumeCard userId=\{user\.id\} onUploaded=\{\(file\) => \{ void importRef\.current\?\.startFromCv\(file\); \}\} \/>/);
+  assert.match(src, /<ResumeCard userId=\{user\.id\} onUploaded=\{\(file, consented\) => \{ void importRef\.current\?\.startFromCv\(file, consented\); \}\} \/>/);
   assert.doesNotMatch(src, /importLinkedInPdf/, "halaman tidak memanggil layanan impor sendiri");
   assert.equal(read(CARD).match(/automationApi\.importLinkedInPdf\(/g)?.length, 1, "satu pintu ke AI");
 });
@@ -89,7 +89,7 @@ test("kartu impor: startFromCv memakai alur yang sama (runImport), dengan penjag
   assert.match(handle, /cvImportEligibility\(file\)\.eligible/);
   assert.match(handle, /blockedRef\.current/, "profil belum termuat penuh: duplikat tidak bisa dicek, jadi dilewati");
   assert.match(handle, /active\.current/, "impor lain sedang berjalan: tidak ada panggilan AI kedua");
-  assert.match(handle, /await runImport\(file, "cv"\)/);
+  assert.match(handle, /await runImport\(file, "cv", consented\)/);
   // semua jalur impor lewat runImport; pemilih berkas juga menjaga active
   const run = src.slice(src.indexOf("const runImport"), src.indexOf("const onPick"));
   assert.match(run, /active\.current = true/);

@@ -322,6 +322,18 @@ export function hasUsableSkills(skills: readonly string[]): boolean {
 // Frasa keterangan ("Berpengalaman diutamakan", "Minimal S1", "Nilai plus") juga bukan skill: JobStreet menaruhnya
 // di daftar tag lowongan (uji klik 21 November 2026, temuan 23).
 const NOT_A_SKILL = /\b(tahun|years?|pengalaman|berpengalaman|experienced?|experience|minimal|maksimal|usia|umur|domisili|fresh graduate|lulusan|gaji|salary|cv|resume|portofolio|portfolio|ktp|ijazah|transkrip|sim|diutamakan|diprioritaskan|dibutuhkan|diharapkan|dipertimbangkan|preferred|required|nilai plus|nilai tambah|lebih disukai|a plus)\b/i;
+
+/**
+ * Kata peran pada judul lowongan ("Staf Administrasi", "Marketing", "Customer Service") bukan skill yang harus
+ * dimiliki pelamar bila tidak disebut ulang di deskripsi, requirements, atau skill_matches. Tanpa pengecualian ini,
+ * kandidat yang memenuhi satu-satunya skill teknis yang diminta tetap mendapat skor 50 persen.
+ */
+const ROLE_ONLY_TERMS = new Set([
+  "administrasi", "administration", "admin", "administrator", "marketing", "pemasaran",
+  "operasional", "operations", "customer service", "layanan pelanggan", "sales", "penjualan",
+  "akuntansi", "accounting", "keuangan", "finance", "hr", "sdm", "sumber daya manusia",
+  "manajemen", "management", "staf", "staff", "konsultan", "consultant",
+]);
 // Kalimat persyaratan yang dipotong pendek ("Mampu bekerja mandiri", "Memiliki kemampuan analisa") bukan nama skill.
 const SENTENCE_START = /^(?:memiliki|mampu|dapat|bisa|bersedia|harus|wajib|mau|senang|suka|bertanggung jawab|able to|ability to|must|have|having|willing|responsible for)\b/i;
 
@@ -389,16 +401,19 @@ export function computeMatch(job: MatchJobInput, profileSkills: readonly string[
   const requirements = stringsOf(job.requirements);
   const title = typeof job.title === "string" ? job.title : "";
   const hay = normalize([title, description, ...requirements, ...stringsOf(job.skill_matches)].join(" \n "));
+  const bodyHay = normalize([description, ...requirements, ...stringsOf(job.skill_matches)].join(" \n "));
+  const titleN = normalize(title);
 
   const profileCanon = new Set(entries.flatMap((e) => (e.canon ? [e.canon.toLowerCase()] : [])));
   // kunci -> { label, covered }; Map mempertahankan urutan ditemukan
   const found = new Map<string, { label: string; covered: boolean }>();
 
   for (const name of dictionarySkills(hay)) {
+    const canonical = normalize(name);
+    if (ROLE_ONLY_TERMS.has(canonical) && containsTerm(titleN, canonical) && !containsTerm(bodyHay, canonical)) continue;
     found.set(name.toLowerCase(), { label: name, covered: profileCanon.has(name.toLowerCase()) });
   }
 
-  const titleN = normalize(title);
   for (const term of explicitTerms(requirements, description)) {
     const n = normalize(term);
     // istilah yang sudah memuat skill kamus diwakili oleh skill kamus itu, supaya tidak dihitung dua kali

@@ -6,6 +6,7 @@ import {
   GMAIL_DENIED_TEXT,
   GMAIL_FAILED_TEXT,
   GMAIL_SESSION_TEXT,
+  GMAIL_NO_REFRESH_TEXT,
   GMAIL_UNAVAILABLE_TEXT,
   GMAIL_UNKNOWN_ERROR_TEXT,
   gmailBanner,
@@ -43,10 +44,11 @@ test("parseGmailCallback dan gmailBanner: berhasil, ditolak, gagal teknis, dan a
   for (const reason of ["invalid_state", "session_mismatch", "missing_params"]) {
     assert.deepEqual(gmailBanner({ kind: "error", reason }), { tone: "error", text: GMAIL_SESSION_TEXT }, reason);
   }
+  assert.deepEqual(gmailBanner({ kind: "error", reason: "no_refresh_token" }), { tone: "error", text: GMAIL_NO_REFRESH_TEXT });
   assert.deepEqual(gmailBanner({ kind: "error", reason: "not_configured" }), { tone: "error", text: GMAIL_UNAVAILABLE_TEXT });
   assert.deepEqual(gmailBanner({ kind: "error", reason: "kode_baru_dari_google" }), { tone: "error", text: GMAIL_UNKNOWN_ERROR_TEXT });
   assert.deepEqual(gmailBanner({ kind: "error", reason: null }), { tone: "error", text: GMAIL_UNKNOWN_ERROR_TEXT });
-  for (const text of [GMAIL_CONNECTED_TEXT, GMAIL_DENIED_TEXT, GMAIL_FAILED_TEXT, GMAIL_SESSION_TEXT, GMAIL_UNAVAILABLE_TEXT, GMAIL_UNKNOWN_ERROR_TEXT]) {
+  for (const text of [GMAIL_CONNECTED_TEXT, GMAIL_DENIED_TEXT, GMAIL_FAILED_TEXT, GMAIL_SESSION_TEXT, GMAIL_NO_REFRESH_TEXT, GMAIL_UNAVAILABLE_TEXT, GMAIL_UNKNOWN_ERROR_TEXT]) {
     assert.doesNotMatch(text, /oauth|token|GOOGLE|server|administrator|reason/i);
   }
 });
@@ -56,7 +58,7 @@ test("kontrak backend: callback mengarahkan ke /settings dengan gmail=connected 
   assert.match(oauth, /\/settings\?gmail=connected/);
   assert.match(oauth, /\/settings\?gmail=error&reason=/);
   // Setiap kode alasan tetap yang ditulis backend punya pesan sendiri di sini (bukan pesan umum).
-  const own = new Set(["token_exchange", "storage", "invalid_state", "session_mismatch", "missing_params", "not_configured"]);
+  const own = new Set(["token_exchange", "storage", "invalid_state", "session_mismatch", "missing_params", "no_refresh_token", "not_configured"]);
   // Bentuk sekarang: fail('kode'); bentuk lama: ...&reason=kode di alamat tujuan.
   const fromBackend = [...oauth.matchAll(/(?:fail\('|reason=)([a-z_]+)/g)].map((m) => m[1]);
   assert.ok(fromBackend.length > 0, "backend tidak menulis kode alasan");

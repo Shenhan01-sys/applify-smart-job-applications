@@ -43,12 +43,28 @@ const writesTo = (backend: MockBackend, table: string) => backend.restWrites.fil
 const dataWrites = (backend: MockBackend) => backend.restWrites.filter((c) => /\/rest\/v1\/(education|achievements|work_experiences|certifications|user_skills)$/.test(c.path));
 
 test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
-  test("CV PDF: tersimpan, satu panggilan impor, pratinjau muncul, tidak ada yang ditulis sebelum setuju, lalu pendidikan dan deskripsi masuk", async ({ app, backend }) => {
+  test("opt-in AI bawaan tidak tercentang: unggah PDF tanpa centang menyimpan CV tanpa memanggil AI", async ({ app, backend }) => {
+    seed(backend);
+    await app.goto("/profile");
+    await expect(app.locator("#resume-ai-consent")).not.toBeChecked();
+    await expect(app.locator("#li-import-ai-consent")).not.toBeChecked();
+    await expect(app.locator("#li-import-file")).toBeDisabled();
+
+    await app.locator("#resume-file").setInputFiles({ name: "cv-tanpa-ai.pdf", mimeType: "application/pdf", buffer: PDF });
+    await expect(app.getByTestId("resume-note")).toContainText("Belum dikirim ke layanan AI");
+    expect(backend.state.storage).toHaveLength(1);
+    expect(importCalls(backend)).toEqual([]);
+    await expect(app.getByRole("dialog")).toHaveCount(0);
+    expect(dataWrites(backend)).toEqual([]);
+  });
+
+  test("CV PDF: tersimpan, satu panggilan impor setelah setuju AI, pratinjau muncul, tidak ada yang ditulis sebelum setuju, lalu pendidikan dan deskripsi masuk", async ({ app, backend }) => {
     seed(backend);
     await app.goto("/profile");
     await expect(app.getByRole("heading", { name: "CV untuk Dilampirkan" })).toBeVisible();
-    await expect(app.getByTestId("resume-import-hint")).toContainText("isinya juga dibaca AI");
+    await expect(app.getByTestId("resume-import-hint")).toContainText("diproses layanan AI setelah kamu mencentang persetujuan");
 
+    await app.locator("#resume-ai-consent").click();
     await app.locator("#resume-file").setInputFiles({ name: "cv-dewi.pdf", mimeType: "application/pdf", buffer: PDF });
 
     // pratinjau persetujuan
@@ -89,6 +105,7 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
   test("Lewati: tidak ada data yang ditulis, CV tetap tersimpan; unggahan berikutnya = satu impor lagi", async ({ app, backend }) => {
     seed(backend);
     await app.goto("/profile");
+    await app.locator("#resume-ai-consent").click();
     await app.locator("#resume-file").setInputFiles({ name: "cv-dewi.pdf", mimeType: "application/pdf", buffer: PDF });
 
     const dialog = app.getByRole("dialog");
@@ -102,6 +119,7 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
     await expect(app.getByText(/cv-\d+\.pdf/)).toBeVisible();
     expect(importCalls(backend)).toHaveLength(1);
 
+    await app.locator("#resume-ai-consent").click();
     await app.locator("#resume-file").setInputFiles({ name: "cv-dewi-2.pdf", mimeType: "application/pdf", buffer: PDF });
     await expect(app.getByRole("dialog").getByRole("heading", { name: "Isi profil dari CV ini?" })).toBeVisible();
     expect(importCalls(backend)).toHaveLength(2);
@@ -128,6 +146,7 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
     seed(backend);
     backend.override(`POST ${IMPORT_PATH}`, { status: 422, body: { success: false, code: "pdf_no_text", error: "Tidak ada teks" } });
     await app.goto("/profile");
+    await app.locator("#resume-ai-consent").click();
     await app.locator("#resume-file").setInputFiles({ name: "cv-pindai.pdf", mimeType: "application/pdf", buffer: PDF });
 
     const error = app.locator("#li-import-error");
@@ -146,6 +165,7 @@ test.describe("Profil: unggah CV menawarkan isi profil dari CV itu", () => {
     await app.goto("/profile");
     await expect(app.getByTestId("li-import-cv-note")).toContainText("Tidak perlu mengunggah dua kali");
 
+    await app.locator("#li-import-ai-consent").click();
     await app.locator("#li-import-file").setInputFiles({ name: "linkedin.pdf", mimeType: "application/pdf", buffer: PDF });
     const dialog = app.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Periksa data dari PDF" })).toBeVisible();

@@ -456,6 +456,27 @@ test("temuan 29: daftar kesenjangan hanya ada untuk draf yang baru dibuat atau d
   assert.match(src, /Model tidak melaporkan kesenjangan skill/);
 });
 
+test("temuan 43: kata peran di judul lowongan tidak memaksa skor 50 persen pada pelamar non-IT", async () => {
+  const { computeMatch } = await import("../src/lib/matchScore.ts");
+  const cases = [
+    { title: "Staf Administrasi", description: "Menguasai Microsoft Excel.", profile: ["Microsoft Excel"] },
+    { title: "Marketing Specialist", description: "Menguasai Canva dan copywriting.", profile: ["Canva", "Copywriting"] },
+    { title: "Customer Service", description: "Menguasai komunikasi dan Excel.", profile: ["Komunikasi", "Excel"] },
+    { title: "Operasional Lapangan", description: "Menguasai Microsoft Excel.", profile: ["Microsoft Excel"] },
+  ];
+  for (const c of cases) {
+    const m = computeMatch({ title: c.title, description: c.description }, c.profile);
+    assert.equal(m.status, "ok", c.title);
+    assert.deepEqual(m.missing, [], c.title);
+    assert.equal(m.score, 100, c.title);
+  }
+  // Peran tetap dihitung bila lowongan menyebutnya sebagai skill di deskripsi atau requirements.
+  const withSkill = computeMatch({ title: "Staf Administrasi", description: "Menguasai Microsoft Excel.", requirements: ["Administrasi"] }, ["Microsoft Excel"]);
+  assert.equal(withSkill.status, "ok");
+  assert.ok(withSkill.missing.includes("Administrasi"));
+  assert.ok(withSkill.score < 100);
+});
+
 test("skill berangka yang sah (standar dan sertifikasi) tidak dibuang; angka syarat lain tetap ditolak", async () => {
   const { cleanSkillTerm } = await import("../src/lib/matchScore.ts");
   for (const t of ["ISO 27001", "ISO 9001:2015", "SOC 2", "PCI DSS", "NIST 800-53", "ITIL 4"]) assert.equal(cleanSkillTerm(t), t, t);

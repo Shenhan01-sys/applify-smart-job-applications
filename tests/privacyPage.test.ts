@@ -27,7 +27,7 @@ test("kebijakan privasi: rute publik tanpa pemeriksaan login dan tanpa AppShell"
 
 test("kebijakan privasi: menyebut data, penyimpanan, pihak ketiga, persetujuan, saklar kirim, dan penghapusan", () => {
   for (const kata of [
-    "Supabase", "Vercel", "Railway", "Gemini", "Claude", "Numes", "OpenRouter", "Groq", "Telegram",
+    "Supabase", "Vercel", "Railway", "Gemini", "Claude", "Numes", "OpenRouter", "Groq", "Langfuse", "Telegram",
     "Google", "LinkedIn", "CV", "PDF LinkedIn", "Persetujuan", "ALLOW_REAL_SUBMIT", "skripsi", "Sistem Informasi", "Universitas Kristen Duta Wacana",
   ]) {
     assert.ok(allText.includes(kata), `kata tidak ada: ${kata}`);
@@ -45,6 +45,7 @@ test("kebijakan privasi: satu-satunya alamat email adalah kontak peneliti, dan t
 test("kebijakan privasi: penyedia model AI di kebijakan dan di halaman ketentuan sama-sama lengkap", () => {
   const terms = read("../src/routes/terms.tsx");
   assert.match(terms, /Google Gemini, Anthropic Claude, Numes, OpenRouter, dan Groq/);
+  assert.match(terms, /Langfuse/);
   assert.match(terms, /to="\/privacy"/);
   // Penyedia yang dipanggil di kode (Edge Function) tercantum di kebijakan.
   const providers = read("../supabase/functions/_shared/providers.ts");

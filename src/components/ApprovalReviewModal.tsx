@@ -17,6 +17,8 @@ import {
   rejectReasonHint,
 } from '@/lib/answerReview'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { clearApprovalDraft, readApprovalDraft, saveApprovalDraft } from '@/lib/approvalDraft'
 import { ShieldCheck, XCircle, Clock, AlertTriangle, Loader2, Edit3, Eye, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -61,11 +63,49 @@ export default function ApprovalReviewModal({
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
   const rejectReasonRef = useRef<HTMLTextAreaElement>(null)
-  const [editedCoverLetter, setEditedCoverLetter] = useState(request.cover_letter || '')
+  const originalCoverLetter = request.cover_letter || ''
+  const [editedCoverLetter, setEditedCoverLetter] = useState(() => readApprovalDraft(request.id, originalCoverLetter))
   const [isEditing, setIsEditing] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
   // Peringatan dari penjaga mutu backend setelah "Tulis ulang": angka yang tidak ada di surat asli.
   const [regenWarnings, setRegenWarnings] = useState<string[]>([])
   const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const restored = readApprovalDraft(request.id, originalCoverLetter)
+    setEditedCoverLetter(restored)
+    setDraftSaved(restored !== originalCoverLetter)
+    setIsEditing(false)
+  }, [request.id, originalCoverLetter])
+
+  const updateCoverLetterDraft = (value: string) => {
+    setEditedCoverLetter(value)
+    setDraftSaved(saveApprovalDraft(request.id, value, originalCoverLetter))
+  }
+
+  const handleCloseRequest = () => {
+    if (editedCoverLetter !== originalCoverLetter) setConfirmDiscardOpen(true)
+    else {
+      clearApprovalDraft(request.id)
+      setDraftSaved(false)
+      onClose()
+    }
+  }
+
+  const closeAndKeepDraft = () => {
+    saveApprovalDraft(request.id, editedCoverLetter, originalCoverLetter)
+    setConfirmDiscardOpen(false)
+    onClose()
+  }
+
+  const discardDraftAndClose = () => {
+    clearApprovalDraft(request.id)
+    setEditedCoverLetter(originalCoverLetter)
+    setDraftSaved(false)
+    setConfirmDiscardOpen(false)
+    onClose()
+  }
 
   useEffect(() => {
     if (!open) return
@@ -102,6 +142,8 @@ export default function ApprovalReviewModal({
     try {
       // The version on screen (including edits) is the one being approved.
       const result = await automationApi.approveApplication(request.id, edited ? editedCoverLetter : undefined)
+      clearApprovalDraft(request.id)
+      setDraftSaved(false)
       // Situs yang perlu login: lamaran belum diantre sampai pengguna mengizinkan ekstensi (kartu di tab Menunggu).
       const consentRequired = consentRequiredFrom(result)
       toast.success(consentRequired ? EXTENSION_CONSENT_REQUIRED_TOAST : 'Disetujui — lamaran masuk antrean agen.')
@@ -117,6 +159,8 @@ export default function ApprovalReviewModal({
     setLoading(true)
     try {
       await automationApi.rejectApplication(request.id, rejectReason)
+      clearApprovalDraft(request.id)
+      setDraftSaved(false)
       toast.success('Ditolak. Alasanmu tersimpan di riwayat persetujuan.')
       onRejected()
     } catch (error: any) {
@@ -154,7 +198,8 @@ export default function ApprovalReviewModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCloseRequest()}>
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col gap-4 rounded-2xl border-2 border-[#16150F]/15 bg-white p-0">
         <DialogHeader className="px-6 pt-6">
           <div className="flex items-center justify-between gap-3">
@@ -214,7 +259,7 @@ export default function ApprovalReviewModal({
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
-                  className="flex h-8 items-center gap-1 rounded-lg border-2 border-[#16150F]/15 px-3 text-xs font-semibold text-[#16150F] transition hover:border-[#0A5BE0]"
+                  className="flex min-h-11 items-center gap-1 rounded-lg border-2 border-[#16150F]/15 px-3 text-xs font-semibold text-[#16150F] transition hover:border-[#0A5BE0]"
                 >
                   {isEditing ? <Eye className="h-3 w-3" /> : <Edit3 className="h-3 w-3" />}
                   {isEditing ? 'Pratinjau' : 'Edit'}
@@ -222,7 +267,7 @@ export default function ApprovalReviewModal({
                 <button
                   onClick={handleRegenerate}
                   disabled={loading}
-                  className="flex h-8 items-center gap-1 rounded-lg bg-[#0A5BE0]/10 px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/20 disabled:opacity-60"
+                  className="flex min-h-11 items-center gap-1 rounded-lg bg-[#0A5BE0]/10 px-3 text-xs font-semibold text-[#0A5BE0] transition hover:bg-[#0A5BE0]/20 disabled:opacity-60"
                 >
                   <Sparkles className="h-3 w-3" />
                   Tulis ulang
@@ -232,7 +277,7 @@ export default function ApprovalReviewModal({
             {isEditing ? (
               <textarea
                 value={editedCoverLetter}
-                onChange={(e) => setEditedCoverLetter(e.target.value)}
+                onChange={(e) => updateCoverLetterDraft(e.target.value)}
                 rows={10}
                 className="w-full resize-none rounded-xl border-2 border-[#16150F]/15 p-4 text-sm leading-relaxed focus:border-[#0A5BE0] focus:outline-none"
               />
@@ -240,6 +285,11 @@ export default function ApprovalReviewModal({
               <div className="whitespace-pre-wrap rounded-xl border-2 border-[#16150F]/10 bg-white p-4 text-sm leading-relaxed">
                 {editedCoverLetter || 'Belum ada surat lamaran.'}
               </div>
+            )}
+            {edited && (
+              <p className="mt-1 text-xs text-[#16150F]/60" role="status" aria-live="polite">
+                {draftSaved ? 'Draf tersimpan di sesi browser ini.' : 'Draf belum bisa disimpan lokal. Jangan tutup halaman bila ingin mempertahankan editan.'}
+              </p>
             )}
             {regenWarnings.length > 0 && (
               <div role="alert" className="mt-2 rounded-xl border-2 border-[#D9741A]/40 bg-[#D9741A]/10 p-3 text-xs text-[#16150F]">
@@ -348,7 +398,7 @@ export default function ApprovalReviewModal({
                     key={preset}
                     type="button"
                     onClick={() => setRejectReason(preset)}
-                    className={`min-h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                    className={`min-h-11 rounded-full border px-3 py-2 text-xs font-medium transition ${
                       rejectReason === preset
                         ? 'border-red-600 bg-red-600 text-white'
                         : 'border-red-200 bg-white text-red-800 hover:border-red-400'
@@ -428,5 +478,20 @@ export default function ApprovalReviewModal({
         </div>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Ada editan yang belum disetujui</AlertDialogTitle>
+          <AlertDialogDescription>
+            Draf tersimpan hanya di sesi browser ini. Simpan untuk nanti agar bisa dipulihkan saat modal dibuka lagi, atau buang editannya.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={closeAndKeepDraft} className="min-h-11">Simpan untuk nanti</AlertDialogAction>
+          <AlertDialogAction onClick={discardDraftAndClose} className="min-h-11 bg-red-600 hover:bg-red-700">Buang editan</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

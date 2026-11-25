@@ -11,6 +11,7 @@ import {
   countSelected,
   defaultSelection,
   describeLinkedInImportError,
+  aiCvConsentHeaders,
   emptyCommit,
   experienceKey,
   hasPdfMagic,
@@ -80,6 +81,7 @@ test("describeLinkedInImportError: tiap kode server menjadi kalimat Indonesia ya
   const err = (status: number, body: object, retry?: number) => new ApiError(status, JSON.stringify(body), retry);
   const msg = (e: unknown) => describeLinkedInImportError(e);
   assert.match(msg(err(400, { code: "not_pdf" })), /bukan PDF/);
+  assert.match(msg(err(400, { code: "ai_consent_required" })), /Centang persetujuan/);
   assert.match(msg(err(413, { code: "file_too_large" })), /5 MB/);
   assert.match(msg(err(422, { code: "pdf_no_text" })), /hasil pindai/);
   assert.match(msg(err(422, { code: "pdf_unreadable" })), /dikunci kata sandi/);
@@ -97,6 +99,11 @@ test("describeLinkedInImportError: tiap kode server menjadi kalimat Indonesia ya
   for (const code of ["not_pdf", "empty_file", "file_too_large", "pdf_unreadable", "pdf_too_long", "pdf_no_text", "nothing_found", "rate_limited", "rate_limit_check_failed", "bad_response"]) {
     assert.doesNotMatch(msg(err(422, { code })), /—/, code);
   }
+});
+
+test("header consent AI CV hanya disertakan setelah persetujuan eksplisit", () => {
+  assert.deepEqual(aiCvConsentHeaders(false), {});
+  assert.deepEqual(aiCvConsentHeaders(true), { "x-ai-consent": "true" });
 });
 
 test("LINKEDIN_PDF_HINT menyebut jalur LinkedIn: Lainnya (More) lalu Simpan ke PDF (Save to PDF)", () => {
