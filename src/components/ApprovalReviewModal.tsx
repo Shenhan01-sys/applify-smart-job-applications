@@ -156,6 +156,10 @@ export default function ApprovalReviewModal({
           <DialogDescription className="text-sm text-[#16150F]/70">
             Tidak ada yang terkirim sebelum kamu menyetujui. Edit dulu bila perlu — versi di layar inilah yang disetujui.
           </DialogDescription>
+          <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900" data-testid="real-submit-warning">
+            Setujui berarti lamaran ini benar-benar dikirim ke perusahaan atas namamu dan tidak bisa ditarik. Tekan Tolak bila
+            kamu tidak ingin melamar.
+          </p>
         </DialogHeader>
 
         {/* Radix renders the viewport child as display:table, which lets content overflow sideways */}

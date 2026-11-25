@@ -12,7 +12,8 @@
 // - hosting: vercel.json (frontend) dan backend/railway.toml (backend)
 //
 // Yang TIDAK bisa diverifikasi dari kode, sengaja tidak ditulis di halaman:
-// - nilai ALLOW_REAL_SUBMIT di server produksi saat ini (kalimat "dimatikan selama penelitian" mengikuti aturan proyek);
+// - nilai ALLOW_REAL_SUBMIT di server produksi: kalimat "menyala" mengikuti keputusan Hans 24 dan 25 November 2026 dan
+//   pemeriksaan Railway 25 November 2026 10.54 WIB (worker true; host Greenhouse dan Portal Uji Applify);
 // - lokasi server worker dan penyedia model AI mana yang benar-benar aktif di produksi (bergantung kunci API yang diset);
 // - lama penyimpanan data (tidak ada pekerjaan terjadwal penghapusan di kode) dan wilayah (region) proyek Supabase;
 // - kontak peneliti: RESEARCHER_EMAIL di bawah, sama dengan email dukungan pada layar persetujuan Google
@@ -20,7 +21,7 @@
 // - tidak ada fitur hapus akun di aplikasi (pencarian deleteUser, hapus akun di src dan backend kosong); hapus data
 //   hanya lewat permintaan ke peneliti.
 
-export const PRIVACY_UPDATED = "21 November 2026";
+export const PRIVACY_UPDATED = "25 November 2026";
 
 /** Kontak peneliti untuk pertanyaan dan permintaan hapus data. */
 export const RESEARCHER_EMAIL = "hansgunawan775@gmail.com";
@@ -88,7 +89,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     title: "Lamaran hanya dikirim setelah kamu menyetujui",
     paragraphs: [
       "Agen tidak mengirim lamaran sebelum kamu menyetujuinya di halaman Persetujuan. Setiap persetujuan punya batas waktu 24 jam.",
-      "Selama masa penelitian, pengiriman sungguhan ke situs lowongan dan email dimatikan lewat saklar di server (ALLOW_REAL_SUBMIT). Agen hanya mengisi formulir sampai sebelum tombol kirim.",
+      "Pengiriman sungguhan menyala lewat saklar di server (ALLOW_REAL_SUBMIT). Setelah kamu menekan Setujui, agen boleh menekan tombol kirim di situs lowongan yang diizinkan server, saat ini Greenhouse dan Portal Uji Applify, atau mengirim email lamaran lewat Gmail yang kamu hubungkan sendiri. Lamaran yang sudah terkirim tidak bisa ditarik. Tekan Tolak bila kamu tidak ingin lamaran terkirim.",
     ],
   },
   {

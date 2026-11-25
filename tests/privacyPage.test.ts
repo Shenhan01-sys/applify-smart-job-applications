@@ -14,7 +14,7 @@ test("kontak peneliti: Ketentuan dan Privasi memakai email yang sama, tanpa pena
 });
 
 test("kebijakan privasi: tanggal pembaruan 21 November 2026 dan tampil di halaman", () => {
-  assert.equal(PRIVACY_UPDATED, "21 November 2026");
+  assert.equal(PRIVACY_UPDATED, "25 November 2026");
   assert.match(read("../src/routes/privacy.tsx"), /\{PRIVACY_UPDATED\}/);
 });
 
