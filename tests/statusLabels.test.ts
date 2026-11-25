@@ -27,7 +27,7 @@ test("status tidak dikenal tidak membuang kodenya dan tidak melempar", () => {
   assert.equal(approvalStatusLabel("approved"), "Disetujui");
   assert.match(approvalStatusLabel("aneh"), /Status tidak diketahui \(aneh\)/);
   assert.equal(applicationStatusLabel(null), "Status tidak diketahui");
-  assert.equal(queueStatusLabel("processing"), "Sedang dikerjakan agen");
+  assert.equal(queueStatusLabel("processing"), "Sedang diproses");
   assert.equal(queueTypeLabel("apply"), "Isi formulir lowongan");
   assert.equal(queueTypeLabel(undefined), "Tugas agen");
 });

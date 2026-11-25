@@ -17,6 +17,7 @@ import { EMAIL_TEST_MODE_LABEL } from "./emailTestMode.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
 import { awaitingCodeState } from "./securityCode.ts";
 import { approvalStatusLabel, effectiveApprovalStatus } from "./statusLabels.ts";
+import { STATUS_TERM } from "./statusVocabulary.ts";
 
 export type ApprovalTab = "pending" | "history";
 
@@ -47,13 +48,13 @@ export interface ApprovalPlacement {
 export const STAGE_LABEL: Record<ApprovalStage, string> = {
   review: "Menunggu persetujuan",
   checking: "Status belum terbaca",
-  not_started: "Disetujui, belum terkirim",
-  processing: "Sedang diproses",
+  not_started: STATUS_TERM.waitingTurn,
+  processing: STATUS_TERM.processing,
   needs_action: "Perlu tindakanmu",
   filled_not_sent: "Terisi, belum terkirim",
   unverified: "Perlu dicek, kirim belum terkonfirmasi",
   test_mode: EMAIL_TEST_MODE_LABEL,
-  failed_retry: "Gagal, bisa dicoba lagi",
+  failed_retry: STATUS_TERM.retryable,
   sent: "Terkirim",
   rejected: "Ditolak",
   expired: "Kedaluwarsa",
@@ -61,8 +62,8 @@ export const STAGE_LABEL: Record<ApprovalStage, string> = {
 };
 
 /** Persetujuan yang gagal dan masa berlakunya habis: tidak bisa dicoba lagi, jadi ditutup (tahap expired). */
-export const FAILED_CLOSED_LABEL = "Gagal, masa berlaku habis";
-export const EXPIRED_NOT_SENT_LABEL = "Kedaluwarsa, belum terkirim";
+export const FAILED_CLOSED_LABEL = STATUS_TERM.expiredNotSent;
+export const EXPIRED_NOT_SENT_LABEL = STATUS_TERM.expiredNotSent;
 
 /** Tahap yang masuk tab Riwayat. Selain ini, persetujuan ada di tab Menunggu. */
 const HISTORY_STAGES: ReadonlySet<ApprovalStage> = new Set(["sent", "rejected", "expired", "replaced"]);

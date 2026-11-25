@@ -201,7 +201,7 @@ test("queueStatusHint apply selesai: 0 isian terisi berbeda dari yang berhasil m
   assert.match(none, /belum berhasil mengisi/);
   assert.match(none, /meminta masuk/);
   assert.match(none, /belum terkirim/);
-  assert.match(none, /Isi sendiri di situs lowongan, atau ajukan lagi/);
+  assert.match(none, /Isi formulirnya sendiri di situs lowongan, atau ajukan lagi/);
   assert.doesNotMatch(none, /sebelum tombol kirim/);
   for (const filled of [3, undefined, null]) {
     const hint = queueStatusHint("completed", "apply", null, filled as number | null | undefined);
@@ -214,7 +214,7 @@ test("queueStatusHint apply selesai: 0 isian terisi berbeda dari yang berhasil m
 });
 
 test("teks baru berbahasa Indonesia, tanpa tanda pisah panjang", () => {
-  assert.equal(FILL_YOURSELF_LABEL, "Isi sendiri di situs");
+  assert.equal(FILL_YOURSELF_LABEL, "Perlu diisi sendiri");
   assert.doesNotMatch(FILL_YOURSELF_LABEL + NO_FIELDS_FILLED_TEXT, /[—–]/);
 });
 

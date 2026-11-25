@@ -130,7 +130,7 @@ test("log incomplete validation_failed: Ditolak formulir, tidak terkirim, lengka
   ]) {
     const v = describeAgentApply(row);
     assert.equal(v.label, AGENT_VALIDATION_LABEL);
-    assert.equal(v.label, "Ditolak formulir (tidak terkirim)");
+    assert.equal(v.label, "Belum terkirim, isian ditolak situs");
     assert.equal(v.tone, "manual");
     assert.match(v.hint, /menolak pengiriman/);
     assert.match(v.hint, /pesan validasi/);
@@ -151,7 +151,7 @@ test("log ready dengan submit_blocked required_remaining: Terisi sebagian, palin
     remaining_required: ["Phone", "City", "Expected salary", "LinkedIn URL", "Portfolio"],
   });
   assert.equal(v.label, AGENT_PARTIAL_LABEL);
-  assert.equal(v.label, "Terisi sebagian, belum dikirim");
+  assert.equal(v.label, "Terisi sebagian, belum terkirim");
   assert.equal(v.tone, "manual");
   assert.match(v.hint, /Phone; City; Expected salary; dan 2 isian lain/);
   assert.doesNotMatch(v.hint, /LinkedIn URL|Portfolio/);

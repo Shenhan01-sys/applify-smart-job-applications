@@ -9,6 +9,7 @@ import type { AgentLogFacts } from "./agentEvidence.ts";
 import { describeExtensionWait, type ExtensionWaitReason } from "./extensionWaitReason.ts";
 import { safeJobUrl } from "./manualSubmit.ts";
 import { awaitingCodeState } from "./securityCode.ts";
+import { STATUS_TERM } from "./statusVocabulary.ts";
 
 /** Host penyedia auth/OAuth eksternal yang butuh parameter OAuth baru dari halaman lowongan agar berfungsi. */
 const EXTERNAL_OAUTH_HOSTS = new Set(["login.seek.com", "auth.seek.com", "accounts.google.com", "login.microsoftonline.com"]);
@@ -79,11 +80,11 @@ export const AGENT_PRIOR_UNVERIFIED_LABEL = "Perlu dicek: kirim sebelumnya belum
 export const AGENT_PRIOR_UNVERIFIED_HINT =
   "Percobaan kirim sebelumnya belum terkonfirmasi, jadi agen tidak menekan kirim lagi. Cek kotak masuk emailmu atau akunmu di situs lowongan. Bila lamaran belum terkirim, kirim sendiri di situs lowongan.";
 
-export const AGENT_VALIDATION_LABEL = "Ditolak formulir (tidak terkirim)";
+export const AGENT_VALIDATION_LABEL = STATUS_TERM.rejectedByForm;
 export const AGENT_VALIDATION_HINT =
   "Formulir menolak pengiriman dan menampilkan pesan validasi. Tidak ada lamaran yang terkirim. Lengkapi data profilmu, lalu ajukan lagi.";
 
-export const AGENT_PARTIAL_LABEL = "Terisi sebagian, belum dikirim";
+export const AGENT_PARTIAL_LABEL = STATUS_TERM.partlyFilled;
 
 export const AGENT_AWAITING_CODE_LABEL = "Menunggu kode keamanan";
 export const AGENT_AWAITING_CODE_HINT =

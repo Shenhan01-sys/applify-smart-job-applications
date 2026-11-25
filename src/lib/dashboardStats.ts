@@ -1,3 +1,4 @@
+import { STATUS_TERM } from "./statusVocabulary.ts";
 /**
  * Counters and activity rows for the Dashboard, computed from `ai_applications` (the table the draft Edge
  * Function, the Applications board and the worker actually write, with a `jobs` join). The older
@@ -37,8 +38,8 @@ export const STATUS_LABEL: Record<DashStatus, string> = {
   draft: "Draf",
   ready: "Siap dikirim",
   submitted: "Terkirim",
-  follow_up: "Perlu follow-up",
-  responded: "Dibalas",
+  follow_up: STATUS_TERM.followUp,
+  responded: STATUS_TERM.responded,
   closed: "Ditutup",
 };
 

@@ -77,7 +77,7 @@ test("agentLogFacts: baris submit_unverified, validation_failed, dan required_re
 
   const rejected = agentLogFacts({ status: "incomplete", created_at: "2026-11-23T14:11:00Z", details: { reason: "validation_failed", submit_check: { verdict: "validation_error" } } });
   assert.equal(rejected.reason, "validation_failed");
-  assert.equal(describeLogOutcome(rejected)?.label, "Ditolak formulir (tidak terkirim)");
+  assert.equal(describeLogOutcome(rejected)?.label, "Belum terkirim, isian ditolak situs");
 
   const partial = agentLogFacts({
     status: "ready",
@@ -85,7 +85,7 @@ test("agentLogFacts: baris submit_unverified, validation_failed, dan required_re
     details: { submit_blocked: "required_remaining", remaining_required: ["Phone", "Phone", "", 4, "City"] },
   });
   assert.deepEqual(partial.remaining_required, ["Phone", "City"]);
-  assert.equal(describeLogOutcome(partial)?.label, "Terisi sebagian, belum dikirim");
+  assert.equal(describeLogOutcome(partial)?.label, "Terisi sebagian, belum terkirim");
 });
 
 test("agentLogFacts: masukan rusak atau log lama tidak melempar dan tidak mengarang bukti", () => {

@@ -67,7 +67,7 @@ test.describe("Persetujuan: menunggu", () => {
     // Disetujui belum berarti terkirim: kartunya tetap di Menunggu dengan label status, dan Riwayat tetap kosong.
     await expect(app.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
     await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toHaveCount(0);
-    await expect(app.getByText("Disetujui, belum terkirim")).toBeVisible();
+    await expect(app.getByText("Menunggu giliran")).toBeVisible();
     await expect(app.getByRole("button", { name: /Periksa/ })).toHaveCount(0);
     await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
     await expect(app.getByRole("button", { name: /Riwayat/ })).toContainText("0");
@@ -978,7 +978,7 @@ test.describe("Persetujuan: pembagian tab Menunggu dan Riwayat", () => {
     await expect(app.getByText("Menunggu persetujuan", { exact: true })).toBeVisible();
     await expect(app.getByText("Sedang diproses", { exact: true })).toBeVisible();
     await expect(app.getByText("Terisi, belum terkirim", { exact: true })).toBeVisible();
-    await expect(app.getByText("Gagal, bisa dicoba lagi", { exact: true })).toBeVisible();
+    await expect(app.getByText("Belum terkirim, bisa dicoba lagi", { exact: true })).toBeVisible();
     // Hanya draf yang menunggu keputusan yang punya tombol Periksa.
     await expect(app.getByRole("button", { name: /Periksa/ })).toHaveCount(1);
 
@@ -1004,7 +1004,7 @@ test.describe("Persetujuan: pembagian tab Menunggu dan Riwayat", () => {
     await expect(app.getByRole("heading", { name: "Semua sudah diperiksa" })).toBeVisible();
     await app.getByRole("button", { name: /Riwayat/ }).click();
     await expect(app.getByRole("heading", { name: "Gagal Lama" })).toBeVisible();
-    await expect(app.getByText("Gagal, masa berlaku habis", { exact: true })).toBeVisible();
+    await expect(app.getByText("Kedaluwarsa, belum terkirim", { exact: true })).toBeVisible();
   });
 
   test("tombol 'Saya sudah mengirimnya sendiri' tidak ada; panel kirim sendiri tetap menawarkan buka formulir dan salin isian", async ({ app, backend }) => {

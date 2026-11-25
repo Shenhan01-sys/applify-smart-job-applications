@@ -6,6 +6,7 @@
 
 import { EMAIL_TEST_MODE_HINT, EMAIL_TEST_MODE_LABEL } from "./emailTestMode.ts";
 import { describeExtensionWait, extensionWaitHint } from "./extensionWaitReason.ts";
+import { STATUS_TERM } from "./statusVocabulary.ts";
 
 /** approval_requests.status */
 export const APPROVAL_STATUS_LABEL: Record<string, string> = {
@@ -36,15 +37,15 @@ export const APPLICATION_STATUS_LABEL: Record<string, string> = {
   draft: "Draf",
   ready: "Siap dikirim",
   submitted: "Terkirim",
-  follow_up: "Perlu tindak lanjut",
-  responded: "Sudah dibalas",
+  follow_up: STATUS_TERM.followUp,
+  responded: STATUS_TERM.responded,
   closed: "Ditutup",
 };
 
 /** automation_queue.status */
 export const QUEUE_STATUS_LABEL: Record<string, string> = {
-  pending: "Menunggu giliran",
-  processing: "Sedang dikerjakan agen",
+  pending: STATUS_TERM.waitingTurn,
+  processing: STATUS_TERM.processing,
   completed: "Selesai",
   failed: "Gagal",
 };
@@ -88,7 +89,7 @@ export function isQueueNeedsManual(status?: string | null, jobType?: string | nu
 }
 
 /** Label untuk tugas apply yang selesai tanpa mengisi apa pun; bukan keadaan sukses, jadi tidak memakai "Selesai". */
-export const QUEUE_NEEDS_MANUAL_LABEL = "Perlu diisi sendiri";
+export const QUEUE_NEEDS_MANUAL_LABEL = STATUS_TERM.fillYourself;
 
 /**
  * Tugas email_apply yang selesai tetapi log-nya `skipped` karena pengiriman nyata dimatikan (mode uji): tidak ada
@@ -114,7 +115,7 @@ export function queueDisplayLabel(
  * Label dan penjelasan bila agen tidak berhasil mengisi satu isian pun (application_logs.details.reason
  * "no_fields_filled"): lamaran tidak berubah status dan belum terkirim, pengguna perlu mengisi sendiri.
  */
-export const FILL_YOURSELF_LABEL = "Isi sendiri di situs";
+export const FILL_YOURSELF_LABEL = STATUS_TERM.fillYourself;
 /**
  * Tugas apply yang selesai dan mengisi formulir, tetapi tidak menekan kirim. Formulir itu ada di peramban server,
  * jadi pengguna tidak bisa menekan kirim di sana; teks ini tidak menyuruhnya (temuan uji klik 23 November 2026).
@@ -124,7 +125,7 @@ export const AGENT_STOPPED_BEFORE_SUBMIT_TEXT =
   "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim karena situs lowongan ini belum ada di daftar situs yang boleh dikirim otomatis. Lamaran tidak terkirim dan ada di kolom Siap dikirim.";
 
 export const NO_FIELDS_FILLED_TEXT =
-  "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi sendiri di situs lowongan, atau ajukan lagi.";
+  "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi formulirnya sendiri di situs lowongan, atau ajukan lagi.";
 
 /**
  * Penjelasan satu kalimat untuk pengguna awam: apa artinya status antrean ini dan apa yang perlu dilakukan.

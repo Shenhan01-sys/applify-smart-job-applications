@@ -126,7 +126,7 @@ test("disetujui, email tidak terkirim karena mode uji: Menunggu, Belum dikirim (
 });
 
 test("disetujui, agen gagal: bisa dicoba lagi tetap di Menunggu, masa berlaku habis ditutup sebagai kedaluwarsa", () => {
-  expectPlace(place(approved(), { agent: agentRow("failed", undefined, { error_message: "timeout" }) }), "pending", "failed_retry", "Gagal, bisa dicoba lagi");
+  expectPlace(place(approved(), { agent: agentRow("failed", undefined, { error_message: "timeout" }) }), "pending", "failed_retry", "Belum terkirim, bisa dicoba lagi");
   expectPlace(place(approved(), { emailJob: { status: "failed", error_message: "smtp" } }), "pending", "failed_retry");
   expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("failed", undefined, { error_message: "timeout" }) }), "history", "expired", FAILED_CLOSED_LABEL);
   expectPlace(place(approved({ expires_at: PAST }), { emailJob: { status: "failed" } }), "history", "expired", FAILED_CLOSED_LABEL);
@@ -139,7 +139,7 @@ test("disetujui, agen gagal: bisa dicoba lagi tetap di Menunggu, masa berlaku ha
 });
 
 test("temuan 22: disetujui tidak pernah berlabel Kedaluwarsa hanya karena waktu lewat", () => {
-  expectPlace(place(approved({ expires_at: PAST }), {}), "pending", "not_started", "Disetujui, belum terkirim");
+  expectPlace(place(approved({ expires_at: PAST }), {}), "pending", "not_started", "Menunggu giliran");
   expectPlace(place(approved({ expires_at: PAST }), { sent: true }), "history", "sent", "Terkirim");
   for (const ctx of [{}, { agent: agentRow("processing") }, { agent: agentRow("completed", { status: "ready" }) }, { sent: true }]) {
     assert.notEqual(place(approved({ expires_at: PAST }), ctx).label, "Kedaluwarsa");
@@ -147,7 +147,7 @@ test("temuan 22: disetujui tidak pernah berlabel Kedaluwarsa hanya karena waktu 
 });
 
 test("disetujui, belum ada tugas agen: Menunggu, Disetujui belum terkirim; status belum terbaca: Menunggu", () => {
-  expectPlace(place(approved(), {}), "pending", "not_started", "Disetujui, belum terkirim");
+  expectPlace(place(approved(), {}), "pending", "not_started", "Menunggu giliran");
   expectPlace(place(approved(), { agent: undefined, agentKnown: true }), "pending", "not_started");
   expectPlace(place(approved(), { agentKnown: false }), "pending", "checking", "Status belum terbaca");
   // status belum terbaca tidak menyembunyikan bukti terkirim yang sudah ada
@@ -217,7 +217,7 @@ test("splitApprovalTabs: yang belum terkirim tetap di Menunggu, review di atas, 
   };
   const tabs = splitApprovalTabs(rows, (r) => ({ agentKnown: true, ...(ctx[r.id] ?? {}) }), NOW);
   assert.deepEqual(tabs.pending.map((p) => p.item.id), ["menunggu-review", "disetujui-diproses", "disetujui-terisi", "disetujui-gagal"]);
-  assert.deepEqual(tabs.pending.map((p) => p.placement.label), ["Menunggu persetujuan", "Sedang diproses", "Terisi, belum terkirim", "Gagal, bisa dicoba lagi"]);
+  assert.deepEqual(tabs.pending.map((p) => p.placement.label), ["Menunggu persetujuan", "Sedang diproses", "Terisi, belum terkirim", "Belum terkirim, bisa dicoba lagi"]);
   assert.deepEqual(tabs.history.map((p) => p.item.id), ["ditolak", "disetujui-terkirim", "kedaluwarsa"]);
   assert.deepEqual(tabs.history.map((p) => p.placement.label), ["Ditolak", "Terkirim", "Kedaluwarsa"]);
   assert.equal(tabs.pending.length + tabs.history.length, rows.length);
