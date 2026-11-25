@@ -23,6 +23,7 @@ import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { awaitingCodeState } from "@/lib/securityCode";
 import { questionsToAnswer } from "@/lib/formQuestions";
+import { followUpBadge } from "@/lib/followUp";
 import { isManualSent, manualSubmitState } from "@/lib/manualSubmit";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -120,6 +121,7 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
   // Kartu asal tetap di tempat dan memudar; yang mengikuti penunjuk hanya DragOverlay (tanpa transform di sini).
   const style = { opacity: isDragging ? 0.5 : 1 };
   const job = jobOf(app);
+  const followUp = followUpBadge(app);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group cursor-grab active:cursor-grabbing">
@@ -147,10 +149,14 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
             <FillYourselfBadge />
           </div>
         )}
-        {app.follow_up_scheduled && !app.follow_up_sent && (
-          <div className="mt-2 text-xs bg-[#FEF3C7] text-[#92400E] px-2 py-1 rounded-full inline-flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" aria-hidden="true" />
-            Perlu tindak lanjut
+        {followUp && (
+          <div
+            className={`mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 ${
+              followUp.kind === "due" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#EEF2FF] text-[#3730A3]"
+            }`}
+          >
+            {followUp.kind === "due" ? <AlertCircle className="h-3 w-3" aria-hidden="true" /> : <Clock className="h-3 w-3" aria-hidden="true" />}
+            {followUp.label}
           </div>
         )}
         <button
