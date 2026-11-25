@@ -3,7 +3,7 @@ import { LayoutDashboard, Briefcase, FileCheck2, Radar, EyeOff, Settings, User, 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { MOBILE_TAB_ITEMS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
+import { MOBILE_TAB_ITEMS, NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
 
 const ICONS: Record<NavItem["to"], typeof Bot> = {
   "/dashboard": LayoutDashboard,
@@ -49,7 +49,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
 
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-black/[6%] bg-card/80 px-4 py-5 sticky top-0 h-screen overflow-y-auto">
-        <Link to="/" className="flex items-center gap-2 px-2 min-h-11">
+        <Link to="/dashboard" className="flex items-center gap-2 px-2 min-h-11">
           <div className="grid h-9 w-9 place-items-center rounded-lg gradient-primary text-white font-bold" aria-hidden="true">A</div>
           <span className="text-lg font-bold">Applify</span>
         </Link>
@@ -73,7 +73,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
         <div className="flex-1 min-w-0 px-4 md:px-8 py-6 pb-28 lg:pb-8">
           {/* Mobile header */}
           <div className="lg:hidden flex items-center justify-between mb-5">
-            <Link to="/" className="flex items-center gap-2 min-h-11">
+            <Link to="/dashboard" className="flex items-center gap-2 min-h-11">
               <div className="grid h-8 w-8 place-items-center rounded-lg gradient-primary text-white font-bold" aria-hidden="true">A</div>
               <span className="font-bold">Applify</span>
             </Link>
@@ -107,7 +107,7 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
             <SheetDescription className="truncate">{email || "Belum masuk"}</SheetDescription>
           </SheetHeader>
           <NavList path={path} onNavigate={() => setMenuOpen(false)} />
-          <AgentNote />
+          <AgentNote onNavigate={() => setMenuOpen(false)} />
           <button type="button" onClick={handleSignOut} className="mt-3 flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition">
             <LogOut className="h-4 w-4" aria-hidden="true" /> Keluar
           </button>
@@ -119,23 +119,35 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
 
 function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
   return (
-    <nav aria-label="Menu utama" className="mt-6 flex-1 flex flex-col gap-1">
-      {NAV_ITEMS.map((it) => {
-        const active = isActivePath(path, it.to);
-        const Icon = ICONS[it.to];
-        return (
-          <Link
-            key={it.to}
-            to={it.to}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? "gradient-primary text-white shadow-md" : "text-muted-foreground hover:bg-black/[4%] hover:text-foreground"}`}
-          >
-            <Icon className="h-4 w-4" aria-hidden="true" />
-            {it.label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Menu utama" className="mt-6 flex-1 flex flex-col gap-4">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.title} className="flex flex-col gap-1">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/75">{group.title}</p>
+          {group.items.map((to) => {
+            const it = NAV_ITEMS.find((item) => item.to === to);
+            if (!it) return null;
+            const active = isActivePath(path, it.to);
+            const Icon = ICONS[it.to];
+            return (
+              <Link
+                key={it.to}
+                to={it.to}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? "gradient-primary text-white shadow-md" : "text-muted-foreground hover:bg-black/[4%] hover:text-foreground"}`}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{it.label}</span>
+                {it.to === "/blind-mode" && (
+                  <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium ${active ? "bg-white/20 text-white" : "bg-black/[6%] text-muted-foreground"}`}>
+                    Pratinjau
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -145,14 +157,17 @@ function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }
  * "aktif" tiap pindah halaman, jadi tidak mengendalikan apa pun. Teks ini menjelaskan hal yang benar-benar
  * dijamin aplikasi: lamaran tidak dikirim tanpa persetujuan pengguna.
  */
-function AgentNote() {
+function AgentNote({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="mt-4 rounded-xl border border-teal/30 bg-teal/5 p-3 text-xs leading-relaxed">
       <p className="flex items-center gap-1.5 font-semibold text-foreground">
         <ShieldCheck className="h-3.5 w-3.5 text-teal" aria-hidden="true" /> Kamu yang memutuskan
       </p>
       <p className="mt-1 text-muted-foreground">
-        Agen tidak mengirim lamaran sebelum kamu menyetujuinya di <Link to="/approvals" className="font-semibold text-primary underline-offset-2 hover:underline">Persetujuan</Link>.
+        Agen tidak mengirim lamaran sebelum kamu menyetujuinya di{" "}
+        <Link to="/approvals" onClick={onNavigate} className="font-semibold text-primary underline-offset-2 hover:underline">
+          Persetujuan
+        </Link>.
       </p>
     </div>
   );

@@ -158,6 +158,15 @@ function ProfilePage() {
   const [prefsState, setPrefsState] = useState<"loading" | "ready" | "failed">(isMockMode() ? "ready" : "loading");
   const [prefsError, setPrefsError] = useState("");
   const [prefErrors, setPrefErrors] = useState<PreferencesErrors>({});
+  const [openEditors, setOpenEditors] = useState<Record<string, boolean>>({});
+  const setEditorOpen = useCallback((key: string, open: boolean) => {
+    setOpenEditors((prev) => (prev[key] === open ? prev : { ...prev, [key]: open }));
+  }, []);
+  const onExpEditing = useCallback((open: boolean) => setEditorOpen("exp", open), [setEditorOpen]);
+  const onEduEditing = useCallback((open: boolean) => setEditorOpen("edu", open), [setEditorOpen]);
+  const onSkillEditing = useCallback((open: boolean) => setEditorOpen("skill", open), [setEditorOpen]);
+  const onAchEditing = useCallback((open: boolean) => setEditorOpen("ach", open), [setEditorOpen]);
+  const hasOpenEditor = Object.values(openEditors).some(Boolean);
 
   const loadPreferences = useCallback(async () => {
     if (isMockMode()) return;
@@ -225,7 +234,11 @@ function ProfilePage() {
   }, [user, loadPreferences]);
 
   const changeStep = (newStep: number, dir: 'next' | 'prev') => {
-    if (newStep < 1 || newStep > steps.length) return;
+    if (newStep === step || newStep < 1 || newStep > steps.length) return;
+    if ((step === 2 || step === 3) && hasOpenEditor) {
+      toast.error("Simpan atau batalkan formulir item yang masih terbuka dulu sebelum pindah langkah.");
+      return;
+    }
     setDirection(dir);
     setAnimKey(prev => prev + 1);
     setStep(newStep);
@@ -493,21 +506,23 @@ function ProfilePage() {
               const isCompleted = step > s.id;
               return (
                 <div key={s.id} className="flex items-center flex-1 last:flex-none">
-                  <div 
+                  <button
+                    type="button"
+                    onClick={() => changeStep(s.id, s.id > step ? 'next' : 'prev')}
                     aria-current={isActive ? "step" : undefined}
-                    role="img"
                     aria-label={`Langkah ${s.id}: ${s.label}${isCompleted ? ", selesai" : isActive ? ", sedang dibuka" : ""}`}
-                    className={`relative h-10 w-10 rounded-full grid place-items-center text-sm font-bold transition-all duration-300 ${
+                    title={s.label}
+                    className={`relative min-h-11 min-w-11 rounded-full grid place-items-center text-sm font-bold transition-all duration-300 ${
                       isActive 
                         ? 'bg-[#0A5BE0] text-white shadow-lg scale-110' 
                         : isCompleted 
-                          ? 'bg-[#0A5BE0]/20 text-[#0A5BE0] border-2 border-[#0A5BE0]' 
-                          : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%]'
+                          ? 'bg-[#0A5BE0]/20 text-[#0A5BE0] border-2 border-[#0A5BE0] hover:bg-[#0A5BE0]/30' 
+                          : 'bg-black/[4%] text-muted-foreground border-2 border-black/[8%] hover:border-[#0A5BE0]/40'
                     }`}
                     style={isActive ? { animation: 'pulse-ring 2s infinite' } : {}}
                   >
                     {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
-                  </div>
+                  </button>
                   {i < steps.length - 1 && (
                     <div className={`flex-1 h-1 mx-2 rounded-full transition-all duration-500 ${
                       isCompleted ? 'bg-[#0A5BE0]' : 'bg-black/[6%]'
@@ -551,26 +566,26 @@ function ProfilePage() {
             }}
           >
             {step === 1 && <Step1Basic formData={formData} setFormData={setFormData} errors={formErrors} />}
-            {step === 2 && <ExperienceEditor items={workExps} onSave={saveExperience} onDelete={deleteExperience} />}
+            {step === 2 && <ExperienceEditor items={workExps} onSave={saveExperience} onDelete={deleteExperience} onEditingChange={onExpEditing} />}
             {step === 3 && (
               <div className="space-y-6">
                 <section aria-labelledby="edu-heading">
                   <h3 id="edu-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
                     <GraduationCap className="h-4 w-4 text-[#0A5BE0]" /> Pendidikan
                   </h3>
-                  <EducationEditor items={educations} onSave={saveEducation} onDelete={deleteEducation} />
+                  <EducationEditor items={educations} onSave={saveEducation} onDelete={deleteEducation} onEditingChange={onEduEditing} />
                 </section>
                 <section aria-labelledby="skill-heading">
                   <h3 id="skill-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
                     <Wrench className="h-4 w-4 text-[#0A5BE0]" /> Skills &amp; Keahlian
                   </h3>
-                  <SkillsEditor items={userSkills} onSave={saveSkill} onDelete={deleteSkill} />
+                  <SkillsEditor items={userSkills} onSave={saveSkill} onDelete={deleteSkill} onEditingChange={onSkillEditing} />
                 </section>
                 <section aria-labelledby="ach-heading">
                   <h3 id="ach-heading" className="text-sm font-semibold flex items-center gap-2 mb-3">
                     <Trophy className="h-4 w-4 text-[#0A5BE0]" /> Penghargaan dan Publikasi
                   </h3>
-                  <AchievementEditor items={achievements} onSave={saveAchievement} onDelete={deleteAchievement} />
+                  <AchievementEditor items={achievements} onSave={saveAchievement} onDelete={deleteAchievement} onEditingChange={onAchEditing} />
                 </section>
               </div>
             )}
@@ -615,15 +630,17 @@ function ProfilePage() {
             </button>
             
             <div className="flex gap-2">
-              <button 
-                type="button"
-                onClick={() => { void handleSave(); }} 
-                disabled={saving} 
-                className="min-h-11 px-5 rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/10 transition disabled:opacity-60"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Simpan
-              </button>
+              {step < steps.length && (
+                <button 
+                  type="button"
+                  onClick={() => { void handleSave(); }} 
+                  disabled={saving} 
+                  className="min-h-11 px-5 rounded-xl border-2 border-[#0A5BE0]/30 bg-[#0A5BE0]/5 text-[#0A5BE0] text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#0A5BE0]/10 transition disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Simpan
+                </button>
+              )}
               
               {step < steps.length ? (
                 <button 
@@ -1018,9 +1035,9 @@ function Step1Basic({ formData, setFormData, errors }: {
               id={`profile-${field.key}`}
               inputMode={field.type === 'number' ? 'numeric' : field.type === 'url' ? 'url' : field.type === 'email' ? 'email' : field.key === 'phone' ? 'tel' : undefined}
               aria-required={field.key === 'full_name' ? true : undefined}
-              aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : field.key === 'portfolio_url' ? 'profile-portfolio-hint' : undefined}
+              aria-describedby={errors[field.key] ? `profile-${field.key}-error` : field.key === 'email' ? 'profile-email-hint' : field.key === 'portfolio_url' ? 'profile-portfolio-hint' : field.key === 'current_title' ? 'profile-title-hint' : undefined}
               type={field.type}
-              value={formData[field.key] || ''}
+              value={field.type === 'number' ? (formData[field.key] ?? '') : (formData[field.key] || '')}
               onChange={(e) => {
                 const value = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
                 setFormData((prev: any) => ({ ...prev, [field.key]: value }));
@@ -1030,6 +1047,7 @@ function Step1Basic({ formData, setFormData, errors }: {
               aria-invalid={!!errors[field.key]}
               className="mt-1.5 w-full h-12 rounded-lg bg-black/[4%] border-2 border-black/[8%] px-4 text-base md:text-sm focus:border-[#0A5BE0]/40 focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]/10 transition-all duration-200 hover:border-black/[12%] aria-[invalid=true]:border-red-400 read-only:opacity-70 read-only:cursor-not-allowed"
             />
+            {field.key === 'current_title' && <p id="profile-title-hint" className="mt-1 text-xs text-muted-foreground">Disarankan: dipakai sebagai target pencarian lowongan dan syarat Profil Siap.</p>}
             {field.key === 'email' && <p id="profile-email-hint" className="mt-1 text-xs text-muted-foreground">Email akun login; tidak diubah dari halaman ini.</p>}
             {field.key === 'portfolio_url' && <p id="profile-portfolio-hint" className="mt-1 text-xs text-muted-foreground">Opsional. Diisikan agen bila formulir lowongan menanyakan situs portofolio. Berkas portofolio diunggah di kartu Dokumen tambahan.</p>}
             {errors[field.key] && <p id={`profile-${field.key}-error`} className="mt-1 text-xs text-red-600" role="alert">{errors[field.key]}</p>}

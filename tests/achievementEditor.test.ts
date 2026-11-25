@@ -163,7 +163,7 @@ test("Profil: editor dipasang di langkah 3 dan menyimpan lewat profileService (m
   assert.match(src, /import \{[^}]*AchievementEditor[^}]*\} from "@\/components\/profile\/ProfileEditors"/);
   const step3 = src.slice(src.indexOf("{step === 3 && ("), src.indexOf("{step === 4 && ("));
   assert.match(step3, /Penghargaan dan Publikasi/);
-  assert.match(step3, /<AchievementEditor items=\{achievements\} onSave=\{saveAchievement\} onDelete=\{deleteAchievement\} \/>/);
+  assert.match(step3, /<AchievementEditor items=\{achievements\} onSave=\{saveAchievement\} onDelete=\{deleteAchievement\}/);
   const save = src.slice(src.indexOf("const saveAchievement"), src.indexOf("const deleteAchievement"));
   assert.match(save, /isMockMode\(\)/);
   assert.match(save, /profileService\.updateAchievement\(id, row\)/);

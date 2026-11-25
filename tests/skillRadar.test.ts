@@ -274,3 +274,22 @@ test("J: kata kunci baru tetap kata utuh dan tidak menangkap potongan kata atau 
   const all = AXES.flatMap((ax) => [...ax.kw]);
   assert.equal(new Set(all).size, all.length, "kata kunci ganda di antar bidang");
 });
+
+test("UX Wave 3: multi-skill memakai tingkat tertinggi per bidang (matchedSkills) dan Karier Hijau simpan hasil + konfirmasi keluar", () => {
+  const r = buildRadarData([
+    { name: "React", proficiency_level: 5 },
+    { name: "Vue", proficiency_level: 1 },
+  ]);
+  const fe = r.data.find((d) => d.name === "Frontend");
+  assert.equal(fe?.userLevel, 100);
+  assert.deepEqual(fe?.matchedSkills, ["React", "Vue"]);
+
+  const radarPage = read("../src/routes/skill-radar.tsx");
+  assert.match(radarPage, /AXIS_GUIDANCE/);
+  assert.match(radarPage, /d\.matchedSkills/);
+
+  const gc = read("../src/routes/green-career.tsx");
+  assert.match(gc, /completedResults/);
+  assert.match(gc, /Buka di Lowongan/);
+  assert.match(gc, /Keluar dari asesmen ini\?/);
+});

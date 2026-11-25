@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState, useEffect, useId } from "react";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
@@ -225,6 +225,12 @@ function AutomationSettingsPage() {
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Search className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Preferensi Pencarian
               </h2>
+              <p className="text-sm text-muted-foreground">
+                Target gaji dasar &amp; tipe pekerjaan juga bisa dilengkapi dari{' '}
+                <Link to="/profile" className="font-semibold text-[#0A5BE0] underline">
+                  Profil Saya (Langkah 4 — Preferensi)
+                </Link>.
+              </p>
               <div className="space-y-4">
                 <CommaListField
                   label="Kata kunci pencarian (pisahkan dengan koma)"
@@ -289,15 +295,21 @@ function AutomationSettingsPage() {
 
           {/* Save Button */}
           <div className="mt-6 pt-6 border-t border-black/[6%] flex justify-end">
-            <button
-              onClick={handleSave}
-              type="button"
-              disabled={saving}
-              className="min-h-11 px-8 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
-            </button>
+            {activeTab === 'ai' ? (
+              <p className="text-xs text-muted-foreground">
+                Model AI dipilih otomatis sesuai paketmu dan tidak perlu disimpan terpisah.
+              </p>
+            ) : (
+              <button
+                onClick={handleSave}
+                type="button"
+                disabled={saving}
+                className="min-h-11 px-8 rounded-xl bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition inline-flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-[#0A5BE0]/20 hover:shadow-[#0A5BE0]/30 hover:-translate-y-0.5"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+              </button>
+            )}
           </div>
         </div>
       </div>

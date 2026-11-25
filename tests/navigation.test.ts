@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { MOBILE_TAB_ITEMS, NAV_ITEMS, isActivePath } from "../src/lib/navItems.ts";
+import { MOBILE_TAB_ITEMS, NAV_GROUPS, NAV_ITEMS, isActivePath } from "../src/lib/navItems.ts";
 import { planFromRow } from "../src/lib/subscriptionStore.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -81,4 +81,28 @@ test("fitur tanpa handler berlabel Segera hadir di Pengaturan, bukan tombol yang
   // Sesi LinkedIn disembunyikan (23 Nov 2026): tidak ada tautan dari Pengaturan, dan rutenya dialihkan.
   assert.doesNotMatch(src, /to="\/linkedin-session"/);
   assert.match(read("../src/routes/linkedin-session.tsx"), /throw redirect\(\{ to: "\/settings" \}\)/);
+});
+
+test("UX Wave 3: navigasi terkelompok ke /dashboard, profil cegah tutup editor terbuka, LLM keys terlipat, AI tab tanpa tombol simpan", () => {
+  assert.deepEqual(
+    NAV_GROUPS.flatMap((g) => g.items).sort(),
+    NAV_ITEMS.map((i) => i.to).sort(),
+  );
+  const shell = read("../src/components/app/AppShell.tsx");
+  assert.doesNotMatch(shell, /<Link to="\/"\s+className=/);
+  assert.match(shell, /<Link to="\/dashboard" className="flex items-center/);
+  assert.match(shell, /<AgentNote onNavigate=\{\(\) => setMenuOpen\(false\)\} \/>/);
+  assert.match(shell, /Pratinjau/);
+
+  const profile = read("../src/routes/profile.tsx");
+  assert.match(profile, /hasOpenEditor/);
+  assert.match(profile, /step < steps\.length && \(/);
+  assert.match(profile, /formData\[field\.key\] \?\? ''/);
+
+  const llm = read("../src/components/LlmKeysCard.tsx");
+  assert.match(llm, /<details open=\{keys\.length > 0\}/);
+
+  const auto = read("../src/routes/automation-settings.tsx");
+  assert.match(auto, /activeTab === 'ai' \?/);
+  assert.match(auto, /to="\/profile"/);
 });

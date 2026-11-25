@@ -12,6 +12,11 @@ export interface NavItem {
   label: string;
 }
 
+export interface NavGroup {
+  title: string;
+  items: readonly NavItem["to"][];
+}
+
 /** Menu penuh: sidebar desktop dan laci ponsel. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/dashboard", label: "Beranda" },
@@ -24,6 +29,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/blind-mode", label: "Mode Anonim" },
   { to: "/green-career", label: "Karier Hijau" },
   { to: "/settings", label: "Pengaturan" },
+];
+
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { title: "Utama", items: ["/dashboard", "/jobs", "/applications", "/approvals"] },
+  { title: "Profil & Karir", items: ["/profile", "/skill-radar", "/green-career"] },
+  { title: "Preferensi & Lainnya", items: ["/automation-settings", "/settings", "/blind-mode"] },
 ];
 
 /** Bilah bawah ponsel: lima tujuan yang paling sering dipakai, semuanya terjangkau satu ketukan. */

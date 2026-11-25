@@ -9,6 +9,7 @@ export interface SkillAxis {
   name: string;
   userLevel: number;
   marketDemand: number;
+  matchedSkills?: string[];
 }
 
 export interface UserSkillRow {
@@ -116,9 +117,12 @@ export function buildRadarData(skills: UserSkillRow[]): RadarBuild {
     });
     matched.forEach((m) => used.add(m));
     const userLevel = matched.length
-      ? Math.round(Math.min(100, norm(matched.reduce((a, s) => a + (Number(s.proficiency_level) || 0), 0) / matched.length)))
+      ? Math.round(Math.min(100, norm(Math.max(...matched.map((s) => Number(s.proficiency_level) || 0)))))
       : 0;
-    return { id: i + 1, name: ax.name, userLevel, marketDemand: ax.market };
+    const matchedSkills = Array.from(
+      new Set(matched.map((m) => (m.name ?? "").trim()).filter(Boolean)),
+    );
+    return { id: i + 1, name: ax.name, userLevel, marketDemand: ax.market, matchedSkills };
   });
   if (!data.some((d) => d.userLevel > 0)) return { data: [], status: "unmatched", matchedCount: 0, unmatched: [...skills] };
   return { data, status: "ok", matchedCount: used.size, unmatched: skills.filter((s) => !used.has(s)) };

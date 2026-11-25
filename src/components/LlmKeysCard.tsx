@@ -128,18 +128,23 @@ export default function LlmKeysCard() {
         <p>{LLM_KEYS_STORAGE_NOTE}</p>
         <p>{LLM_KEYS_QUOTA_NOTE}</p>
       </div>
-      <ul className="mt-3 space-y-2">
-        {visibleProviders(data.providers).map((info) => (
-          <ProviderRow
-            key={info.id}
-            info={info}
-            row={keys.find((k) => k.provider === info.id) ?? null}
-            enabled={enabled}
-            onSaved={(saved) => setKeys((current) => upsertKey(current, saved))}
-            onRemoved={() => setKeys((current) => removeKey(current, info.id))}
-          />
-        ))}
-      </ul>
+      <details open={keys.length > 0} className="mt-3 rounded-xl border border-black/[8%] bg-[#F7F6F2]/60 px-3 py-2">
+        <summary className="cursor-pointer min-h-11 flex items-center text-xs font-semibold text-[#16150F]">
+          Kelola penyedia &amp; kunci API ({visibleProviders(data.providers).length} penyedia)
+        </summary>
+        <ul className="mt-2 space-y-2">
+          {visibleProviders(data.providers).map((info) => (
+            <ProviderRow
+              key={info.id}
+              info={info}
+              row={keys.find((k) => k.provider === info.id) ?? null}
+              enabled={enabled}
+              onSaved={(saved) => setKeys((current) => upsertKey(current, saved))}
+              onRemoved={() => setKeys((current) => removeKey(current, info.id))}
+            />
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

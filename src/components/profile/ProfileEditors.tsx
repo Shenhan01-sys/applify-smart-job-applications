@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   Briefcase, GraduationCap, Wrench, Building2, Calendar, MapPin, Layers, Star,
   Pencil, Trash2, Plus, X, Loader2, AlertCircle, Trophy,
@@ -134,11 +134,12 @@ const labelOf = (list: ReadonlyArray<{ value: string | number; label: string }>,
 // Work experience
 // ================================================================================================
 
-export function ExperienceEditor({ items, onSave, onDelete, now }: {
+export function ExperienceEditor({ items, onSave, onDelete, now, onEditingChange }: {
   items: any[];
   onSave: (row: ExperienceRow, id: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   now?: Date;
+  onEditingChange?: (open: boolean) => void;
 }) {
   const uid = useId();
   // null = list only, "new" = add form, otherwise the id being edited
@@ -148,6 +149,13 @@ export function ExperienceEditor({ items, onSave, onDelete, now }: {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => {
+      onEditingChange?.(false);
+    };
+  }, [editing, onEditingChange]);
 
   const open = (id: string | null, f: ExperienceForm) => { setEditing(id); setForm(f); setErrors({}); setFormError(""); };
   const set = <K extends keyof ExperienceForm>(k: K, v: ExperienceForm[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -274,11 +282,12 @@ export function ExperienceEditor({ items, onSave, onDelete, now }: {
 // Education
 // ================================================================================================
 
-export function EducationEditor({ items, onSave, onDelete, now }: {
+export function EducationEditor({ items, onSave, onDelete, now, onEditingChange }: {
   items: any[];
   onSave: (row: EducationRow, id: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   now?: Date;
+  onEditingChange?: (open: boolean) => void;
 }) {
   const uid = useId();
   const [editing, setEditing] = useState<string | null>(null);
@@ -287,6 +296,13 @@ export function EducationEditor({ items, onSave, onDelete, now }: {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => {
+      onEditingChange?.(false);
+    };
+  }, [editing, onEditingChange]);
 
   const open = (id: string | null, f: EducationForm) => { setEditing(id); setForm(f); setErrors({}); setFormError(""); };
   const set = <K extends keyof EducationForm>(k: K, v: EducationForm[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -389,10 +405,11 @@ export function EducationEditor({ items, onSave, onDelete, now }: {
 // Skills
 // ================================================================================================
 
-export function SkillsEditor({ items, onSave, onDelete }: {
+export function SkillsEditor({ items, onSave, onDelete, onEditingChange }: {
   items: any[];
   onSave: (row: SkillRow, id: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onEditingChange?: (open: boolean) => void;
 }) {
   const uid = useId();
   const [editing, setEditing] = useState<string | null>(null);
@@ -401,6 +418,13 @@ export function SkillsEditor({ items, onSave, onDelete }: {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => {
+      onEditingChange?.(false);
+    };
+  }, [editing, onEditingChange]);
 
   const open = (id: string | null, f: SkillForm) => { setEditing(id); setForm(f); setErrors({}); setFormError(""); };
   const set = <K extends keyof SkillForm>(k: K, v: SkillForm[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -478,11 +502,12 @@ export function SkillsEditor({ items, onSave, onDelete }: {
 // Achievements: penghargaan dan publikasi
 // ================================================================================================
 
-export function AchievementEditor({ items, onSave, onDelete, now }: {
+export function AchievementEditor({ items, onSave, onDelete, now, onEditingChange }: {
   items: any[];
   onSave: (row: AchievementRow, id: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   now?: Date;
+  onEditingChange?: (open: boolean) => void;
 }) {
   const uid = useId();
   const [editing, setEditing] = useState<string | null>(null);
@@ -491,6 +516,13 @@ export function AchievementEditor({ items, onSave, onDelete, now }: {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => {
+      onEditingChange?.(false);
+    };
+  }, [editing, onEditingChange]);
 
   const open = (id: string | null, f: AchievementForm) => { setEditing(id); setForm(f); setErrors({}); setFormError(""); };
   const set = <K extends keyof AchievementForm>(k: K, v: AchievementForm[K]) => setForm((p) => ({ ...p, [k]: v }));

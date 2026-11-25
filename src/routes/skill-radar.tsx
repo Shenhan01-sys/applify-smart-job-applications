@@ -224,9 +224,16 @@ function RadarTable({ data }: { data: SkillAxis[] }) {
         <tbody>
           {data.map((d) => (
             <tr key={d.id} className="border-t border-neutral-100">
-              <th scope="row" className="py-1.5 pr-2 text-left font-medium">{d.name}</th>
-              <td className="py-1.5 pr-2 font-mono">{d.userLevel}%</td>
-              <td className="py-1.5 font-mono">{d.marketDemand}%</td>
+              <th scope="row" className="py-1.5 pr-2 text-left font-medium align-top">
+                <span>{d.name}</span>
+                {d.matchedSkills && d.matchedSkills.length > 0 && (
+                  <span className="block text-xs font-normal text-neutral-500">
+                    {d.matchedSkills.join(", ")}
+                  </span>
+                )}
+              </th>
+              <td className="py-1.5 pr-2 font-mono align-top">{d.userLevel}%</td>
+              <td className="py-1.5 font-mono align-top">{d.marketDemand}%</td>
             </tr>
           ))}
         </tbody>
@@ -234,6 +241,15 @@ function RadarTable({ data }: { data: SkillAxis[] }) {
     </details>
   );
 }
+
+const AXIS_GUIDANCE: Record<string, string> = {
+  Frontend: "Perkuat React/TypeScript, aksesibilitas UI, atau manajemen state lewat proyek antarmuka nyata lalu tambahkan di profil.",
+  Backend: "Latih perancangan API, autentikasi, serta basis data server lewat layanan kecil lalu catat skill-nya di profil.",
+  "UI/UX": "Tambahkan pengalaman riset pengguna, wireframe, atau desain sistem di Figma agar posisi produk lebih kuat.",
+  "Cloud/DevOps": "Bangun alur deploy otomatis, kontainer Docker, atau pengelolaan cloud sederhana sebagai bukti praktik.",
+  "Data/AI": "Perdalam kueri SQL, olah data, atau integrasi model AI terstruktur lewat studi kasus portofolio.",
+  "Agile/Soft": "Tonjolkan pengalaman kolaborasi tim, kepemimpinan proyek, atau presentasi kerja pada profil dan pencapaianmu.",
+};
 
 function ActionableInsights({ data }: { data: SkillAxis[] }) {
   const gaps = findGaps(data);
@@ -263,12 +279,19 @@ function ActionableInsights({ data }: { data: SkillAxis[] }) {
                 <span className="font-mono font-bold text-neutral-800">{gap.marketDemand}%</span>.{" "}
                 <span className="font-bold text-[#B45A0E]">Selisih {diff} poin</span>
               </p>
+              {gap.matchedSkills && gap.matchedSkills.length > 0 && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Terbaca dari profil: {gap.matchedSkills.join(", ")}
+                </p>
+              )}
               <div className="mt-4 pt-4 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-50 text-[#0A5BE0] rounded-xl flex items-center justify-center shrink-0">
                     <BookOpen className="w-5 h-5" aria-hidden="true" />
                   </div>
-                  <p className="text-sm text-neutral-700">Pelajari bidang ini lewat kursus atau proyek latihan pilihanmu, lalu catat hasilnya di profil.</p>
+                  <p className="text-sm text-neutral-700">
+                    {AXIS_GUIDANCE[gap.name] ?? "Pelajari bidang ini lewat proyek latihan pilihanmu, lalu catat hasilnya di profil."}
+                  </p>
                 </div>
                 <Link to="/profile" className="shrink-0 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-bold text-[#0A5BE0] hover:underline">
                   Tambah skill di Profil <ArrowRight className="w-4 h-4" aria-hidden="true" />

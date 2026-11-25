@@ -16,6 +16,7 @@ import { greenMatchView, type GreenMatchView } from "@/lib/greenMatch";
 import { greenCareerListNotice } from "@/lib/greenCareerUi";
 import { profileService } from "@/services/profileService";
 import { ErrorState } from "@/components/ErrorState";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/green-career")({
   beforeLoad: async () => {
@@ -38,6 +39,7 @@ function GreenCareerPage() {
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<AssessmentResult | null>(null);
+  const [completedResults, setCompletedResults] = useState<Map<string, AssessmentResult>>(() => new Map());
   const [busy, setBusy] = useState(false);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
   const inFlightRef = useRef(false);
@@ -103,6 +105,7 @@ function GreenCareerPage() {
     try {
       const payload = questions.map((q) => ({ id: q.id, question: q.question, answer: answers[q.id] ?? "" }));
       const r = await greenCareerService.submitAssessment(assessmentId, payload);
+      if (job?.id) setCompletedResults((prev) => new Map(prev).set(job.id, r));
       setResult(r); setView("result");
     } catch (e) {
       // Jawaban tetap tersimpan di layar, jadi pengguna bisa mengirim ulang tanpa mengetik lagi.
@@ -165,16 +168,21 @@ function GreenCareerPage() {
                   </div>
                 </div>
                 <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-0 animate-fade-up">
-                  {shownJobs.map((j) => (
-                    <JobCard
-                      key={j.id}
-                      job={j}
-                      view={matchViews.get(j.id)!}
-                      onStart={() => startAssessment(j)}
-                      busy={busy}
-                      loadingThis={busyJobId === j.id}
-                    />
-                  ))}
+                  {shownJobs.map((j) => {
+                    const savedResult = completedResults.get(j.id);
+                    return (
+                      <JobCard
+                        key={j.id}
+                        job={j}
+                        view={matchViews.get(j.id)!}
+                        onStart={() => startAssessment(j)}
+                        savedResult={savedResult}
+                        onViewResult={savedResult ? () => { setJob(j); setResult(savedResult); setView("result"); } : undefined}
+                        busy={busy}
+                        loadingThis={busyJobId === j.id}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -194,7 +202,23 @@ function GreenCareerPage() {
 }
 
 /* ── List: job card ── */
-function JobCard({ job, view, onStart, busy, loadingThis }: { job: GreenJob; view: GreenMatchView; onStart: () => void; busy: boolean; loadingThis: boolean }) {
+function JobCard({
+  job,
+  view,
+  onStart,
+  savedResult,
+  onViewResult,
+  busy,
+  loadingThis,
+}: {
+  job: GreenJob;
+  view: GreenMatchView;
+  onStart: () => void;
+  savedResult?: AssessmentResult;
+  onViewResult?: () => void;
+  busy: boolean;
+  loadingThis: boolean;
+}) {
   const esg = job.company_insight?.green_score;
   const tags = job.company_insight?.esg_flags ?? [];
   return (
@@ -217,9 +241,38 @@ function JobCard({ job, view, onStart, busy, loadingThis }: { job: GreenJob; vie
       )}
       <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-3 mt-auto">
         <MatchBlock view={view} />
+        {savedResult && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            <span className="font-semibold">Skor asesmen: {savedResult.readinessScore}%</span>
+            {onViewResult && (
+              <button type="button" onClick={onViewResult} className="min-h-11 px-2 font-bold underline">
+                Lihat hasil
+              </button>
+            )}
+          </div>
+        )}
         <button type="button" onClick={onStart} disabled={busy} aria-label={`Ikuti asesmen kesiapan untuk ${job.title} di ${job.company}`} className="w-full mt-2 min-h-11 bg-white border-2 border-brand-emerald text-brand-emerald hover:bg-brand-emerald hover:text-white font-sans font-bold text-sm py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-          {loadingThis ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Menyiapkan asesmen...</> : <>Ikuti Asesmen <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
+          {loadingThis ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Menyiapkan asesmen...</> : <>{savedResult ? "Ulangi Asesmen" : "Ikuti Asesmen"} <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
         </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/jobs"
+            search={{ cari: job.title }}
+            className="flex-1 min-h-11 inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-800 hover:border-[#0A5BE0] transition"
+          >
+            <Briefcase className="h-3.5 w-3.5" aria-hidden="true" /> Buka di Lowongan
+          </Link>
+          {job.external_url && (
+            <a
+              href={job.external_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-11 inline-flex items-center justify-center gap-1 rounded-lg border-2 border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:border-neutral-400 transition"
+            >
+              Situs asal <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            </a>
+          )}
+        </div>
         <p className="text-xs text-neutral-500 text-center">Opsional dan tanpa biaya. Hasilnya hanya untuk kamu.</p>
       </div>
     </div>
@@ -312,10 +365,40 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
   job: GreenJob | null; questions: AssessmentQuestion[]; answers: Record<string, string>;
   setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; onBack: () => void; onSubmit: () => void; allAnswered: boolean;
 }) {
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const answered = questions.filter((q) => (answers[q.id] ?? "").trim().length > 0).length;
+  const requestBack = () => {
+    if (answered > 0) setConfirmLeaveOpen(true);
+    else onBack();
+  };
   return (
     <div className="w-full max-w-2xl opacity-0 animate-fade-up">
-      <button type="button" onClick={onBack} className="min-h-11 text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Kembali</button>
+      <button type="button" onClick={requestBack} className="min-h-11 text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Kembali</button>
+      <Dialog open={confirmLeaveOpen} onOpenChange={setConfirmLeaveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Keluar dari asesmen ini?</DialogTitle>
+            <DialogDescription>
+              {answered} jawaban yang sudah kamu tulis belum dikirim dan akan hilang jika kamu kembali ke daftar.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button type="button" onClick={() => setConfirmLeaveOpen(false)} className="min-h-11 rounded-xl border-2 border-neutral-300 px-4 text-sm font-semibold">
+              Lanjut jawab
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmLeaveOpen(false);
+                onBack();
+              }}
+              className="min-h-11 rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white"
+            >
+              Ya, keluar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="glass-solid rounded-3xl p-5 mb-5 flex items-center gap-4">
         <div className="w-12 h-12 bg-neutral-900 text-brand-emerald rounded-xl flex items-center justify-center shadow-lg border-2 border-neutral-700"><Bot className="w-6 h-6" /></div>
         <div className="min-w-0 flex-1">
