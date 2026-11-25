@@ -50,8 +50,13 @@ test("parser gaji Indonesia membaca pemisah ribuan, Rp, desimal, dan satuan", ()
     ["6.500", 6_500],
     ["Rp 1,25 juta", 1_250_000],
     ["2 rb", 2_000],
+    ["Rp. 7.500.000", 7_500_000],
+    ["5.000.000,-", 5_000_000],
+    ["IDR 5.000.000", 5_000_000],
+    ["5.000.000 per bulan", 5_000_000],
+    ["6 jt/bulan", 6_000_000],
   ] as const) assert.equal(parseIndonesianSalary(input), expected, input);
-  for (const input of ["", "   ", "Rp", "enam juta", "5,5jt++", "-5000", "Infinity"]) {
+  for (const input of ["", "   ", "Rp", "enam juta", "5,5jt++", "-5000", "Infinity", "6,5", "6.5"]) {
     assert.equal(parseIndonesianSalary(input), null, input);
   }
 });
@@ -85,7 +90,9 @@ test("langkah Preferensi Profil menerima format gaji Rupiah dan mencegah simpan 
   assert.match(profilePage, /type="text"[\s\S]*?inputMode="decimal"/);
   assert.match(profilePage, /parseIndonesianSalary\(raw\)/);
   assert.match(profilePage, /onSalaryError\(key, "Format gaji belum dikenali/);
-  assert.match(profilePage, /\.\.\.validatePreferences\(preferences\), \.\.\.prefErrors/);
+  // Hanya galat format gaji yang dibawa dari prefErrors; galat lain dihitung ulang (simpan tidak terkunci).
+  assert.match(profilePage, /\.\.\.validatePreferences\(preferences\), \.\.\.salaryParseErrors/);
+  assert.doesNotMatch(profilePage, /\.\.\.validatePreferences\(preferences\), \.\.\.prefErrors/);
   assert.match(profilePage, /Contoh: 5\.000\.000 atau 6,5 jt/);
 });
 

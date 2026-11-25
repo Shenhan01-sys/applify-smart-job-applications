@@ -95,7 +95,6 @@ export const LOCATION_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["jakbar", "jakarta barat"],
   ["jaktim", "jakarta timur"],
   ["jakut", "jakarta utara"],
-  ["jabodetabek", "jakarta", "bogor", "depok", "tangerang", "bekasi"],
   ["sby", "surabaya"],
   ["bdg", "bandung"],
   ["smg", "semarang"],
@@ -113,6 +112,18 @@ const normalizeLocationPhrase = (value: string): string => value
 const locationAliasByPhrase = new Map<string, readonly string[]>();
 for (const group of LOCATION_ALIAS_GROUPS) {
   for (const phrase of group) locationAliasByPhrase.set(normalizeLocationPhrase(phrase), group);
+}
+/**
+ * Istilah payung satu arah: "jabodetabek" mencakup kelima kota, tetapi mencari "Bogor" tidak ikut menampilkan
+ * lowongan Jakarta atau Bekasi (review 25 November 2026).
+ */
+export const LOCATION_UMBRELLAS: Readonly<Record<string, readonly string[]>> = {
+  jabodetabek: ["jabodetabek", "jakarta", "bogor", "depok", "tangerang", "bekasi"],
+};
+for (const [umbrella, cities] of Object.entries(LOCATION_UMBRELLAS)) {
+  locationAliasByPhrase.set(umbrella, cities);
+  // Kota anggota hanya diperluas ke payungnya (lowongan berlokasi "Jabodetabek"), tidak ke kota anggota lain.
+  for (const city of cities) if (city !== umbrella && !locationAliasByPhrase.has(city)) locationAliasByPhrase.set(city, [city, umbrella]);
 }
 
 interface SearchGroup { terms: string[]; locationOnly: boolean }

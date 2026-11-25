@@ -40,7 +40,11 @@ export function parseOptionalNumber(raw: string): number | null {
  * desimal diperbolehkan sebelum satuan (mis. "6,5 jt"). Tanpa satuan, "6.500" berarti enam ribu lima ratus.
  */
 export function parseIndonesianSalary(raw: string): number | null {
-  let text = raw.trim().toLowerCase().replace(/\u00a0/g, " ").replace(/^rp\s*/i, "").trim();
+  let text = raw.trim().toLowerCase().replace(/\u00a0/g, " ")
+    .replace(/^(?:rp\.?|idr)\s*/i, "")
+    .replace(/\s*(?:\/|per\s*)(?:bulan|bln|bulanan)$|\s*sebulan$/i, "")
+    .replace(/,-$/, "")
+    .trim();
   if (!text) return null;
   text = text.replace(/\s+/g, " ");
 
@@ -63,8 +67,8 @@ export function parseIndonesianSalary(raw: string): number | null {
   } else if (/^\d{1,3}(?:,\d{3})+\.\d{1,2}$/.test(text)) {
     text = text.replace(/,/g, "");
   } else if (/^\d+[,.]\d+$/.test(text)) {
-    // Desimal tanpa satuan dipertahankan; jangan memakai parseInt yang memotong "6.500" menjadi 6.
-    text = text.replace(",", ".");
+    // Desimal tanpa satuan ("6,5") ambigu: enam setengah juta atau Rp 6,5? Minta satuan, jangan menebak.
+    return null;
   }
 
   if (!/^\d+(?:\.\d+)?$/.test(text)) return null;

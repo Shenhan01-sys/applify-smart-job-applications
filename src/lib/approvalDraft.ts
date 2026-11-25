@@ -21,7 +21,9 @@ export function readApprovalDraft(
   storage: ApprovalDraftStorage | null = browserSessionStorage(),
 ): string {
   try {
-    return storage?.getItem(approvalDraftKey(approvalId)) ?? original;
+    const saved = storage?.getItem(approvalDraftKey(approvalId));
+    // Draf kosong tidak dipulihkan: Setujui dengan surat kosong hampir pasti bukan maksud pengguna.
+    return saved && saved.trim() ? saved : original;
   } catch {
     return original;
   }
@@ -36,7 +38,7 @@ export function saveApprovalDraft(
 ): boolean {
   try {
     if (!storage) return false;
-    if (draft === original) storage.removeItem(approvalDraftKey(approvalId));
+    if (draft === original || !draft.trim()) storage.removeItem(approvalDraftKey(approvalId));
     else storage.setItem(approvalDraftKey(approvalId), draft);
     return true;
   } catch {

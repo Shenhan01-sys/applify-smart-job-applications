@@ -126,6 +126,9 @@ test("pencarian lokasi memperluas alias kota Indonesia di kueri server dan penco
     assert.match(filters[0], /location\.ilike\./, query);
   }
   assert.equal(matchesJobSearch({ title: "Staff", company: "Acme", location: "Bandung" }, "Jaksel"), false);
+  // Payung satu arah: kota anggota tidak saling menarik (review 25 Nov 2026).
+  assert.equal(matchesJobSearch({ title: "Staff", company: "Acme", location: "Jakarta" }, "Bogor"), false);
+  assert.equal(matchesJobSearch({ title: "Staff", company: "Acme", location: "Bekasi" }, "Depok"), false);
   assert.equal(matchesJobSearch({ title: "Frontend", company: "Acme", location: "Jakarta Selatan" }, "Frontend Jaksel"), true);
 });
 

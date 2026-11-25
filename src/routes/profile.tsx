@@ -276,7 +276,12 @@ function ProfilePage() {
       toast.error("Periksa kolom profil dasar yang ditandai merah.");
       return false;
     }
-    const prefProblems = { ...validatePreferences(preferences), ...prefErrors };
+    // Dari prefErrors hanya galat format gaji (dipasang saat mengetik) yang dibawa; galat lain dihitung ulang supaya
+    // kolom yang sudah dibetulkan tidak terus memblokir simpan.
+    const salaryParseErrors: typeof prefErrors = {};
+    if (prefErrors.desired_salary) salaryParseErrors.desired_salary = prefErrors.desired_salary;
+    if (prefErrors.current_ctc) salaryParseErrors.current_ctc = prefErrors.current_ctc;
+    const prefProblems = { ...validatePreferences(preferences), ...salaryParseErrors };
     if (Object.keys(prefProblems).length > 0) {
       setPrefErrors(prefProblems);
       setDirection('next');

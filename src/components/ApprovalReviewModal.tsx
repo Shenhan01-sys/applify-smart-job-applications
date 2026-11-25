@@ -178,7 +178,8 @@ export default function ApprovalReviewModal({
         'Make it more concise and highlight relevant experience'
       )
       if (result?.cover_letter) {
-        setEditedCoverLetter(result.cover_letter)
+        // Lewat updateCoverLetterDraft supaya draf tersimpan ikut diganti hasil tulis ulang, bukan suntingan lama.
+        updateCoverLetterDraft(result.cover_letter)
         setRegenWarnings(
           Array.isArray(result.warnings)
             ? result.warnings.map((w: any) => String(w?.message ?? '')).filter(Boolean)
