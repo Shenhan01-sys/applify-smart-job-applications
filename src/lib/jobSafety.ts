@@ -5,6 +5,7 @@
  * Selaras deterministik dengan `backend/services/job-safety.service.ts` tanpa memerlukan migrasi DB.
  */
 import { extractRecruiterEmails } from "./emailApply.ts";
+import { postedDate } from "./jobCardData.ts";
 
 export type SafetyRiskLevel = "low" | "caution" | "high";
 export type SafetyFlagCode =
@@ -26,6 +27,8 @@ export interface JobFreshnessInfo {
   status: "fresh" | "stale" | "unknown";
   ageDays: number | null;
   label: string | null;
+  /** Asal tanggal: `posted` = tanggal tayang dari sumber; `saved` = tanggal baris disimpan (cadangan yang sama dengan kartu). */
+  source?: "posted" | "saved" | null;
 }
 
 export interface JobSafetyReport {
@@ -43,6 +46,8 @@ export interface JobSafetyInput {
   apply_url?: string | null;
   apply_email?: string | null;
   posted_at?: string | null;
+  /** Cadangan bila posted_at kosong atau tidak valid, sama seperti tanggal yang dicetak kartu lowongan. */
+  created_at?: string | null;
 }
 
 export const STALE_POSTING_DAYS = 30;
@@ -108,19 +113,28 @@ function hostOf(rawUrl: string): string {
   }
 }
 
-export function assessJobFreshness(postedAt: string | null | undefined, now: Date = new Date()): JobFreshnessInfo {
-  if (!postedAt || typeof postedAt !== "string") {
-    return { status: "unknown", ageDays: null, label: "Tanggal tayang tidak tercantum" };
+export function assessJobFreshness(
+  postedAt: string | null | undefined,
+  now: Date = new Date(),
+  savedAt?: string | null,
+): JobFreshnessInfo {
+  // Tanggal yang dihitung harus tanggal yang dicetak kartu (postedDate: posted_at, lalu created_at).
+  const posted = postedDate({ posted_at: postedAt });
+  const shown = posted ?? postedDate({ created_at: savedAt });
+  if (!shown) {
+    return { status: "unknown", ageDays: null, label: "Tanggal tayang tidak tercantum", source: null };
   }
-  const ts = Date.parse(postedAt);
-  if (!Number.isFinite(ts)) {
-    return { status: "unknown", ageDays: null, label: "Tanggal tayang tidak tercantum" };
-  }
-  const ageDays = Math.max(0, Math.floor((now.getTime() - ts) / 86_400_000));
+  const source = posted ? "posted" : "saved";
+  const ageDays = Math.max(0, Math.floor((now.getTime() - shown.getTime()) / 86_400_000));
   if (ageDays > STALE_POSTING_DAYS) {
-    return { status: "stale", ageDays, label: `Tayang ${ageDays} hari lalu (mungkin sudah tutup)` };
+    // Dari tanggal simpan, jangan mengaku "tayang": tanggal tayang sebenarnya tidak diketahui.
+    const label =
+      source === "posted"
+        ? `Tayang ${ageDays} hari lalu (mungkin sudah tutup)`
+        : `Tersimpan ${ageDays} hari lalu (mungkin sudah tutup)`;
+    return { status: "stale", ageDays, label, source };
   }
-  return { status: "fresh", ageDays, label: null };
+  return { status: "fresh", ageDays, label: null, source };
 }
 
 export function assessJobSafety(job: JobSafetyInput, now: Date = new Date()): JobSafetyReport {
@@ -174,13 +188,16 @@ export function assessJobSafety(job: JobSafetyInput, now: Date = new Date()): Jo
     });
   }
 
-  const freshness = assessJobFreshness(job.posted_at, now);
+  const freshness = assessJobFreshness(job.posted_at, now, job.created_at);
   if (freshness.status === "stale") {
     flags.push({
       code: "stale_posting",
       severity: "caution",
       label: `Lowongan lama (${freshness.ageDays} hari)`,
-      detail: "Lowongan sudah tayang lebih dari 30 hari; pastikan posisi masih dibuka sebelum melamar.",
+      detail:
+        freshness.source === "saved"
+          ? "Sumber tidak mencantumkan tanggal tayang; umur dihitung dari tanggal lowongan tersimpan di Applify (tanggal yang tampil di kartu), jadi lowongan ini sudah ada lebih dari 30 hari. Pastikan posisi masih dibuka sebelum melamar."
+          : "Lowongan sudah tayang lebih dari 30 hari; pastikan posisi masih dibuka sebelum melamar.",
     });
   } else if (freshness.status === "unknown") {
     flags.push({
