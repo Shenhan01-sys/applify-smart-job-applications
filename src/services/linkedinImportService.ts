@@ -15,7 +15,7 @@ import { profileService } from "@/services/profileService";
 /** Hasil `profileService.create*` berbentuk { data, error }. Galat dijadikan pesan Indonesia, data dikembalikan. */
 async function unwrap(request: PromiseLike<{ data: unknown; error: { message?: string } | null }>): Promise<unknown> {
   const res = await request;
-  if (res.error) throw new Error(describeError(res.error, "Gagal menyimpan."));
+  if (res.error) throw new Error(describeError(res.error, "Data dari PDF belum tersimpan. Coba simpan lagi. Bila tetap gagal, muat ulang halaman Profil lalu impor ulang PDF LinkedIn."));
   return res.data;
 }
 

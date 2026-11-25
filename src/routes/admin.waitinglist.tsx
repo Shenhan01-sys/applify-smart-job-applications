@@ -64,7 +64,7 @@ function AdminWaitinglistPage() {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
-      toast.error("Gagal memuat data: " + error.message);
+      toast.error("Daftar tunggu belum bisa dimuat. Muat ulang halaman, lalu coba lagi. Rincian: " + error.message);
     } else {
       setRows((data as WaitinglistEntry[]) ?? []);
     }

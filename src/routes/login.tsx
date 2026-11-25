@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
 import { describeAuthError, rememberAuthProvider } from "@/lib/authErrors";
+import { rememberAuthMode } from "@/lib/authMode";
 import { detectInAppBrowser, inAppBrowserWarning } from "@/lib/inAppBrowser";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -154,6 +155,7 @@ function LoginPage() {
     setGoogleLoading(true);
     setError("");
     rememberAuthProvider("google");
+    rememberAuthMode(isSignUp ? "daftar" : "masuk");
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -179,6 +181,7 @@ function LoginPage() {
     setLinkedInLoading(true);
     setError("");
     rememberAuthProvider("linkedin");
+    rememberAuthMode(isSignUp ? "daftar" : "masuk");
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "linkedin_oidc",
@@ -376,6 +379,17 @@ function LoginPage() {
               </button>
             )}
           </form>
+
+          {isSignUp && (
+            <div className="mt-6 rounded-xl bg-black/[3%] p-4 text-sm text-[#16150F]">
+              <p className="font-semibold">Setelah daftar, kamu akan:</p>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted-foreground">
+                <li>Unggah CV atau isi profil singkatmu.</li>
+                <li>Cari lowongan, lalu buat draf lamaran dengan AI.</li>
+                <li>Periksa draf di halaman Persetujuan. Tidak ada lamaran yang dikirim sebelum kamu menyetujuinya.</li>
+              </ol>
+            </div>
+          )}
 
           <div className="mt-6 text-center">
             <button
