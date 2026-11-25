@@ -254,6 +254,22 @@ export function nextCallTimeoutMs(input: { perCallMs: number; totalBudgetMs: num
   return Math.max(0, Math.min(input.perCallMs, remaining));
 }
 
+/** Cadangan waktu untuk kandidat Anthropic (berbayar, paling andal) di akhir rantai. */
+export const DEFAULT_AI_RESERVE_MS = 12_000;
+
+/**
+ * Anggaran total untuk kandidat ke-`index`. Insiden 25 November 2026: model gratis (Numes, Gemini, Gemma, OpenRouter)
+ * menghabiskan 34 detik, lalu Anthropic di akhir rantai dilewati dengan "time_budget 0ms" dan pengguna melihat
+ * "Layanan AI sedang sibuk". Kandidat sebelum Anthropic pertama hanya boleh memakai anggaran dikurangi cadangan.
+ */
+export function budgetForCandidate(input: { index: number; firstReservedIndex: number; totalBudgetMs: number; reserveMs: number }): {
+  budgetMs: number;
+  reserveAhead: boolean;
+} {
+  const reserveAhead = input.firstReservedIndex >= 0 && input.index < input.firstReservedIndex;
+  return { budgetMs: reserveAhead ? Math.max(0, input.totalBudgetMs - input.reserveMs) : input.totalBudgetMs, reserveAhead };
+}
+
 /** Angka dari secret (string) atau bawaan bila kosong, bukan angka, atau tidak positif. */
 export function positiveMs(raw: string | undefined | null, fallback: number): number {
   const n = Number(raw);

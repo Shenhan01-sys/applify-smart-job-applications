@@ -205,7 +205,7 @@ test("generate-application: BYOK di balik flag, kuota hanya dipotong bila key Ap
   assert.match(src, /if \(keyErr\) return json\([^;]*byok_lookup_failed[^;]*503\)/);
   assert.match(src, /const decision = countErr\s*\? \{ allowed: false \}/);
   assert.match(src, /\.eq\("provider", candidate\.provider\)\.eq\("key_encrypted", candidate\.keyEncrypted \?\? ""\)/);
-  assert.match(src, /for \(const candidate of chain\)/);
+  assert.match(src, /for \(const \[index, candidate\] of chain\.entries\(\)\)/);
   assert.match(src, /requestBody\(candidate, \[/);
   assert.match(src, /readCompletion\(candidate\.format, aiJson\)/);
   // Key tidak pernah masuk console.

@@ -9,6 +9,7 @@ import {
   DEFAULT_AI_TOTAL_BUDGET_MS,
   MIN_AI_CALL_MS,
   nextCallTimeoutMs,
+  budgetForCandidate,
   numesKeysFromEnv,
   positiveMs,
   parseModelList,
@@ -280,7 +281,7 @@ test("rantai gaya generate-application: Numes lambat di semua entri, Gemini teta
     const numesBudget = new NumesBudget({ totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS });
     const outcomes: string[] = [];
     let winner = "";
-    for (const candidate of chain) {
+    for (const [index, candidate] of chain.entries()) {
       const callTimeout = nextCallTimeoutMs({ perCallMs: DEFAULT_AI_CALL_TIMEOUT_MS, totalBudgetMs: DEFAULT_AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - started });
       if (callTimeout === 0) {
         outcomes.push(`${candidate.entry} time_budget`);
@@ -388,7 +389,7 @@ test("Edge Function memakai rantai penyedia dan batas waktu per panggilan yang d
   const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
   assert.match(src, /from "\.\.\/_shared\/providers\.ts"/);
   // Batas waktu per percobaan dihitung ulang dari sisa anggaran total dan dipasang di postChat (providers.ts).
-  assert.match(src, /postChat\(candidate, \{\s*timeoutMs: \(\) => nextCallTimeoutMs\(\{ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date\.now\(\) - requestStarted \}\)/);
+  assert.match(src, /postChat\(candidate, \{\s*timeoutMs: \(\) => nextCallTimeoutMs\(\{ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: budgetMs, elapsedMs: Date\.now\(\) - requestStarted \}\)/);
   // Numes: batas 12 detik per percobaan (NUMES_TIMEOUT_MS) dan satu NumesBudget per permintaan, supaya Gemini tidak kena time_budget
   assert.match(src, /const NUMES_TIMEOUT_MS = positiveMs\(Deno\.env\.get\("NUMES_TIMEOUT_MS"\), DEFAULT_NUMES_CALL_TIMEOUT_MS\)/);
   assert.match(src, /const numesBudget = new NumesBudget\(\{ totalBudgetMs: AI_TOTAL_BUDGET_MS \}\)/);
@@ -481,9 +482,11 @@ test("Edge Function: anggaran total dihitung sejak permintaan masuk, rantai berh
   assert.match(src, /AI_CALL_TIMEOUT_MS = positiveMs\(Deno\.env\.get\("AI_CALL_TIMEOUT_MS"\), DEFAULT_AI_CALL_TIMEOUT_MS\)/);
   assert.match(src, /elapsedMs: started - requestStarted/);
   // Sejak BYOK (23 Nov 2026) loop berjalan atas `chain` (rantai BYOK lalu rantai paket), bukan `models`.
-  const loop = src.slice(src.indexOf("for (const candidate of chain)"), src.indexOf("if (!parsed && soft)"));
-  assert.ok(src.indexOf("for (const candidate of chain)") > 0);
+  const loop = src.slice(src.indexOf("for (const [index, candidate] of chain.entries())"), src.indexOf("if (!parsed && soft)"));
+  assert.ok(src.indexOf("for (const [index, candidate] of chain.entries())") > 0);
   assert.match(loop, /if \(callTimeoutMs === 0\) \{[\s\S]{0,260}break;/);
+  // Jatah kandidat gratis habis sebelum Anthropic: lompat (continue), bukan berhenti.
+  assert.match(loop, /if \(callTimeoutMs === 0 && reserveAhead\) \{[\s\S]{0,120}continue;/);
   assert.match(loop, /note\("skipped time_budget", started\)/);
   // galat tetap 502 "AI generation failed" (describeError di klien menerjemahkannya), dengan penanda anggaran
   assert.match(src, /error: "AI generation failed"[^;]*budgetExhausted[^;]*\}, 502\)/);
@@ -491,4 +494,14 @@ test("Edge Function: anggaran total dihitung sejak permintaan masuk, rantai berh
   assert.match(src, /admin\.auth\.getUser\(token\)/);
   assert.match(src, /Missing auth token/);
   assert.equal(MIN_AI_CALL_MS < DEFAULT_AI_CALL_TIMEOUT_MS && DEFAULT_AI_CALL_TIMEOUT_MS < DEFAULT_AI_TOTAL_BUDGET_MS, true);
+});
+
+test("budgetForCandidate: kandidat sebelum Anthropic menyisakan cadangan; Anthropic memakai anggaran penuh (insiden 25 Nov 2026)", () => {
+  const total = 34_000, reserve = 12_000;
+  assert.deepEqual(budgetForCandidate({ index: 0, firstReservedIndex: 4, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: 22_000, reserveAhead: true });
+  assert.deepEqual(budgetForCandidate({ index: 4, firstReservedIndex: 4, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: total, reserveAhead: false });
+  assert.deepEqual(budgetForCandidate({ index: 2, firstReservedIndex: -1, totalBudgetMs: total, reserveMs: reserve }), { budgetMs: total, reserveAhead: false });
+  // Sesudah 22 detik model gratis, OpenRouter tidak boleh mulai lagi, tetapi Anthropic masih punya 12 detik.
+  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: 22_000, elapsedMs: 22_500 }), 0);
+  assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: total, elapsedMs: 22_500 }), 11_500);
 });

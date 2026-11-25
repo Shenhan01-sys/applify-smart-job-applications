@@ -14,6 +14,8 @@ import { DEFAULT_NUMES_CALL_TIMEOUT_MS, NumesBudget } from "../_shared/numes-key
 import {
   DEFAULT_AI_CALL_TIMEOUT_MS,
   DEFAULT_AI_TOTAL_BUDGET_MS,
+  DEFAULT_AI_RESERVE_MS,
+  budgetForCandidate,
   DEFAULT_FREE_MODELS,
   DEFAULT_PRO_MODELS,
   nextCallTimeoutMs,
@@ -82,6 +84,7 @@ const PRO_MODELS = platformChain(
 // after about 35 seconds instead of after every model in the chain has timed out.
 const AI_CALL_TIMEOUT_MS = positiveMs(Deno.env.get("AI_CALL_TIMEOUT_MS"), DEFAULT_AI_CALL_TIMEOUT_MS);
 const AI_TOTAL_BUDGET_MS = positiveMs(Deno.env.get("AI_TOTAL_BUDGET_MS"), DEFAULT_AI_TOTAL_BUDGET_MS);
+const AI_RESERVE_MS = positiveMs(Deno.env.get("AI_RESERVE_MS"), DEFAULT_AI_RESERVE_MS);
 // Numes (model gratis) sering lambat: satu percobaan paling lama NUMES_TIMEOUT_MS (12 detik), dan semua entri Numes
 // dalam satu permintaan berbagi NumesBudget (paling banyak 40% AI_TOTAL_BUDGET_MS atau 15 detik). Insiden 25 Nov 2026:
 // timeout Numes menghabiskan seluruh anggaran, Gemini dan OpenRouter tidak pernah dicoba, dan semua draf gagal 502.
@@ -313,17 +316,24 @@ Return JSON exactly in this shape:
     let budgetExhausted = false;
     const invalidatedProviders = new Set<string>();
     const numesBudget = new NumesBudget({ totalBudgetMs: AI_TOTAL_BUDGET_MS });
-    for (const candidate of chain) {
+    const firstReservedIndex = chain.findIndex((c) => c.entry.startsWith("anthropic:"));
+    for (const [index, candidate] of chain.entries()) {
       model = candidate.entry;
+      const { budgetMs, reserveAhead } = budgetForCandidate({ index, firstReservedIndex, totalBudgetMs: AI_TOTAL_BUDGET_MS, reserveMs: AI_RESERVE_MS });
       // Key pengguna yang sudah ditolak penyedia di permintaan ini tidak dicoba lagi untuk model berikutnya.
       if (candidate.source === "byok" && invalidatedProviders.has(candidate.provider)) continue;
       const started = Date.now();
       // Total budget since the request arrived: stop the chain when too little is left for one more call.
       const callTimeoutMs = nextCallTimeoutMs({
         perCallMs: AI_CALL_TIMEOUT_MS,
-        totalBudgetMs: AI_TOTAL_BUDGET_MS,
+        totalBudgetMs: budgetMs,
         elapsedMs: started - requestStarted,
       });
+      // Jatah kandidat gratis habis, tetapi cadangan untuk Anthropic masih ada: lompat ke kandidat berikutnya.
+      if (callTimeoutMs === 0 && reserveAhead) {
+        note("skipped reserve_for_anthropic", started);
+        continue;
+      }
       if (callTimeoutMs === 0) {
         budgetExhausted = true;
         lastDetail = lastDetail || `${model}: skipped, time budget used up`;
@@ -336,7 +346,7 @@ Return JSON exactly in this shape:
         // Numes memakai kolam kunci: kunci berikutnya hanya dicoba untuk 401/402/403/429. Batas waktu Numes melepas
         // modelnya (didinginkan 5 menit) dan rantai lanjut ke kandidat berikutnya, dalam jatah waktu Numes saja.
         aiResp = await postChat(candidate, {
-          timeoutMs: () => nextCallTimeoutMs({ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - requestStarted }),
+          timeoutMs: () => nextCallTimeoutMs({ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: budgetMs, elapsedMs: Date.now() - requestStarted }),
           numesTimeoutMs: NUMES_TIMEOUT_MS,
           numesBudget,
           // Key pengguna dan isi CV tidak boleh ikut redirect ke host lain: 3xx dianggap gagal.
