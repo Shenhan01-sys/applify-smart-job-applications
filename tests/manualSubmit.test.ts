@@ -358,3 +358,13 @@ test("tombol tandai terkirim sendiri sudah tidak ada di layar, komponen, layanan
   assert.match(panel, /OPEN_FORM_LABEL/);
   assert.doesNotMatch(panel, /markApprovalSent|setConfirming|confirmMark/);
 });
+
+test("manualSubmitState: log incomplete page_mismatch menawarkan coba kirim otomatis lagi", () => {
+  const s = manualSubmitState({ status: "completed", log_status: "incomplete", reason: "page_mismatch" });
+  assert.equal(s?.kind, "page_mismatch");
+  assert.equal(s?.canRerun, true);
+  assert.match(s?.text ?? "", /belum terkirim/);
+  // incomplete lain tetap punya penjelasan sendiri, tanpa panel ini
+  assert.equal(manualSubmitState({ status: "completed", log_status: "incomplete", reason: "captcha_blocked" }), null);
+  assert.equal(manualSubmitState({ status: "processing", log_status: "incomplete", reason: "page_mismatch" }), null);
+});

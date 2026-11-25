@@ -17,7 +17,7 @@ import { isCodeTimeout } from "./securityCode.ts";
  * tidak dipercaya: bentuk yang rusak diabaikan dan tidak pernah melempar galat.
  */
 
-export type ManualSubmitKind = "not_allowed" | "required_remaining" | "other";
+export type ManualSubmitKind = "not_allowed" | "required_remaining" | "page_mismatch" | "other";
 
 export interface ManualSubmitState {
   kind: ManualSubmitKind;
@@ -33,6 +33,8 @@ export const MANUAL_NOT_ALLOWED_TEXT =
   "Situs lowongan ini belum didukung untuk kirim otomatis, jadi agen berhenti sebelum tombol kirim. Lamaran belum terkirim.";
 export const MANUAL_REQUIRED_REMAINING_TEXT =
   "Agen berhenti karena masih ada isian wajib yang kosong. Lamaran belum terkirim. Kamu bisa melengkapinya dan mengirimnya sendiri di situs lowongan.";
+export const MANUAL_PAGE_MISMATCH_TEXT =
+  "Halaman lowongan berpindah ke situs lain sebelum tombol kirim, jadi agen berhenti demi keamanan. Lamaran belum terkirim.";
 export const MANUAL_OTHER_TEXT = "Agen berhenti sebelum tombol kirim. Lamaran belum terkirim.";
 export const MANUAL_STEPS_TEXT = "Buka formulirnya, lalu tempel isian dan cover letter dari agen bila kamu ingin mengirimnya sendiri.";
 
@@ -61,7 +63,11 @@ const OTHER_FLOW_BLOCKS: ReadonlySet<string> = new Set(["prior_unverified", "alr
  * (pertanyaan untuk dijawab, kode keamanan, kode tidak dimasukkan, kirim sebelumnya belum terkonfirmasi, klaim).
  */
 export function manualSubmitState(row: AgentApplyRow | null | undefined): ManualSubmitState | null {
-  if (!row || row.log_status !== "ready" || row.manual === true) return null;
+  if (!row || row.manual === true) return null;
+  // Log "incomplete" page_mismatch (25 November 2026, Datadog): halaman berpindah sebelum kirim. Alamat lowongan bisa
+  // diperbaiki di server, jadi pengguna perlu tombol coba lagi; sebelumnya kartu hanya berkata "coba ajukan lagi".
+  const pageMismatch = row.log_status === "incomplete" && row.reason === "page_mismatch";
+  if (row.log_status !== "ready" && !pageMismatch) return null;
   if (isAgentApplyActive(row)) return null;
   // Tugas yang gagal atau dilewati setelah log itu punya penjelasan sendiri. Fakta tanpa status tugas (jendela detail) lolos.
   if (row.status && row.status !== "completed") return null;
@@ -69,6 +75,7 @@ export function manualSubmitState(row: AgentApplyRow | null | undefined): Manual
   if (isCodeTimeout(row)) return null;
   const blocked = row.submit_blocked ?? null;
   if (blocked !== null && OTHER_FLOW_BLOCKS.has(blocked)) return null;
+  if (pageMismatch) return { kind: "page_mismatch", text: MANUAL_PAGE_MISMATCH_TEXT, canRerun: true };
   if (blocked === "not_allowed") return { kind: "not_allowed", text: MANUAL_NOT_ALLOWED_TEXT, canRerun: true };
   if (blocked === "required_remaining") return { kind: "required_remaining", text: MANUAL_REQUIRED_REMAINING_TEXT, canRerun: false };
   return { kind: "other", text: MANUAL_OTHER_TEXT, canRerun: false };

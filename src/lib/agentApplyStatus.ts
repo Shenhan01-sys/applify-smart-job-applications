@@ -220,7 +220,7 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
       // Contoh nyata 25 November 2026: papan Greenhouse Datadog mengalihkan formulir ke situs perusahaan.
       return {
         label: "Halaman berpindah, berhenti sebelum kirim",
-        hint: "Sebelum menekan kirim, halaman lowongan berpindah ke situs lain, jadi agen berhenti demi keamanan. Lamaran belum terkirim. Coba ajukan lagi; bila terulang, situs ini perlu dicek.",
+        hint: "Sebelum menekan kirim, halaman lowongan berpindah ke situs lain, jadi agen berhenti demi keamanan. Lamaran belum terkirim. Tekan Coba kirim otomatis lagi di bawah; bila terulang, situs ini perlu dicek.",
         tone: "manual",
         suggestEmail: false,
       };
