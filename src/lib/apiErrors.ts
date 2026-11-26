@@ -201,6 +201,19 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return GMAIL_UNAVAILABLE_MESSAGE;
     case "keywords_required":
       return KEYWORDS_REQUIRED_MESSAGE;
+    case "empty_off_portal_input":
+      return "Isi teks caption, tautan lowongan, atau unggah gambar poster lebih dulu.";
+    case "off_portal_text_too_long":
+      return "Teks caption terlalu panjang. Ringkas menjadi maksimal 12.000 karakter lalu coba lagi.";
+    case "empty_image":
+    case "invalid_image":
+      return "Berkas gambar poster tidak valid. Unggah gambar PNG, JPG, atau WebP yang utuh.";
+    case "image_too_large":
+      return "Ukuran gambar poster terlalu besar, maksimal 5 MB.";
+    case "private_jobs_migration_required":
+      return "Penyimpanan lowongan pribadi belum aktif di database (migrasi belum dijalankan). Pratinjau tetap bisa dibaca.";
+    case "off_portal_save_failed":
+      return "Lowongan pribadi belum bisa disimpan saat ini. Coba lagi beberapa saat lagi.";
   }
 
   if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;
