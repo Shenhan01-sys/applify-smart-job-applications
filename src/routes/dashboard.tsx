@@ -147,8 +147,10 @@ export function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [pendingApprovals, queueRes, logsRes] = await Promise.all([
+        const [pendingApprovals, decidedApprovals, queueRes, logsRes] = await Promise.all([
           automationApi.getPendingApprovals().catch(() => []),
+          // Riwayat: dipakai untuk membuang kode dan pertanyaan milik persetujuan yang sudah kedaluwarsa. Gagal = tanpa penyaring.
+          automationApi.getApprovalHistory({ limit: 100 }).catch(() => undefined),
           supabase
             .from("automation_queue")
             .select("id, job_type, status, error_message, scheduled_at, created_at, payload")
@@ -168,6 +170,7 @@ export function DashboardPage() {
         setUrgent(
           summarizeUrgentActions({
             pendingApprovals,
+            approvals: decidedApprovals,
             queueRows: queueRes.error ? [] : (queueRes.data ?? []),
             applyLogs: logsRes.error ? [] : (logsRes.data ?? []),
           }),

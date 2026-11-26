@@ -2,6 +2,7 @@ import { buildAgentApplyRows } from "./agentApplyRows.ts";
 import { isAgentApplyActive } from "./agentApplyStatus.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
 import { awaitingCodeState } from "./securityCode.ts";
+import { liveApprovalIds } from "./approvalExpiry.ts";
 
 export interface UrgentActionsSummary {
   pendingApprovalsCount: number;
@@ -20,6 +21,13 @@ export function summarizeUrgentActions(input: {
   pendingApprovals?: unknown;
   queueRows?: unknown;
   applyLogs?: unknown;
+  /**
+   * Persetujuan yang sudah diputuskan (Riwayat dari backend, memuat status dan expires_at). Bila ada, kode dan
+   * pertanyaan hanya dihitung untuk persetujuan yang masih berlaku: persetujuan kedaluwarsa ada di tab Riwayat dan
+   * tidak bisa dijawab lagi, jadi tautan banner ke halaman Persetujuan tidak akan menemukannya (audit Gemini 26 November
+   * 2026: banner menghitung 2 pertanyaan yang tidak tampil di tujuan). Tanpa daftar ini, semua dihitung seperti dulu.
+   */
+  approvals?: unknown;
   now?: number;
 }): UrgentActionsSummary {
   const now = input.now ?? Date.now();
@@ -41,9 +49,12 @@ export function summarizeUrgentActions(input: {
   );
   const agentRows = buildAgentApplyRows(input.queueRows, logs, extensionLogs);
 
+  const liveIds = Array.isArray(input.approvals) ? liveApprovalIds(input.approvals, now) : null;
+
   let awaitingCodeCount = 0;
   let pendingQuestionsCount = 0;
-  for (const row of Object.values(agentRows)) {
+  for (const [approvalId, row] of Object.entries(agentRows)) {
+    if (liveIds && !liveIds.has(approvalId)) continue;
     if (awaitingCodeState(row, now).waiting) {
       awaitingCodeCount += 1;
       continue;
