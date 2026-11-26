@@ -46,6 +46,7 @@ import {
   showFollowUpDoneBadge,
 } from "@/lib/followUp";
 import { isManualSent, manualSubmitState, safeJobUrl } from "@/lib/manualSubmit";
+import { STALE_ATTEMPT_TOGGLE_LABEL, staleAttemptNote } from "@/lib/staleAttempt";
 import { applyOutcomePreset, extractOutcomeTag, filterApplications, OUTCOME_PRESETS, type OutcomePreset } from "@/lib/applicationFilters";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,6 +79,7 @@ import {
   GripVertical,
   Search,
   ShieldCheck,
+  ChevronDown,
 } from "lucide-react";
 import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
@@ -719,6 +721,13 @@ export function AppsPage() {
   const approvalLive = !selectedApprovalId || liveApprovals === null || liveApprovals.has(selectedApprovalId);
   // Log lama yang ditandai terkirim oleh pengguna sendiri: bukan kiriman agen, jadi tidak ada bukti dari situs untuk ditampilkan.
   const selectedManualSent = isManualSent(selectedFacts);
+  // Lamaran terkirim lewat jalur lain (email, atau pengguna sendiri) atau persetujuannya sudah tidak berlaku, sedangkan
+  // percobaan agen yang tercatat berhenti sebelum kirim: beri label percobaan lama dan tutup isiannya (kasus GoToGroup).
+  const selectedStale = staleAttemptNote({
+    applicationSent: !!selectedApp && isApplicationSent(selectedApp),
+    approvalLive: selectedApprovalId && liveApprovals !== null ? liveApprovals.has(selectedApprovalId) : null,
+    facts: selectedFacts,
+  });
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
 
   return (
@@ -1126,10 +1135,26 @@ export function AppsPage() {
                   <div data-testid="agent-proof" className="rounded-xl border-2 border-[#16150F]/10 p-4 space-y-2">
                     <h3 className="text-sm font-semibold flex items-center gap-1.5">
                       <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
-                      {selectedManualSent ? "Ditandai terkirim manual" : selectedSent ? "Bukti pengiriman" : "Bukti dari agen"}
+                      {selectedManualSent ? "Ditandai terkirim manual" : selectedSent ? "Bukti pengiriman" : selectedStale ? selectedStale.label : "Bukti dari agen"}
                     </h3>
                     {selectedSent && selectedOutcome && <p className="text-sm text-muted-foreground">{selectedOutcome.hint}</p>}
-                    <AgentEvidence screenshots={selectedFacts.screenshots} filledFields={selectedFacts.filled_fields} loggedAt={selectedFacts.logged_at} />
+                    {selectedStale ? (
+                      <>
+                        <p data-testid="agent-proof-stale" className="text-sm text-muted-foreground">{selectedStale.hint}</p>
+                        {/* Catatan percobaan lama tertutup: isiannya tidak boleh terbaca sebagai bukti kirim oleh agen. */}
+                        <details data-testid="agent-proof-stale-toggle" className="group rounded-lg border-2 border-[#16150F]/10 bg-white">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-semibold">
+                            {STALE_ATTEMPT_TOGGLE_LABEL}
+                            <ChevronDown className="h-4 w-4 transition group-open:rotate-180" aria-hidden="true" />
+                          </summary>
+                          <div className="border-t-2 border-[#16150F]/10 px-3 pb-3">
+                            <AgentEvidence stale screenshots={selectedFacts.screenshots} filledFields={selectedFacts.filled_fields} loggedAt={selectedFacts.logged_at} />
+                          </div>
+                        </details>
+                      </>
+                    ) : (
+                      <AgentEvidence screenshots={selectedFacts.screenshots} filledFields={selectedFacts.filled_fields} loggedAt={selectedFacts.logged_at} />
+                    )}
                   </div>
                 )}
 

@@ -203,7 +203,7 @@ test("AgentEvidence: dua tombol tangkapan layar, daftar isian yang bisa dibuka, 
   // tombol "setelah kirim" hanya bila tangkapan layar itu ada
   assert.match(src, /\(\["filled", "after"\] as const\)\.filter\(\(k\) => !!screenshots\?\.\[k\]\)/);
   assert.match(src, /<details/);
-  assert.match(src, /Isian yang diisi agen \(\{fields\.length\}\)/);
+  assert.match(src, /"Isian yang diisi agen"\} \(\{fields\.length\}\)/);
   assert.match(src, /formatAttemptTime\(loggedAt\)/);
   assert.match(src, /Percobaan agen: \{time\}/);
   // tautan dibuat saat tombol ditekan, galat tampil sebagai pesan, gambar yang gagal dimuat juga
@@ -248,7 +248,7 @@ test("Lamaran Saya: bukti pengiriman untuk lamaran terkirim, bukti dari agen unt
   const src = read("../src/routes/applications.tsx");
   assert.match(src, /import AgentEvidence from "@\/components\/AgentEvidence"/);
   assert.match(src, /const selectedSent = selectedOutcome\?\.tone === "sent";/);
-  assert.match(src, /\{selectedManualSent \? "Ditandai terkirim manual" : selectedSent \? "Bukti pengiriman" : "Bukti dari agen"\}/);
+  assert.match(src, /\{selectedManualSent \? "Ditandai terkirim manual" : selectedSent \? "Bukti pengiriman" : selectedStale \? selectedStale\.label : "Bukti dari agen"\}/);
   assert.match(src, /<AgentEvidence screenshots=\{selectedFacts\.screenshots\} filledFields=\{selectedFacts\.filled_fields\} loggedAt=\{selectedFacts\.logged_at\} \/>/);
   // blok bukti hanya bila lamaran punya percobaan agen yang terbaca
   assert.match(src, /\{selectedFacts && \(selectedSent \|\| hasAgentEvidence\(selectedFacts\)\) && \(/);

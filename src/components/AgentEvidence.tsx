@@ -32,6 +32,11 @@ interface Props {
   loggedAt?: string | null;
   /** Tulisan di halaman konfirmasi yang dikenali worker; ditampilkan bila diberikan. */
   confirmationPhrase?: string | null;
+  /**
+   * Percobaan lama yang bukan sumber lamaran terkirim (lib/staleAttempt.ts): judulnya tidak boleh "Bukti dari agen",
+   * supaya pengguna tidak mengira agen yang mengirim.
+   */
+  stale?: boolean;
 }
 
 /**
@@ -39,7 +44,7 @@ interface Props {
  * diisi, dan waktu percobaan. Tangkapan layar ada di bucket privat, jadi tautannya dibuat dengan sesi pengguna
  * saat tombol ditekan (berlaku satu jam) dan gambar dibuka di jendela di halaman ini. Hanya membaca.
  */
-export default function AgentEvidence({ screenshots, filledFields, loggedAt, confirmationPhrase }: Props) {
+export default function AgentEvidence({ screenshots, filledFields, loggedAt, confirmationPhrase, stale = false }: Props) {
   const fields = filledFields ?? [];
   const shots: ShotKind[] = (["filled", "after"] as const).filter((k) => !!screenshots?.[k]);
   const time = formatAttemptTime(loggedAt);
@@ -75,7 +80,7 @@ export default function AgentEvidence({ screenshots, filledFields, loggedAt, con
 
   return (
     <div className="mt-3 space-y-2.5" data-testid="agent-evidence">
-      <p className="text-xs font-semibold">Bukti dari agen</p>
+      <p className="text-xs font-semibold">{stale ? "Catatan percobaan lama" : "Bukti dari agen"}</p>
       {time && <p className="text-xs text-muted-foreground">Percobaan agen: {time}</p>}
       {confirmationPhrase && (
         <p className="text-xs text-muted-foreground">Tulisan di halaman konfirmasi: &quot;{confirmationPhrase}&quot;</p>
@@ -106,7 +111,7 @@ export default function AgentEvidence({ screenshots, filledFields, loggedAt, con
       {fields.length > 0 && (
         <details className="group rounded-lg border-2 border-[#16150F]/10 bg-white">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-semibold">
-            Isian yang diisi agen ({fields.length})
+            {stale ? "Isian percobaan lama" : "Isian yang diisi agen"} ({fields.length})
             <ChevronDown className="h-4 w-4 transition group-open:rotate-180" aria-hidden="true" />
           </summary>
           <ul className="divide-y divide-[#16150F]/10 border-t-2 border-[#16150F]/10">

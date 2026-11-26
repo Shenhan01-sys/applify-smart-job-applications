@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./helpers/test";
 import type { MockBackend } from "./helpers/mockBackend";
-import { applicationRow, approval, approvedApproval, awaitingCodeLog, extensionQuestionsLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
+import { applicationRow, applyLog, approval, approvedApproval, awaitingCodeLog, extensionLog, extensionQuestionsLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
 
 /**
  * Halaman Lamaran Saya (src/routes/applications.tsx), jendela detail: yang ditawarkan ke pengguna saat agen
@@ -246,5 +246,78 @@ test.describe("Lamaran: Antrean Agen untuk email yang tidak dikirim (mode uji)",
     await expect(panel.getByText("Belum dikirim (mode uji)")).toBeVisible();
     await expect(panel.getByText("Selesai", { exact: true })).toHaveCount(0);
     await expect(panel.getByText(/tidak dikirim ke rekruter/)).toBeVisible();
+  });
+});
+
+// ---- percobaan agen lama pada lamaran yang terkirim lewat jalur lain (kasus GoToGroup, 26 November 2026) ----------
+
+const MINUTE = 60_000;
+const TEN_FIELDS = Array.from({ length: 10 }, (_, i) => ({ label: `Isian ${i + 1}`, kind: "text", value: `Nilai ${i + 1}` }));
+
+/** Lamaran terkirim (kolom Terkirim) dengan satu log percobaan agen terbaru; persetujuannya masih berlaku. */
+function seedSent(backend: MockBackend, log: Record<string, any>) {
+  seed(backend, log);
+  backend.state.applications = [
+    applicationRow(APP_ID, JOB_ID, {
+      status: "submitted",
+      submitted_at: isoAgo(10 * MINUTE),
+      jobs: jobRow(JOB_ID, { title: "Backend Engineer", company: "PT Contoh", external_url: FORM_URL }),
+    }),
+  ];
+}
+
+test.describe("Lamaran: percobaan agen lama pada lamaran terkirim lewat jalur lain", () => {
+  test("GoToGroup: terkirim lewat email, percobaan ekstensi berhenti sebelum kirim -> 'Percobaan agen sebelumnya (tidak dikirim)', isian di balik toggle", async ({ app, backend }) => {
+    seedSent(backend, extensionLog(APPROVAL_ID, "incomplete", { reason: "partly_filled", fields_filled: 10, filled_fields: TEN_FIELDS }, { created_at: isoAgo(30 * MINUTE), job_id: JOB_ID }));
+    // Email terkirim sesudah percobaan itu (log email_apply, bukan log apply).
+    backend.state.logs.push({ action: "email_apply", status: "success", job_id: JOB_ID, created_at: isoAgo(10 * MINUTE), details: { approval_request_id: APPROVAL_ID, to: "hrd@perusahaan.test" } });
+    const dialog = await openDetail(app);
+
+    const proof = dialog.getByTestId("agent-proof");
+    await expect(proof.getByRole("heading", { name: "Percobaan agen sebelumnya (tidak dikirim)" })).toBeVisible();
+    await expect(proof.getByTestId("agent-proof-stale")).toContainText("tidak berlaku lagi");
+    // Tidak ada yang terbaca sebagai bukti kirim oleh agen.
+    await expect(dialog.getByText("Bukti dari agen")).toHaveCount(0);
+    await expect(dialog.getByText("Bukti pengiriman")).toHaveCount(0);
+    await expect(proof.getByText("Isian 1", { exact: true })).toBeHidden();
+
+    // Isian tersedia bila pengguna membuka toggle, dan berlabel percobaan lama.
+    await proof.getByText("Lihat catatan percobaan lama").click();
+    await expect(proof.getByText("Catatan percobaan lama", { exact: true })).toBeVisible();
+    await proof.getByText("Isian percobaan lama (10)").click();
+    await expect(proof.getByText("Isian 10", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Isian yang diisi agen")).toHaveCount(0);
+
+    // Hanya membaca: membuka jendela tidak memanggil aksi apa pun.
+    expect(backend.apiCalls.filter((c) => c.method === "POST")).toEqual([]);
+  });
+
+  test("percobaan agen yang memang mengirim tetap 'Bukti pengiriman' tanpa label percobaan lama", async ({ app, backend }) => {
+    seedSent(backend, applyLog("queue-1", APPROVAL_ID, "success", { submit_clicked: true, confirmation_detected: true, filled_fields: TEN_FIELDS }, { job_id: JOB_ID }));
+    const dialog = await openDetail(app);
+
+    const proof = dialog.getByTestId("agent-proof");
+    await expect(proof.getByRole("heading", { name: "Bukti pengiriman" })).toBeVisible();
+    await expect(dialog.getByTestId("agent-proof-stale")).toHaveCount(0);
+    await expect(dialog.getByText("Percobaan agen sebelumnya")).toHaveCount(0);
+  });
+
+  test("lamaran belum terkirim dengan persetujuan berlaku: percobaan agen terbaru tetap 'Bukti dari agen'", async ({ app, backend }) => {
+    seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
+    const dialog = await openDetail(app);
+
+    await expect(dialog.getByTestId("agent-proof").getByRole("heading", { name: "Bukti dari agen" })).toBeVisible();
+    await expect(dialog.getByText("Percobaan agen sebelumnya")).toHaveCount(0);
+  });
+
+  test("persetujuan percobaan sudah kedaluwarsa: percobaan yang berhenti sebelum kirim diberi label percobaan sebelumnya", async ({ app, backend }) => {
+    seed(backend, stoppedLog("queue-1", APPROVAL_ID, "not_allowed"));
+    backend.state.history = [approvedApproval(APPROVAL_ID, { job_id: JOB_ID, application_id: APP_ID, expires_at: isoAgo(2 * 3600_000) })];
+    const dialog = await openDetail(app);
+
+    const proof = dialog.getByTestId("agent-proof");
+    await expect(proof.getByRole("heading", { name: "Percobaan agen sebelumnya (tidak dikirim)" })).toBeVisible();
+    await expect(proof.getByTestId("agent-proof-stale")).toContainText("kedaluwarsa atau ditutup");
+    await expect(dialog.getByText("Bukti dari agen")).toHaveCount(0);
   });
 });
