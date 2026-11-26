@@ -18,7 +18,7 @@ import { pendingEmptyState } from "@/lib/approvalsEmpty";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
-import { splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
+import { pendingBreakdown, splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
 import type { NotQueuedRoute } from "@/lib/approveOutcome";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
@@ -250,6 +250,7 @@ function ApprovalsPage() {
     notQueued: notQueuedFor(a.id),
   }));
   const displayApprovals = activeTab === 'pending' ? tabs.pending : tabs.history;
+  const pendingParts = pendingBreakdown(tabs);
 
   return (
     <AppShell>
@@ -287,6 +288,15 @@ function ApprovalsPage() {
           );
         })}
       </div>
+
+      {/* Rincian tab Menunggu: angka yang sama dengan hitungan di Beranda, ditambah yang sudah disetujui tetapi belum selesai */}
+      {activeTab === 'pending' && pendingParts.total > 0 && (
+        <p data-testid="pending-breakdown" className="mb-4 text-xs text-muted-foreground">
+          {pendingParts.review} menunggu keputusanmu
+          {pendingParts.inProgress > 0 ? `, ${pendingParts.inProgress} sudah disetujui tetapi belum selesai (diproses agen atau butuh tindakanmu).` : '.'}
+          {' '}Yang masa berlakunya habis ada di tab Riwayat.
+        </p>
+      )}
 
       {/* Content */}
       <div key={tabKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>

@@ -69,6 +69,8 @@ export const STAGE_LABEL: Record<ApprovalStage, string> = {
 /** Persetujuan yang gagal dan masa berlakunya habis: tidak bisa dicoba lagi, jadi ditutup (tahap expired). */
 export const FAILED_CLOSED_LABEL = STATUS_TERM.expiredNotSent;
 export const EXPIRED_NOT_SENT_LABEL = STATUS_TERM.expiredNotSent;
+/** Masa berlaku habis dan status agen tidak terbaca: ditutup dari Menunggu, tetapi tidak diklaim "belum terkirim". */
+export const EXPIRED_UNKNOWN_LABEL = "Masa berlaku habis, status belum terbaca";
 
 /** Tahap yang masuk tab Riwayat. Selain ini, persetujuan ada di tab Menunggu. */
 const HISTORY_STAGES: ReadonlySet<ApprovalStage> = new Set(["sent", "rejected", "expired", "replaced"]);
@@ -127,7 +129,8 @@ const isEmailJobActive = (job: EmailQueueRow | null | undefined) => job?.status 
  *   approved                        -> tergantung hasil kerja agen dan email, urutan pemeriksaan:
  *     1. ada log success                                       -> Riwayat, "Terkirim"
  *     2. klaim kirim dilepas (persetujuan baru sudah dibuat)    -> Riwayat, "Diganti persetujuan baru"
- *     3. status agen belum terbaca                              -> Menunggu, "Status belum terbaca"
+ *     3. status agen belum terbaca                              -> Menunggu, "Status belum terbaca";
+ *        masa berlaku sudah habis                               -> Riwayat, "Masa berlaku habis, status belum terbaca"
  *     3b. masa berlaku habis, agen tidak bekerja, kirim sudah  -> Riwayat, "Kedaluwarsa, belum terkirim"
  *         terkonfirmasi atau tidak ada percobaan terbuka (pertanyaan tertunda ikut ditutup)
  *     4. menunggu kode, login, jawaban, atau izin               -> Menunggu, "Perlu tindakanmu"
@@ -157,7 +160,13 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
 
   if (ctx.sent === true || view.tone === "sent") return place("sent");
   if (row?.claim_state === "abandoned") return place("replaced");
-  if (ctx.agentKnown === false && !row) return place("checking");
+  if (ctx.agentKnown === false && !row) {
+    // Persetujuan yang masa berlakunya sudah habis tidak bisa dijawab, diunggah, atau dilanjutkan lagi, jadi status
+    // agen yang tidak terbaca tidak boleh menahannya di Menunggu (uji E2E production 26 November 2026: tab Menunggu
+    // menunjukkan 18 sementara Beranda menghitung 2 tindakan, sebagian besar kartu kedaluwarsa berlabel
+    // "Status belum terbaca"). Labelnya tidak menyebut "belum terkirim": tanpa status agen, belum pasti lamarannya tidak terkirim.
+    return isExpiredByTime(approval?.expires_at, now) ? place("expired", EXPIRED_UNKNOWN_LABEL) : place("checking");
+  }
 
   // Masa berlaku habis dan agen tidak sedang bekerja: tidak ada lagi yang bisa dijawab, diunggah, atau dilanjutkan di
   // ekstensi, jadi kartu pindah ke Riwayat walau masih ada pertanyaan tertunda (Hans, 26 November 2026: kartu Dealls
@@ -204,6 +213,20 @@ export interface PlacedApproval<T> {
 export interface ApprovalTabs<T> {
   pending: PlacedApproval<T>[];
   history: PlacedApproval<T>[];
+}
+
+export interface PendingBreakdown {
+  /** Menunggu keputusanmu: belum disetujui atau ditolak, dan belum kedaluwarsa. Sama dengan hitungan Beranda. */
+  review: number;
+  /** Sudah disetujui, tetapi belum selesai (antre, diproses, perlu tindakanmu, terisi belum terkirim, dan sejenisnya). */
+  inProgress: number;
+  total: number;
+}
+
+/** Rincian isi tab Menunggu, supaya angkanya bisa dibandingkan dengan hitungan "tindakan" di Beranda. */
+export function pendingBreakdown<T>(tabs: ApprovalTabs<T>): PendingBreakdown {
+  const review = tabs.pending.filter((p) => p.placement.stage === "review").length;
+  return { review, inProgress: tabs.pending.length - review, total: tabs.pending.length };
 }
 
 /**

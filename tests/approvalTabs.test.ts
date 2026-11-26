@@ -4,12 +4,15 @@ import assert from "node:assert/strict";
 import {
   FAILED_CLOSED_LABEL,
   EXPIRED_NOT_SENT_LABEL,
+  EXPIRED_UNKNOWN_LABEL,
   STAGE_LABEL,
+  pendingBreakdown,
   placeApproval,
   splitApprovalTabs,
   type ApprovalPlacementContext,
   type ApprovalStage,
 } from "../src/lib/approvalTabs.ts";
+import { summarizeUrgentActions } from "../src/lib/dashboardUrgent.ts";
 import { agentLogFacts } from "../src/lib/agentEvidence.ts";
 import type { AgentApplyRow } from "../src/lib/agentApplyStatus.ts";
 
@@ -154,6 +157,40 @@ test("disetujui, belum ada tugas agen: Menunggu, Disetujui belum terkirim; statu
   expectPlace(place(approved(), { agentKnown: false, sent: true }), "history", "sent");
 });
 
+test("E2E 26 Nov: disetujui, masa berlaku habis, status agen tidak terbaca -> Riwayat, tidak menggelembungkan tab Menunggu", () => {
+  expectPlace(place(approved({ expires_at: PAST }), { agentKnown: false }), "history", "expired", EXPIRED_UNKNOWN_LABEL);
+  assert.doesNotMatch(EXPIRED_UNKNOWN_LABEL, /belum terkirim/i);
+  // belum lewat masa berlaku: tetap Menunggu (belum pasti apa-apa)
+  expectPlace(place(approved({ expires_at: FUTURE }), { agentKnown: false }), "pending", "checking", "Status belum terbaca");
+  // bukti terkirim tetap menang, dan tugas yang masih jalan tidak ikut ditutup
+  expectPlace(place(approved({ expires_at: PAST }), { agentKnown: false, sent: true }), "history", "sent");
+  expectPlace(place(approved({ expires_at: PAST }), { agentKnown: false, agent: agentRow("processing") }), "pending", "processing");
+  // pending murni yang lewat masa berlaku (kedaluwarsa lazy: status tetap pending di database) juga ke Riwayat
+  expectPlace(place({ status: "pending", expires_at: PAST }, { agentKnown: false }), "history", "expired", "Kedaluwarsa");
+});
+
+test("E2E 26 Nov: hitungan Menunggu dipecah menjadi menunggu keputusan dan belum selesai, dan 'menunggu keputusan' sama dengan hitungan Beranda", () => {
+  const rows = [
+    { id: "p1", status: "pending", expires_at: FUTURE },
+    { id: "p2", status: "pending", expires_at: FUTURE },
+    // 16 kartu lama: pending lazy-kedaluwarsa dan disetujui dengan status agen tidak terbaca
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `lazy-${i}`, status: "pending", expires_at: PAST })),
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `old-${i}`, status: "approved", expires_at: PAST })),
+    { id: "jalan", status: "approved", expires_at: FUTURE },
+  ];
+  const tabs = splitApprovalTabs(rows, (r) => ({ agentKnown: false, ...(r.id === "jalan" ? { agent: agentRow("processing") } : {}) }), NOW);
+  const parts = pendingBreakdown(tabs);
+  assert.deepEqual(parts, { review: 2, inProgress: 1, total: 3 });
+  assert.equal(tabs.history.length, 16);
+  assert.deepEqual(
+    tabs.history.slice(0, 8).map((p) => p.placement.label),
+    Array.from({ length: 8 }, () => "Kedaluwarsa"),
+  );
+  // Beranda menghitung persetujuan pending yang belum kedaluwarsa dengan aturan yang sama.
+  const urgent = summarizeUrgentActions({ pendingApprovals: rows.filter((r) => r.status === "pending"), now: NOW });
+  assert.equal(urgent.pendingApprovalsCount, parts.review);
+});
+
 // ---- E2E-01: disetujui tetapi sengaja tidak diantre (LinkedIn, email langsung) ----------------------
 
 test("disetujui tanpa antrean: LinkedIn berlabel Perlu diisi sendiri, email langsung Kirim lewat panel Email, bukan Menunggu giliran", () => {
@@ -274,7 +311,8 @@ test("splitApprovalTabs: yang belum terkirim tetap di Menunggu, review di atas, 
 
 test("kabel: halaman Persetujuan membagi tab lewat splitApprovalTabs dan memasang kartu agen di tab mana pun", () => {
   const page = read("../src/routes/approvals.tsx");
-  assert.match(page, /import \{ splitApprovalTabs, type ApprovalStage \} from "@\/lib\/approvalTabs"/);
+  assert.match(page, /import \{ pendingBreakdown, splitApprovalTabs, type ApprovalStage \} from "@\/lib\/approvalTabs"/);
+  assert.match(page, /data-testid="pending-breakdown"/);
   assert.match(page, /splitApprovalTabs\(\[\.\.\.pendingApprovals, \.\.\.history\]/);
   assert.match(page, /activeTab === 'pending' \? tabs\.pending : tabs\.history/);
   assert.match(page, /count: tabs\.pending\.length/);
