@@ -24,6 +24,7 @@ import {
   educationToForm,
   experienceToForm,
   formatMonthYear,
+  hasYearOnlyExperienceNote,
   normalizeAchievements,
   normalizeStringList,
   skillToForm,
@@ -212,6 +213,11 @@ export function ExperienceEditor({ items, onSave, onDelete, now, onEditingChange
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatMonthYear(exp.start_date)} - {exp.is_current ? "Sekarang" : formatMonthYear(exp.end_date) || "-"}</span>
+              {hasYearOnlyExperienceNote(exp.notes) && (
+                <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  Hanya tahun (bulan perkiraan)
+                </span>
+              )}
               {exp.location_type && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {labelOf(LOCATION_TYPES, exp.location_type)}</span>}
               {exp.employment_type && <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" /> {labelOf(EMPLOYMENT_TYPES, exp.employment_type)}</span>}
             </div>

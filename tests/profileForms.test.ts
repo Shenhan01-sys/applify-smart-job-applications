@@ -445,6 +445,8 @@ test("Gelombang 11 (1b): form pengalaman menulis penanda year_only ke work_exper
 
   const editors = read("../src/components/profile/ProfileEditors.tsx");
   assert.match(editors, /Hanya ingat tahunnya/);
+  assert.match(editors, /hasYearOnlyExperienceNote\(exp\.notes\)/);
+  assert.match(editors, /Hanya tahun \(bulan perkiraan\)/);
 });
 
 test("Gelombang 11 (1b): penulisan notes pra-migrasi membuang notes, mengingatnya sementara, dan mencoba lagi sesudah TTL", async () => {
