@@ -1,24 +1,6 @@
-import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
+import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
-
-function NotFoundComponent() {
-  return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-gradient-primary">404</h1>
-        <h2 className="mt-4 text-xl font-semibold">Halaman tidak ditemukan</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Halaman yang kamu cari tidak ada atau sudah dipindahkan.
-        </p>
-        <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-md gradient-primary px-5 py-2.5 text-sm font-medium text-white">
-            Kembali ke Beranda
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { DefaultNotFoundComponent } from "@/components/RouterFallbacks";
 
 export const Route = createRootRoute({
   // The Toaster must be mounted once: without it every toast.success/toast.error in the app is invisible
@@ -29,5 +11,6 @@ export const Route = createRootRoute({
       <Toaster richColors position="top-right" />
     </>
   ),
-  notFoundComponent: NotFoundComponent,
+  // BS-09: gunakan fallback 404 bersama dari RouterFallbacks agar tidak ada komponen duplikat.
+  notFoundComponent: DefaultNotFoundComponent,
 });

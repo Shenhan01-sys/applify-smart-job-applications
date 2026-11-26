@@ -49,7 +49,7 @@ export function validateRecruiterEmail(raw: unknown): EmailCheck {
     return { ok: false, error: "Bagian sebelum @ tidak valid." };
   }
   const labels = domain.split(".");
-  if (labels.length < 2 || !labels.every((l) => LABEL_RE.test(l)) || !/^[A-Za-z]{2,}$/.test(labels[labels.length - 1])) {
+  if (labels.length < 2 || !labels.every((l) => LABEL_RE.test(l)) || !/^[A-Za-z]{2,63}$/.test(labels[labels.length - 1])) {
     return { ok: false, error: "Domain email tidak valid." };
   }
   return { ok: true, email };
