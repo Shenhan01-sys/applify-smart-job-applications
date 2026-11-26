@@ -156,9 +156,42 @@ test.describe("Lamaran: berhenti karena alasan lain tidak menawarkan jalan kelua
     seed(backend, stoppedLog("queue-1", APPROVAL_ID, null, { reason: "code_timeout" }));
     const dialog = await openDetail(app);
 
-    await expect(dialog.getByTestId("agent-outcome")).toContainText("Kode tidak dimasukkan");
+    await expect(dialog.getByTestId("agent-outcome")).toContainText("Perlu dicek: kode tidak dimasukkan");
     await expect(dialog.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: RERUN_LABEL })).toHaveCount(0);
+  });
+
+  test("kode keamanan tidak sampai ke agen: kartu Perlu dicek di kolom Perlu tindak lanjut, status tetap ready, langkah email-portal-kirim sendiri", async ({ app, backend }) => {
+    seed(backend, stoppedLog("queue-1", APPROVAL_ID, null, { reason: "code_timeout" }));
+    await app.goto("/applications");
+
+    // Papan: kartu pindah tampilan ke Perlu tindak lanjut dengan lencana Perlu dicek; Siap dikirim kosong.
+    const followUp = app.getByRole("group", { name: "Kolom Perlu tindak lanjut, 1 lamaran" });
+    await expect(followUp).toBeVisible();
+    await expect(followUp.getByTestId("needs-check-badge")).toContainText("Perlu dicek");
+    await expect(followUp.getByText("Backend Engineer")).toBeVisible();
+    await expect(app.getByRole("group", { name: "Kolom Siap dikirim, 0 lamaran" })).toBeVisible();
+
+    // Jendela detail: langkah berikutnya jelas, tautan formulir aman, dan tidak ada tombol Sudah terkirim.
+    await followUp.getByRole("button", { name: "Lihat detail", exact: true }).click();
+    const dialog = app.getByRole("dialog");
+    const panel = dialog.getByTestId("needs-check-panel");
+    await expect(panel).toContainText("Perlu dicek: kode keamanan dari situs lowongan");
+    await expect(panel.getByRole("listitem")).toHaveCount(3);
+    await expect(panel.getByRole("listitem").nth(0)).toContainText("Buka emailmu");
+    await expect(panel.getByRole("listitem").nth(1)).toContainText("masukkan kodenya di halaman situs");
+    const open = panel.getByRole("link", { name: "Buka formulir lowongan" });
+    await expect(open).toHaveAttribute("href", FORM_URL);
+    await expect(open).toHaveAttribute("target", "_blank");
+    await expect(open).toHaveAttribute("rel", /noopener/);
+    await expect(panel.getByRole("link", { name: "Buka Persetujuan" })).toHaveAttribute("href", "/approvals");
+    await expect(dialog.getByRole("button", { name: MARK_LABEL })).toHaveCount(0);
+    // Status asli tetap Siap dikirim: "Perlu tindak lanjut" tidak bisa dipilih untuk kartu ini dan tidak dihitung terkirim.
+    const statusSelect = dialog.getByLabel("Ubah status");
+    // Playwright tidak membaca atribut disabled pada <option>, jadi atributnya diperiksa langsung.
+    await expect(statusSelect.locator("option[value=follow_up]")).toHaveAttribute("disabled", "");
+    await expect(statusSelect).toHaveValue("ready");
+    expect(backend.apiCalls.filter((c) => c.method === "POST")).toEqual([]);
   });
 
   test("draf yang sudah menunggu persetujuan: hanya tautan Buka Persetujuan, tanpa panel kirim sendiri", async ({ app, backend }) => {

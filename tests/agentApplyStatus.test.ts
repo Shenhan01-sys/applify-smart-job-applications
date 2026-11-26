@@ -211,12 +211,15 @@ test("kartu Persetujuan menampilkan bukti dari agen hanya bila ada, dan layanan 
   assert.doesNotMatch(svc, /from\("automation_queue"\)\s*\.(insert|update|upsert|delete)/);
 });
 
-test("kode keamanan: tidak dimasukkan (code_timeout) dan ditolak (code_rejected) sama-sama belum terkirim", () => {
+test("kode keamanan: tidak dimasukkan (code_timeout) dan ditolak (code_rejected) sama-sama Perlu dicek, bukan sekadar belum terkirim", () => {
   const timeout = describeAgentApply({ status: "completed", log_status: "ready", reason: "code_timeout" } as any);
   assert.equal(timeout.label, AGENT_CODE_TIMEOUT_LABEL);
+  assert.match(timeout.label, /^Perlu dicek/);
   const rejected = describeAgentApply({ status: "completed", log_status: "ready", reason: "code_rejected" } as any);
   assert.equal(rejected.label, AGENT_CODE_REJECTED_LABEL);
-  assert.match(rejected.hint ?? "", /belum terkirim/);
+  assert.match(rejected.label, /^Perlu dicek/);
+  assert.match(rejected.hint ?? "", /kirim sendiri/);
+  assert.doesNotMatch(rejected.hint ?? "", /belum terkirim/);
 });
 
 test("antrean ekstensi Fase 2 & jeda login (awaiting_login): status aktif, resolusi URL login aman, dan batas waktu", () => {

@@ -229,7 +229,7 @@ test("describeAgentApply: tugas processing dengan log awaiting_code = Menunggu k
   assert.equal(describeLogOutcome(facts), null);
 });
 
-test("describeLogOutcome: ready dengan reason code_timeout = Kode tidak dimasukkan, lamaran belum terkirim", () => {
+test("describeLogOutcome: ready dengan reason code_timeout = Perlu dicek: kode tidak dimasukkan (bukan sekadar belum terkirim)", () => {
   const timeout = agentLogFacts({
     job_id: "job-1",
     status: "ready",
@@ -237,11 +237,15 @@ test("describeLogOutcome: ready dengan reason code_timeout = Kode tidak dimasukk
     details: { reason: "code_timeout", queue_job_id: "q1", submit_clicked: true },
   });
   const v = describeLogOutcome(timeout);
-  assert.equal(v?.label, "Kode tidak dimasukkan");
-  assert.equal(v?.hint, "Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru.");
+  assert.equal(v?.label, "Perlu dicek: kode tidak dimasukkan");
+  assert.equal(
+    v?.hint,
+    "Situs lowongan mengirim kode keamanan ke emailmu dan kodenya tidak sampai ke agen. Buka email, masukkan kode di halaman situs lowongan lalu kirim sendiri, atau jalankan agen lagi untuk meminta kode baru.",
+  );
+  assert.doesNotMatch(v?.hint ?? "", /belum terkirim/);
   assert.equal(v?.tone, "manual");
   const row = describeAgentApply({ status: "completed", fields_filled: 6, ...timeout });
-  assert.equal(row.label, "Kode tidak dimasukkan");
+  assert.equal(row.label, "Perlu dicek: kode tidak dimasukkan");
   assert.equal(isCodeTimeout(timeout), true);
   // reason lain pada log ready tidak ikut
   assert.equal(describeLogOutcome({ log_status: "ready", reason: "timeout" }), null);

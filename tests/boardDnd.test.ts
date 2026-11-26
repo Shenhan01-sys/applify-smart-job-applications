@@ -158,7 +158,8 @@ test("halaman Lamaran: tidak ada jalan memindahkan kartu ke Terkirim secara manu
   assert.match(end, /setPendingSubmitted\(move\.appId\);\s*return;/);
   assert.doesNotMatch(src, /moveApplication\(pendingSubmitted, "submitted"\)/);
   assert.doesNotMatch(src, /sudah kukirim/i);
-  assert.match(src, /disabled=\{dropIntoSubmittedBlocked\(selectedApp\.status, s\)\}/);
+  // Pilihan Terkirim dikunci; kartu "Perlu dicek" juga tidak bisa dipilihkan follow_up (lib/needsCheck.ts).
+  assert.match(src, /disabled=\{dropIntoSubmittedBlocked\(selectedApp\.status, s\)( \|\| \(selectedNeedsCheck && s === NEEDS_CHECK_BOARD_COLUMN\))?\}/);
 });
 
 test("Antrean Agen: tugas yang sudah terkirim tidak berlabel belum terkirim; tautan situs asal Karier Hijau disaring", async () => {

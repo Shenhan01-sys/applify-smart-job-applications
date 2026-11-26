@@ -23,6 +23,7 @@ import {
   normaliseCode,
   validateCode,
 } from "@/lib/securityCode";
+import { NEEDS_CHECK_HEADING, NEEDS_CHECK_STEPS } from "@/lib/needsCheck";
 import { automationApi } from "@/services/automationApi";
 import { describeRerunError, rerunApproval } from "@/services/formAnswerService";
 
@@ -95,16 +96,33 @@ export default function AgentSecurityCode({ approvalId, row, onRerun, onCodeSent
   // Pertanyaan yang belum dijawab punya tombol jalankan ulang sendiri (AgentQuestions).
   if (isCodeTimeout(row) && questionsToAnswer(row).length === 0) {
     return (
-      <RerunButton
-        approvalId={approvalId}
-        onStarted={() => {
-          setRerunStarted(true);
-          onRerun(approvalId);
-        }}
-      />
+      <>
+        <NeedsCheckSteps />
+        <RerunButton
+          approvalId={approvalId}
+          onStarted={() => {
+            setRerunStarted(true);
+            onRerun(approvalId);
+          }}
+        />
+      </>
     );
   }
   return null;
+}
+
+/** Langkah berikutnya untuk lamaran "Perlu dicek": email, kode di halaman situs, lalu kirim sendiri (lib/needsCheck.ts). */
+function NeedsCheckSteps() {
+  return (
+    <div data-testid="needs-check-steps" className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+      <p className="font-semibold">{NEEDS_CHECK_HEADING}</p>
+      <ol className="mt-1.5 list-decimal space-y-0.5 pl-5 leading-relaxed">
+        {NEEDS_CHECK_STEPS.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 function Note({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "started" }) {

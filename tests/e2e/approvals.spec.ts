@@ -305,7 +305,7 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
     backend.state.logs = [stoppedLog("queue-t", "apr-t", null, { reason: "code_timeout" })];
     await app.goto("/approvals");
 
-    await expect(app.getByText("Kode tidak dimasukkan")).toBeVisible();
+    await expect(app.getByText("Perlu dicek: kode tidak dimasukkan")).toBeVisible();
     await app.getByRole("button", { name: "Jalankan agen lagi" }).click();
     await expect(app.getByText(/Agen berjalan lagi/).first()).toBeVisible();
 

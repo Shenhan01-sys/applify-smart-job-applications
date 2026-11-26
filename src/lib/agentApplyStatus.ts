@@ -139,12 +139,15 @@ export function resolveLoginTabUrl(row: AgentApplyRow | null | undefined, jobUrl
   return safeLogin ?? safeFallback ?? null;
 }
 
-export const AGENT_CODE_TIMEOUT_LABEL = "Kode tidak dimasukkan";
-export const AGENT_CODE_TIMEOUT_HINT = "Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru.";
+// Keputusan Hans 26 November 2026: situs yang meminta kode keamanan berarti "Perlu dicek", bukan sekadar "belum terkirim"
+// (lib/needsCheck.ts). Pelamar bisa membuka email, memasukkan kode di halaman situs lowongan, lalu mengirim sendiri.
+export const AGENT_CODE_TIMEOUT_LABEL = "Perlu dicek: kode tidak dimasukkan";
+export const AGENT_CODE_TIMEOUT_HINT =
+  "Situs lowongan mengirim kode keamanan ke emailmu dan kodenya tidak sampai ke agen. Buka email, masukkan kode di halaman situs lowongan lalu kirim sendiri, atau jalankan agen lagi untuk meminta kode baru.";
 /** Worker menulis reason "code_rejected" sesudah 3 kode tidak diterima situs lowongan. */
-export const AGENT_CODE_REJECTED_LABEL = "Kode ditolak";
+export const AGENT_CODE_REJECTED_LABEL = "Perlu dicek: kode ditolak";
 export const AGENT_CODE_REJECTED_HINT =
-  "Situs lowongan tidak menerima kode yang dimasukkan. Lamaran belum terkirim. Jalankan agen lagi untuk meminta kode baru, lalu salin kode terbaru dari email.";
+  "Situs lowongan tidak menerima kode yang dimasukkan ke agen. Buka email untuk kode terbaru, masukkan di halaman situs lowongan lalu kirim sendiri, atau jalankan agen lagi untuk meminta kode baru.";
 
 const MAX_HINT_LABELS = 3;
 const MAX_HINT_LABEL_LENGTH = 70;

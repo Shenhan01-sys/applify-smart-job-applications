@@ -22,6 +22,18 @@ import AgentManualSubmit from "@/components/AgentManualSubmit";
 import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { awaitingCodeState } from "@/lib/securityCode";
+import {
+  NEEDS_CHECK_APPROVALS_LABEL,
+  NEEDS_CHECK_BOARD_COLUMN,
+  NEEDS_CHECK_HEADING,
+  NEEDS_CHECK_INTRO,
+  NEEDS_CHECK_LABEL,
+  NEEDS_CHECK_OPEN_FORM_LABEL,
+  NEEDS_CHECK_STEPS,
+  boardColumnOf,
+  groupForBoard,
+  isNeedsCheckApplication,
+} from "@/lib/needsCheck";
 import { questionsToAnswer } from "@/lib/formQuestions";
 import {
   FOLLOW_UP_DONE_LABEL,
@@ -29,7 +41,7 @@ import {
   nextStatusAfterFollowUpSent,
   showFollowUpDoneBadge,
 } from "@/lib/followUp";
-import { isManualSent, manualSubmitState } from "@/lib/manualSubmit";
+import { isManualSent, manualSubmitState, safeJobUrl } from "@/lib/manualSubmit";
 import { applyOutcomePreset, extractOutcomeTag, filterApplications, OUTCOME_PRESETS, type OutcomePreset } from "@/lib/applicationFilters";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -116,13 +128,29 @@ function FillYourselfBadge() {
   );
 }
 
+// Lencana "Perlu dicek": situs lowongan meminta kode keamanan lewat email dan kodenya tidak sampai ke agen (lib/needsCheck.ts).
+// Kartunya berstatus ready di database dan ditampilkan di kolom Perlu tindak lanjut.
+function NeedsCheckBadge() {
+  return (
+    <span
+      data-testid="needs-check-badge"
+      title={NEEDS_CHECK_INTRO}
+      className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-1 text-xs font-medium text-[#92400E]"
+    >
+      <AlertCircle className="h-3 w-3" aria-hidden="true" />
+      {NEEDS_CHECK_LABEL}
+      <span className="sr-only">: {NEEDS_CHECK_INTRO}</span>
+    </span>
+  );
+}
+
 // Baris kecil untuk kartu yang lowongannya muncul lebih dari sekali: urutan dan waktu dibuat (lib/applicationCards.ts).
 function DuplicateNote({ info, className = "" }: { info?: DuplicateInfo; className?: string }) {
   if (!info) return null;
   return <p className={`text-xs text-muted-foreground/80 ${className}`}>{duplicateLabel(info)}</p>;
 }
 
-function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
+function DraggableKanbanCard({ app, gaps, fillYourself, needsCheck, duplicate, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; needsCheck?: boolean; duplicate?: DuplicateInfo; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: app.id, data: app, attributes: { roleDescription: BOARD_ROLE_DESCRIPTION } });
   // Kartu asal tetap di tempat dan memudar; yang mengikuti penunjuk hanya DragOverlay (tanpa transform di sini).
   const style = { opacity: isDragging ? 0.5 : 1 };
@@ -169,6 +197,11 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
           {fillYourself && (
             <div className="mt-2">
               <FillYourselfBadge />
+            </div>
+          )}
+          {needsCheck && (
+            <div className="mt-2">
+              <NeedsCheckBadge />
             </div>
           )}
           {followUp && (
@@ -229,7 +262,7 @@ function DroppableColumn({ status, apps, children }: {
   );
 }
 
-function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; duplicate?: DuplicateInfo; profileSkills: readonly string[] | null; onOpen: () => void }) {
+function AppListRow({ app, gaps, fillYourself, needsCheck, duplicate, profileSkills, onOpen }: { app: AIApplicationData; gaps?: FormGaps; fillYourself?: boolean; needsCheck?: boolean; duplicate?: DuplicateInfo; profileSkills: readonly string[] | null; onOpen: () => void }) {
   const config = statusConfig[app.status] ?? statusConfig.draft;
   const job = jobOf(app);
   return (
@@ -261,6 +294,11 @@ function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen 
         {fillYourself && (
           <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
             <FillYourselfBadge />
+          </span>
+        )}
+        {needsCheck && (
+          <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
+            <NeedsCheckBadge />
           </span>
         )}
       </div>
@@ -484,6 +522,9 @@ export function AppsPage() {
   // (hasilnya bergantung pada halaman, misalnya perlu masuk dulu), jadi petunjuk itu akan menjadi klaim tanpa bukti.
   const attemptOf = (app: AIApplicationData) => attemptForApplication(attempts[app.job_id], app);
   const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attemptOf(app));
+  // "Perlu dicek": percobaan agen terbaru berhenti di tunggu kode keamanan (lib/needsCheck.ts). Status di database tetap
+  // ready; kartunya hanya ditampilkan di kolom Perlu tindak lanjut dan hitungan terkirim tidak berubah.
+  const needsCheckFor = (app: AIApplicationData) => isNeedsCheckApplication(app, agentFacts[app.job_id], !!attemptOf(app));
 
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
   // mengirim email follow-up. Status `submitted` tetap di kolom Terkirim, dan kartu di `follow_up`
@@ -537,23 +578,34 @@ export function AppsPage() {
     setActiveDragApp(null);
     const move = dragEndMove(event);
     if (!move) return;
-    const from = applications.find((a) => a.id === move.appId)?.status;
+    const dragged = applications.find((a) => a.id === move.appId);
+    const from = dragged?.status;
+    // Kartu "Perlu dicek" sudah tampil di Perlu tindak lanjut: dijatuhkan di kolom itu tidak boleh mengubah status aslinya
+    // menjadi follow_up (dihitung terkirim dan tidak bisa kembali ke submitted).
+    if (dragged && move.status === NEEDS_CHECK_BOARD_COLUMN && needsCheckFor(dragged)) return;
     // "Terkirim" tidak bisa dipilih pengguna: hanya agen atau email yang mengisinya. Tampilkan penjelasan saja.
     if (dropIntoSubmittedBlocked(from, move.status)) {
       setPendingSubmitted(move.appId);
       return;
     }
     moveApplication(move.appId, move.status);
-  }, [applications, moveApplication]);
+    // needsCheckFor membaca attempts dan agentFacts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applications, moveApplication, attempts, agentFacts]);
 
   // Hitungan yang sama dengan penghitung Beranda (lib/dashboardStats.ts): "Terkirim" mencakup semua lamaran yang sudah
   // dikirim (Terkirim, Perlu tindak lanjut, Sudah dibalas, dan Ditutup yang pernah dikirim), bukan hanya kolom Terkirim.
   const stats = summarizeApplications(applications);
 
-  const filteredApps = useMemo(
-    () => filterApplications(applications, { query: searchQuery, status: statusFilter }),
-    [applications, searchQuery, statusFilter],
-  );
+  const filteredApps = useMemo(() => {
+    // Saringan Siap dikirim dan Perlu tindak lanjut mengikuti kolom papan, jadi kartu "Perlu dicek" ikut Perlu tindak lanjut.
+    const byBoardColumn = statusFilter === "ready" || statusFilter === NEEDS_CHECK_BOARD_COLUMN;
+    const rows = filterApplications(applications, { query: searchQuery, status: byBoardColumn ? "all" : statusFilter });
+    if (!byBoardColumn) return rows;
+    return rows.filter((a) => boardColumnOf(a.status, needsCheckFor(a)) === statusFilter);
+    // needsCheckFor membaca attempts dan agentFacts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applications, searchQuery, statusFilter, attempts, agentFacts]);
   const hasActiveFilter = searchQuery.trim() !== "" || statusFilter !== "all";
 
   useEffect(() => {
@@ -582,9 +634,11 @@ export function AppsPage() {
 
   // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
   const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
-  const displayedGroupedApps: Record<ApplicationStatus, AIApplicationData[]> = hasActiveFilter
-    ? groupByStatus(filteredApps)
-    : groupedApps;
+  // Kolom papan: sama dengan groupedApps, kecuali kartu "Perlu dicek" yang ikut ke Perlu tindak lanjut.
+  const displayedGroupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupForBoard(
+    hasActiveFilter ? filteredApps : applications,
+    needsCheckFor,
+  );
   // Lowongan yang sama dengan lebih dari satu lamaran: kartunya diberi urutan dan waktu dibuat agar bisa dibedakan.
   const duplicates = useMemo(
     () => duplicateApplications(applications.map((a) => ({ id: a.id, created_at: a.created_at, job_id: a.job_id, title: jobOf(a)?.title, company: jobOf(a)?.company }))),
@@ -606,6 +660,7 @@ export function AppsPage() {
   const selectedGaps = selectedApp && selectedApp.status === "ready" ? formGaps[selectedApp.job_id] : undefined;
   const selectedAttempt = selectedApp ? attemptOf(selectedApp) : undefined;
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
+  const selectedNeedsCheck = selectedApp ? needsCheckFor(selectedApp) : false;
   // Hasil percobaan agen terbaru untuk lamaran ini (hanya percobaan sesudah lamaran dibuat, lihat attemptForApplication).
   const selectedFacts = selectedApp && selectedAttempt ? agentFacts[selectedApp.job_id] : undefined;
   const selectedOutcome = describeLogOutcome(selectedFacts);
@@ -757,7 +812,7 @@ export function AppsPage() {
                     {APPLICATION_STATUSES.map((status) => (
                       <DroppableColumn key={status} status={status} apps={displayedGroupedApps[status]}>
                         {displayedGroupedApps[status].map((app) => (
-                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />
+                          <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} needsCheck={needsCheckFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
                     ))}
@@ -777,12 +832,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
+                  {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} needsCheck={needsCheckFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
+                {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} needsCheck={needsCheckFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
@@ -851,7 +906,7 @@ export function AppsPage() {
                       className="min-h-11 rounded-lg border-2 border-[#999999] bg-white px-3 text-base md:text-sm"
                     >
                       {APPLICATION_STATUSES.map((s) => (
-                        <option key={s} value={s} disabled={dropIntoSubmittedBlocked(selectedApp.status, s)}>
+                        <option key={s} value={s} disabled={dropIntoSubmittedBlocked(selectedApp.status, s) || (selectedNeedsCheck && s === NEEDS_CHECK_BOARD_COLUMN)}>
                           {applicationStatusLabel(s)}
                         </option>
                       ))}
@@ -888,6 +943,33 @@ export function AppsPage() {
                           >
                             <p className="font-semibold">{selectedIssue.label}</p>
                             <p>{selectedIssue.hint}</p>
+                          </div>
+                        )}
+                        {selectedNeedsCheck && (
+                          <div data-testid="needs-check-panel" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E] space-y-2">
+                            <p id="detail-needs-check-heading" className="font-semibold">{NEEDS_CHECK_HEADING}</p>
+                            <p>{NEEDS_CHECK_INTRO}</p>
+                            <ol aria-labelledby="detail-needs-check-heading" className="list-decimal space-y-0.5 break-words pl-5">
+                              {NEEDS_CHECK_STEPS.map((step, i) => <li key={i}>{step}</li>)}
+                            </ol>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              {safeJobUrl(selectedJob?.external_url) && (
+                                <a
+                                  href={safeJobUrl(selectedJob?.external_url) as string}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex min-h-11 items-center rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white hover:bg-[#0256d3]"
+                                >
+                                  {NEEDS_CHECK_OPEN_FORM_LABEL}
+                                </a>
+                              )}
+                              <Link
+                                to="/approvals"
+                                className="inline-flex min-h-11 items-center rounded-lg border-2 border-[#92400E]/40 bg-white px-4 text-sm font-semibold text-[#92400E] hover:bg-black/[4%]"
+                              >
+                                {NEEDS_CHECK_APPROVALS_LABEL}
+                              </Link>
+                            </div>
                           </div>
                         )}
                         {selectedQuestionCount > 0 && (
