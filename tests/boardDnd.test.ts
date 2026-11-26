@@ -151,6 +151,17 @@ test("Terkirim tidak bisa dipilih pengguna lewat seret atau Ubah status; pindah 
   assert.doesNotMatch(JSON.stringify(SUBMITTED_BLOCKED_TEXT), /sudah kukirim/i);
 });
 
+test("47.6 FE-05: tingkat layanan melarang updateStatus('submitted') secara langsung", async () => {
+  const { assertClientStatusChangeAllowed } = await import("../src/lib/boardDnd.ts");
+  assert.throws(() => assertClientStatusChangeAllowed("submitted"), /Persetujuan/);
+  for (const ok of BOARD_STATUSES.filter((s) => s !== "submitted")) {
+    assert.doesNotThrow(() => assertClientStatusChangeAllowed(ok));
+  }
+  const service = read("../src/services/aiApplicationService.ts");
+  assert.match(service, /assertClientStatusChangeAllowed\(status\)/);
+  assert.doesNotMatch(service, /if\s*\(status === "submitted"\)\s*\{/);
+});
+
 test("halaman Lamaran: tidak ada jalan memindahkan kartu ke Terkirim secara manual", () => {
   const src = read("../src/routes/applications.tsx");
   const end = src.slice(src.indexOf("const handleDragEnd"), src.indexOf("const stats ="));

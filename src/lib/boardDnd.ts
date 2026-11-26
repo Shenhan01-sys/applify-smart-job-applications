@@ -115,6 +115,16 @@ export const SUBMITTED_BLOCKED_TEXT = {
   ok: "Mengerti",
 } as const;
 
+/**
+ * Penjaga tingkat layanan (FE-05): mencegah pemanggil browser menulis status `submitted` secara langsung ke DB
+ * maupun memicu notifikasi Telegram/email tanpa bukti pengiriman agen atau email resmi.
+ */
+export function assertClientStatusChangeAllowed(targetStatus: string): void {
+  if (targetStatus === "submitted") {
+    throw new Error(SUBMITTED_BLOCKED_TEXT.description);
+  }
+}
+
 // ---- teks pembaca layar (bawaan dnd-kit berbahasa Inggris) -------------------------------------------------
 
 export const BOARD_SCREEN_READER_INSTRUCTIONS =
