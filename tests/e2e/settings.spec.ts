@@ -153,3 +153,29 @@ test.describe("Pengaturan Agen", () => {
     await expect(app.getByTestId("always-approve-note")).toBeVisible();
   });
 });
+
+test.describe("Pusat Notifikasi In-App (AppShell)", () => {
+  test("lonceng menampilkan jumlah belum dibaca, membuka daftar, dan menandai semua dibaca lewat backend", async ({ app, backend }) => {
+    backend.state.inAppNotifications = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        event: "ready",
+        title: "Applify: Siap ditinjau",
+        body: "Cek halaman Persetujuan.",
+        href: "/approvals",
+        read_at: null,
+        created_at: "2026-11-26T09:00:00Z",
+      },
+    ];
+    await app.goto("/settings");
+    const bell = app.getByTestId("in-app-notifications-bell").first();
+    await expect(bell).toBeVisible();
+    await expect(bell.getByTestId("in-app-notifications-badge")).toHaveText("1");
+
+    await bell.click();
+    await expect(app.getByTestId("in-app-notifications-list")).toContainText("Applify: Siap ditinjau");
+    await app.getByTestId("in-app-notifications-mark-all").click();
+    await expect.poll(() => backend.callsTo("POST", "/api/notifications/in-app/read").length).toBe(1);
+    await expect(bell.getByTestId("in-app-notifications-badge")).toHaveCount(0);
+  });
+});

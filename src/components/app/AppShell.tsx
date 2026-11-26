@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { HELP_NAV_ITEM, MOBILE_TAB_ITEMS, NAV_GROUPS, NAV_ITEMS, isActivePath, type NavItem } from "@/lib/navItems";
+import { InAppNotificationsBell } from "@/components/app/InAppNotificationsBell";
 
 const ICONS: Record<NavItem["to"], typeof Bot> = {
   "/dashboard": LayoutDashboard,
@@ -49,10 +50,13 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
 
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-black/[6%] bg-card/80 px-4 py-5 sticky top-0 h-screen overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center gap-2 px-2 min-h-11">
-          <div className="grid h-9 w-9 place-items-center rounded-lg gradient-primary text-white font-bold" aria-hidden="true">A</div>
-          <span className="text-lg font-bold">Applify</span>
-        </Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link to="/dashboard" className="flex items-center gap-2 px-2 min-h-11">
+            <div className="grid h-9 w-9 place-items-center rounded-lg gradient-primary text-white font-bold" aria-hidden="true">A</div>
+            <span className="text-lg font-bold">Applify</span>
+          </Link>
+          <InAppNotificationsBell />
+        </div>
         <div className="mt-6 glass rounded-xl p-3 flex items-center gap-3">
           <div className="h-9 w-9 shrink-0 rounded-full gradient-primary grid place-items-center text-white text-sm font-bold" aria-hidden="true">{initials}</div>
           <div className="min-w-0 flex-1">
@@ -77,16 +81,19 @@ export default function AppShell({ children, rightPanel }: { children: React.Rea
               <div className="grid h-8 w-8 place-items-center rounded-lg gradient-primary text-white font-bold" aria-hidden="true">A</div>
               <span className="font-bold">Applify</span>
             </Link>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Buka menu"
-              aria-haspopup="dialog"
-              aria-expanded={menuOpen}
-              className="h-11 w-11 rounded-full glass grid place-items-center"
-            >
-              <Menu className="h-5 w-5" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-2">
+              <InAppNotificationsBell />
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                aria-label="Buka menu"
+                aria-haspopup="dialog"
+                aria-expanded={menuOpen}
+                className="h-11 w-11 rounded-full glass grid place-items-center"
+              >
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
           {children ?? <Outlet />}
         </div>
