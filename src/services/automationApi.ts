@@ -326,6 +326,21 @@ export const automationApi = {
     )
   },
 
+  /**
+   * E2E-04: sinkronkan perubahan surat lamaran dari AIApplyModal ke approval yang masih berstatus pending.
+   */
+  async updateApprovalCoverLetter(id: string, coverLetter: string) {
+    return apiFetch<{ success: boolean; approval?: Record<string, unknown> }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/cover-letter`,
+      {
+        method: 'PATCH',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ cover_letter: coverLetter }),
+      },
+      () => ({ success: true, approval: { id, cover_letter: coverLetter } }),
+    )
+  },
+
   async regenerateCoverLetter(id: string, instructions: string) {
     return apiFetch(
       `${apiBase()}/api/approvals/${id}/regenerate`,
