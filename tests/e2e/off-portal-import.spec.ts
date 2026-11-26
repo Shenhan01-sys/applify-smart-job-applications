@@ -1,4 +1,5 @@
 import { expect, test } from "./helpers/test";
+import { approval, isoAgo, jobRow } from "./helpers/fixtures";
 
 /**
  * Alur Impor Lowongan Off-Portal (Gelombang 3) pada halaman /jobs:
@@ -171,5 +172,72 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await expect(applyDialog).toBeVisible();
     await expect(applyDialog.getByText("Frontend Engineer")).toBeVisible();
     await expect(applyDialog.getByText("PT Nusantara Digital")).toBeVisible();
+  });
+
+  test("handoff Google Forms dari worker ke ekstensi menampilkan pertanyaan wajib dan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
+    const gfUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeDemo/viewform";
+    backend.state.jobs = [
+      jobRow("job-gf-1", {
+        title: "Product Engineer",
+        company: "PT Form Publik",
+        external_url: gfUrl,
+        platform_source: "off_portal_poster",
+      }),
+    ];
+    backend.state.history = [
+      approval("apr-gf-1", {
+        job_id: "job-gf-1",
+        job_title: "Product Engineer",
+        company: "PT Form Publik",
+        platform: "google_forms",
+        status: "approved",
+        reviewed_at: isoAgo(1),
+      }),
+    ];
+    backend.state.queue = [
+      {
+        id: "q-gf-1",
+        job_type: "apply",
+        status: "completed",
+        created_at: isoAgo(1),
+        payload: { approval_request_id: "apr-gf-1", job_id: "job-gf-1" },
+      },
+    ];
+    backend.state.logs = [
+      {
+        id: "log-gf-1",
+        action: "apply",
+        job_id: "job-gf-1",
+        status: "incomplete",
+        created_at: isoAgo(1),
+        details: {
+          queue_job_id: "q-gf-1",
+          approval_request_id: "apr-gf-1",
+          reason: "google_forms_missing_required",
+          extension_handoff: true,
+          handoff_reason: "missing_required",
+          fields_filled: 3,
+          remaining_required: ["Ceritakan proyek sistem terdistribusi tersulitmu"],
+          questions: [
+            {
+              key: "ceritakan proyek sistem terdistribusi tersulitmu",
+              label: "Ceritakan proyek sistem terdistribusi tersulitmu",
+              kind: "textarea",
+            },
+          ],
+        },
+      },
+    ];
+
+    await app.goto("/approvals");
+    await expect(app.getByText("Product Engineer")).toBeVisible();
+    await expect(app.getByText("Ceritakan proyek sistem terdistribusi tersulitmu", { exact: true })).toBeVisible();
+
+    const continueBtn = app.getByRole("button", { name: "Lanjutkan di ekstensi" });
+    await expect(continueBtn).toBeVisible();
+    await continueBtn.click();
+
+    await expect(app.getByText(/Izin diberikan/)).toBeVisible();
+    expect(backend.callsTo("POST", "/api/approvals/apr-gf-1/extension-consent")).toHaveLength(1);
   });
 });

@@ -14,6 +14,9 @@ import {
   EXTENSION_CONSENT_GRANTED_TEXT,
   EXTENSION_CONSENT_LOGIN_NOTE,
   EXTENSION_CONSENT_TITLE,
+  EXTENSION_HANDOFF_BUTTON,
+  EXTENSION_HANDOFF_NOTE,
+  EXTENSION_HANDOFF_TITLE,
   describeConsentError,
   type ExtensionConsentReason,
 } from "@/lib/extensionConsent";
@@ -65,11 +68,15 @@ export default function ExtensionConsent({ approvalId, reason, onGranted }: Prop
       aria-labelledby={`${uid}-title`}
     >
       <p id={`${uid}-title`} className="inline-flex items-center gap-2 text-xs font-semibold">
-        <Chrome className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" /> {EXTENSION_CONSENT_TITLE}
+        <Chrome className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />{" "}
+        {reason === "handoff_needed" ? EXTENSION_HANDOFF_TITLE : EXTENSION_CONSENT_TITLE}
       </p>
       <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{EXTENSION_CONSENT_EXPLAIN}</p>
       {reason === "login_needed" && (
         <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{EXTENSION_CONSENT_LOGIN_NOTE}</p>
+      )}
+      {reason === "handoff_needed" && (
+        <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{EXTENSION_HANDOFF_NOTE}</p>
       )}
       <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
         {EXTENSION_CONSENT_CONNECT_PREFIX}{" "}
@@ -91,7 +98,11 @@ export default function ExtensionConsent({ approvalId, reason, onGranted }: Prop
           className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white transition hover:bg-[#0256d3] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {busy ? EXTENSION_CONSENT_BUSY_LABEL : EXTENSION_CONSENT_BUTTON}
+          {busy
+            ? EXTENSION_CONSENT_BUSY_LABEL
+            : reason === "handoff_needed"
+              ? EXTENSION_HANDOFF_BUTTON
+              : EXTENSION_CONSENT_BUTTON}
         </button>
         <label htmlFor={`${uid}-always`} className="inline-flex min-h-11 items-center gap-2 text-xs">
           <input

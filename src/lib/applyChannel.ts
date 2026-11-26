@@ -165,7 +165,7 @@ export function isGoogleFormUrl(rawUrl: unknown): boolean {
   if (!safe) return false;
   const u = new URL(safe);
   const host = u.hostname.toLowerCase().replace(/^www\./, "");
-  return host === "forms.gle" || (host === "docs.google.com" && u.pathname.includes("/forms/"));
+  return host === "forms.gle" || (host === "docs.google.com" && /^\/(?:u\/\d+\/)?forms\//i.test(u.pathname));
 }
 
 export function extractPublicAtsUrl(description: string): string | null {
@@ -330,19 +330,18 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
   if (isGoogleFormUrl(primaryUrl)) {
     return {
       channel: "external_web",
-      platform: platform || "google-forms",
+      platform: "google_forms",
       applyUrl: primaryUrl,
       resolvedApplyUrl: null,
       applyEmail: null,
-      autoWorkerSupported: false,
+      autoWorkerSupported: true,
       emailApplySupported: false,
-      extensionSupported: externalViaExtension,
+      extensionSupported: true,
       manualOnly: false,
-      badgeLabel: externalViaExtension ? "Google Form · Ekstensi" : "Google Form · Manual",
-      badgeTone: externalViaExtension ? "extension" : "manual",
-      reason: externalViaExtension
-        ? "Formulir Google Form didukung Ekstensi Browser khusus laptop (Chrome atau Edge) dan berhenti sebelum kirim."
-        : "Formulir Google Form. Siapkan draf surat dan jawaban di Applify lalu buka formulir untuk mengirimnya.",
+      badgeLabel: "Google Form · Agen",
+      badgeTone: "ats",
+      reason:
+        "Formulir Google Form publik. Agen server mengisinya setelah kamu menekan Setujui, lalu beralih ke Ekstensi Browser bila formulir meminta login Google, unggah berkas, CAPTCHA, atau pertanyaan wajib tambahan.",
     };
   }
 

@@ -16,6 +16,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   off_portal_link: "Tautan Pribadi",
   off_portal_poster: "Poster Pribadi",
   off_portal_caption: "Caption Pribadi",
+  google_forms: "Google Form",
 };
 
 export function platformLabel(source?: string | null): string {

@@ -148,6 +148,13 @@ export interface OffPortalChannelBadge {
 /** Label kanal yang mudah dipahami pelamar pada kartu pratinjau off-portal. */
 export function describeOffPortalChannel(job: Pick<ParsedOffPortalJob, "formProvider" | "applyEmail" | "whatsappUrl" | "applyUrl" | "channel">): OffPortalChannelBadge {
   if (job.formProvider === "google_forms") {
+    if (job.channel.autoWorkerSupported) {
+      return {
+        label: "Google Form · Agen",
+        tone: "ats",
+        detail: "Formulir Google Form publik; diisi agen server setelah disetujui dan beralih ke Ekstensi Browser bila perlu login, unggah berkas, atau jawaban tambahan.",
+      };
+    }
     return {
       label: job.channel.extensionSupported ? "Google Form · Ekstensi" : "Google Form",
       tone: job.channel.extensionSupported ? "extension" : "manual",
