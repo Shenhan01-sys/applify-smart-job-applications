@@ -1,4 +1,5 @@
 import { Sparkles, ShieldCheck, Layers, Bot, Building2, FileText } from "lucide-react";
+import { STATUS_TERM } from "@/lib/statusVocabulary";
 
 // Visual contract: docs/design/hitl-approval-flow.md
 // A draft letter travels along the human-in-the-loop track. The gate (index 1) is the only
@@ -7,7 +8,7 @@ import { Sparkles, ShieldCheck, Layers, Bot, Building2, FileText } from "lucide-
 const STEPS = [
   { key: "draft", label: "Draf AI", icon: Sparkles },
   { key: "gate", label: "Persetujuanmu", icon: ShieldCheck },
-  { key: "queue", label: "Menunggu giliran", icon: Layers },
+  { key: "queue", label: STATUS_TERM.waitingTurn, icon: Layers },
   { key: "agent", label: "Agen isi form", icon: Bot },
   { key: "sent", label: "Terkirim", icon: Building2 },
 ] as const;
