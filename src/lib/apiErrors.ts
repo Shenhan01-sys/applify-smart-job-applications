@@ -214,6 +214,8 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return "Penyimpanan lowongan pribadi belum aktif di database (migrasi belum dijalankan). Pratinjau tetap bisa dibaca.";
     case "off_portal_save_failed":
       return "Lowongan pribadi belum bisa disimpan saat ini. Coba lagi beberapa saat lagi.";
+    case "private_jobs_limit_reached":
+      return "Daftar lowongan pribadi sudah penuh (maksimal 200). Hapus lowongan pribadi yang tidak dipakai lalu simpan lagi.";
   }
 
   if (e.code && GENERIC_SERVER_CODES.has(e.code)) return `${fallback} Server sedang bermasalah. Coba lagi beberapa saat lagi.`;

@@ -107,6 +107,10 @@ test("Gelombang 3 visibilitas & apiErrors: lowongan off-portal berbasis email ta
 
   const migMsg = describeApiError(new ApiError(503, JSON.stringify({ code: "private_jobs_migration_required" })));
   assert.match(migMsg, /migrasi belum dijalankan/i);
+  const limitMsg = describeApiError(new ApiError(409, JSON.stringify({ code: "private_jobs_limit_reached" })));
+  assert.match(limitMsg, /maksimal 200/i);
+  const ocrLimitMsg = describeApiError(new ApiError(429, JSON.stringify({ code: "rate_limited", retryAfterSec: 30 })));
+  assert.match(ocrLimitMsg, /Terlalu banyak permintaan/i);
 
   const jobData = savedRowToJobData({
     id: "priv-1",
