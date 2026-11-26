@@ -13,6 +13,7 @@ import OutcomeActions, { type OutcomeChange } from "@/components/OutcomeActions"
 import ExtensionConsent from "@/components/ExtensionConsent";
 import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
+import { keepAgentRowsWhenUnreadable } from "@/lib/agentApplyRows";
 import { isEmailApplyActive } from "@/lib/emailApply";
 import { extensionConsentState } from "@/lib/extensionConsent";
 import { pendingEmptyState } from "@/lib/approvalsEmpty";
@@ -98,6 +99,9 @@ function ApprovalsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   // Data for the "Kirim lewat Email" action on approved history rows.
   const [emailData, setEmailData] = useState<EmailApplyData>(emptyEmailApplyData());
+  // Pemuatan yang gagal membaca antrean tidak boleh mengosongkan baris agen yang sudah terbaca: kartu berganti-ganti
+  // antara "Menunggu Ekstensi Browser" dan "Agen belum dijalankan" (temuan production 27 November 2026).
+  const applyLoadedData = (next: EmailApplyData) => setEmailData((prev) => keepAgentRowsWhenUnreadable(prev, next));
   // Persetujuan yang jawaban approve-nya meminta izin ekstensi (lamaran belum diantre). Hanya ingatan halaman ini:
   // sesudah dimuat ulang, blok izin tampil karena persetujuan itu belum punya tugas agen.
   const [consentIds, setConsentIds] = useState<Set<string>>(() => new Set());
@@ -128,7 +132,7 @@ function ApprovalsPage() {
   useEffect(() => {
     if (!pollingActive || isMockMode()) return;
     const t = window.setInterval(() => {
-      loadEmailApplyData(history).then(setEmailData).catch(() => {});
+      loadEmailApplyData(history).then(applyLoadedData).catch(() => {});
     }, awaitingCode ? CODE_POLL_MS : AGENT_POLL_MS);
     return () => window.clearInterval(t);
   }, [pollingActive, awaitingCode, history]);
@@ -136,7 +140,7 @@ function ApprovalsPage() {
   // Sesudah backend menerima kode keamanan: baca status agen sekarang juga, tanpa menunggu putaran berikutnya.
   const handleCodeSent = () => {
     if (isMockMode()) return;
-    loadEmailApplyData(history).then(setEmailData).catch(() => {});
+    loadEmailApplyData(history).then(applyLoadedData).catch(() => {});
   };
 
   // Sesudah pengguna menjawab pertanyaan agen dan backend menerima tugas ulang: tandai tugasnya menunggu
@@ -156,7 +160,7 @@ function ApprovalsPage() {
     });
     setEmailData((d) => ({ ...d, agent: { ...d.agent, [approvalId]: { status: 'pending', job_type: 'extension_apply', error_message: null, fields_filled: null } } }));
     if (isMockMode()) return;
-    loadEmailApplyData(history).then(setEmailData).catch(() => {});
+    loadEmailApplyData(history).then(applyLoadedData).catch(() => {});
   };
 
   const loadData = async (opts: { quiet?: boolean } = {}) => {
@@ -167,7 +171,7 @@ function ApprovalsPage() {
       if (isMockMode()) {
         setPendingApprovals(mockApprovals as unknown as ApprovalRequest[]);
         setHistory(mockApprovalHistory as unknown as ApprovalRequest[]);
-        loadEmailApplyData(mockApprovalHistory as unknown as ApprovalRequest[]).then(setEmailData).catch(() => {});
+        loadEmailApplyData(mockApprovalHistory as unknown as ApprovalRequest[]).then(applyLoadedData).catch(() => {});
         setLoading(false);
         return;
       }
@@ -178,9 +182,9 @@ function ApprovalsPage() {
       setPendingApprovals(pending as unknown as ApprovalRequest[]);
       setHistory(hist as unknown as ApprovalRequest[]);
       // Best effort: without it the email action just stays disabled with an explanation.
-      loadEmailApplyData(hist as unknown as ApprovalRequest[]).then(setEmailData).catch((err) => {
+      loadEmailApplyData(hist as unknown as ApprovalRequest[]).then(applyLoadedData).catch((err) => {
+        // Data lama tetap dipakai: layar kosong lebih menyesatkan daripada status yang sedikit tertinggal.
         console.warn('[approvals] email action data unavailable:', err);
-        setEmailData(emptyEmailApplyData());
       });
     } catch (error) {
       // Tanpa data contoh: galat ditampilkan di halaman dengan tombol "Coba lagi".
@@ -403,7 +407,7 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {approved && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} expired={expired} sentVia={sentVia} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} agentKnown={emailData.agentKnown} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} expired={expired} sentVia={sentVia} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />

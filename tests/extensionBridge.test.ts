@@ -360,7 +360,8 @@ test("layanan: log ekstensi dibaca dengan sesi pengguna, dibatasi action apply, 
   const lib = read("../src/lib/agentApplyRows.ts");
   assert.deepEqual([...lib.matchAll(/^\s*import\s.*$/gm)].map((m) => m[0]), [
     'import { agentLogFacts } from "./agentEvidence.ts";',
-    'import type { AgentApplyRow } from "./agentApplyStatus.ts";',
+    'import { handoffLabels, type AgentApplyRow, type AgentHandoffContext } from "./agentApplyStatus.ts";',
+    'import { isExtensionHandoffRow } from "./extensionConsent.ts";',
   ]);
 });
 

@@ -1,6 +1,6 @@
 import { expect, test } from "./helpers/test";
 import type { MockBackend } from "./helpers/mockBackend";
-import { applyLog, approval, approvedApproval, awaitingCodeLog, isoAgo, jobRow, queueRow, questionsLog, stoppedLog } from "./helpers/fixtures";
+import { applicationRow, applyLog, approval, approvedApproval, awaitingCodeLog, isoAgo, jobRow, queueRow, questionsLog, stoppedLog } from "./helpers/fixtures";
 
 /**
  * Banner "Tindakan mendesak" di Beranda (src/routes/dashboard.tsx, E2E-06). Kode aplikasi asli; backend dan Supabase
@@ -360,5 +360,21 @@ test.describe("Beranda: banner menghitung setiap tahap Menunggu yang butuh tinda
     await expect(app.getByText("Sedang diproses").first()).toBeVisible();
     await expect(app.getByText("Menunggu giliran").first()).toBeVisible();
     expect(backend.restWrites).toEqual([]);
+  });
+});
+
+test.describe("Beranda: chip Siap dikirim", () => {
+  test("menghitung lamaran di kolom Siap dikirim, bukan persetujuan Menunggu, dan labelnya menyebut kolom itu", async ({ app, backend }) => {
+    // Temuan E2E production 27 November 2026: chip menunjukkan 3 sementara tab Menunggu berisi 1 kartu.
+    backend.state.applications = ["a1", "a2", "a3"].map((id) => applicationRow(id, `job-${id}`, { status: "ready" }));
+    backend.state.history = [approvedApproval("apr-a1", { application_id: "a1", job_id: "job-a1" })];
+    backend.state.queue = [queueRow("q-a1", "apr-a1", "processing")];
+    await app.goto("/dashboard");
+
+    const chip = app.getByTestId("dashboard-ready-chip");
+    await expect(chip).toHaveText("3 lamaran belum terkirim di kolom Siap dikirim");
+    await expect(chip).toHaveAttribute("href", "/applications");
+    await expect(chip).toHaveAttribute("title", /bisa berbeda dari tab Menunggu/);
+    await expect(app.getByText(/lamaran siap dikirim/)).toHaveCount(0);
   });
 });

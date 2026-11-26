@@ -8,7 +8,10 @@ import {
   awaitingLoginState,
   describeAgentApply,
   describeExpiredApproval,
+  describeHandoffReason,
   describeSentApproval,
+  describeUnreadAgent,
+  isAgentApplyActive,
   resolveLoginTabUrl,
   type AgentApplyRow,
   type AgentApplyTone,
@@ -53,8 +56,11 @@ export default function AgentApplyStatus({
   notQueued = null,
   expired = false,
   sentVia = null,
+  agentKnown = true,
 }: {
   row: AgentApplyRow | null | undefined;
+  /** false = status agen belum terbaca (kueri antrean gagal): tanpa baris, kartu tidak boleh berkata "Agen belum dijalankan". */
+  agentKnown?: boolean;
   jobUrl?: string | null;
   consentShown?: boolean;
   /** Masa berlaku persetujuan habis dan agen tidak bekerja lagi: tanpa langkah lanjutan, hanya penjelasan dan tautan ajukan lagi. */
@@ -66,7 +72,9 @@ export default function AgentApplyStatus({
 }) {
   if (notQueued && !row) return <NotQueuedNotice route={notQueued} jobUrl={jobUrl} />;
   const sentOverride = !expired && sentVia ? describeSentApproval(row, sentVia) : null;
-  const view = sentOverride ?? (expired ? describeExpiredApproval() : describeAgentApply(row));
+  const view = sentOverride ?? (expired ? describeExpiredApproval() : !row && !agentKnown ? describeUnreadAgent() : describeAgentApply(row));
+  // Tugas ekstensi hasil pengalihan sedang menunggu: formulir jawabannya disembunyikan selama tugas aktif, jadi pertanyaan yang kosong ditampilkan sebagai daftar.
+  const handoff = !expired && !sentOverride && row?.handoff_context && isAgentApplyActive(row) ? row.handoff_context : null;
   // Berhenti sebelum kirim dengan langkah dari ekstensi: daftar bernomor menggantikan kalimat umumnya.
   const nextSteps = expired || sentOverride ? null : nextStepGuideFor(row, view.tone);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
@@ -100,6 +108,22 @@ export default function AgentApplyStatus({
         </p>
       )}
       {showHint && !view.waitReason && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{effectiveHint}</p>}
+      {handoff && (
+        <div data-testid="handoff-questions" data-handoff-reason={handoff.handoff_reason ?? ""} className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <p className="font-semibold">Agen berhenti sebelum kirim dan mengalihkannya ke Ekstensi Browser</p>
+          <p className="mt-0.5">
+            Alasannya: {describeHandoffReason(handoff.handoff_reason)}.
+            {handoff.labels.length > 0 ? " Pertanyaan yang belum terjawab:" : " Ekstensi akan menunjukkan isian yang perlu kamu lengkapi."}
+          </p>
+          {handoff.labels.length > 0 && (
+            <ol className="mt-1 list-decimal space-y-0.5 break-words pl-5">
+              {handoff.labels.map((label, i) => (
+                <li key={i}>{label}</li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
       {expired && (
         <p className="mt-2">
           <Link

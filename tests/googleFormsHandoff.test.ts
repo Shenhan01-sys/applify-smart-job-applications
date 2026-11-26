@@ -61,7 +61,8 @@ test("Gelombang 4 Google Forms handoff: sebelum worker jalan tidak meminta izin 
 
   const view = describeLogOutcome(logRow);
   assert.ok(view);
-  assert.match(view.label, /lanjutkan di ekstensi/i);
+  assert.match(view.label, /pertanyaan wajib yang belum terjawab/i);
+  assert.match(view.hint, /Ceritakan proyek sistem terdistribusi tersulitmu/);
 
   const after = extensionConsentState({
     approvalStatus: "approved",

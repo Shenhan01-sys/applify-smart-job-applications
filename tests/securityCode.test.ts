@@ -344,7 +344,7 @@ test("Persetujuan: kolom kode tampil di bawah status agen dan di atas pertanyaan
   assert.match(page, /awaitingCode \? CODE_POLL_MS : AGENT_POLL_MS/);
   assert.doesNotMatch(page, /15_000/);
   // sesudah kode diterima: baca status agen sekarang juga
-  assert.match(page, /const handleCodeSent = \(\) => \{[\s\S]*loadEmailApplyData\(history\)\.then\(setEmailData\)/);
+  assert.match(page, /const handleCodeSent = \(\) => \{[\s\S]*loadEmailApplyData\(history\)\.then\(applyLoadedData\)/);
 });
 
 test("layanan: id tugas antrean ikut di baris status agen supaya kode bisa dikirim ke tugas yang benar", () => {

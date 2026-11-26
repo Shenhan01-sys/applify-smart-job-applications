@@ -439,8 +439,13 @@ function MissionControlStage({ drafts, ready, sent, responded, followUp, empty }
         <div className="relative z-30 mt-6 flex flex-wrap items-center justify-center gap-2 px-4">
           {/* Draf dan Siap dikirim dihitung terpisah, sama seperti dua kolom di papan Lamaran Saya */}
           {ready > 0 && (
-            <Link to="/applications" className="text-xs font-bold text-neutral-700 bg-neutral-100 border border-neutral-300 rounded-full px-3 py-1 hover:underline">
-              {ready} lamaran siap dikirim
+            <Link
+              to="/applications"
+              data-testid="dashboard-ready-chip"
+              title="Lamaran yang sudah diisi agen atau ditandai siap, tetapi belum terkirim. Angkanya bisa berbeda dari tab Menunggu di Persetujuan, karena tab itu menghitung persetujuan, bukan lamaran."
+              className="text-xs font-bold text-neutral-700 bg-neutral-100 border border-neutral-300 rounded-full px-3 py-1 hover:underline"
+            >
+              {ready} lamaran belum terkirim di kolom Siap dikirim
             </Link>
           )}
           {followUp > 0 && (

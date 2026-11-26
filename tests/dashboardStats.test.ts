@@ -198,7 +198,9 @@ test("papan Lamaran Saya dan Beranda memakai fungsi pengelompokan yang sama", ()
   const page = read("../src/routes/dashboard.tsx");
   assert.match(page, /summarizeApplications\(applications\)/);
   assert.match(page, /ready=\{stats\.ready\}/);
-  assert.match(page, /lamaran siap dikirim/);
+  assert.match(page, /lamaran belum terkirim di kolom Siap dikirim/);
+  // Angka ini menghitung lamaran (kolom papan), bukan persetujuan Menunggu: labelnya harus menyebut kolomnya.
+  assert.doesNotMatch(page, /\{ready\} lamaran siap dikirim/);
 });
 
 // Uji E2E 24 November 2026: penghitung "3 terkirim" tidak sejalan dengan kolom Terkirim dan lencana baris.

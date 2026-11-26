@@ -367,3 +367,97 @@ test.describe("Lamaran Saya: status dan teks yang tidak menyesatkan", () => {
     await expect(dialog.getByText("Bukti pengiriman")).toHaveCount(0);
   });
 });
+
+// ---- pengalihan ke ekstensi (temuan E2E production 27 November 2026) ----------------------------------------------------
+
+const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeDemo/viewform";
+
+/**
+ * Google Form "Uji Applify (Peneliti)": worker mengisi formulir lalu berhenti karena pertanyaan wajib "Posisi yang
+ * dilamar" tanpa jawaban (details.reason google_forms_missing_required) dan mengalihkan ke Ekstensi Browser.
+ * `extensionJob` = status tugas extension_apply yang diantrekan sesudahnya (null: pengalihan belum diantre).
+ */
+function seedGoogleFormHandoff(backend: MockBackend, extensionJob: string | null, id = "apr-gf") {
+  backend.state.history = [approvedApproval(id, { job_title: "Uji Applify (Peneliti)", company: "Applify", platform: "web" })];
+  backend.state.jobs = [jobRow(`job-${id}`, { platform_source: "web", external_url: FORM_URL })];
+  backend.state.queue = [queueRow("q-apply", id, "completed", { created_at: isoAgo(10 * 60_000) })];
+  if (extensionJob) backend.state.queue.unshift(queueRow("q-ext", id, extensionJob, { job_type: "extension_apply", created_at: isoAgo(9 * 60_000) }));
+  backend.state.logs = [
+    applyLog("q-apply", id, "incomplete", {
+      reason: "google_forms_missing_required",
+      extension_handoff: true,
+      handoff_reason: "missing_required",
+      remaining_required: ["Posisi yang dilamar"],
+      questions: [{ key: "posisi yang dilamar", label: "Posisi yang dilamar", kind: "text" }],
+      questions_pending: 1,
+      fields_filled: 3,
+      note: "formulir Google Form memiliki pertanyaan wajib yang belum punya jawaban; agen berhenti dan mengalihkan ke Ekstensi Browser",
+    }),
+  ];
+}
+
+test.describe("Persetujuan: Google Form yang dialihkan ke Ekstensi Browser", () => {
+  test("tugas ekstensi antre: tetap Menunggu Ekstensi Browser, menyebut pertanyaan yang kosong, dan tidak berganti ke Agen belum dijalankan", async ({ app, backend }) => {
+    seedGoogleFormHandoff(backend, "pending");
+    await app.goto("/approvals");
+
+    const card = cardOf(app, "Uji Applify (Peneliti)");
+    await expect(card.getByText("Menunggu Ekstensi Browser")).toBeVisible();
+    const list = card.getByTestId("handoff-questions");
+    await expect(list).toContainText("formulir punya pertanyaan wajib yang belum terjawab");
+    await expect(list.getByRole("listitem")).toHaveText(["Posisi yang dilamar"]);
+    await expect(card.getByText("Agen belum dijalankan")).toHaveCount(0);
+    await expect(card.getByTestId("action-open_form")).toHaveAttribute("href", FORM_URL);
+    // Teks lama yang menyalahkan daftar situs tidak tampil: alasannya pertanyaan wajib, bukan host.
+    await expect(app.getByText(/daftar situs yang boleh dikirim otomatis/)).toHaveCount(0);
+  });
+
+  test("Muat ulang status yang gagal membaca antrean tidak mengganti kartu ke Agen belum dijalankan", async ({ app, backend }) => {
+    seedGoogleFormHandoff(backend, "pending");
+    await app.goto("/approvals");
+    const card = cardOf(app, "Uji Applify (Peneliti)");
+    await expect(card.getByText("Menunggu Ekstensi Browser")).toBeVisible();
+
+    // Kueri antrean gagal (misalnya batas waktu database): baris agen yang sudah terbaca dipertahankan.
+    backend.override("GET /rest/v1/automation_queue", { status: 500, body: { message: "canceling statement due to statement timeout" } });
+    for (let i = 1; i <= 2; i++) {
+      const failedRead = app.waitForResponse((r) => r.url().includes("/rest/v1/automation_queue") && r.status() === 500);
+      await card.getByTestId("action-refresh").click();
+      await failedRead;
+      await expect(card.getByText("Menunggu Ekstensi Browser")).toBeVisible();
+      await expect(card.getByTestId("handoff-questions")).toBeVisible();
+      await expect(app.getByText("Agen belum dijalankan")).toHaveCount(0);
+    }
+  });
+
+  test("pemuatan pertama gagal membaca antrean: kartu berkata status belum terbaca, bukan Agen belum dijalankan", async ({ app, backend }) => {
+    seedGoogleFormHandoff(backend, "pending");
+    backend.override("GET /rest/v1/automation_queue", { status: 500, body: { message: "statement timeout" } });
+    await app.goto("/approvals");
+
+    const card = cardOf(app, "Uji Applify (Peneliti)");
+    await expect(card.getByText("Status agen belum terbaca")).toBeVisible();
+    await expect(card.getByText("Agen belum dijalankan")).toHaveCount(0);
+    await expect(card.getByTestId("action-refresh")).toBeVisible();
+  });
+
+  test("pengalihan belum diantre: alasan dan pertanyaan tampil, dengan Lanjutkan di ekstensi, Buka formulir, Sudah terkirim, dan Tutup", async ({ app, backend }) => {
+    seedGoogleFormHandoff(backend, null);
+    await app.goto("/approvals");
+
+    const card = cardOf(app, "Uji Applify (Peneliti)");
+    await expect(card.getByText("Formulir punya pertanyaan wajib yang belum terjawab", { exact: true })).toBeVisible();
+    await expect(card.getByText(/pertanyaan wajib yang belum terjawab: Posisi yang dilamar\./)).toBeVisible();
+    await expect(card.getByText("Posisi yang dilamar").first()).toBeVisible();
+    await expect(card.getByText(/belum ada di daftar situs/)).toHaveCount(0);
+    await expect(card.getByRole("button", { name: /Lanjutkan di ekstensi/ }).first()).toBeVisible();
+    await expect(card.getByTestId("action-open_form")).toHaveAttribute("href", FORM_URL);
+    await expect(card.getByTestId("action-confirm_sent")).toHaveText(/Sudah terkirim/);
+    await expect(card.getByTestId("action-close")).toHaveText(/Tutup/);
+
+    // Tutup memindahkan kartu ke Riwayat lewat backend.
+    await card.getByTestId("action-close").click();
+    await expect.poll(() => backend.callsTo("POST", "/api/approvals/apr-gf/close").length).toBe(1);
+    expect(backend.restWrites).toEqual([]);
+  });
+});

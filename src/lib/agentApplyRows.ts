@@ -1,5 +1,6 @@
 import { agentLogFacts } from "./agentEvidence.ts";
-import type { AgentApplyRow } from "./agentApplyStatus.ts";
+import { handoffLabels, type AgentApplyRow, type AgentHandoffContext } from "./agentApplyStatus.ts";
+import { isExtensionHandoffRow } from "./extensionConsent.ts";
 
 /**
  * Status agen per persetujuan dari tiga sumber yang dibaca dengan sesi pengguna sendiri (RLS pemilik):
@@ -42,9 +43,37 @@ function latestQueueByApproval(queueRows: unknown): Map<string, RawRow> {
   return out;
 }
 
-/** Id tugas apply terbaru per persetujuan: log worker hanya dibaca untuk tugas-tugas ini. */
+/** Tugas worker (bukan extension_apply) terbaru per persetujuan. Dipakai bila tugas terbarunya extension_apply hasil pengalihan. */
+function latestWorkerQueueByApproval(queueRows: unknown): Map<string, RawRow> {
+  const out = new Map<string, RawRow>();
+  if (!Array.isArray(queueRows)) return out;
+  for (const row of queueRows) {
+    if (!isRecord(row) || !isRecord(row.payload) || row.job_type === "extension_apply") continue;
+    const approvalId = row.payload.approval_request_id;
+    if (typeof approvalId !== "string" || !approvalId || row.id == null) continue;
+    const current = out.get(approvalId);
+    if (!current || timeOf(row) > timeOf(current)) out.set(approvalId, row);
+  }
+  return out;
+}
+
+/** Tugas extension_apply yang masih berjalan atau menunggu ekstensi, tanpa memandang siapa yang mengantrekannya. */
+const isActiveExtensionJob = (row: RawRow | undefined): boolean =>
+  !!row && row.job_type === "extension_apply" && ACTIVE_QUEUE_STATUSES.has(String(row.status));
+
+/**
+ * Id tugas yang lognya dibaca: tugas apply terbaru per persetujuan, dan bila tugas terbarunya extension_apply yang
+ * masih aktif (pengalihan dari worker), tugas worker sebelumnya juga: lognya memuat alasan dan pertanyaan yang kosong.
+ */
 export function latestQueueJobIds(queueRows: unknown): string[] {
-  return [...latestQueueByApproval(queueRows).values()].map((row) => String(row.id));
+  const ids = new Set<string>();
+  const worker = latestWorkerQueueByApproval(queueRows);
+  for (const [approvalId, row] of latestQueueByApproval(queueRows)) {
+    ids.add(String(row.id));
+    const prior = worker.get(approvalId);
+    if (isActiveExtensionJob(row) && prior) ids.add(String(prior.id));
+  }
+  return [...ids];
 }
 
 /** Log terbaru per kunci. Waktu sama: yang lebih dulu di daftar menang (kueri mengurutkan terbaru dulu). */
@@ -62,6 +91,32 @@ function newestBy(rows: unknown, keyOf: (details: RawRow) => string | null): Map
 }
 
 const stringOrNull = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+
+/** Alasan pengalihan dari log percobaan worker; null bila percobaan itu bukan pengalihan ke ekstensi. */
+function handoffContextOf(facts: ReturnType<typeof agentLogFacts>): AgentHandoffContext | null {
+  if (!isExtensionHandoffRow(facts)) return null;
+  return { reason: facts.reason ?? null, handoff_reason: facts.handoff_reason ?? null, labels: handoffLabels(facts) };
+}
+
+/**
+ * Bila muat ulang status gagal membaca antrean (agentKnown false), baris agen dari pemuatan sebelumnya yang sudah
+ * terbaca dipertahankan. Tanpa ini satu kueri yang gagal mengosongkan semua baris, dan kartu "Menunggu Ekstensi Browser"
+ * berganti menjadi "Agen belum dijalankan" lalu kembali pada muat ulang berikutnya (temuan production 27 November 2026).
+ * Status klaim (ditutup, diganti) tetap diambil dari pemuatan baru karena dibaca dari backend, bukan antrean.
+ */
+export function keepAgentRowsWhenUnreadable<T extends { agent: Record<string, AgentApplyRow>; agentKnown: boolean }>(previous: T, next: T): T {
+  if (next.agentKnown || !previous.agentKnown) return next;
+  const agent: Record<string, AgentApplyRow> = { ...previous.agent };
+  for (const [id, row] of Object.entries(next.agent)) {
+    const prior = agent[id];
+    if (!prior) {
+      agent[id] = row;
+    } else if (row.claim_state) {
+      agent[id] = { ...prior, claim_state: row.claim_state, claim_channel: row.claim_channel ?? null };
+    }
+  }
+  return { ...next, agent, agentKnown: true };
+}
 
 /**
  * Baris status agen per persetujuan.
@@ -97,6 +152,19 @@ export function buildAgentApplyRows(queueRows: unknown, workerLogs: unknown, ext
     if (!approvalId) continue;
     const current = workerNewest.get(approvalId);
     if (!current || timeOf(row) > timeOf(current)) workerNewest.set(approvalId, row);
+  }
+
+  // Tugas terbaru extension_apply yang masih aktif (pengalihan dari worker, mis. Google Form dengan pertanyaan wajib):
+  // baris utamanya tetap tugas ekstensi, tetapi alasan dan pertanyaan yang kosong dibawa dari log tugas worker sebelumnya.
+  const workerQueue = latestWorkerQueueByApproval(queueRows);
+  const workerLogByQueueId = newestBy(workerLogs, (d) => stringOrNull(d.queue_job_id));
+  for (const [approvalId, latest] of queue) {
+    if (!isActiveExtensionJob(latest)) continue;
+    const prior = workerQueue.get(approvalId);
+    const log = prior ? workerLogByQueueId.get(String(prior.id)) : undefined;
+    if (!log) continue;
+    const context = handoffContextOf(agentLogFacts(log));
+    if (context) out[approvalId] = { ...out[approvalId], handoff_context: context };
   }
 
   const extensionNewest = newestBy(extensionLogs, (d) => (d.channel === "extension" ? stringOrNull(d.approval_request_id) : null));

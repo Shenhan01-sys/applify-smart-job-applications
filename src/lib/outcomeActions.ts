@@ -3,6 +3,7 @@ import { classifyJobChannel } from "./applyChannel.ts";
 import { describeApiError, parseApiError } from "./apiErrors.ts";
 import { APPROVAL_VALID_TEXT } from "./approvalExpiry.ts";
 import type { ApprovalStage } from "./approvalTabs.ts";
+import { isExtensionHandoffRow } from "./extensionConsent.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
 import { manualSubmitState, safeJobUrl } from "./manualSubmit.ts";
 import { awaitingCodeState, isCodeTimeout } from "./securityCode.ts";
@@ -230,10 +231,15 @@ export function panelActions(input: PanelInput): StatusActionId[] {
       const manual = manualSubmitState(row);
       const reason = row?.reason ?? "";
       const rerunnable = approved && !active && !hasOwnForm && !manual?.canRerun && !NO_RERUN_REASONS.has(reason);
+      // Agen mengalihkan pengisian ke ekstensi (Google Form dengan pertanyaan wajib, unggah berkas, login): "Lanjutkan di
+      // ekstensi" dan jawaban ada di blok sendiri, tetapi pengguna yang memilih mengirim sendiri tetap perlu "Sudah
+      // terkirim" dan "Tutup" (temuan production 27 November 2026: kartu tanpa jalan keluar selain Muat ulang).
+      const handoff = approved && !active && isExtensionHandoffRow(row);
       add("rerun", rerunnable);
       add("continue_extension", approved && !active && !hasOwnForm && extensionCanContinue(input.platform, url));
       add("open_form", !!url && !manual);
-      add("close", approved && !active && !hasOwnForm);
+      add("confirm_sent", handoff);
+      add("close", approved && !active && (!hasOwnForm || handoff));
       add("refresh", out.length === 0 || active);
       return out;
     }

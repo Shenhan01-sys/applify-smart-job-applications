@@ -63,6 +63,16 @@ export interface ExtensionConsentState {
 
 const HIDDEN: ExtensionConsentState = { show: false };
 
+/**
+ * Percobaan agen terbaru berhenti karena pengisian harus dialihkan ke Ekstensi Browser (Google Form dengan pertanyaan
+ * wajib atau unggah berkas, login, CAPTCHA). Dipakai blok "Lanjutkan di ekstensi" dan tindakan di kartu Persetujuan.
+ */
+export function isExtensionHandoffRow(row: Pick<AgentApplyRow, "extension_handoff" | "reason"> | null | undefined): boolean {
+  return (
+    row?.extension_handoff === true || row?.reason === "file_upload_required" || row?.reason === "google_forms_missing_required"
+  );
+}
+
 /** Log menunjukkan lamaran sudah dikirim atau pengiriman sedang diurus: izin tidak relevan lagi. */
 function alreadySentOrClaimed(row: AgentApplyRow | null | undefined, submitted: boolean): boolean {
   if (submitted) return true;
@@ -94,12 +104,7 @@ export function extensionConsentState(input: ExtensionConsentInput): ExtensionCo
 
   const row = input.row;
   const pendingQuestions = Math.max(row?.questions_pending ?? 0, row?.questions?.length ?? 0);
-  if (
-    row?.extension_handoff === true ||
-    row?.reason === "file_upload_required" ||
-    row?.reason === "google_forms_missing_required" ||
-    (row?.log_status === "incomplete" && row.reason === "partly_filled" && pendingQuestions > 0)
-  ) {
+  if (isExtensionHandoffRow(row) || (row?.log_status === "incomplete" && row.reason === "partly_filled" && pendingQuestions > 0)) {
     return { show: true, reason: "handoff_needed" };
   }
   if (row?.log_status === "incomplete" && (row.reason === "auth_required" || row.reason === "external_redirect")) {

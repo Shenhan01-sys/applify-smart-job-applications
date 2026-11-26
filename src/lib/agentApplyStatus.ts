@@ -43,6 +43,51 @@ export interface AgentApplyRow extends AgentLogFacts {
   /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
   claim_state?: "none" | "in_progress" | "submitted" | "abandoned" | "closed" | "locked_stuck";
   claim_channel?: "worker" | "extension" | null;
+  /**
+   * Alasan percobaan worker sebelumnya berhenti dan mengalihkan pengisian ke Ekstensi Browser. Hanya ada pada baris
+   * yang tugas terbarunya `extension_apply` yang masih aktif: log percobaan worker itu tidak lagi menjadi baris
+   * utama, tetapi kartu tetap harus menjelaskan pertanyaan mana yang belum terjawab (agentApplyRows.ts).
+   */
+  handoff_context?: AgentHandoffContext;
+}
+
+export interface AgentHandoffContext {
+  /** details.reason percobaan worker, misalnya google_forms_missing_required. */
+  reason: string | null;
+  /** details.handoff_reason: google_login | file_upload | captcha | missing_required. */
+  handoff_reason: string | null;
+  /** Label pertanyaan atau isian wajib yang belum terjawab, apa adanya dari formulir. */
+  labels: string[];
+}
+
+const MAX_HANDOFF_LABELS = 10;
+
+/** Label isian wajib yang belum terjawab pada log: remaining_required dulu, lalu label pertanyaan. Tanpa duplikat. */
+export function handoffLabels(facts: Pick<AgentLogFacts, "remaining_required" | "questions"> | null | undefined): string[] {
+  const out: string[] = [];
+  const add = (v: unknown) => {
+    const t = typeof v === "string" ? v.trim() : "";
+    if (t && !out.includes(t) && out.length < MAX_HANDOFF_LABELS) out.push(t);
+  };
+  for (const l of facts?.remaining_required ?? []) add(l);
+  if (Array.isArray(facts?.questions)) for (const q of facts.questions) add(q?.label);
+  return out;
+}
+
+/** Kalimat alasan agen mengalihkan pengisian ke ekstensi, menurut details.handoff_reason. */
+export function describeHandoffReason(reason: string | null | undefined): string {
+  switch (reason) {
+    case "missing_required":
+      return "formulir punya pertanyaan wajib yang belum terjawab";
+    case "file_upload":
+      return "formulir meminta unggah berkas";
+    case "google_login":
+      return "formulir meminta masuk dengan akun Google";
+    case "captcha":
+      return "halaman menampilkan CAPTCHA";
+    default:
+      return "formulir perlu dilanjutkan di Ekstensi Browser";
+  }
 }
 
 export type AgentApplyTone = "waiting" | "working" | "ready" | "sent" | "unverified" | "manual" | "failed" | "none";
@@ -157,12 +202,26 @@ export const AGENT_CODE_REJECTED_LABEL = "Perlu dicek: kode ditolak";
 export const AGENT_CODE_REJECTED_HINT =
   "Situs lowongan tidak menerima kode yang dimasukkan ke agen. Buka email untuk kode terbaru, masukkan di halaman situs lowongan lalu kirim sendiri, atau jalankan agen lagi untuk meminta kode baru.";
 
+/**
+ * Worker berhenti di Google Form karena ada pertanyaan wajib tanpa jawaban dan mengalihkannya ke Ekstensi Browser
+ * (reason google_forms_missing_required). Alasannya bukan situs yang belum diizinkan kirim otomatis: teks ini menyebut
+ * pertanyaan yang kosong apa adanya, supaya pengguna tahu apa yang harus dijawab.
+ */
+export const GOOGLE_FORMS_MISSING_LABEL = "Formulir punya pertanyaan wajib yang belum terjawab";
+
 const MAX_HINT_LABELS = 3;
 const MAX_HINT_LABEL_LENGTH = 70;
 
 function clip(label: string, max: number): string {
   const text = label.trim();
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+function googleFormsMissingHint(labels: readonly string[]): string {
+  const shown = labels.slice(0, MAX_HINT_LABELS).map((l) => clip(l, MAX_HINT_LABEL_LENGTH)).join("; ");
+  const more = labels.length - MAX_HINT_LABELS;
+  const list = labels.length > 0 ? `: ${shown}${more > 0 ? `; dan ${more} pertanyaan lain` : ""}` : "";
+  return `Agen berhenti sebelum kirim karena formulir punya pertanyaan wajib yang belum terjawab${list}. Lamaran belum terkirim. Jawab pertanyaannya di halaman Persetujuan, atau lanjutkan di Ekstensi Browser lalu kirim sendiri.`;
 }
 
 function partialHint(remaining: readonly string[] | undefined): string {
@@ -271,8 +330,8 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
     }
     if (reason === "google_forms_missing_required") {
       return {
-        label: "Ada pertanyaan wajib yang perlu dilanjutkan di ekstensi",
-        hint: partialHint(facts.remaining_required),
+        label: GOOGLE_FORMS_MISSING_LABEL,
+        hint: googleFormsMissingHint(handoffLabels(facts)),
         tone: "manual",
         suggestEmail: false,
       };
@@ -337,6 +396,17 @@ export const AGENT_ABANDONED_HINT =
 export const AGENT_CLOSED_LABEL = "Ditutup";
 export const AGENT_CLOSED_HINT =
   "Kamu menutup persetujuan ini tanpa mengirim lamaran, jadi agen tidak akan menjalankannya lagi. Bila lowongan ini masih kamu minati, ajukan lagi dari halaman Lowongan.";
+
+/**
+ * Status agen belum terbaca dari database (kueri antrean gagal atau belum selesai). Bukan "belum dijalankan": tugasnya
+ * bisa saja sudah ada, hanya tidak terbaca saat ini.
+ */
+export const AGENT_UNREAD_LABEL = "Status agen belum terbaca";
+export const AGENT_UNREAD_HINT =
+  "Status agen belum bisa dibaca saat ini, jadi belum jelas apakah agen sudah berjalan. Tekan Muat ulang status. Tidak ada yang berubah pada lamaranmu.";
+export function describeUnreadAgent(): AgentApplyView {
+  return { label: AGENT_UNREAD_LABEL, hint: AGENT_UNREAD_HINT, tone: "none", suggestEmail: false };
+}
 
 export function describeAgentApply(row: AgentApplyRow | null | undefined, now: number = Date.now()): AgentApplyView {
   // Pernyataan pengguna mengalahkan kirim yang belum terkonfirmasi; hanya log success yang lebih kuat.

@@ -34,6 +34,8 @@ Kolom "Sebelum" memakai keadaan sebelum perubahan ini: kartu hanya punya tombol 
 | Kirim lewat panel Email | Menunggu | panel Email | panel Email, Sudah terkirim, Buka formulir lowongan, Tutup |
 | Sedang diproses | Menunggu | tidak ada | Muat ulang status, Buka formulir lowongan |
 | Perlu tindakanmu (pertanyaan, kode, login, izin ekstensi) | Menunggu | jawaban, kolom kode, atau izin ekstensi | tindakan yang sama, ditambah Muat ulang status. Bila kode tidak masuk atau ditolak: Sudah terkirim, Belum terkirim ulangi, Tutup |
+| Google Form dialihkan ke ekstensi, belum diantre (`google_forms_missing_required`) | Menunggu, Perlu tindakanmu | jawaban dan blok Lanjutkan di ekstensi | jawaban, Lanjutkan di ekstensi, Sudah terkirim, Buka formulir lowongan, Tutup. Label "Formulir punya pertanyaan wajib yang belum terjawab", teksnya menyebut pertanyaan yang kosong |
+| Google Form dialihkan ke ekstensi, tugas ekstensi antre | Menunggu, Sedang diproses | hanya "Menunggu Ekstensi Browser", pertanyaan yang kosong tidak disebut | tetap "Menunggu Ekstensi Browser", ditambah daftar pertanyaan yang belum terjawab. Muat ulang status, Buka formulir lowongan |
 | Terisi, belum terkirim | Menunggu | panel kirim sendiri | panel kirim sendiri, Coba lagi, Tutup |
 | Perlu dicek, kirim belum terkonfirmasi | Menunggu | tidak ada | Sudah terkirim, Belum terkirim ulangi, Buka formulir lowongan, Tutup |
 | Belum dikirim (mode uji) | Menunggu | panel Email | panel Email, Buka formulir lowongan, Tutup |
@@ -49,6 +51,8 @@ Catatan penempatan:
 
 - Persetujuan yang disetujui, masa berlakunya habis, dan tidak punya tugas agen sama sekali (status agen terbaca dan kosong) pindah ke Riwayat sebagai "Kedaluwarsa, belum terkirim" dan mendapat tiga tindakan. Tes lama temuan 22 sebelumnya menahannya di "Menunggu giliran" tanpa jalan keluar. Tugas yang masih berjalan dan kirim yang belum terkonfirmasi tetap di Menunggu walau waktunya lewat.
 - Pernyataan pengguna menang atas log agen yang tidak pasti. "Belum terkirim, ulangi" dan "Tutup" menutup persetujuan itu walau agen sempat mencatat `submit_unverified`. Hanya log `success` yang lebih kuat.
+- Pengalihan ke ekstensi (temuan E2E production 27 November 2026, Google Form "Uji Applify (Peneliti)"): worker mengisi formulir lalu berhenti karena pertanyaan wajib tanpa jawaban, menulis log `incomplete` dengan `reason: google_forms_missing_required`, dan (bila `extension_auto_use` menyala) mengantre tugas `extension_apply`. Baris agen kartu memakai tugas terbaru, yaitu tugas ekstensi, sehingga log tugas worker sebelumnya tidak terbaca dan pertanyaan yang kosong hilang dari kartu. `buildAgentApplyRows` kini membaca juga log tugas worker sebelumnya dan membawa alasan serta labelnya sebagai `handoff_context`, hanya selama tugas ekstensi masih aktif. Penempatan tidak berubah (tetap Sedang diproses), karena ekstensi memang sedang bekerja. Teks alasannya menyebut pertanyaan yang kosong, bukan situs yang belum diizinkan kirim otomatis. Teks umum "berhenti sebelum kirim" kini menyebut penyebab yang paling umum, bukan satu-satunya.
+- Status agen belum terbaca: bila satu muat ulang gagal membaca antrean (misalnya batas waktu database), baris agen dari pemuatan sebelumnya dipertahankan (`keepAgentRowsWhenUnreadable`), jadi kartu tidak berganti-ganti antara "Menunggu Ekstensi Browser" dan "Agen belum dijalankan". Pada pemuatan pertama yang gagal, kartu berkata "Status agen belum terbaca", bukan "Agen belum dijalankan".
 - Kartu Terkirim yang masih punya percobaan agen lama (pertanyaan, langkah berikutnya, bukti) menyembunyikan semuanya dan menampilkan satu catatan bahwa percobaan lama tidak berlaku lagi (kasus GoToGroup, 26 November 2026).
 - Kolom jawaban, kolom kode, dan panel kirim sendiri hanya tampil untuk kartu yang belum terkirim.
 
@@ -97,6 +101,8 @@ Tidak dihitung walau ada di Menunggu, karena tidak ada keputusan yang bisa diamb
 | Status belum terbaca | Data status agen belum termuat atau gagal dimuat. Itu masalah data, bukan hasil kerja agen. Bila ikut dihitung, kegagalan memuat membuat semua kartu disetujui tampak mendesak. |
 
 Ketiganya tetap punya tombol di kartu (Muat ulang status, Coba lagi, Buka formulir lowongan), sesuai aturan tanpa status buntu. Persetujuan yang macet di sana kedaluwarsa dan pindah ke Riwayat dengan tiga tindakan. Tahap baru di `ApprovalStage` membuat `urgentFieldForStage` gagal dikompilasi sampai diputuskan dihitung atau tidak. Tes per tahap ada di `tests/statusActions.test.ts` dan `tests/e2e/dashboard-urgent.spec.ts`.
+
+Chip "N lamaran belum terkirim di kolom Siap dikirim" di Beranda (`MissionControlStage`) menghitung lamaran (`ai_applications` berstatus `ready`, sama dengan kolom papan Lamaran Saya), bukan persetujuan Menunggu. Angkanya bisa berbeda dari tab Menunggu: satu lamaran bisa punya persetujuan yang sudah kedaluwarsa atau ditutup, dan sebaliknya satu persetujuan Menunggu belum tentu punya lamaran `ready`. Chip tidak lagi berbunyi "siap dikirim", karena menyiratkan Applify tinggal mengirim; labelnya kini menyebut kolomnya dan keterangannya (`title`) menjelaskan perbedaannya.
 
 Teks "belum terkirim, bisa dicoba lagi" mengikuti label kartu (`STATUS_TERM.retryable`). Label lama "Gagal, bisa dicoba lagi" sudah dipensiunkan (`RETIRED_STATUS_LABELS`).
 

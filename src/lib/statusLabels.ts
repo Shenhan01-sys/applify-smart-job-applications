@@ -120,9 +120,11 @@ export const FILL_YOURSELF_LABEL = STATUS_TERM.fillYourself;
  * Tugas apply yang selesai dan mengisi formulir, tetapi tidak menekan kirim. Formulir itu ada di peramban server,
  * jadi pengguna tidak bisa menekan kirim di sana; teks ini tidak menyuruhnya (temuan uji klik 23 November 2026).
  * Kalimatnya tetap benar saat ALLOW_REAL_SUBMIT dinyalakan, karena host yang tidak diizinkan juga berhenti di sini.
+ * Teks ini hanya dipakai bila log percobaan tidak menyebut alasan yang lebih spesifik (describeLogOutcome), jadi penyebabnya
+ * ditulis sebagai yang paling umum, bukan satu-satunya (temuan 27 November 2026: Google Form dengan pertanyaan wajib).
  */
 export const AGENT_STOPPED_BEFORE_SUBMIT_TEXT =
-  "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim karena situs lowongan ini belum ada di daftar situs yang boleh dikirim otomatis. Lamaran tidak terkirim dan ada di kolom Siap dikirim.";
+  "Agen sudah mengisi formulir di peramban server, lalu berhenti sebelum tombol kirim. Penyebab yang paling umum: situs lowongan ini belum ada di daftar situs yang boleh dikirim otomatis, atau ada isian wajib yang masih kosong. Lamaran tidak terkirim dan ada di kolom Siap dikirim.";
 
 export const NO_FIELDS_FILLED_TEXT =
   "Agen belum berhasil mengisi formulir lowongan ini (halaman mungkin meminta masuk dulu). Lamaran belum terkirim. Isi formulirnya sendiri di situs lowongan, atau ajukan lagi.";
