@@ -300,7 +300,7 @@ test("kabel: kartu Persetujuan memasang panel kirim sendiri sesudah pertanyaan a
   const emailAt = page.indexOf("<EmailApplyPanel");
   assert.ok(questionsAt > 0 && manualAt > questionsAt && emailAt > manualAt);
   // kartu agen tampil di tab mana pun selama persetujuannya sudah disetujui (Menunggu atau Riwayat)
-  assert.match(page, /\{approved && \(\s*<AgentManualSubmit/);
+  assert.match(page, /\{approved && !expired && \(\s*<AgentManualSubmit/);
   assert.match(page, /jobUrl=\{emailData\.jobUrls\[request\.id\]\}/);
   assert.match(page, /coverLetter=\{request\.cover_letter \?\? null\}/);
   assert.match(page, /onRerun=\{handleAgentRerun\}/);

@@ -1,10 +1,13 @@
 import { AlertCircle, Bot, CheckCircle2, Clock, ExternalLink, Loader2, XCircle } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
+  AGENT_EXPIRED_ACTION_LABEL,
   LOGIN_TAB_INSTRUCTION,
   OPEN_JOB_PAGE_HINT,
   OPEN_JOB_PAGE_LABEL,
   awaitingLoginState,
   describeAgentApply,
+  describeExpiredApproval,
   resolveLoginTabUrl,
   type AgentApplyRow,
   type AgentApplyTone,
@@ -12,6 +15,8 @@ import {
 import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
 import AgentEvidence from "@/components/AgentEvidence";
+import AgentNextSteps from "@/components/AgentNextSteps";
+import { nextStepGuideFor } from "@/lib/nextStepsGuide";
 import NotQueuedNotice from "@/components/NotQueuedNotice";
 import type { NotQueuedRoute } from "@/lib/approveOutcome";
 
@@ -44,25 +49,31 @@ export default function AgentApplyStatus({
   jobUrl,
   consentShown = false,
   notQueued = null,
+  expired = false,
 }: {
   row: AgentApplyRow | null | undefined;
   jobUrl?: string | null;
   consentShown?: boolean;
+  /** Masa berlaku persetujuan habis dan agen tidak bekerja lagi: tanpa langkah lanjutan, hanya penjelasan dan tautan ajukan lagi. */
+  expired?: boolean;
   /** Persetujuan ini sengaja tidak diantre (LinkedIn, email langsung). Tanpa percobaan agen, kartu ini diganti penjelasan jalurnya. */
   notQueued?: NotQueuedRoute | null;
 }) {
   if (notQueued && !row) return <NotQueuedNotice route={notQueued} jobUrl={jobUrl} />;
-  const view = describeAgentApply(row);
+  const view = expired ? describeExpiredApproval() : describeAgentApply(row);
+  // Berhenti sebelum kirim dengan langkah dari ekstensi: daftar bernomor menggantikan kalimat umumnya.
+  const nextSteps = expired ? null : nextStepGuideFor(row, view.tone);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
-  const showHint = !!view.hint && manualSubmitState(row)?.kind !== "not_allowed";
+  const showHint = !!view.hint && !nextSteps && (expired || manualSubmitState(row)?.kind !== "not_allowed");
   const effectiveHint =
     consentShown && row?.reason === "auth_required"
       ? "Situs ini mewajibkan akun pelamar. Klik Izinkan pada kartu Ekstensi Browser di bawah untuk membuka tab masuk."
       : view.hint;
   // Hanya log Ekstensi Browser yang mencatat berkas terpasang (details.documents_attached). Hanya jenisnya, tanpa nama atau jalur berkas.
   const documents = row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
-  const openLoginUrl = awaitingLoginState(row).waiting ? resolveLoginTabUrl(row, jobUrl) : null;
+  const loginWaiting = !expired && awaitingLoginState(row).waiting;
+  const openLoginUrl = loginWaiting ? resolveLoginTabUrl(row, jobUrl) : null;
   return (
     <div className="mt-3 rounded-xl border-2 border-black/[8%] bg-white px-3 py-2.5" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -83,7 +94,19 @@ export default function AgentApplyStatus({
         </p>
       )}
       {showHint && !view.waitReason && <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{effectiveHint}</p>}
-      {awaitingLoginState(row).waiting && (
+      {expired && (
+        <p className="mt-2">
+          <Link
+            to="/jobs"
+            data-testid="expired-reapply"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border-2 border-[#0A5BE0] bg-white px-3 py-1.5 text-xs font-semibold text-[#0A5BE0] transition-colors hover:bg-[#0A5BE0]/5"
+          >
+            {AGENT_EXPIRED_ACTION_LABEL}
+          </Link>
+        </p>
+      )}
+      {nextSteps && <AgentNextSteps items={nextSteps} jobUrl={jobUrl} />}
+      {loginWaiting && (
         <div className="mt-2 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2" data-testid="login-tab-guide">
           <p className="text-xs leading-relaxed text-amber-900">{LOGIN_TAB_INSTRUCTION}</p>
           {openLoginUrl && (

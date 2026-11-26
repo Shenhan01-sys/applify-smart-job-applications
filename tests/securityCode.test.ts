@@ -335,7 +335,7 @@ test("Persetujuan: kolom kode tampil di bawah status agen dan di atas pertanyaan
   const questions = page.indexOf("<AgentQuestions");
   const email = page.indexOf("<EmailApplyPanel");
   assert.ok(status > 0 && code > status && questions > code && email > questions);
-  assert.match(page, /\{approved && \(\s*<AgentSecurityCode/);
+  assert.match(page, /\{approved && !expired && \(\s*<AgentSecurityCode/);
   assert.match(page, /pollIntervalMs\(agentRows\) === CODE_POLL_MS/);
   assert.match(page, /awaitingCode \? CODE_POLL_MS : AGENT_POLL_MS/);
   assert.doesNotMatch(page, /15_000/);

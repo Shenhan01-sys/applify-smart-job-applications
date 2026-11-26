@@ -128,10 +128,11 @@ const isEmailJobActive = (job: EmailQueueRow | null | undefined) => job?.status 
  *     1. ada log success                                       -> Riwayat, "Terkirim"
  *     2. klaim kirim dilepas (persetujuan baru sudah dibuat)    -> Riwayat, "Diganti persetujuan baru"
  *     3. status agen belum terbaca                              -> Menunggu, "Status belum terbaca"
+ *     3b. masa berlaku habis, agen tidak bekerja, kirim sudah  -> Riwayat, "Kedaluwarsa, belum terkirim"
+ *         terkonfirmasi atau tidak ada percobaan terbuka (pertanyaan tertunda ikut ditutup)
  *     4. menunggu kode, login, jawaban, atau izin               -> Menunggu, "Perlu tindakanmu"
  *     5. tugas agen atau email masih antre atau berjalan        -> Menunggu, "Sedang diproses"
  *     6. kirim belum terkonfirmasi atau klaim terkunci          -> Menunggu, "Perlu dicek, kirim belum terkonfirmasi"
- *     6b. masa berlaku habis (tidak bisa dicoba lagi)           -> Riwayat, "Kedaluwarsa, belum terkirim"
  *     7. agen berhenti dan butuh tindakan (login, CAPTCHA, isian wajib kosong, dilewati, dan sejenisnya)
  *                                                               -> Menunggu, "Perlu tindakanmu"
  *     8. email tidak terkirim karena mode uji                   -> Menunggu, "Belum dikirim (mode uji)"
@@ -158,6 +159,23 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   if (row?.claim_state === "abandoned") return place("replaced");
   if (ctx.agentKnown === false && !row) return place("checking");
 
+  // Masa berlaku habis dan agen tidak sedang bekerja: tidak ada lagi yang bisa dijawab, diunggah, atau dilanjutkan di
+  // ekstensi, jadi kartu pindah ke Riwayat walau masih ada pertanyaan tertunda (Hans, 26 November 2026: kartu Dealls
+  // lama masih berlabel "Perlu tindakanmu" dan menanyakan kolom). Tugas yang masih berjalan dan kirim yang belum
+  // terkonfirmasi tetap di Menunggu. Tanpa tugas apa pun, persetujuan yang tidak diantre (LinkedIn, email langsung)
+  // juga ditutup saat masa berlakunya habis, karena tidak ada percobaan agen yang akan datang dan tidak ada tombol
+  // untuk menandainya terkirim.
+  const idleNotQueued = !!ctx.notQueued && !ctx.emailJob && ctx.testMode !== true;
+  if (
+    (row || idleNotQueued) &&
+    isExpiredByTime(approval?.expires_at, now) &&
+    view.tone !== "unverified" &&
+    !isAgentApplyActive(row) &&
+    !isEmailJobActive(ctx.emailJob)
+  ) {
+    return view.tone === "failed" || ctx.emailJob?.status === "failed" ? place("expired", FAILED_CLOSED_LABEL) : place("expired", EXPIRED_NOT_SENT_LABEL);
+  }
+
   const waitingForUser =
     ctx.consentRequired === true ||
     awaitingCodeState(row, now).waiting ||
@@ -167,14 +185,6 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   if (waitingForUser) return place("needs_action");
   if (isAgentApplyActive(row) || isEmailJobActive(ctx.emailJob)) return place("processing");
   if (view.tone === "unverified") return place("unverified");
-  // Masa berlaku habis: agen tidak akan mencoba lagi dan tombol ulangi tidak ada, jadi kartu pindah ke Riwayat
-  // (Hans, 25 November 2026: enam kartu Datadog lama menumpuk di Menunggu tanpa bisa diapa-apakan).
-  // Tanpa tugas apa pun, persetujuan yang tidak diantre (LinkedIn, email langsung) juga ditutup saat masa berlakunya habis,
-  // karena tidak ada percobaan agen yang akan datang dan tidak ada tombol untuk menandainya terkirim.
-  const idleNotQueued = !!ctx.notQueued && !ctx.emailJob && ctx.testMode !== true;
-  if ((row || idleNotQueued) && isExpiredByTime(approval?.expires_at, now)) {
-    return view.tone === "failed" || ctx.emailJob?.status === "failed" ? place("expired", FAILED_CLOSED_LABEL) : place("expired", EXPIRED_NOT_SENT_LABEL);
-  }
   if (view.tone === "manual") return place("needs_action");
   if (ctx.testMode === true) return place("test_mode");
   if (view.tone === "ready") return place("filled_not_sent");

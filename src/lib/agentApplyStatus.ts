@@ -86,6 +86,19 @@ export const AGENT_VALIDATION_HINT =
 
 export const AGENT_PARTIAL_LABEL = STATUS_TERM.partlyFilled;
 
+/**
+ * Persetujuan yang masa berlakunya habis: agen dan ekstensi tidak akan mengisi atau mengirimnya lagi, jadi pertanyaan,
+ * unggahan, dan langkah lama di kartu tidak ada gunanya. Hanya ada satu jalan: ajukan lowongan itu lagi.
+ */
+export const AGENT_EXPIRED_LABEL = "Persetujuan kedaluwarsa";
+export const AGENT_EXPIRED_HINT =
+  "Masa berlaku persetujuan ini sudah habis, jadi agen dan ekstensi tidak lagi mengisi atau mengirimnya. Pertanyaan dan langkah lama tidak perlu dikerjakan. Bila lowongan ini masih kamu minati, ajukan lagi dari halaman Lowongan.";
+export const AGENT_EXPIRED_ACTION_LABEL = "Ajukan lagi dari Lowongan";
+
+export function describeExpiredApproval(): AgentApplyView {
+  return { label: AGENT_EXPIRED_LABEL, hint: AGENT_EXPIRED_HINT, tone: "manual", suggestEmail: false };
+}
+
 export const AGENT_AWAITING_CODE_LABEL = "Menunggu kode keamanan";
 export const AGENT_AWAITING_CODE_HINT =
   "Situs lowongan mengirim kode ke emailmu. Masukkan kodenya di bawah sebelum waktunya habis.";

@@ -28,6 +28,14 @@ export const DOCUMENT_LABELS: Record<DocumentKind, string> = {
 /** details.documents_attached: jenis berkas -> terpasang atau tidak. Hanya jenis yang tercatat; tanpa nama atau jalur berkas. */
 export type AgentDocumentsAttached = Partial<Record<DocumentKind, boolean>>;
 
+/** Jenis langkah berikutnya yang dilaporkan Ekstensi Browser saat berhenti sebelum tombol kirim akhir (`details.next_steps`). */
+export type AgentNextStepKind = "subform_save" | "next_page" | "upload_file" | "answer_required" | "login";
+
+export interface AgentNextStep {
+  kind: AgentNextStepKind;
+  label: string;
+}
+
 export interface AgentFilledField {
   label: string;
   kind: FilledFieldKind;
@@ -97,6 +105,11 @@ export interface AgentLogFacts {
   channel?: "extension";
   /** details.documents_attached pada log ekstensi: berkas yang terpasang ke formulir. Hanya ada bila log memuatnya. */
   documents_attached?: AgentDocumentsAttached;
+  /**
+   * details.next_steps pada log ekstensi: langkah yang masih harus dilakukan pengguna sebelum tombol kirim akhir
+   * (simpan sub-formulir, halaman berikutnya, unggah berkas, jawab pertanyaan, login). Hanya ada bila log memuatnya.
+   */
+  next_steps?: AgentNextStep[];
   /** details.extension_handoff === true: worker berhenti dan mengalihkan pengisian (mis. Google Forms) ke Ekstensi Browser. */
   extension_handoff?: boolean;
   /** details.handoff_reason: google_login | file_upload | captcha | missing_required. */
@@ -187,6 +200,23 @@ export function describeDocumentsAttached(docs: AgentDocumentsAttached | null | 
   return attached.length > 0 ? `Ekstensi Browser memasang berkas: ${attached.join(", ")}.` : "Ekstensi Browser tidak memasang berkas apa pun.";
 }
 
+const NEXT_STEP_KINDS: ReadonlySet<string> = new Set(["subform_save", "next_page", "upload_file", "answer_required", "login"]);
+export const MAX_NEXT_STEPS = 6;
+
+/** `details.next_steps` -> langkah dengan jenis dikenal dan label tidak kosong (paling banyak 6, tanpa duplikat). Selain itu dibuang. */
+export function cleanNextSteps(value: unknown): AgentNextStep[] {
+  if (!Array.isArray(value)) return [];
+  const out: AgentNextStep[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.kind !== "string" || !NEXT_STEP_KINDS.has(item.kind)) continue;
+    const label = cleanText(item.label, 120);
+    if (!label || out.some((s) => s.kind === item.kind && s.label === label)) continue;
+    out.push({ kind: item.kind as AgentNextStepKind, label });
+    if (out.length >= MAX_NEXT_STEPS) break;
+  }
+  return out;
+}
+
 function cleanRemaining(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -211,6 +241,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
   const check = isRecord(details.submit_check) ? details.submit_check : null;
   const fromExtension = details.channel === "extension";
   const documents = fromExtension ? cleanDocumentsAttached(details.documents_attached) : null;
+  const nextSteps = fromExtension ? cleanNextSteps(details.next_steps) : [];
   return {
     log_status: cleanText(row.status, 40),
     submit_check_verdict: check ? cleanText(check.verdict, 40) : null,
@@ -234,6 +265,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     ...(cleanText(details.approval_request_id, 64) ? { approval_request_id: cleanText(details.approval_request_id, 64) } : {}),
     ...(fromExtension ? { channel: "extension" as const } : {}),
     ...(documents ? { documents_attached: documents } : {}),
+    ...(nextSteps.length > 0 ? { next_steps: nextSteps } : {}),
     ...(details.extension_handoff === true ? { extension_handoff: true } : {}),
     ...(cleanText(details.handoff_reason, 40) ? { handoff_reason: cleanText(details.handoff_reason, 40) } : {}),
   };

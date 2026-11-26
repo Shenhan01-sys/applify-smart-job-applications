@@ -324,7 +324,9 @@ function ApprovalsPage() {
             const config = STAGE_STYLE[placement.stage];
             const StatusIcon = config.icon;
             const approved = request.status === 'approved';
-            const consent = approved
+            // Masa berlaku habis: tanpa pertanyaan, unggahan, kode, atau tombol lanjut. Hanya penjelasan dan ajukan lagi.
+            const expired = approved && placement.stage === 'expired';
+            const consent = approved && !expired
               ? extensionConsentState({
                   approvalStatus: request.status,
                   platform: request.platform,
@@ -379,18 +381,18 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {approved && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} expired={expired} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />
                     )}
-                    {approved && (
+                    {approved && !expired && (
                       <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />
                     )}
-                    {approved && (
+                    {approved && !expired && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
                     )}
-                    {approved && (
+                    {approved && !expired && (
                       <AgentManualSubmit
                         approvalId={request.id}
                         row={emailData.agent[request.id]}

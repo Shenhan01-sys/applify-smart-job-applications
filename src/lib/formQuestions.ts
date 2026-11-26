@@ -88,6 +88,32 @@ function cleanOptions(value: unknown): string[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
+const DIAL_OPTION_RE = /\+\s?\d{1,4}\b/;
+const COUNTRY_CODE_LABEL_RE =
+  /\b(?:kode\s+(?:negara|telepon|telp|area|panggilan)|country\s+code|dial(?:ing)?\s+code|calling\s+code|phone\s+(?:code|prefix|country))\b/i;
+const BARE_INDONESIA_CODE_RE = /^\s*(?:\+\s?62|IDN|INA)\s*(?:\(\s*opsional\s*\))?\s*$/i;
+const FILE_LABEL_RE = /\b(?:file|berkas|pdf|docx?|unggah|upload|lampiran|lampirkan|attach(?:ment)?)\b/i;
+const FILE_OPTION_RE = /\b(?:file|berkas|pdf|docx?|unggah|upload|lampiran|lampirkan|attach(?:ment)?|browse|choose|pilih)\b/i;
+
+/**
+ * Log lama (sebelum ekstensi memperbaikinya) menyimpan pemilih kode negara telepon ("IDN (opsional)") dan sakelar
+ * unggah berkas ("File PDF (opsional)") sebagai pertanyaan pilihan. Keduanya bukan pertanyaan untuk dijawab di
+ * Applify: kode negara tidak ditanyakan, unggahan menjadi petunjuk unggah sendiri (jenis `file`).
+ * Aturan yang sama ada di ekstensi (`controlHints.ts`) dan backend (`extension-control-hints.ts`).
+ */
+function isCountryCodeQuestion(label: string, options: readonly string[] | undefined): boolean {
+  const list = options ?? [];
+  const dial = list.filter((o) => DIAL_OPTION_RE.test(o)).length;
+  if (list.length >= 3 && dial / list.length >= 0.6) return true;
+  return COUNTRY_CODE_LABEL_RE.test(label) || BARE_INDONESIA_CODE_RE.test(label);
+}
+
+function isFileUploadQuestion(label: string, options: readonly string[] | undefined): boolean {
+  const list = options ?? [];
+  if (list.length === 0) return FILE_LABEL_RE.test(label);
+  return list.every((o) => FILE_OPTION_RE.test(o)) && (FILE_LABEL_RE.test(label) || list.every((o) => FILE_LABEL_RE.test(o)));
+}
+
 /**
  * `details` satu baris application_logs (atau langsung daftar pertanyaannya) -> pertanyaan yang bisa dijawab.
  * Butir tanpa kunci atau label dibuang, jenis tak dikenal dianggap teks, kunci kembar hanya dipakai sekali,
@@ -104,8 +130,15 @@ export function parseQuestions(details: unknown): PendingQuestion[] {
     const label = typeof item.label === "string" ? item.label.trim().slice(0, MAX_LABEL_LENGTH).trim() : "";
     // "__proto__" tidak pernah dihasilkan questionKey; kunci seperti itu hanya mungkin dari data rusak.
     if (!key || !label || key === "__proto__" || seen.has(key)) continue;
-    const kind = typeof item.kind === "string" && KINDS.has(item.kind) ? (item.kind as QuestionKind) : "text";
-    const options = kind === "select" || kind === "radio" ? cleanOptions(item.options) : undefined;
+    let kind = typeof item.kind === "string" && KINDS.has(item.kind) ? (item.kind as QuestionKind) : "text";
+    let options = kind === "select" || kind === "radio" ? cleanOptions(item.options) : undefined;
+    if (kind === "select" || kind === "radio") {
+      if (isCountryCodeQuestion(label, options)) continue;
+      if (isFileUploadQuestion(label, options)) {
+        kind = "file";
+        options = undefined;
+      }
+    }
     seen.add(key);
     out.push({ key, label, kind, ...(options ? { options } : {}), ...(typeof item.required === "boolean" ? { required: item.required } : {}) });
     if (out.length >= MAX_QUESTIONS) break;

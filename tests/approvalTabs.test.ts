@@ -292,3 +292,26 @@ test("kabel: toast izin ekstensi menyebut tab Menunggu, tempat kartunya berada",
   const src = read("../src/lib/extensionConsent.ts");
   assert.match(src, /EXTENSION_CONSENT_REQUIRED_TOAST = "Disetujui\. Izinkan ekstensi browser untuk mengisi formulirnya di tab Menunggu\."/);
 });
+
+// ---- kedaluwarsa dengan pertanyaan tertunda (Dealls, 26 November 2026) ----------------------------------------
+
+test("disetujui, masa berlaku habis, masih ada pertanyaan tertunda: Riwayat Kedaluwarsa, bukan Perlu tindakanmu", () => {
+  const questions = [{ key: "lokasi", label: "Lokasi (wajib)", kind: "text", required: true }];
+  const stale = agentRow("completed", { status: "incomplete", details: { channel: "extension", reason: "partly_filled", questions } }, { job_type: "extension_apply", channel: "extension" });
+  expectPlace(place(approved({ expires_at: PAST }), { agent: stale }), "history", "expired", EXPIRED_NOT_SENT_LABEL);
+  // masih berlaku: tetap menunggu jawaban
+  expectPlace(place(approved({ expires_at: FUTURE }), { agent: stale }), "pending", "needs_action", "Perlu tindakanmu");
+  // izin ekstensi belum diberikan tetapi masa berlaku habis: tidak ada lagi yang bisa diizinkan
+  expectPlace(place(approved({ expires_at: PAST }), { agent: stale, consentRequired: true }), "history", "expired", EXPIRED_NOT_SENT_LABEL);
+});
+
+test("masa berlaku habis tidak menutup tugas yang masih berjalan, menunggu kode, atau kirim yang belum terkonfirmasi", () => {
+  expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("processing") }), "pending", "processing");
+  const until = iso(NOW + 600_000);
+  expectPlace(
+    place(approved({ expires_at: PAST }), { agent: agentRow("processing", { status: "awaiting_code", details: { awaiting_until: until, code_length: 6 } }) }),
+    "pending",
+    "needs_action",
+  );
+  expectPlace(place(approved({ expires_at: PAST }), { agent: agentRow("completed", { status: "submit_unverified" }) }), "pending", "unverified");
+});
