@@ -49,8 +49,16 @@ export const automationQueue = {
       body: JSON.stringify({ job_id: jobId }),
     });
     if (!resp.ok) {
+      // Backend menjawab {"error": "...", "code": "..."}; tampilkan pesannya saja, bukan JSON mentah, dan bawa status HTTP.
       const text = await resp.text().catch(() => "");
-      throw new Error(text || `HTTP ${resp.status}`);
+      let message = "";
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown };
+        if (typeof parsed?.error === "string") message = parsed.error;
+      } catch {
+        // bukan JSON: pakai teks apa adanya
+      }
+      throw Object.assign(new Error(message || text || `HTTP ${resp.status}`), { status: resp.status });
     }
     const body = (await resp.json()) as { jobId?: string; id?: string };
     const id = body.jobId ?? body.id;

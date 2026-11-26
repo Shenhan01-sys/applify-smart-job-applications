@@ -223,8 +223,11 @@ Deno.serve(async (req: Request) => {
         .eq("user_id", userId).order("achievement_date", { ascending: false, nullsFirst: false }).limit(50),
     ]);
     if (!job) return json({ error: "Job not found" }, 404);
+    // Lowongan privat (poster, tautan, caption) hanya untuk pemiliknya: klien admin melewati RLS, jadi dicek di sini.
+    // Sebelum migrasi lowongan privat kolomnya belum ada (undefined), dan lowongan dianggap publik.
+    if (job.visibility === "private" && job.created_by !== userId) return json({ error: "Job not found" }, 404);
 
-    const skillList = (skills ?? []).map((s: any) => s.name).join(", ")
+    const skillList =(skills ?? []).map((s: any) => s.name).join(", ")
       || (Array.isArray(profile?.skills) ? profile!.skills.join(", ") : "");
     const workList = (work ?? [])
       .map((w: any) => `- ${w.role_title} @ ${w.company_name}: ${w.description ?? ""}`).join("\n");

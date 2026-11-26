@@ -105,7 +105,8 @@ export const greenCareerService = {
       if (!user) return map;
       const { data, error } = await supabase
         .from("green_career_assessments")
-        .select("job_id, status, readiness_score, assessment, updated_at")
+        // `feedback` adalah kolom hasil penilaian yang ditulis Edge Function (bukan `assessment`, yang hanya memuat soal).
+        .select("job_id, status, readiness_score, feedback, updated_at")
         .eq("user_id", user.id)
         .in("status", ["ready", "needs_development"])
         .order("updated_at", { ascending: false })
@@ -116,7 +117,7 @@ export const greenCareerService = {
         if (!jobId || map.has(jobId)) continue;
         const score = Number(row?.readiness_score);
         if (!Number.isFinite(score)) continue;
-        const fb = row?.assessment?.feedback ?? {};
+        const fb = row?.feedback ?? {};
         map.set(jobId, {
           readinessScore: Math.max(0, Math.min(100, Math.round(score))),
           status: row.status === "ready" ? "ready" : "needs_development",

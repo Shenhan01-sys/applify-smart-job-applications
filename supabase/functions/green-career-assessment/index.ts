@@ -109,6 +109,8 @@ Deno.serve(async (req: Request) => {
 
       const { data: job } = await admin.from("jobs").select("*").eq("id", jobId).maybeSingle();
       if (!job) return json({ error: "Job not found" }, 404);
+      // Lowongan privat hanya untuk pemiliknya: klien admin melewati RLS. Sebelum migrasi kolomnya belum ada (publik).
+      if (job.visibility === "private" && job.created_by !== userId) return json({ error: "Job not found" }, 404);
       if (!job.is_green) return json({ error: "Job bukan Green Career role" }, 400);
 
       // UX-P7-11: tabel `profiles` tidak memiliki kolom `skills`; skill kandidat disimpan di tabel `user_skills`.
