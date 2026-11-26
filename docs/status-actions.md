@@ -70,16 +70,35 @@ Konstanta masa berlaku persetujuan ada di `src/lib/approvalExpiry.ts` dan dijaga
 
 ## Banner Tindakan mendesak di Beranda
 
-Banner tidak punya aturan penempatan sendiri. `summarizeUrgentActions` (`src/lib/dashboardUrgent.ts`) menempatkan setiap persetujuan dengan `splitApprovalTabs` dan `placementContextFromData` (`src/lib/approvalTabs.ts`), fungsi yang sama dengan halaman Persetujuan. Datanya dibaca `loadEmailApplyData` (dengan `placementOnly`, tanpa status Gmail dan profil) dari Riwayat sebanyak `APPROVAL_HISTORY_LIMIT` baris, sama dengan halaman Persetujuan. Banner hanya menghitung kartu tab Menunggu menurut tahapnya, jadi angkanya sama dengan kartu yang ditemukan pengguna setelah menekan "Tinjau di Persetujuan". Kartu yang masuk Riwayat (kedaluwarsa, terkirim, ditutup, diganti) tidak dihitung.
+Banner tidak punya aturan penempatan sendiri. `summarizeUrgentActions` (`src/lib/dashboardUrgent.ts`) menempatkan setiap persetujuan dengan `splitApprovalTabs` dan `placementContextFromData` (`src/lib/approvalTabs.ts`), fungsi yang sama dengan halaman Persetujuan. Datanya dibaca `loadEmailApplyData` (dengan `placementOnly`, tanpa status Gmail dan profil) dari Riwayat sebanyak `APPROVAL_HISTORY_LIMIT` baris, sama dengan halaman Persetujuan.
+
+Keputusan Hans, 27 November 2026: banner menghitung setiap kartu tab Menunggu yang butuh tindakan pengguna, bukan hanya draf dan kartu kirim belum terkonfirmasi. Angka total sama dengan jumlah kartu Menunggu dikurangi kartu yang tidak butuh tindakan (`BACKGROUND_STAGES`). Kartu yang masuk Riwayat (kedaluwarsa, terkirim, ditutup, diganti) tidak dihitung. Satu baris per kelompok, urutannya di `URGENT_LINES`, semuanya menaut ke Persetujuan lewat "Tinjau di Persetujuan".
 
 | Baris banner | Tahap kartu di Menunggu | Sebelum | Sesudah |
 | --- | --- | --- | --- |
-| "N draf menunggu persetujuanmu." | Menunggu persetujuan | "N draf lamaran menunggu persetujuanmu sebelum dikirim.", dihitung dari draf pending yang belum kedaluwarsa | sama hitungannya, teks diringkas |
-| "N lamaran menunggu kode keamanan dari emailmu." | Perlu tindakanmu, agen menunggu kode | dihitung dari log, termasuk persetujuan kedaluwarsa | hanya kartu yang tampil di Menunggu. Tugas yang masih berjalan tetap dihitung walau masa berlakunya lewat, karena kartunya tetap di Menunggu |
-| "N lamaran menunggu jawaban pertanyaan formulir untuk agen." | Perlu tindakanmu, ada pertanyaan | dihitung dari log, termasuk persetujuan kedaluwarsa | hanya kartu yang tampil di Menunggu |
-| "N lamaran perlu dicek: kirim belum terkonfirmasi." | Perlu dicek, kirim belum terkonfirmasi | tidak dihitung (kasus Binance, 26 November 2026: Menunggu berisi 2 kartu, banner hanya menyebut 1 draf) | dihitung, termasuk yang masa berlakunya sudah lewat |
+| "N draf menunggu persetujuanmu." | Menunggu persetujuan | dihitung | sama |
+| "N lamaran menunggu kode keamanan dari emailmu." | Perlu tindakanmu, agen menunggu kode | dihitung | sama. Tugas yang masih berjalan tetap dihitung walau masa berlakunya lewat, karena kartunya tetap di Menunggu |
+| "N lamaran menunggu jawaban pertanyaan formulir untuk agen." | Perlu tindakanmu, ada pertanyaan | dihitung | sama |
+| "N lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak." | Perlu tindakanmu, `code_timeout` atau `code_rejected` | tidak dihitung | dihitung |
+| "N lamaran berhenti dan perlu tindakanmu (login, CAPTCHA, atau isian wajib)." | Perlu tindakanmu selain empat di atas: menunggu login, CAPTCHA, lowongan ditutup, dialihkan, dan sejenisnya | tidak dihitung | dihitung |
+| "N lamaran perlu dicek: kirim belum terkonfirmasi." | Perlu dicek, kirim belum terkonfirmasi | dihitung (sejak 26 November 2026) | sama, termasuk yang masa berlakunya sudah lewat |
+| "N lamaran perlu diisi sendiri." | Perlu diisi sendiri (LinkedIn dan sejenisnya) | tidak dihitung | dihitung |
+| "N lamaran perlu dikirim lewat panel Email." | Kirim lewat panel Email | tidak dihitung | dihitung |
+| "N lamaran terisi, belum terkirim." | Terisi, belum terkirim | tidak dihitung | dihitung |
+| "N lamaran belum terkirim, bisa dicoba lagi." | Belum terkirim, bisa dicoba lagi | tidak dihitung | dihitung |
+| "N lamaran belum dikirim (mode uji)." | Belum dikirim (mode uji) | tidak dihitung | dihitung |
 
-Belum dihitung banner: kartu Menunggu bertahap Perlu diisi sendiri, Kirim lewat panel Email, kode tidak masuk atau ditolak (`code_timeout`, `code_rejected`), Terisi belum terkirim, dan Gagal bisa dicoba lagi. Kartu itu tampil di tab Menunggu dengan tindakannya sendiri. Menambahkannya ke banner adalah keputusan terpisah.
+Tidak dihitung walau ada di Menunggu, karena tidak ada keputusan yang bisa diambil pengguna:
+
+| Tahap | Alasan |
+| --- | --- |
+| Sedang diproses | Agen atau email sedang bekerja, hasilnya datang sendiri. |
+| Menunggu giliran | Tugas menunggu giliran di antrean agen. Tombol Coba lagi hanya jalan keluar bila macet. |
+| Status belum terbaca | Data status agen belum termuat atau gagal dimuat. Itu masalah data, bukan hasil kerja agen. Bila ikut dihitung, kegagalan memuat membuat semua kartu disetujui tampak mendesak. |
+
+Ketiganya tetap punya tombol di kartu (Muat ulang status, Coba lagi, Buka formulir lowongan), sesuai aturan tanpa status buntu. Persetujuan yang macet di sana kedaluwarsa dan pindah ke Riwayat dengan tiga tindakan. Tahap baru di `ApprovalStage` membuat `urgentFieldForStage` gagal dikompilasi sampai diputuskan dihitung atau tidak. Tes per tahap ada di `tests/statusActions.test.ts` dan `tests/e2e/dashboard-urgent.spec.ts`.
+
+Teks "belum terkirim, bisa dicoba lagi" mengikuti label kartu (`STATUS_TERM.retryable`). Label lama "Gagal, bisa dicoba lagi" sudah dipensiunkan (`RETIRED_STATUS_LABELS`).
 
 ## Panel samping ekstensi (hanya dokumentasi, tidak diubah)
 

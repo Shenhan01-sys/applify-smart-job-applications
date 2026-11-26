@@ -1,11 +1,14 @@
 import { expect, test } from "./helpers/test";
-import { applyLog, approval, approvedApproval, awaitingCodeLog, isoAgo, jobRow, queueRow } from "./helpers/fixtures";
+import type { MockBackend } from "./helpers/mockBackend";
+import { applyLog, approval, approvedApproval, awaitingCodeLog, isoAgo, jobRow, queueRow, questionsLog, stoppedLog } from "./helpers/fixtures";
 
 /**
  * Banner "Tindakan mendesak" di Beranda (src/routes/dashboard.tsx, E2E-06). Kode aplikasi asli; backend dan Supabase
- * palsu (tests/e2e/helpers). Yang dijaga: banner muncul dari empat sumber (draf, kode, pertanyaan, kirim belum
- * terkonfirmasi) dan angkanya sama dengan kartu di tab Menunggu halaman Persetujuan, hanya membaca (tidak ada tulis ke
- * tabel yang dikunci RLS), tidak polling, dan tidak membuat Beranda menunggu backend.
+ * palsu (tests/e2e/helpers). Yang dijaga: banner menghitung setiap kartu tab Menunggu yang butuh tindakan pengguna
+ * (draf, kode, pertanyaan, kode gagal, kirim belum terkonfirmasi, perlu diisi sendiri, panel Email, terisi belum
+ * terkirim, gagal bisa dicoba lagi, mode uji, dan berhenti karena login atau CAPTCHA), angkanya sama dengan kartu di tab
+ * Menunggu halaman Persetujuan, kartu yang sedang diproses atau menunggu giliran tidak dihitung, hanya membaca (tidak
+ * ada tulis ke tabel yang dikunci RLS), tidak polling, dan tidak membuat Beranda menunggu backend.
  */
 
 const DAY = 24 * 3600_000;
@@ -160,5 +163,202 @@ test.describe("Beranda: banner Tindakan mendesak", () => {
     await expect(app.getByRole("heading", { level: 1 }).first()).toBeVisible();
     await expect(app.getByTestId("dashboard-urgent-actions")).toHaveCount(0);
     await expect(app.getByText("Data belum bisa dimuat")).toHaveCount(0);
+  });
+});
+
+// ---- setiap tahap Menunggu yang butuh tindakan ikut dihitung (keputusan Hans, 27 November 2026) -----------------------
+
+const LINKEDIN_URL = "https://www.linkedin.com/jobs/view/999";
+const MAIL_JOB = { platform_source: "jooble", external_url: "https://jooble.example.test/em", description: "Kirim CV ke hr@perusahaan-contoh.co.id" };
+
+interface UrgentStage {
+  name: string;
+  /** Teks baris banner, dan data-testid barisnya. null = kartu Menunggu yang tidak dihitung. */
+  line: { field: string; text: string } | null;
+  /** Label kartu di tab Menunggu. */
+  cardLabel: string | RegExp;
+  seed: (backend: MockBackend, id: string) => void;
+}
+
+const live = (id: string, over: Record<string, unknown> = {}) => approvedApproval(id, { job_title: `Judul ${id}`, platform: "web", ...over });
+const webJob = (id: string, over: Record<string, unknown> = {}) => jobRow(`job-${id}`, { platform_source: "web", external_url: `https://karier.example.test/${id}`, ...over });
+
+const URGENT_STAGES: UrgentStage[] = [
+  {
+    name: "draf menunggu persetujuan",
+    line: { field: "pendingApprovalsCount", text: "1 draf menunggu persetujuanmu." },
+    cardLabel: "Menunggu persetujuan",
+    seed: (b, id) => {
+      b.state.pending.push(approval(id, { job_title: `Judul ${id}` }));
+    },
+  },
+  {
+    name: "perlu diisi sendiri (LinkedIn)",
+    line: { field: "fillYourselfCount", text: "1 lamaran perlu diisi sendiri." },
+    cardLabel: "Perlu diisi sendiri",
+    seed: (b, id) => {
+      b.state.history.push(live(id, { platform: "linkedin" }));
+      b.state.jobs.push(webJob(id, { platform_source: "linkedin", external_url: LINKEDIN_URL }));
+    },
+  },
+  {
+    name: "kirim lewat panel Email",
+    line: { field: "sendByEmailCount", text: "1 lamaran perlu dikirim lewat panel Email." },
+    cardLabel: "Kirim lewat panel Email",
+    seed: (b, id) => {
+      b.state.history.push(live(id, { platform: "jooble" }));
+      b.state.jobs.push(webJob(id, MAIL_JOB));
+    },
+  },
+  {
+    name: "kode tidak dimasukkan (code_timeout)",
+    line: { field: "codeFailedCount", text: "1 lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak." },
+    cardLabel: "Perlu dicek: kode tidak dimasukkan",
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "completed"));
+      b.state.logs.push(stoppedLog(`q-${id}`, id, null, { reason: "code_timeout" }));
+    },
+  },
+  {
+    name: "kode ditolak (code_rejected)",
+    line: { field: "codeFailedCount", text: "1 lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak." },
+    cardLabel: /Perlu dicek: kode/,
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "completed"));
+      b.state.logs.push(stoppedLog(`q-${id}`, id, null, { reason: "code_rejected" }));
+    },
+  },
+  {
+    name: "CAPTCHA menahan agen",
+    line: { field: "otherActionCount", text: "1 lamaran berhenti dan perlu tindakanmu (login, CAPTCHA, atau isian wajib)." },
+    cardLabel: /CAPTCHA/,
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "completed"));
+      b.state.logs.push(applyLog(`q-${id}`, id, "incomplete", { reason: "captcha_blocked" }));
+    },
+  },
+  {
+    name: "kirim belum terkonfirmasi",
+    line: { field: "unverifiedCount", text: "1 lamaran perlu dicek: kirim belum terkonfirmasi." },
+    cardLabel: "Perlu dicek, kirim belum terkonfirmasi",
+    seed: (b, id) => {
+      b.state.history.push(live(id, { expires_at: isoAgo(2 * DAY) }));
+      b.state.queue.push(queueRow(`q-${id}`, id, "completed", { created_at: isoAgo(3 * DAY) }));
+      b.state.logs.push(applyLog(`q-${id}`, id, "submit_unverified", {}, { created_at: isoAgo(3 * DAY) }));
+    },
+  },
+  {
+    name: "terisi, belum terkirim",
+    line: { field: "filledNotSentCount", text: "1 lamaran terisi, belum terkirim." },
+    cardLabel: /Terisi|Formulir terisi|Formulir diisi/,
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "completed"));
+      b.state.logs.push(stoppedLog(`q-${id}`, id, "not_allowed"));
+    },
+  },
+  {
+    name: "belum terkirim, bisa dicoba lagi",
+    line: { field: "failedRetryCount", text: "1 lamaran belum terkirim, bisa dicoba lagi." },
+    cardLabel: /Belum terkirim, bisa dicoba lagi/,
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "failed", { error_message: "Timeout membuka formulir" }));
+    },
+  },
+  {
+    name: "email tidak dikirim karena mode uji",
+    line: { field: "testModeCount", text: "1 lamaran belum dikirim (mode uji)." },
+    cardLabel: "Belum dikirim (mode uji)",
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push({ ...queueRow(`q-${id}`, id, "completed"), job_type: "email_apply" });
+      b.state.logs.push({
+        action: "email_apply",
+        status: "skipped",
+        job_id: `job-${id}`,
+        created_at: isoAgo(60_000),
+        details: { to: "hrd@perusahaan.test", approval_request_id: id, reason: "real_submit_off", note: "email tidak dikirim" },
+      });
+    },
+  },
+  // Kartu Menunggu yang tidak dihitung: agen bekerja atau belum ada yang bisa dilakukan pengguna.
+  {
+    name: "sedang diproses",
+    line: null,
+    cardLabel: "Sedang diproses",
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.queue.push(queueRow(`q-${id}`, id, "processing"));
+    },
+  },
+  {
+    name: "menunggu giliran",
+    line: null,
+    cardLabel: "Menunggu giliran",
+    seed: (b, id) => {
+      b.state.history.push(live(id));
+      b.state.jobs.push(webJob(id));
+    },
+  },
+];
+
+test.describe("Beranda: banner menghitung setiap tahap Menunggu yang butuh tindakan", () => {
+  for (const stage of URGENT_STAGES) {
+    test(`${stage.name}: ${stage.line ? "satu baris banner, angkanya sama dengan satu kartu di Menunggu" : "kartu ada di Menunggu tetapi tidak dihitung banner"}`, async ({ app, backend }) => {
+      const id = "apr-stage";
+      stage.seed(backend, id);
+      await app.goto("/dashboard");
+
+      const banner = app.getByTestId("dashboard-urgent-actions");
+      if (stage.line) {
+        await expect(banner).toContainText("Ada 1 tindakan");
+        await expect(banner.getByTestId(`urgent-${stage.line.field}`)).toHaveText(stage.line.text);
+        await expect(banner.getByRole("listitem")).toHaveCount(1);
+        await expect(banner.getByRole("link", { name: /Tinjau di Persetujuan/ })).toHaveAttribute("href", "/approvals");
+        await banner.getByRole("link", { name: /Tinjau di Persetujuan/ }).click();
+      } else {
+        // Tunggu Beranda selesai memuat banner: bila kartunya dihitung, banner akan muncul sebelum pemeriksaan ini lewat.
+        await expect(app.getByRole("heading", { level: 1 }).first()).toBeVisible();
+        await app.waitForLoadState("networkidle");
+        await expect(banner).toHaveCount(0);
+        await app.goto("/approvals");
+      }
+
+      // Kartunya ada di Menunggu, dengan label yang sama dengan yang dituju banner.
+      await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText("1");
+      await expect(app.getByRole("heading", { name: `Judul ${id}` })).toBeVisible();
+      await expect(app.getByText(stage.cardLabel).first()).toBeVisible();
+      expect(backend.restWrites).toEqual([]);
+    });
+  }
+
+  test("semua tahap sekaligus: total banner = kartu Menunggu dikurangi kartu yang sedang diproses atau menunggu giliran", async ({ app, backend }) => {
+    URGENT_STAGES.forEach((stage, i) => stage.seed(backend, `apr-${i}`));
+    // Kartu "pertanyaan formulir" dan "kode keamanan" dari agen yang sedang menunggu pengguna.
+    backend.state.history.push(live("apr-ask"), live("apr-otp"));
+    backend.state.queue.push(queueRow("q-ask", "apr-ask", "completed"), queueRow("q-otp", "apr-otp", "processing"));
+    backend.state.logs.push(questionsLog("q-ask", "apr-ask"), awaitingCodeLog("q-otp", "apr-otp"));
+
+    const notCounted = URGENT_STAGES.filter((s) => s.line === null).length;
+    const counted = URGENT_STAGES.length - notCounted + 2;
+    await app.goto("/dashboard");
+
+    const banner = app.getByTestId("dashboard-urgent-actions");
+    await expect(banner).toContainText(`Ada ${counted} tindakan`);
+    // Dua baris untuk kode dan pertanyaan, dan satu baris per kelompok lain (kode gagal dan lainnya terisi dua kartu).
+    await expect(banner.getByTestId("urgent-awaitingCodeCount")).toHaveText("1 lamaran menunggu kode keamanan dari emailmu.");
+    await expect(banner.getByTestId("urgent-pendingQuestionsCount")).toHaveText("1 lamaran menunggu jawaban pertanyaan formulir untuk agen.");
+    await expect(banner.getByTestId("urgent-codeFailedCount")).toHaveText("2 lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak.");
+    await expect(banner.getByRole("listitem")).toHaveCount(11);
+
+    await banner.getByRole("link", { name: /Tinjau di Persetujuan/ }).click();
+    await expect(app.getByRole("button", { name: /Menunggu/ })).toContainText(String(counted + notCounted));
+    await expect(app.getByText("Sedang diproses").first()).toBeVisible();
+    await expect(app.getByText("Menunggu giliran").first()).toBeVisible();
+    expect(backend.restWrites).toEqual([]);
   });
 });

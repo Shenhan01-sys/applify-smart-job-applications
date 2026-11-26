@@ -14,7 +14,7 @@ import { describeError } from "@/lib/authErrors";
 import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
 import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
 import { automationApi } from "@/services/automationApi";
-import { EMPTY_URGENT_SUMMARY as EMPTY_URGENT, summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
+import { EMPTY_URGENT_SUMMARY as EMPTY_URGENT, summarizeUrgentActions, urgentLines, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
 import { APPROVAL_HISTORY_LIMIT } from "@/lib/approvalTabs";
 import type { ApprovalLike } from "@/lib/emailApply";
 import { loadEmailApplyData } from "@/services/emailApplyService";
@@ -250,18 +250,11 @@ export function DashboardPage() {
                 Ada {urgent.total} tindakan yang perlu segera dicek
               </p>
               <ul className="text-sm text-amber-900 space-y-0.5">
-                {urgent.awaitingCodeCount > 0 && (
-                  <li>{urgent.awaitingCodeCount} lamaran menunggu kode keamanan dari emailmu.</li>
-                )}
-                {urgent.pendingQuestionsCount > 0 && (
-                  <li>{urgent.pendingQuestionsCount} lamaran menunggu jawaban pertanyaan formulir untuk agen.</li>
-                )}
-                {urgent.unverifiedCount > 0 && (
-                  <li>{urgent.unverifiedCount} lamaran perlu dicek: kirim belum terkonfirmasi.</li>
-                )}
-                {urgent.pendingApprovalsCount > 0 && (
-                  <li>{urgent.pendingApprovalsCount} draf menunggu persetujuanmu.</li>
-                )}
+                {urgentLines(urgent).map((line) => (
+                  <li key={line.field} data-testid={`urgent-${line.field}`}>
+                    {line.text}
+                  </li>
+                ))}
               </ul>
             </div>
             <Link

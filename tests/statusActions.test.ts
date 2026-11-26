@@ -31,7 +31,17 @@ import { AGENT_CLOSED_LABEL, AGENT_USER_CONFIRMED_LABEL, describeAgentApply, des
 import { manualSentRow } from "../src/lib/manualSubmit.ts";
 import { attemptsForApplications } from "../src/lib/applicationAttempts.ts";
 import { buildAgentApplyRows } from "../src/lib/agentApplyRows.ts";
-import { summarizeUrgentActions } from "../src/lib/dashboardUrgent.ts";
+import {
+  BACKGROUND_STAGES,
+  EMPTY_URGENT_SUMMARY,
+  URGENT_LINES,
+  summarizeUrgentActions,
+  urgentFieldForStage,
+  urgentLines,
+  type UrgentCountField,
+} from "../src/lib/dashboardUrgent.ts";
+import { EMAIL_TEST_MODE_LABEL } from "../src/lib/emailTestMode.ts";
+import { STATUS_TERM } from "../src/lib/statusVocabulary.ts";
 import { liveApprovalIds } from "../src/lib/approvalExpiry.ts";
 
 /**
@@ -306,7 +316,7 @@ test("banner Beranda: kartu Binance 'kirim belum terkonfirmasi' (kedaluwarsa, te
   const history = [{ id: "apr-bin", status: "approved", expires_at: PAST }];
   const data = sourceData({ "apr-bin": UNVERIFIED });
   const summary = summarizeUrgentActions({ pendingApprovals, history, data, now: NOW });
-  assert.deepEqual(summary, { pendingApprovalsCount: 1, awaitingCodeCount: 0, pendingQuestionsCount: 0, unverifiedCount: 1, total: 2 });
+  assert.deepEqual(summary, { ...EMPTY_URGENT_SUMMARY, pendingApprovalsCount: 1, unverifiedCount: 1, total: 2 });
   // Sebelum perbaikan banner hanya melihat draf pending: tanpa data agen, kartu Binance tidak ikut (agen belum terbaca).
   assert.equal(summarizeUrgentActions({ pendingApprovals, history, now: NOW }).unverifiedCount, 0);
 });
@@ -380,6 +390,160 @@ test("banner Beranda: setiap hitungan sama dengan jumlah kartu tahap itu di tab 
   // Kartu yang berjalan (processing) dan yang belum punya tugas (not_started) bukan tindakan pengguna.
   assert.equal(inMenunggu("processing"), 1);
   assert.equal(inMenunggu("not_started"), 1);
+});
+
+// ---- banner Beranda menghitung setiap tahap Menunggu yang butuh tindakan (keputusan Hans, 27 November 2026) ----------
+
+interface StageCase {
+  name: string;
+  stage: ApprovalStage;
+  /** Kelompok banner; null = kartu Menunggu yang tidak dihitung (BACKGROUND_STAGES). */
+  field: UrgentCountField | null;
+  /** Teks baris banner untuk satu kartu. */
+  text?: string;
+  pending?: boolean;
+  data: (id: string) => PlacementSourceData;
+}
+
+const READY_STOP = agentRow("completed", { status: "ready" });
+const waitingForLogin = () => agentRow("processing", { status: "awaiting_login", details: { awaiting_until: iso(NOW + 600_000) } });
+const waitingForCode = () => agentRow("processing", { status: "awaiting_code", details: { awaiting_until: iso(NOW + 600_000), code_length: 6 } });
+const withQuestion = () =>
+  agentRow("completed", { status: "incomplete", details: { reason: "partly_filled", questions: [{ key: "gaji", label: "Berapa ekspektasi gajimu?", kind: "text" }], questions_pending: 1 } });
+
+const STAGE_CASES: StageCase[] = [
+  { name: "draf menunggu persetujuan", stage: "review", field: "pendingApprovalsCount", text: "1 draf menunggu persetujuanmu.", pending: true, data: () => sourceData({}) },
+  { name: "kode keamanan ditunggu agen", stage: "needs_action", field: "awaitingCodeCount", text: "1 lamaran menunggu kode keamanan dari emailmu.", data: (id) => sourceData({ [id]: waitingForCode() }) },
+  { name: "pertanyaan formulir", stage: "needs_action", field: "pendingQuestionsCount", text: "1 lamaran menunggu jawaban pertanyaan formulir untuk agen.", data: (id) => sourceData({ [id]: withQuestion() }) },
+  { name: "kode tidak dimasukkan (code_timeout)", stage: "needs_action", field: "codeFailedCount", text: "1 lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak.", data: (id) => sourceData({ [id]: agentRow("completed", { status: "ready", details: { reason: "code_timeout" } }) }) },
+  { name: "kode ditolak (code_rejected)", stage: "needs_action", field: "codeFailedCount", text: "1 lamaran perlu dicek: kode keamanan tidak dimasukkan atau ditolak.", data: (id) => sourceData({ [id]: agentRow("completed", { status: "ready", details: { reason: "code_rejected" } }) }) },
+  { name: "CAPTCHA menahan agen", stage: "needs_action", field: "otherActionCount", text: "1 lamaran berhenti dan perlu tindakanmu (login, CAPTCHA, atau isian wajib).", data: (id) => sourceData({ [id]: agentRow("completed", { status: "incomplete", details: { reason: "captcha_blocked" } }) }) },
+  { name: "agen menunggu login", stage: "needs_action", field: "otherActionCount", text: "1 lamaran berhenti dan perlu tindakanmu (login, CAPTCHA, atau isian wajib).", data: (id) => sourceData({ [id]: waitingForLogin() }) },
+  { name: "kirim belum terkonfirmasi", stage: "unverified", field: "unverifiedCount", text: "1 lamaran perlu dicek: kirim belum terkonfirmasi.", data: (id) => sourceData({ [id]: UNVERIFIED }) },
+  { name: "perlu diisi sendiri (LinkedIn)", stage: "fill_yourself", field: "fillYourselfCount", text: "1 lamaran perlu diisi sendiri.", data: (id) => sourceData({}, { notQueued: { [id]: "manual" } }) },
+  { name: "kirim lewat panel Email", stage: "send_by_email", field: "sendByEmailCount", text: "1 lamaran perlu dikirim lewat panel Email.", data: (id) => sourceData({}, { notQueued: { [id]: "email_direct" } }) },
+  { name: "terisi, belum terkirim", stage: "filled_not_sent", field: "filledNotSentCount", text: "1 lamaran terisi, belum terkirim.", data: (id) => sourceData({ [id]: READY_STOP }) },
+  { name: "belum terkirim, bisa dicoba lagi (agen gagal)", stage: "failed_retry", field: "failedRetryCount", text: "1 lamaran belum terkirim, bisa dicoba lagi.", data: (id) => sourceData({ [id]: agentRow("failed") }) },
+  { name: "belum terkirim, bisa dicoba lagi (email gagal)", stage: "failed_retry", field: "failedRetryCount", text: "1 lamaran belum terkirim, bisa dicoba lagi.", data: (id) => sourceData({}, { jobs: { [id]: { status: "failed", error_message: "smtp" } } }) },
+  { name: "email tidak dikirim karena mode uji", stage: "test_mode", field: "testModeCount", text: "1 lamaran belum dikirim (mode uji).", data: (id) => sourceData({}, { testMode: new Set([id]), jobs: { [id]: { status: "completed" } } }) },
+  // Kartu Menunggu yang tidak dihitung: tidak ada keputusan yang bisa diambil pengguna.
+  { name: "sedang diproses agen", stage: "processing", field: null, data: (id) => sourceData({ [id]: agentRow("processing") }) },
+  { name: "email sedang diproses", stage: "processing", field: null, data: (id) => sourceData({}, { jobs: { [id]: { status: "pending" } } }) },
+  { name: "menunggu giliran", stage: "not_started", field: null, data: () => sourceData({}) },
+  { name: "status belum terbaca", stage: "checking", field: null, data: () => ({ ...emptyPlacementData(), agentKnown: false }) },
+];
+
+const caseApproval = (c: StageCase, id: string) =>
+  c.pending ? { pendingApprovals: [{ id, status: "pending", expires_at: FUTURE }], history: [] } : { pendingApprovals: [], history: [{ id, status: "approved", expires_at: FUTURE }] };
+
+for (const c of STAGE_CASES) {
+  test(`banner Beranda, tahap ${c.stage} (${c.name}): ${c.field ? `satu baris "${c.text}"` : "tidak dihitung"}`, () => {
+    const id = "apr-case";
+    const data = c.data(id);
+    const input = { ...caseApproval(c, id), data, now: NOW };
+    // Kartu ada di Menunggu pada tahap yang diharapkan (aturan penempatan yang sama dengan halaman Persetujuan).
+    const tabs = splitApprovalTabs([...input.pendingApprovals, ...input.history], (a) => placementContextFromData(data, a.id), NOW);
+    assert.equal(tabs.pending.length, 1, c.name);
+    assert.equal(tabs.pending[0].placement.stage, c.stage, c.name);
+
+    const summary = summarizeUrgentActions(input);
+    if (c.field === null) {
+      assert.deepEqual(summary, EMPTY_URGENT_SUMMARY, c.name);
+      assert.deepEqual(urgentLines(summary), []);
+      return;
+    }
+    assert.deepEqual(summary, { ...EMPTY_URGENT_SUMMARY, [c.field]: 1, total: 1 }, c.name);
+    assert.deepEqual(urgentLines(summary), [{ field: c.field, text: c.text }]);
+  });
+}
+
+test("banner Beranda: setiap tahap tab Menunggu terwakili satu kasus, dan tahap Riwayat tidak pernah dihitung", () => {
+  const history: ApprovalStage[] = ["sent", "rejected", "expired", "replaced", "closed"];
+  const pendingStages = (Object.keys(STAGE_LABEL) as ApprovalStage[]).filter((s) => !history.includes(s));
+  assert.deepEqual([...new Set(STAGE_CASES.map((c) => c.stage))].sort(), [...pendingStages].sort());
+  for (const stage of pendingStages) {
+    const counted = urgentFieldForStage(stage, undefined, NOW) !== null;
+    assert.equal(counted, !BACKGROUND_STAGES.has(stage), `${stage}: dihitung atau tidak harus cocok dengan BACKGROUND_STAGES`);
+  }
+  assert.deepEqual([...BACKGROUND_STAGES].sort(), ["checking", "not_started", "processing"]);
+  for (const stage of history) assert.equal(urgentFieldForStage(stage, undefined, NOW), null, stage);
+});
+
+test("banner Beranda: total sama dengan jumlah kartu Menunggu yang butuh tindakan, semua tahap bercampur", () => {
+  const ids = STAGE_CASES.map((_, i) => `apr-${i}`);
+  let data = sourceData({});
+  const merge = (next: PlacementSourceData): PlacementSourceData => ({
+    ...data,
+    agent: { ...data.agent, ...next.agent },
+    jobs: { ...data.jobs, ...next.jobs },
+    notQueued: { ...data.notQueued, ...next.notQueued },
+    testMode: new Set([...data.testMode, ...next.testMode]),
+  });
+  STAGE_CASES.forEach((c, i) => {
+    // "Status belum terbaca" membutuhkan agentKnown false untuk seluruh data; dicakup tes per tahap di atas.
+    if (c.stage === "checking") return;
+    data = merge(c.data(ids[i]));
+  });
+  const active = STAGE_CASES.map((c, i) => ({ c, id: ids[i] })).filter(({ c }) => c.stage !== "checking");
+  const pendingApprovals = active.filter(({ c }) => c.pending).map(({ id }) => ({ id, status: "pending", expires_at: FUTURE }));
+  const history = active.filter(({ c }) => !c.pending).map(({ id }) => ({ id, status: "approved", expires_at: FUTURE }));
+  const summary = summarizeUrgentActions({ pendingApprovals, history, data, now: NOW });
+
+  const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) => placementContextFromData(data, a.id), NOW);
+  assert.equal(tabs.history.length, 0);
+  const needsUser = tabs.pending.filter((p) => !BACKGROUND_STAGES.has(p.placement.stage)).length;
+  assert.equal(summary.total, needsUser);
+  assert.equal(summary.total, tabs.pending.length - tabs.pending.filter((p) => BACKGROUND_STAGES.has(p.placement.stage)).length);
+  assert.equal(summary.total, active.filter(({ c }) => c.field !== null).length);
+  assert.deepEqual(
+    { ...summary },
+    {
+      pendingApprovalsCount: 1,
+      awaitingCodeCount: 1,
+      pendingQuestionsCount: 1,
+      codeFailedCount: 2,
+      otherActionCount: 2,
+      unverifiedCount: 1,
+      fillYourselfCount: 1,
+      sendByEmailCount: 1,
+      filledNotSentCount: 1,
+      failedRetryCount: 2,
+      testModeCount: 1,
+      total: 14,
+    },
+  );
+  assert.equal(urgentLines(summary).length, URGENT_LINES.length, "setiap kelompok punya satu baris");
+});
+
+test("banner Beranda: kartu terisi, gagal, LinkedIn, atau email yang kedaluwarsa tanpa tugas aktif pindah ke Riwayat dan tidak dihitung", () => {
+  // Hanya kartu terisi yang masih berlaku yang ada di Menunggu.
+  const history = [
+    { id: "filled-old", status: "approved", expires_at: PAST },
+    { id: "failed-old", status: "approved", expires_at: PAST },
+    { id: "manual-old", status: "approved", expires_at: PAST },
+    { id: "email-old", status: "approved", expires_at: PAST },
+    { id: "filled-live", status: "approved", expires_at: FUTURE },
+  ];
+  const data = sourceData(
+    { "filled-old": READY_STOP, "failed-old": agentRow("failed"), "filled-live": READY_STOP },
+    { notQueued: { "manual-old": "manual", "email-old": "email_direct" } },
+  );
+  const summary = summarizeUrgentActions({ history, data, now: NOW });
+  assert.deepEqual(summary, { ...EMPTY_URGENT_SUMMARY, filledNotSentCount: 1, total: 1 });
+});
+
+test("banner Beranda: kata di tiap baris sama dengan label kartu tahap itu di tab Menunggu", () => {
+  const text = (field: UrgentCountField) => URGENT_LINES.find((l) => l.field === field)!.text(1).toLowerCase();
+  assert.ok(text("fillYourselfCount").includes(STATUS_TERM.fillYourself.toLowerCase()));
+  assert.ok(text("sendByEmailCount").includes(STATUS_TERM.sendByEmail.toLowerCase()));
+  assert.ok(text("filledNotSentCount").includes(STAGE_LABEL.filled_not_sent.toLowerCase()));
+  assert.ok(text("failedRetryCount").includes(STATUS_TERM.retryable.toLowerCase()));
+  assert.ok(text("testModeCount").includes(EMAIL_TEST_MODE_LABEL.toLowerCase()));
+  assert.ok(text("unverifiedCount").includes("kirim belum terkonfirmasi"));
+  assert.ok(text("pendingApprovalsCount").includes("menunggu persetujuanmu"));
+  assert.equal(new Set(URGENT_LINES.map((l) => l.field)).size, URGENT_LINES.length, "satu baris per kelompok");
+  // Tidak memakai label lama atau kata antre untuk tahap yang tidak punya giliran.
+  for (const l of URGENT_LINES) assert.doesNotMatch(l.text(1), /giliran|antre|\{|undefined/i, l.field);
 });
 
 test("banner Beranda: tidak ada aturan penempatan sendiri, dan angkanya memakai batas Riwayat yang sama dengan halaman Persetujuan", () => {

@@ -85,6 +85,7 @@ test("E2E-06: dashboard.tsx merender banner tindakan mendesak dan automation-set
   const auto = readFileSync(new URL("../src/routes/automation-settings.tsx", import.meta.url), "utf8");
   assert.match(dash, /data-testid="dashboard-urgent-actions"/);
   assert.match(dash, /summarizeUrgentActions/);
+  assert.match(dash, /urgentLines\(urgent\)/);
   assert.match(auto, /mergeIdentityFromProfile/);
   assert.match(auto, /profile-identity-sync-note/);
 });
