@@ -6,6 +6,19 @@
 export const EXTENSION_GUIDE_HREF = "/bantuan#ekstensi";
 export const EXTENSION_GUIDE_LINK_LABEL = "Baca panduan pasang ekstensi";
 
+/**
+ * Paket UAT ekstensi untuk dipasang dari zip (Muat yang belum dikemas), selama Chrome Web Store belum menyetujui.
+ * Berkasnya ada di `public/downloads/` dan disalin dari `extension/store/applify-extension-uat-<versi>.zip`
+ * (hasil `npm run package:uat`). Ganti versi, nama berkas, dan SHA256 bersamaan saat zip diganti.
+ */
+export const EXTENSION_DOWNLOAD_HREF = "/downloads/applify-extension-uat.zip";
+export const EXTENSION_DOWNLOAD_FILENAME = "applify-extension-uat.zip";
+export const EXTENSION_DOWNLOAD_VERSION = "0.1.0";
+export const EXTENSION_DOWNLOAD_SHA256 = "3c41efe617b0fcd2976b51fe4e251e560fbfe9239d09df9c804e64ad75a70320";
+export const EXTENSION_DOWNLOAD_LABEL = "Unduh ekstensi (zip)";
+/** ID tetap dari `key` di manifest paket UAT, sama di semua laptop. */
+export const EXTENSION_UAT_ID = "ikojbhmbbaignmlkcdailnbnekneplkj";
+
 export const EXTENSION_LAPTOP_ONLY_NOTE =
   "Ekstensi ini khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP.";
 

@@ -1,8 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   EXTENSION_COPY_FAILED_TEXT,
+  EXTENSION_DOWNLOAD_FILENAME,
+  EXTENSION_DOWNLOAD_HREF,
+  EXTENSION_DOWNLOAD_LABEL,
+  EXTENSION_DOWNLOAD_SHA256,
+  EXTENSION_DOWNLOAD_VERSION,
   EXTENSION_GUIDE_HREF,
   EXTENSION_INSTALL_STEPS,
   copyToClipboard,
@@ -78,4 +84,39 @@ test("masa berlaku token dalam kata biasa: jam, sisa waktu, sudah lewat, dan tid
   assert.equal(describeTokenExpiry("bukan tanggal", now), "");
   assert.equal(describeTokenExpiry(undefined, now), "");
   assert.doesNotMatch(fourHours, /scope|extension:apply|ISO|T\d\d:/);
+});
+
+test("unduhan zip ekstensi: tombol di kartu, berkas ada di public/downloads, dan rewrite SPA tidak menelan /downloads", () => {
+  assert.equal(EXTENSION_DOWNLOAD_HREF, `/downloads/${EXTENSION_DOWNLOAD_FILENAME}`);
+  assert.equal(EXTENSION_DOWNLOAD_LABEL, "Unduh ekstensi (zip)");
+  assert.match(EXTENSION_DOWNLOAD_VERSION, /^\d+\.\d+\.\d+$/);
+
+  const card = read("../src/components/ExtensionConnectCard.tsx");
+  assert.match(card, /href=\{EXTENSION_DOWNLOAD_HREF\}/);
+  assert.match(card, /data-testid="extension-download-link"/);
+  assert.match(card, /\{EXTENSION_DOWNLOAD_LABEL\}/);
+  assert.match(card, /href=\{EXTENSION_GUIDE_HREF\}/);
+
+  // Berkas statis: zip sungguhan, berisi manifest.json, dan sama dengan SHA256 yang tercatat di konstanta.
+  const zip = readFileSync(new URL(`../public/downloads/${EXTENSION_DOWNLOAD_FILENAME}`, import.meta.url));
+  assert.equal(zip.subarray(0, 4).toString("hex"), "504b0304", "bukan berkas zip");
+  assert.ok(zip.length > 10_000, "zip terlalu kecil");
+  assert.ok(zip.includes(Buffer.from("manifest.json")), "manifest.json tidak ada di zip");
+  assert.equal(createHash("sha256").update(zip).digest("hex"), EXTENSION_DOWNLOAD_SHA256);
+
+  // Rewrite SPA di vercel.json: semua rute aplikasi tetap ke index.html, /downloads/* tidak.
+  const vercel = JSON.parse(read("../vercel.json")) as {
+    rewrites: { source: string; destination: string }[];
+    headers: { source: string; headers: { key: string; value: string }[] }[];
+  };
+  const spa = vercel.rewrites.find((r) => r.destination === "/index.html");
+  assert.ok(spa, "rewrite SPA tidak ada");
+  const spaRegex = new RegExp(`^${spa.source}$`);
+  for (const path of ["/", "/bantuan", "/settings", "/approvals", "/downloadsaya"]) assert.ok(spaRegex.test(path), `rute aplikasi harus ke index.html: ${path}`);
+  assert.ok(!spaRegex.test(EXTENSION_DOWNLOAD_HREF), "rewrite SPA menelan /downloads");
+  assert.ok(!spaRegex.test("/downloads/apa-saja.zip"), "rewrite SPA menelan /downloads/*");
+
+  const dlHeaders = vercel.headers.find((h) => h.source === EXTENSION_DOWNLOAD_HREF)?.headers ?? [];
+  assert.equal(dlHeaders.find((h) => h.key === "Content-Type")?.value, "application/zip");
+  assert.match(dlHeaders.find((h) => h.key === "Content-Disposition")?.value ?? "", /^attachment; filename="applify-extension-uat\.zip"$/);
 });

@@ -73,6 +73,7 @@ test.describe("Pengaturan: kartu Ekstensi Browser", () => {
     });
     await app.goto("/settings");
     await expect(app.getByTestId("extension-install-steps")).toContainText("Pasang ekstensi Applify");
+    await expect(app.getByRole("link", { name: "Baca panduan pasang ekstensi" })).toHaveAttribute("href", "/bantuan#ekstensi");
 
     await app.getByRole("button", { name: "Hubungkan Ekstensi Chrome/Edge" }).click();
     await expect(app.getByTestId("extension-token-expiry")).toContainText(/Berlaku sampai pukul \d{2}[.:]\d{2} \(/);
@@ -82,6 +83,37 @@ test.describe("Pengaturan: kartu Ekstensi Browser", () => {
     const fallback = app.getByTestId("extension-token-fallback");
     await expect(fallback).toContainText("belum bisa disalin otomatis");
     await expect(fallback.getByRole("textbox")).toHaveValue("ext_tok_v1.e2e-test-token-value.e2e-signature");
+  });
+});
+
+test.describe("Unduhan zip ekstensi", () => {
+  test("kartu Pengaturan menyediakan tombol unduh dan berkas zip benar-benar terunduh", async ({ app }) => {
+    await app.goto("/settings");
+    const link = app.getByTestId("extension-download-link");
+    await expect(link).toHaveText("Unduh ekstensi (zip)");
+    await expect(link).toHaveAttribute("href", "/downloads/applify-extension-uat.zip");
+
+    const [download] = await Promise.all([app.waitForEvent("download"), link.click()]);
+    expect(download.suggestedFilename()).toBe("applify-extension-uat.zip");
+
+    // Dilayani sebagai berkas statis (zip), bukan index.html milik rute SPA.
+    const res = await app.request.get("/downloads/applify-extension-uat.zip");
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).not.toContain("text/html");
+    expect((await res.body()).subarray(0, 2).toString()).toBe("PK");
+  });
+
+  test("halaman Bantuan #ekstensi memuat enam langkah, catatan, dan tombol unduh", async ({ app }) => {
+    await app.goto("/bantuan#ekstensi");
+    const steps = app.getByTestId("help-extension-steps").getByRole("listitem");
+    await expect(steps).toHaveCount(6);
+    await expect(steps.nth(1)).toContainText("chrome://extensions");
+    await expect(steps.nth(2)).toContainText("Muat yang belum dikemas");
+    await expect(app.getByTestId("help-extension-notes")).toContainText("Jangan hapus atau pindahkan folder hasil ekstrak");
+    const download = app.getByTestId("help-extension-download");
+    await expect(download).toHaveText("Unduh ekstensi (zip)");
+    await expect(download).toHaveAttribute("href", "/downloads/applify-extension-uat.zip");
+    await expect(steps.nth(4).getByRole("link", { name: "bagian Ekstensi Browser di Pengaturan" })).toHaveAttribute("href", "/settings#ekstensi");
   });
 });
 

@@ -3,6 +3,10 @@ import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
 import {
   EXTENSION_COPY_FAILED_TEXT,
+  EXTENSION_DOWNLOAD_FILENAME,
+  EXTENSION_DOWNLOAD_HREF,
+  EXTENSION_DOWNLOAD_LABEL,
+  EXTENSION_DOWNLOAD_VERSION,
   EXTENSION_GUIDE_HREF,
   EXTENSION_GUIDE_LINK_LABEL,
   EXTENSION_INSTALL_STEPS,
@@ -10,7 +14,7 @@ import {
   copyToClipboard,
   describeTokenExpiry,
 } from "@/lib/extensionConnect";
-import { Check, Copy, KeyRound, Loader2, ShieldAlert } from "lucide-react";
+import { Check, Copy, Download, KeyRound, Loader2, ShieldAlert } from "lucide-react";
 
 interface ExtensionTokenState {
   token: string;
@@ -99,15 +103,24 @@ export function ExtensionConnectCard() {
             <li key={step}>
               {step}
               {index === 0 && (
-                <>
-                  {" "}
+                <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <a
+                    href={EXTENSION_DOWNLOAD_HREF}
+                    download={EXTENSION_DOWNLOAD_FILENAME}
+                    data-testid="extension-download-link"
+                    className="min-h-10 px-3 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition"
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    {EXTENSION_DOWNLOAD_LABEL}
+                  </a>
+                  <span className="text-xs text-muted-foreground">Versi uji {EXTENSION_DOWNLOAD_VERSION}</span>
                   <a
                     href={EXTENSION_GUIDE_HREF}
                     className="font-semibold text-[#0A5BE0] underline underline-offset-2"
                   >
                     {EXTENSION_GUIDE_LINK_LABEL}
                   </a>
-                </>
+                </span>
               )}
             </li>
           ))}

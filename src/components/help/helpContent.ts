@@ -32,9 +32,59 @@ export const HELP_EXTENSION = {
   title: "Ekstensi Browser",
   intro: "Ekstensi Browser hanya dipakai di Chrome atau Edge di laptop. Ekstensi tidak bisa dipasang di HP.",
   use: "Ekstensi membantu mengisi formulir pada portal yang mewajibkan masuk dengan akunmu sendiri, seperti JobStreet, Glints, Kalibrr, dan Dealls.",
-  token: "Buka Pengaturan, bagian Ekstensi Browser, lalu salin token ekstensi. Tempel token itu di panel ekstensi untuk menyambungkan laptopmu ke akun Applify.",
   stop: "Ekstensi berhenti sebelum kirim. Kamu yang memeriksa isian, lalu menekan Kirim Sekarang di panel ekstensi.",
+  installTitle: "Cara memasang ekstensi uji",
+  installIntro:
+    "Ekstensi belum ada di toko Chrome. Selama masa uji, pasang dari berkas zip dengan enam langkah berikut. Langkahnya sama di Chrome dan Edge.",
+  notesTitle: "Catatan penting",
 } as const;
+
+export interface HelpExtensionStep {
+  title: string;
+  detail: string;
+  /** Tautan yang ditampilkan di akhir langkah: unduhan zip, atau bagian Ekstensi Browser di Pengaturan. */
+  link?: "download" | "settings";
+}
+
+/** Langkah pasang paket UAT dari zip. Berkasnya: `EXTENSION_DOWNLOAD_HREF` di `src/lib/extensionConnect.ts`. */
+export const HELP_EXTENSION_STEPS: readonly HelpExtensionStep[] = [
+  {
+    title: "Unduh dan ekstrak zip",
+    detail:
+      "Tekan tombol Unduh ekstensi (zip). Setelah selesai, ekstrak berkasnya. Di Windows, klik kanan berkas zip lalu pilih Extract All. Di Mac, klik dua kali berkas zip.",
+    link: "download",
+  },
+  {
+    title: "Buka halaman ekstensi",
+    detail:
+      "Ketik chrome://extensions di kolom alamat Chrome, atau edge://extensions di Edge, lalu tekan Enter. Nyalakan Mode pengembang (Developer mode) di kanan atas.",
+  },
+  {
+    title: "Muat ekstensi",
+    detail:
+      "Klik Muat yang belum dikemas (Load unpacked). Pilih folder hasil ekstrak yang langsung berisi berkas manifest.json. Kartu Applify Form Copilot akan muncul dengan ID ikojbhmbbaignmlkcdailnbnekneplkj. Bila ID berbeda, jangan lanjut dan hubungi peneliti.",
+  },
+  {
+    title: "Sematkan ikon Applify",
+    detail: "Klik ikon puzzle di toolbar peramban, lalu klik ikon pin di samping Applify Form Copilot.",
+  },
+  {
+    title: "Salin token di Applify",
+    detail: "Buka Pengaturan, klik Hubungkan Ekstensi Chrome/Edge, lalu salin token yang muncul.",
+    link: "settings",
+  },
+  {
+    title: "Tempel token di ekstensi",
+    detail: "Klik ikon Applify di toolbar untuk membuka panel samping. Tempel token di kolom token, lalu tekan Hubungkan Ekstensi.",
+  },
+];
+
+export const HELP_EXTENSION_NOTES: readonly string[] = [
+  "Jangan hapus atau pindahkan folder hasil ekstrak. Chrome membaca ekstensi langsung dari folder itu, jadi ekstensi berhenti bekerja bila folder hilang.",
+  "Chrome atau Edge mungkin menampilkan peringatan tentang mode pengembang. Itu wajar untuk versi uji.",
+  "Ekstensi hanya untuk laptop. Chrome dan Edge di HP tidak bisa memasangnya.",
+  "Untuk versi baru, hapus ekstensi lama di halaman ekstensi, ekstrak zip baru ke folder baru, lalu ulangi langkah 3.",
+];
 
 export interface HelpTerm {
   term: string;
