@@ -68,6 +68,43 @@ export interface DocumentRef {
 export const documentReasonEmpty = (kind: DocumentKind): string => `Berkas ${DOCUMENT_NOUN[kind]} kosong. Pilih berkas lain.`;
 export const documentReasonType = (kind: DocumentKind): string => `Format ${DOCUMENT_NOUN[kind]} harus PDF, DOC, atau DOCX.`;
 export const documentReasonSize = (kind: DocumentKind): string => `Ukuran ${DOCUMENT_NOUN[kind]} terlalu besar, maksimal 5 MB.`;
+export const documentReasonCorrupt = (kind: DocumentKind, ext: string): string =>
+  `Isi berkas ${DOCUMENT_NOUN[kind]} tidak sesuai format ${ext.toUpperCase()} atau rusak. Pilih berkas ${ext.toUpperCase()} yang asli.`;
+
+/**
+ * Validasi magic bytes dokumen di browser sebelum dikirim ke Storage (audit 48.1 BS-U1-04).
+ * PDF mengizinkan header `%PDF-` dalam 1024 byte pertama; DOCX = `PK\x03\x04`; DOC = `D0 CF 11 E0 A1 B1 1A E1`.
+ */
+export function hasDocumentMagicBytes(bytes: Uint8Array, ext: string): boolean {
+  if (!bytes || bytes.length < 4) return false;
+  const clean = String(ext ?? "").replace(/^\./, "").toLowerCase();
+  if (clean === "pdf") {
+    const limit = Math.min(bytes.length, 1024);
+    for (let i = 0; i <= limit - 5; i++) {
+      if (bytes[i] === 0x25 && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x44 && bytes[i + 3] === 0x46 && bytes[i + 4] === 0x2d) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (clean === "docx") {
+    return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+  }
+  if (clean === "doc") {
+    return (
+      bytes.length >= 8 &&
+      bytes[0] === 0xd0 &&
+      bytes[1] === 0xcf &&
+      bytes[2] === 0x11 &&
+      bytes[3] === 0xe0 &&
+      bytes[4] === 0xa1 &&
+      bytes[5] === 0xb1 &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0xe1
+    );
+  }
+  return false;
+}
 
 /**
  * Memeriksa berkas pilihan pengguna. Berkas diterima bila MIME-nya salah satu dari DOCUMENT_TYPES, atau bila MIME

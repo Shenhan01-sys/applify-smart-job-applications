@@ -92,4 +92,44 @@ export const greenCareerService = {
     }
     return invoke("score", { assessmentId, answers });
   },
+
+  /**
+   * Muat hasil asesmen yang sudah selesai milik pengguna saat ini (audit 48.3 BS-07),
+   * supaya lencana skor tetap tampil sesudah muat ulang halaman. Gagal baca / kolom belum ada -> peta kosong.
+   */
+  async listCompletedAssessments(): Promise<Map<string, AssessmentResult>> {
+    const map = new Map<string, AssessmentResult>();
+    if (isMockMode()) return map;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return map;
+      const { data, error } = await supabase
+        .from("green_career_assessments")
+        .select("job_id, status, readiness_score, assessment, updated_at")
+        .eq("user_id", user.id)
+        .in("status", ["ready", "needs_development"])
+        .order("updated_at", { ascending: false })
+        .limit(100);
+      if (error || !Array.isArray(data)) return map;
+      for (const row of data as any[]) {
+        const jobId = typeof row?.job_id === "string" ? row.job_id : "";
+        if (!jobId || map.has(jobId)) continue;
+        const score = Number(row?.readiness_score);
+        if (!Number.isFinite(score)) continue;
+        const fb = row?.assessment?.feedback ?? {};
+        map.set(jobId, {
+          readinessScore: Math.max(0, Math.min(100, Math.round(score))),
+          status: row.status === "ready" ? "ready" : "needs_development",
+          feedback: {
+            strengths: Array.isArray(fb.strengths) ? fb.strengths : [],
+            gaps: Array.isArray(fb.gaps) ? fb.gaps : [],
+            developmentPath: Array.isArray(fb.developmentPath) ? fb.developmentPath : [],
+          },
+        });
+      }
+    } catch {
+      // degradasi tenang bila skema belum lengkap
+    }
+    return map;
+  },
 };

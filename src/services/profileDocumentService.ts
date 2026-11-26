@@ -7,6 +7,8 @@ import {
   DOCUMENT_LABEL,
   DOCUMENTS_UNAVAILABLE,
   documentObjectPath,
+  documentReasonCorrupt,
+  hasDocumentMagicBytes,
   isMissingDocumentColumn,
   parseDocumentPath,
   validateDocumentFile,
@@ -76,6 +78,12 @@ export async function uploadProfileDocument(userId: string, kind: DocumentKind, 
   const label = DOCUMENT_LABEL[kind];
   const check = validateDocumentFile(kind, file);
   if (!check.ok) throw new ProfileDocumentError(check.reason);
+  if (typeof file?.slice === "function") {
+    const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    if (!hasDocumentMagicBytes(head, check.ext)) {
+      throw new ProfileDocumentError(documentReasonCorrupt(kind, check.ext));
+    }
+  }
   const path = documentObjectPath(kind, userId, check.ext, Date.now());
 
   if (isMockMode()) {

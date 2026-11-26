@@ -27,14 +27,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let active = true;
     const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser((prev) => keepUserIfUnchanged(prev, session?.user ?? null));
-      setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!active) return;
+        setSession(session);
+        setUser((prev) => keepUserIfUnchanged(prev, session?.user ?? null));
 
-      if (session?.user) {
-        console.log('[Auth] Session recovered for user:', session.user.email);
+        if (session?.user) {
+          console.log('[Auth] Session recovered for user:', session.user.email);
+        }
+      } catch (err) {
+        console.warn('[Auth] Session initialization failed:', err instanceof Error ? err.message : 'unknown');
+        if (active) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
@@ -52,7 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

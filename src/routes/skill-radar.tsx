@@ -50,7 +50,13 @@ function SkillPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      // BS-07: bersihkan skill akun lama saat sesi berakhir.
+      setSkills([]);
+      setError("");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
     try {

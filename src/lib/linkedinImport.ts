@@ -73,7 +73,7 @@ export function cvImportEligibility(file: PdfFileInfo): { eligible: true } | { e
 /** Nilai kolom `user_skills.source` untuk skill dari PDF (skill yang diketik di UI memakai "manual"). */
 export const IMPORTED_SKILL_SOURCE = "linkedin_pdf";
 export const LINKEDIN_PDF_MAX_BYTES = RESUME_MAX_BYTES;
-/** Batas tunggu jawaban server (ms). Server sendiri berhenti menunggu AI setelah 75 detik. */
+/** Batas tunggu jawaban server (ms). Server berhenti menunggu AI setelah 40 detik dan OCR setelah 45 detik. */
 export const LINKEDIN_IMPORT_TIMEOUT_MS = 120_000;
 
 export interface PdfFileInfo {

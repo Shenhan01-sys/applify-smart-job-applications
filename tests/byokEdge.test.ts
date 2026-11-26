@@ -200,7 +200,7 @@ test("generate-application: BYOK di balik flag, kuota hanya dipotong bila key Ap
   assert.match(src, /\.from\("user_llm_keys"\)\.select\("provider, key_encrypted, status, model"\)\.eq\("user_id", userId\)/);
   assert.match(src, /if \(mode !== "analyze" && keySource === "applify"\) \{\s*const \{ data: q, error: qErr \} = await admin\.rpc\("consume_monthly_apply"/);
   assert.match(src, /quota\.remaining <= 0 && byokTargets\.length === 0/);
-  assert.match(src, /redactSecrets\(await aiResp\.text\(\), byokSecrets\)\.slice\(0, 300\)/);
+  assert.match(src, /redactSecrets\(await aiResp\.text\(\),\s*\[\.\.\.byokSecrets,\s*\.\.\.platformSecrets\]\)\.slice\(0,\s*200\)/);
   assert.match(src, /redirect: candidate\.source === "byok" \? "manual" : "follow"/);
   assert.match(src, /if \(keyErr\) return json\([^;]*byok_lookup_failed[^;]*503\)/);
   assert.match(src, /const decision = countErr\s*\? \{ allowed: false \}/);
