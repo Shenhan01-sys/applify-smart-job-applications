@@ -2,9 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  OFF_PORTAL_SOCIAL_CAPTION_HINT,
   POSTER_MAX_BYTES,
   describeOffPortalChannel,
+  describeUnreadFields,
   detectPosterMagicBytes,
+  detectSocialPostUrl,
+  isLinkedInLink,
   savedRowToJobData,
   validatePosterUpload,
 } from "../src/lib/offPortal.ts";
@@ -146,4 +150,58 @@ test("Gelombang 3 wiring: halaman Lowongan memasang tombol & OffPortalImportModa
   assert.match(modalSrc, /automationApi\.saveOffPortalJobs/);
   assert.match(modalSrc, /migrationRequired/);
   assert.match(modalSrc, /Buat Draf &amp; Persetujuan/);
+});
+
+test("E2E 26 Nov offPortal: link postingan Instagram, X, Facebook, dan LinkedIn posts dikenali sebagai sumber, bukan tautan lamaran", () => {
+  assert.equal(detectSocialPostUrl("https://www.instagram.com/p/DgH95gJmZos/")?.label, "Instagram");
+  assert.equal(detectSocialPostUrl("https://x.com/Nikitont/status/2125539436477792758?a=eAWn3mU7OqAnqPf0rXo&s=19")?.label, "X (Twitter)");
+  assert.equal(detectSocialPostUrl("https://twitter.com/a/status/1")?.label, "X (Twitter)");
+  assert.equal(detectSocialPostUrl("https://m.facebook.com/groups/1/posts/2")?.label, "Facebook");
+  assert.equal(detectSocialPostUrl("https://www.linkedin.com/posts/acme_hiring-activity-1")?.label, "LinkedIn");
+  assert.equal(detectSocialPostUrl("instagram.com/p/abc")?.label, "Instagram");
+  // Halaman lowongan bukan postingan sosial.
+  assert.equal(detectSocialPostUrl("https://www.linkedin.com/jobs/view/123"), null);
+  assert.equal(detectSocialPostUrl("https://www.kast.xyz/en/careers"), null);
+  assert.equal(detectSocialPostUrl("https://notx.com/a"), null);
+  assert.equal(detectSocialPostUrl("javascript:alert(1)"), null);
+  assert.equal(detectSocialPostUrl(""), null);
+  assert.equal(detectSocialPostUrl(undefined), null);
+  assert.match(OFF_PORTAL_SOCIAL_CAPTION_HINT("Instagram"), /meminta login.*tempel di kolom caption.*bukan tautan lamaran/s);
+});
+
+test("E2E 26 Nov offPortal: kartu LinkedIn berlabel lamar manual; bidang tak terbaca dijelaskan dengan bahasa biasa", () => {
+  const linkedin = describeOffPortalChannel({
+    formProvider: null,
+    applyUrl: "https://www.linkedin.com/company/bitget-wallet/jobs/",
+    applyEmail: null,
+    whatsappUrl: null,
+    channel: {
+      channel: "auth_portal",
+      platform: "off_portal_caption",
+      applyUrl: "https://www.linkedin.com/company/bitget-wallet/jobs/",
+      applyEmail: null,
+      autoWorkerSupported: false,
+      emailApplySupported: false,
+      extensionSupported: false,
+      manualOnly: true,
+      reason: "",
+    },
+  });
+  assert.equal(linkedin.label, "LinkedIn · Lamar Manual");
+  assert.equal(linkedin.tone, "manual");
+  assert.equal(isLinkedInLink("https://www.linkedin.com/jobs/view/1"), true);
+  assert.equal(isLinkedInLink("https://notlinkedin.com/jobs"), false);
+
+  assert.equal(describeUnreadFields([]), "");
+  assert.equal(describeUnreadFields(undefined), "");
+  assert.match(describeUnreadFields(["title"]), /^Belum terbaca dari teks: posisi\./);
+  assert.match(describeUnreadFields(["title", "company", "location"]), /posisi, perusahaan dan lokasi/);
+});
+
+test("E2E 26 Nov offPortal: modal membuang isian saat ditutup, punya tombol Tutup terlihat, dan menolak jawaban terlambat", () => {
+  const modalSrc = readFileSync(new URL("../src/components/OffPortalImportModal.tsx", import.meta.url), "utf8");
+  assert.match(modalSrc, /<Dialog open=\{open\} onOpenChange=\{handleOpenChange\}>/);
+  assert.match(modalSrc, /data-testid="offportal-close"/);
+  assert.match(modalSrc, /runId\.current !== |myRun !== runId\.current/);
+  assert.match(modalSrc, /offportal-needs-caption/);
 });

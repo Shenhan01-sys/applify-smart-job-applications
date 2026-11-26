@@ -35,6 +35,18 @@ export interface ParsedOffPortalJob {
     reason: string;
   };
   safety: JobSafetyReport;
+  /** Bidang yang tidak terbaca dari teks dan memakai nilai bawaan (server 26 Nov 2026). */
+  unreadFields?: OffPortalUnreadField[];
+  /** Peringatan khusus lowongan ini, mis. LinkedIn wajib dilamar manual. */
+  warnings?: string[];
+}
+
+export type OffPortalUnreadField = "title" | "company" | "location";
+
+export interface OffPortalSocialPost {
+  url: string;
+  platform: "instagram" | "x" | "facebook" | "threads" | "tiktok" | "linkedin_post";
+  label: string;
 }
 
 export interface OffPortalParseResponse {
@@ -43,6 +55,10 @@ export interface OffPortalParseResponse {
   acceptedUrls: string[];
   rejectedUrls: string[];
   jobs: ParsedOffPortalJob[];
+  /** Tautan postingan media sosial yang ditemukan. Hanya sumber, bukan tautan lamaran. */
+  socialPosts?: OffPortalSocialPost[];
+  /** true bila hanya ada tautan postingan sosial tanpa caption: pengguna harus menempel caption. */
+  needsCaption?: boolean;
   ocr?: {
     ran: boolean;
     status: "ok" | "empty" | "unavailable" | "failed" | "skipped";
@@ -145,8 +161,81 @@ export interface OffPortalChannelBadge {
   detail: string;
 }
 
+/** Sama dengan `SOCIAL_POST_PLATFORM_LABELS` di backend (services/apply-channel.ts). */
+const SOCIAL_HOSTS: Array<{ domains: string[]; label: string }> = [
+  { domains: ["instagram.com", "instagr.am"], label: "Instagram" },
+  { domains: ["x.com", "twitter.com"], label: "X (Twitter)" },
+  { domains: ["facebook.com", "fb.com", "fb.me", "fb.watch"], label: "Facebook" },
+  { domains: ["threads.net", "threads.com"], label: "Threads" },
+  { domains: ["tiktok.com"], label: "TikTok" },
+];
+
+function hostOf(raw: string | null | undefined): string {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  if (!text) return "";
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    return u.hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function hostMatches(host: string, domains: string[]): boolean {
+  return domains.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+/**
+ * Nama platform bila tautan adalah postingan atau profil media sosial (Instagram, X/Twitter, Facebook, Threads,
+ * TikTok, postingan LinkedIn). Server tidak bisa membaca isinya karena butuh login, dan tautan ini bukan tautan lamaran.
+ */
+export function detectSocialPostUrl(raw: string | null | undefined): { label: string } | null {
+  const host = hostOf(raw);
+  if (!host) return null;
+  for (const entry of SOCIAL_HOSTS) if (hostMatches(host, entry.domains)) return { label: entry.label };
+  if (hostMatches(host, ["linkedin.com"])) {
+    try {
+      const text = String(raw).trim();
+      const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+      if (/^\/(?:posts|feed\/update|pulse|embed\/feed)(?:\/|$)/i.test(u.pathname)) return { label: "LinkedIn" };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function isLinkedInLink(raw: string | null | undefined): boolean {
+  return hostMatches(hostOf(raw), ["linkedin.com"]);
+}
+
+export const OFF_PORTAL_SOCIAL_CAPTION_HINT = (label: string) =>
+  `Tautan ${label} tidak bisa dibaca otomatis karena ${label} meminta login. Buka postingannya, salin caption lengkapnya, lalu tempel di kolom caption di bawah. Tautan postingan hanya jadi sumber, bukan tautan lamaran.`;
+
+const UNREAD_FIELD_LABELS: Record<OffPortalUnreadField, string> = {
+  title: "posisi",
+  company: "perusahaan",
+  location: "lokasi",
+};
+
+/** Kalimat untuk bidang yang memakai nilai bawaan karena tidak terbaca dari teks. Kosong bila semuanya terbaca. */
+export function describeUnreadFields(fields: readonly OffPortalUnreadField[] | undefined): string {
+  const list = (fields ?? []).map((f) => UNREAD_FIELD_LABELS[f]).filter(Boolean);
+  if (list.length === 0) return "";
+  const joined = list.length > 1 ? `${list.slice(0, -1).join(", ")} dan ${list[list.length - 1]}` : list[0];
+  return `Belum terbaca dari teks: ${joined}. Isinya memakai nilai bawaan. Periksa captionnya, atau tambahkan baris seperti "Posisi: ...", "Perusahaan: ...", dan "Lokasi: ..." lalu analisis lagi.`;
+}
+
 /** Label kanal yang mudah dipahami pelamar pada kartu pratinjau off-portal. */
 export function describeOffPortalChannel(job: Pick<ParsedOffPortalJob, "formProvider" | "applyEmail" | "whatsappUrl" | "applyUrl" | "channel">): OffPortalChannelBadge {
+  if (isLinkedInLink(job.applyUrl)) {
+    return {
+      label: "LinkedIn · Lamar Manual",
+      tone: "manual",
+      detail: "Lowongan LinkedIn wajib dilamar manual di LinkedIn. Applify tidak mengisi atau mengirim lamaran di sana.",
+    };
+  }
   if (job.formProvider === "google_forms") {
     if (job.channel.autoWorkerSupported) {
       return {

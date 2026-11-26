@@ -175,6 +175,135 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await expect(applyDialog.getByText("PT Nusantara Digital")).toBeVisible();
   });
 
+  test("modal Impor tertutup lewat Escape dan tombol Tutup sesudah simpan, dan dibuka lagi dalam keadaan bersih", async ({ app, backend }) => {
+    const parseOne = { ...SAMPLE_PARSE_RESPONSE, jobs: [SAMPLE_PARSE_RESPONSE.jobs[0]] };
+    backend.state.offPortalParse = parseOne;
+    backend.state.offPortalSave = {
+      saved: true,
+      migrationRequired: false,
+      message: "1 lowongan pribadi berhasil disimpan.",
+      jobs: [
+        {
+          id: "job-priv-close",
+          title: "Frontend Engineer",
+          company: "PT Nusantara Digital",
+          location: "Jakarta Selatan",
+          type: "full-time",
+          workplace_type: "hybrid",
+          description: "x",
+          platform_source: "off_portal_caption",
+          external_url: null,
+          status: "active",
+          visibility: "private",
+          source_type: "off_portal_caption",
+          source_group_id: "grp-poster-e2e",
+          publication_fingerprint: "fp-frontend-e2e-1",
+          alreadySaved: false,
+        },
+      ],
+    };
+
+    await app.goto("/jobs");
+    for (const how of ["escape", "tutup", "x", "escape-from-textarea"] as const) {
+      await app.getByTestId("open-offportal-modal").click();
+      const dialog = app.getByRole("dialog");
+      // Dibuka lagi: kolom dan hasil lama sudah bersih.
+      await expect(dialog.locator("#offportal-caption")).toHaveValue("");
+      await expect(dialog.getByTestId("offportal-preview")).toHaveCount(0);
+      await dialog.locator("#offportal-caption").fill("Frontend Engineer di PT Nusantara Digital");
+      await dialog.getByRole("button", { name: "Analisis & Pratinjau" }).click();
+      await dialog.getByRole("button", { name: "Simpan 1 Lowongan Pribadi" }).click();
+      await expect(dialog.getByTestId("offportal-saved-panel")).toBeVisible();
+
+      if (how === "escape") await app.keyboard.press("Escape");
+      else if (how === "tutup") await dialog.getByTestId("offportal-close").click();
+      else if (how === "x") await dialog.locator("button:has(> span.sr-only)").click();
+      else {
+        await dialog.locator("#offportal-caption").focus();
+        await app.keyboard.press("Escape");
+      }
+      await expect(app.getByRole("dialog")).toHaveCount(0);
+    }
+  });
+
+  test("link postingan Instagram/X: petunjuk tempel caption langsung tampil, dan hasil needsCaption memberi panduan tanpa kandidat palsu", async ({ app, backend }) => {
+    backend.state.offPortalParse = {
+      sourceGroupId: "",
+      sourceType: "off_portal_link",
+      acceptedUrls: ["https://www.instagram.com/p/DgH95gJmZos/"],
+      rejectedUrls: [],
+      jobs: [],
+      socialPosts: [{ url: "https://www.instagram.com/p/DgH95gJmZos/", platform: "instagram", label: "Instagram" }],
+      needsCaption: true,
+      warnings: ["Tautan postingan Instagram tidak bisa dibaca otomatis karena platform itu meminta login."],
+    };
+    await app.goto("/jobs");
+    await app.getByTestId("open-offportal-modal").click();
+    const dialog = app.getByRole("dialog");
+
+    await dialog.locator("#offportal-url").fill("https://www.instagram.com/p/DgH95gJmZos/");
+    await expect(dialog.getByTestId("offportal-social-hint")).toContainText("Instagram");
+    await expect(dialog.getByTestId("offportal-social-hint")).toContainText("tempel di kolom caption");
+    // Tautan biasa tidak memunculkan petunjuk itu.
+    await dialog.locator("#offportal-url").fill("https://jobs.lever.co/acme/123");
+    await expect(dialog.getByTestId("offportal-social-hint")).toHaveCount(0);
+
+    await dialog.locator("#offportal-url").fill("https://www.instagram.com/p/DgH95gJmZos/");
+    await dialog.getByRole("button", { name: "Analisis & Pratinjau" }).click();
+    await expect(dialog.getByTestId("offportal-needs-caption")).toContainText("Tempel caption postingannya");
+    await expect(dialog.getByRole("button", { name: /Simpan \d+ Lowongan Pribadi/ })).toHaveCount(0);
+    await expect(dialog.getByTestId("offportal-preview").getByText(/meminta login/)).toBeVisible();
+    // Fokus pindah ke kolom caption.
+    await expect(dialog.locator("#offportal-caption")).toBeFocused();
+  });
+
+  test("kartu pratinjau: LinkedIn diberi peringatan lamar manual, dan bidang yang tidak terbaca ditandai", async ({ app, backend }) => {
+    const base = SAMPLE_PARSE_RESPONSE.jobs[0];
+    backend.state.offPortalParse = {
+      ...SAMPLE_PARSE_RESPONSE,
+      warnings: [],
+      jobs: [
+        {
+          ...base,
+          title: "Product Manager",
+          company: "BitgetWallet",
+          location: "Global",
+          applyUrl: "https://www.linkedin.com/company/bitget-wallet/jobs/",
+          applyEmail: null,
+          formProvider: null,
+          publicationFingerprint: "fp-linkedin-1",
+          channel: { channel: "auth_portal", platform: "off_portal_caption", extensionSupported: false, manualOnly: true, reason: "LinkedIn manual" },
+          unreadFields: [],
+          warnings: ["Lowongan LinkedIn wajib dilamar manual di LinkedIn."],
+        },
+        {
+          ...base,
+          title: "Lowongan Off-Portal",
+          company: "Perusahaan (Off-Portal)",
+          location: "Indonesia",
+          applyUrl: null,
+          applyEmail: null,
+          formProvider: null,
+          publicationFingerprint: "fp-unread-2",
+          channel: { channel: "external_web", platform: "off_portal_caption", extensionSupported: false, manualOnly: false, reason: "" },
+          unreadFields: ["title", "company", "location"],
+          warnings: [],
+        },
+      ],
+    };
+    await app.goto("/jobs");
+    await app.getByTestId("open-offportal-modal").click();
+    const dialog = app.getByRole("dialog");
+    await dialog.locator("#offportal-caption").fill("Teks apa saja");
+    await dialog.getByRole("button", { name: "Analisis & Pratinjau" }).click();
+
+    const preview = dialog.getByTestId("offportal-preview");
+    await expect(preview.getByText("LinkedIn · Lamar Manual")).toBeVisible();
+    await expect(preview.getByTestId("offportal-job-warnings")).toContainText("wajib dilamar manual");
+    await expect(preview.getByTestId("offportal-unread-note")).toContainText("Belum terbaca dari teks: posisi, perusahaan dan lokasi");
+    await expect(preview.getByTestId("offportal-unread-note")).toHaveCount(1);
+  });
+
   test("handoff Google Forms dari worker ke ekstensi menampilkan pertanyaan wajib dan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
     const gfUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeDemo/viewform";
     backend.state.jobs = [

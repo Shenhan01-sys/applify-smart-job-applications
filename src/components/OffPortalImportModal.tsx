@@ -21,7 +21,10 @@ import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
 import { safeExternalHref } from "@/lib/jobCardData";
 import {
+  OFF_PORTAL_SOCIAL_CAPTION_HINT,
   describeOffPortalChannel,
+  describeUnreadFields,
+  detectSocialPostUrl,
   savedRowToJobData,
   validatePosterUpload,
   type OffPortalParseResponse,
@@ -69,6 +72,9 @@ async function detectBrowserQrUrls(file: File): Promise<string[]> {
 
 export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySavedJob }: OffPortalImportModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const captionRef = useRef<HTMLTextAreaElement | null>(null);
+  // Naik tiap modal ditutup, supaya jawaban pratinjau atau simpan yang terlambat tidak muncul di modal yang dibuka berikutnya.
+  const runId = useRef(0);
   const [sourceUrl, setSourceUrl] = useState("");
   const [rawText, setRawText] = useState("");
   const [posterName, setPosterName] = useState("");
@@ -133,11 +139,33 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
     resetPreview();
   };
 
+  // Ditutup lewat tombol X, Escape, tombol Tutup, atau klik di luar: semua jalur lewat sini, dan isian lama dibuang
+  // supaya modal yang dibuka lagi tidak menampilkan hasil simpan sebelumnya.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      runId.current += 1;
+      setSourceUrl("");
+      setRawText("");
+      setPosterName("");
+      setPosterBase64("");
+      setClientQrUrls([]);
+      setFileError("");
+      setParsing(false);
+      setSaving(false);
+      resetPreview();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    onOpenChange(next);
+  };
+
+  const socialHint = detectSocialPostUrl(sourceUrl);
+
   const handleAnalyze = async () => {
     if (!rawText.trim() && !sourceUrl.trim() && !posterBase64) {
       setParseError("Tempel caption, isi tautan lowongan, atau unggah gambar poster terlebih dahulu.");
       return;
     }
+    const myRun = runId.current;
     setParsing(true);
     setParseError("");
     setSaveError("");
@@ -150,12 +178,16 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
         qrUrls: clientQrUrls.length > 0 ? clientQrUrls : undefined,
         sourceType: posterBase64 ? "off_portal_poster" : rawText.trim() ? "off_portal_caption" : "off_portal_link",
       });
+      if (myRun !== runId.current) return;
       setPreview(res);
       setSelectedIndexes(new Set(res.jobs.map((_, idx) => idx)));
+      // Hanya link postingan sosial: arahkan pengguna langsung ke kolom caption.
+      if (res.needsCaption) setTimeout(() => captionRef.current?.focus(), 0);
     } catch (err) {
+      if (myRun !== runId.current) return;
       setParseError(describeApiError(err, "Lowongan belum bisa dibaca saat ini. Periksa isi masukan lalu coba lagi."));
     } finally {
-      setParsing(false);
+      if (myRun === runId.current) setParsing(false);
     }
   };
 
@@ -175,19 +207,21 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
       setSaveError("Pilih minimal satu kandidat lowongan untuk disimpan.");
       return;
     }
+    const myRun = runId.current;
     setSaving(true);
     setSaveError("");
     setSaveResult(null);
     try {
       const res = await automationApi.saveOffPortalJobs(chosen);
+      // Lowongan sudah tersimpan di server walau modal sempat ditutup, jadi daftar tetap dimuat ulang.
+      if (res.saved) onSaved();
+      if (myRun !== runId.current) return;
       setSaveResult(res);
-      if (res.saved) {
-        onSaved();
-      }
     } catch (err) {
+      if (myRun !== runId.current) return;
       setSaveError(describeApiError(err, "Lowongan pribadi belum bisa disimpan saat ini. Coba lagi nanti."));
     } finally {
-      setSaving(false);
+      if (myRun === runId.current) setSaving(false);
     }
   };
 
@@ -201,7 +235,7 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
           : "bg-amber-50 text-amber-900 border-amber-200";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-3 border-b border-[#E0E0E0] shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -234,6 +268,16 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
                   className="w-full rounded-xl border-2 border-[#999999] pl-10 pr-4 h-11 text-base md:text-sm focus:outline-none focus:border-[#0A5BE0] bg-white"
                 />
               </div>
+              {socialHint && (
+                <p
+                  role="status"
+                  data-testid="offportal-social-hint"
+                  className="mt-2 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900"
+                >
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{OFF_PORTAL_SOCIAL_CAPTION_HINT(socialHint.label)}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -242,6 +286,7 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
               </label>
               <textarea
                 id="offportal-caption"
+                ref={captionRef}
                 rows={4}
                 value={rawText}
                 onChange={(e) => {
@@ -352,7 +397,21 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
                 </p>
               )}
 
-              {preview.jobs.length === 0 ? (
+              {preview.jobs.length === 0 && preview.needsCaption ? (
+                <div
+                  role="status"
+                  data-testid="offportal-needs-caption"
+                  className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 space-y-1.5"
+                >
+                  <p className="font-semibold flex items-center gap-2">
+                    <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    Tempel caption postingannya
+                  </p>
+                  <p className="text-xs leading-relaxed">
+                    Applify belum membuat kandidat lowongan karena isi postingan tidak bisa dibaca dari tautan. Tempel caption di kolom caption di atas, lalu tekan Analisis &amp; Pratinjau lagi.
+                  </p>
+                </div>
+              ) : preview.jobs.length === 0 ? (
                 <p className="rounded-xl border border-[#E0E0E0] bg-[#FAFAFA] p-4 text-sm text-muted-foreground">
                   Belum ada kandidat lowongan yang bisa diekstrak. Tempel teks caption atau tautan lowongan secara manual lalu coba lagi.
                 </p>
@@ -360,7 +419,10 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
                 <ul className="space-y-3">
                   {preview.jobs.map((job, idx) => {
                     const ch = describeOffPortalChannel(job);
-                    const safeUrl = safeExternalHref(job.applyUrl);
+                    // Tautan postingan sosial bukan tautan lamaran (jaga-jaga bila server lama masih mengirimnya).
+                    const safeUrl = detectSocialPostUrl(job.applyUrl) ? null : safeExternalHref(job.applyUrl);
+                    const unreadNote = describeUnreadFields(job.unreadFields);
+                    const jobWarnings = job.warnings ?? [];
                     const safeWa = safeExternalHref(job.whatsappUrl);
                     const highFlags = job.safety.flags.filter((f) => f.severity === "high");
                     const cautionFlags = job.safety.flags.filter((f) => f.severity === "caution");
@@ -439,6 +501,22 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
                           )}
                         </div>
 
+                        {unreadNote && (
+                          <p data-testid="offportal-unread-note" className="pl-7 text-xs text-amber-900">
+                            {unreadNote}
+                          </p>
+                        )}
+                        {jobWarnings.length > 0 && (
+                          <ul className="pl-7 space-y-1 text-xs text-amber-900" data-testid="offportal-job-warnings">
+                            {jobWarnings.map((w, wi) => (
+                              <li key={wi} className="flex items-start gap-1.5">
+                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span>{w}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
                         {/* Rincian laporan anti-scam */}
                         {(highFlags.length > 0 || cautionFlags.length > 0) && (
                           <ul className="pl-7 space-y-1 text-xs">
@@ -510,7 +588,7 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
                         <button
                           type="button"
                           onClick={() => {
-                            onOpenChange(false);
+                            handleOpenChange(false);
                             onApplySavedJob(savedRowToJobData(saved));
                           }}
                           className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[#0A5BE0] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition"
@@ -525,6 +603,17 @@ export function OffPortalImportModal({ open, onOpenChange, onSaved, onApplySaved
               )}
             </div>
           )}
+        </div>
+
+        <div className="shrink-0 flex justify-end border-t border-[#E0E0E0] px-6 py-3">
+          <button
+            type="button"
+            data-testid="offportal-close"
+            onClick={() => handleOpenChange(false)}
+            className="inline-flex min-h-11 items-center rounded-xl border-2 border-[#16150F] bg-white px-5 text-sm font-semibold text-[#16150F] transition hover:bg-[#16150F]/5"
+          >
+            Tutup
+          </button>
         </div>
       </DialogContent>
     </Dialog>
