@@ -7,11 +7,17 @@ import { describeAuthError, rememberAuthProvider } from "@/lib/authErrors";
 import { rememberAuthMode } from "@/lib/authMode";
 import { detectInAppBrowser, inAppBrowserWarning } from "@/lib/inAppBrowser";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { safeRedirectPath } from "@/lib/authRedirect";
 
 export const Route = createFileRoute("/login")({
-  // `?mode=daftar` membuka formulir daftar (tombol "Daftar Gratis" di beranda); tanpa itu formulir masuk.
-  validateSearch: (search: Record<string, unknown>): { mode?: "daftar" } =>
-    search.mode === "daftar" ? { mode: "daftar" } : {},
+  // `?mode=daftar` membuka formulir daftar (tombol "Daftar Gratis" di beranda); `?redirect=` mempertahankan rute tujuan UAT yang aman.
+  validateSearch: (search: Record<string, unknown>): { mode?: "daftar"; redirect?: string } => {
+    const redirect = safeRedirectPath(search.redirect);
+    return {
+      ...(search.mode === "daftar" ? { mode: "daftar" as const } : {}),
+      ...(redirect ? { redirect } : {}),
+    };
+  },
   component: LoginPage,
 });
 
@@ -51,7 +57,7 @@ function LinkedInIcon() {
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { mode } = Route.useSearch();
+  const { mode, redirect: redirectTo } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(mode === "daftar");
   const [email, setEmail] = useState("");
@@ -103,8 +109,22 @@ function LoginPage() {
     if (routing.current) return;
     routing.current = true;
     const target = await profileService.resolvePostLoginTarget(userId);
-    if (target.to === "/profile") navigate({ to: "/profile", search: { welcome: 1 } });
-    else navigate({ to: "/dashboard" });
+    if (target.to === "/profile") {
+      navigate({ to: "/profile", search: { welcome: 1 } });
+      return;
+    }
+    const safeNext = safeRedirectPath(redirectTo);
+    if (safeNext) {
+      const u = new URL(safeNext, "https://applify.local");
+      const searchObj = Object.fromEntries(u.searchParams.entries());
+      navigate({
+        to: u.pathname as any,
+        ...(u.search ? { search: searchObj as any } : {}),
+        ...(u.hash ? { hash: u.hash.slice(1) } : {}),
+      } as any);
+      return;
+    }
+    navigate({ to: "/dashboard" });
   };
 
   useEffect(() => {

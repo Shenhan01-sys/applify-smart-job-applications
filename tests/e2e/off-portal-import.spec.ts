@@ -106,12 +106,13 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await dialog.getByRole("button", { name: "Analisis & Pratinjau" }).click();
 
     // Kedua kandidat tampil dengan kanal dan laporan anti-scam masing-masing.
-    await expect(dialog.getByText("Frontend Engineer")).toBeVisible();
-    await expect(dialog.getByText("Google Form · Ekstensi")).toBeVisible();
-    await expect(dialog.getByText("Admin Lapangan Cepat Cair")).toBeVisible();
-    await expect(dialog.getByText("WhatsApp Manual")).toBeVisible();
-    await expect(dialog.getByText("Risiko tinggi (1)")).toBeVisible();
-    await expect(dialog.getByText(/Indikasi permintaan biaya di awal/)).toBeVisible();
+    const preview = dialog.getByTestId("offportal-preview");
+    await expect(preview.getByText("Frontend Engineer")).toBeVisible();
+    await expect(preview.getByText("Google Form · Ekstensi")).toBeVisible();
+    await expect(preview.getByText("Admin Lapangan Cepat Cair")).toBeVisible();
+    await expect(preview.getByText("WhatsApp Manual")).toBeVisible();
+    await expect(preview.getByText("Risiko tinggi (1)")).toBeVisible();
+    await expect(preview.getByText(/Indikasi permintaan biaya di awal/)).toBeVisible();
 
     // Simpan privat saat migrasi belum ada -> pesan kuning jelas, tidak crash.
     await dialog.getByRole("button", { name: "Simpan 2 Lowongan Pribadi" }).click();

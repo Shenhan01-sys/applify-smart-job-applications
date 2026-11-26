@@ -18,11 +18,23 @@ test("47.6 FE-13: /reset-password mewajibkan event PASSWORD_RECOVERY atau parame
   assert.match(src, /if \(!recoveryConfirmed\)/);
 });
 
-test("47.6 FE-10: /waitinglist memiliki honeypot anti-bot, jeda kirim lokal, dan batas panjang", () => {
+test("47.6 FE-10: /waitinglist memiliki honeypot anti-bot aman autofill, jeda kirim lokal, dan batas panjang", () => {
   const src = read("../src/routes/waitinglist.tsx");
-  assert.match(src, /name="website"/);
+  assert.doesNotMatch(src, /name="website"/);
+  assert.doesNotMatch(src, />Situs web</);
+  assert.match(src, /name="applify_hp_confirm"/);
+  assert.match(src, /autoComplete="new-password"/);
+  assert.match(src, /data-lpignore="true"/);
   assert.match(src, /applify:waitinglist-last-submit/);
   assert.match(src, /\.slice\(0, 120\)/);
+});
+
+test("waitinglistGuard: WAITLIST_HONEYPOT_NAME aman dari autofill dan shouldBlockHoneypot hanya memblokir isi non-kosong", async () => {
+  const { WAITLIST_HONEYPOT_NAME, shouldBlockHoneypot } = await import("../src/lib/waitinglistGuard.ts");
+  assert.equal(WAITLIST_HONEYPOT_NAME, "applify_hp_confirm");
+  assert.equal(shouldBlockHoneypot(""), false);
+  assert.equal(shouldBlockHoneypot("   "), false);
+  assert.equal(shouldBlockHoneypot("https://spam.example"), true);
 });
 
 test("48.6 UX-P7-09: /profile memasang penjaga perubahan belum tersimpan (beforeunload + indikator)", () => {

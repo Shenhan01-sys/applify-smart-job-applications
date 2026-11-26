@@ -27,14 +27,15 @@ import {
   ShieldCheck, History, ChevronRight, Clock, CheckCircle2,
   XCircle, AlertCircle, Loader2, Sparkles, type LucideIcon
 } from "lucide-react";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/approvals")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Persetujuan Lamaran — Applify" }] }),
   component: ApprovalsPage,

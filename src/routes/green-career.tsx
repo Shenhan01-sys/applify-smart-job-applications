@@ -18,12 +18,13 @@ import { greenCareerListNotice } from "@/lib/greenCareerUi";
 import { profileService } from "@/services/profileService";
 import { ErrorState } from "@/components/ErrorState";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 export const Route = createFileRoute("/green-career")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Karier Hijau — Applify" }] }),
   component: GreenCareerPage,
