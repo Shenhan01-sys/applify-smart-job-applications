@@ -271,6 +271,32 @@ export const aiApplicationService = {
     return data;
   },
 
+  // Simpan hasil akhir (Wawancara/Tawaran/Ditolak) dan catatan bebas pengguna di kolom company_response (UX-P7-04, UX-P7-06).
+  async updateCompanyResponse(id: string, companyResponse: string | null) {
+    const clean = companyResponse?.trim() ? companyResponse.trim() : null;
+    const now = new Date().toISOString();
+    if (isMockMode()) {
+      mockAppStore = mockAppStore.map((a) =>
+        a.id === id
+          ? ({ ...a, company_response: clean ?? undefined, response_received_at: clean ? now : undefined, updated_at: now } as any)
+          : a
+      );
+      return mockAppStore.find((a) => a.id === id);
+    }
+    const { data, error } = await supabase
+      .from("ai_applications")
+      .update({
+        company_response: clean,
+        response_received_at: clean ? now : null,
+        updated_at: now,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   // Schedule follow-up
   async scheduleFollowUp(id: string, date: string) {
     const { data, error } = await supabase
