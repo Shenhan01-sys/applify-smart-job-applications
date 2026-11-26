@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { mockAIApplications, mockAiAnalysis, MOCK_USER_ID } from "@/mocks/mockData";
 import { automationApi } from "@/services/automationApi";
 import { followUpDueAt } from "@/lib/followUp";
+import { assertClientStatusChangeAllowed } from "@/lib/boardDnd";
 import { cleanStringList } from "@/lib/jobCardData";
 import { rawModelUsed } from "@/lib/modelLabel";
 import { quotaFromEdgeResponse, type QuotaSummary } from "@/lib/quotaStatus";
@@ -240,24 +241,16 @@ export const aiApplicationService = {
   },
 
   // Move an application to another status (board drag, manual updates) and announce it on Telegram.
+  // Penjaga tingkat layanan (FE-05): status `submitted` tidak pernah boleh disetel langsung oleh klien browser.
   async updateStatus(id: string, status: ApplicationStatus) {
     if (!APPLICATION_STATUSES.includes(status)) throw new Error(`Status tidak dikenal: ${status}`);
+    assertClientStatusChangeAllowed(status);
     if (isMockMode()) {
       mockAppStore = mockAppStore.map(a => (a.id === id ? ({ ...a, status, updated_at: new Date().toISOString() } as any) : a));
       return mockAppStore.find(a => a.id === id);
     }
 
     const patch: Record<string, any> = { status, updated_at: new Date().toISOString() };
-    if (status === "submitted") {
-      // First time submitted: record when, and when the follow-up reminder is due (FOLLOW_UP_DAYS).
-      const { data: current } = await supabase
-        .from("ai_applications")
-        .select("submitted_at, follow_up_scheduled")
-        .eq("id", id)
-        .single();
-      if (!current?.submitted_at) patch.submitted_at = new Date().toISOString();
-      if (!current?.follow_up_scheduled) patch.follow_up_scheduled = followUpDueAt();
-    }
 
     const { data, error } = await supabase
       .from("ai_applications")

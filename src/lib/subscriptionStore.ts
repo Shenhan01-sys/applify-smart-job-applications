@@ -10,6 +10,11 @@ import { useEffect, useState } from "react";
 export type PlanTier = "free" | "pro" | "kampus";
 export type PaymentMethod = "gopay" | "ovo" | "dana" | "qris";
 
+/** Validasi parameter query `?plan=` di rute pembayaran agar nilai asing diabaikan (47.6 FE-25). */
+export function parsePlanSearch(raw: unknown): PlanTier | undefined {
+  return raw === "free" || raw === "pro" || raw === "kampus" ? raw : undefined;
+}
+
 export interface SubscriptionState {
   tier: PlanTier;
   paymentMethod: PaymentMethod | null;

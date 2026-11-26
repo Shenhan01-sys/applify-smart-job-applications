@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { profileService } from "@/services/profileService";
-import { describeAuthError, recallAuthProvider } from "@/lib/authErrors";
+import { describeAuthError, describeOAuthCallbackError, recallAuthProvider } from "@/lib/authErrors";
 import { backSearchFor, clearAuthMode, recallAuthMode } from "@/lib/authMode";
 import { consumePostLoginRedirect, navigateArgsForRedirect } from "@/lib/authRedirect";
 import { waitForSession } from "@/lib/authSession";
@@ -28,7 +28,7 @@ function AuthCallbackPage() {
     // Supabase mengembalikan galat OAuth atau verifikasi email lewat parameter alamat.
     if (error) {
       setStatus('error');
-      setErrorMsg(describeAuthError({ code: errorCode ?? error, message: errorDescription ?? error }, "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi.", recallAuthProvider()));
+      setErrorMsg(describeOAuthCallbackError({ error, errorCode, errorDescription }, "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi.", recallAuthProvider()));
       return;
     }
 

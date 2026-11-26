@@ -556,6 +556,10 @@ export function AppsPage() {
   const moveApplication = useCallback((appId: string, targetStatus: ApplicationStatus) => {
     const current = applications.find(a => a.id === appId);
     if (!current || current.status === targetStatus) return;
+    if (dropIntoSubmittedBlocked(current.status, targetStatus)) {
+      setPendingSubmitted(appId);
+      return;
+    }
     const previousStatus = current.status;
     setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: targetStatus } : a));
     setSelectedApp(prev => (prev && prev.id === appId ? { ...prev, status: targetStatus } : prev));
