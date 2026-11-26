@@ -5,6 +5,39 @@ import { postLoginTarget, type PostLoginTarget, type ProfileSummary } from "@/li
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
+const MISSING_NOTES_RE = /notes|schema cache|42703|PGRST204/i;
+let workExpNotesUnsupported = false;
+
+export function resetWorkExperienceNotesWriteCache() {
+  workExpNotesUnsupported = false;
+}
+
+function isMissingWorkExpNotesError(error: any): boolean {
+  if (!error) return false;
+  const code = String(error.code ?? "");
+  const msg = String(error.message ?? "");
+  return (code === "42703" || code === "PGRST204" || /does not exist|schema cache/i.test(msg)) && MISSING_NOTES_RE.test(`${code} ${msg}`);
+}
+
+async function writeWorkExperienceWithNotesFallback<
+  T extends { data: unknown; error: { message?: string; code?: string } | null },
+>(
+  data: Partial<ExperienceRow>,
+  runFull: () => PromiseLike<T>,
+  runWithoutNotes: (stripped: Partial<ExperienceRow>) => PromiseLike<T>,
+): Promise<T> {
+  const hasNotesField = "notes" in data;
+  if (!hasNotesField) return runFull();
+  const { notes: _omit, ...withoutNotes } = data;
+  if (workExpNotesUnsupported) return runWithoutNotes(withoutNotes);
+  const res = await runFull();
+  if (res?.error && isMissingWorkExpNotesError(res.error)) {
+    workExpNotesUnsupported = true;
+    return runWithoutNotes(withoutNotes);
+  }
+  return res;
+}
+
 // ==================== TYPES ====================
 
 export interface WorkExperience {
@@ -230,14 +263,22 @@ export const profileService = {
     return { skills: s.data ?? [], experiences: e.data ?? [] };
   },
 
-  // Work Experiences CRUD
+  // Work Experiences CRUD (dengan fallback & cache pra-migrasi saat kolom `notes` belum ada di schema live)
   async createWorkExperience(data: ExperienceRow) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
-    return supabase.from("work_experiences").insert({ ...data, user_id: user.id }).select().single();
+    return writeWorkExperienceWithNotesFallback(
+      data,
+      () => supabase.from("work_experiences").insert({ ...data, user_id: user.id }).select().single(),
+      (withoutNotes) => supabase.from("work_experiences").insert({ ...withoutNotes, user_id: user.id }).select().single(),
+    );
   },
   async updateWorkExperience(id: string, data: Partial<ExperienceRow>) {
-    return supabase.from("work_experiences").update(data).eq("id", id).select().single();
+    return writeWorkExperienceWithNotesFallback(
+      data,
+      () => supabase.from("work_experiences").update(data).eq("id", id).select().single(),
+      (withoutNotes) => supabase.from("work_experiences").update(withoutNotes).eq("id", id).select().single(),
+    );
   },
   async deleteWorkExperience(id: string) {
     return supabase.from("work_experiences").delete().eq("id", id);
