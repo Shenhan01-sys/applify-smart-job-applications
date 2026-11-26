@@ -506,8 +506,13 @@ test("budgetForCandidate: kandidat sebelum Anthropic menyisakan cadangan; Anthro
   assert.equal(nextCallTimeoutMs({ perCallMs: 20_000, totalBudgetMs: total, elapsedMs: 14_500 }), 19_500);
 });
 
-test("prompt surat: experience_years disebut total pengalaman, bukan lama satu jabatan (uji draf 25 Nov 2026)", () => {
+test("prompt surat: lama pengalaman dihitung di kode dari tanggal peran, bukan experience_years yang diisi sendiri (uji draf 25 dan 27 Nov 2026)", () => {
+  // 25 November: experience_years dibaca model sebagai lama satu jabatan, jadi prompt menyebutnya total. 27 November:
+  // angka isian itu (3) salah untuk kandidat yang baru 13 bulan di peran teknis, jadi tidak lagi dikirim ke model.
   const src = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
-  assert.match(src, /Total work experience across all roles \(years\)/);
-  assert.match(src, /never the length of one role/);
+  assert.doesNotMatch(src, /Total work experience across all roles/);
+  assert.doesNotMatch(src, /\$\{profile\?\.experience_years/);
+  assert.match(src, /\$\{experiencePromptBlock\(experience\)\}/);
+  const facts = readFileSync(new URL("../supabase/functions/_shared/experience-facts.ts", import.meta.url), "utf8");
+  assert.match(facts, /these figures are the only durations you may state/);
 });

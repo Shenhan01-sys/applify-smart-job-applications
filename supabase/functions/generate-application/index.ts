@@ -49,10 +49,18 @@ import {
   selectLanguage,
   stripReasoning,
   validateCoverLetter,
+  wordCount,
 } from "../_shared/output-guard.ts";
 import { ACHIEVEMENT_GROUNDING_RULE, achievementPromptSection, buildAchievementLines } from "../_shared/profile-context.ts";
 import { selectTailoredSkills } from "../_shared/tailored-skills.ts";
 import { letterStructureRules } from "../_shared/letter-rules.ts";
+import {
+  EXPERIENCE_CLAIM_RULES,
+  computeExperienceFacts,
+  experiencePromptBlock,
+  monthsLabelId,
+} from "../_shared/experience-facts.ts";
+import { correctionNote, findClaimViolations, removalWarnings, removeViolatingSentences, type ClaimKnowledge } from "../_shared/letter-claims.ts";
 import { extractDraftJson } from "../_shared/json-salvage.ts";
 import { CLOSED_STATUS, isUniqueViolation, pickActiveApplication, reusedAnalysis } from "../_shared/active-application.ts";
 
@@ -106,6 +114,9 @@ function json(body: unknown, status = 200): Response {
 
 // JSON jawaban model: lihat _shared/json-salvage.ts (juga menyelamatkan surat dari JSON yang terpotong).
 const extractJson = (s: string): any => extractDraftJson(s);
+
+/** Surat yang kurang dari ini setelah kalimat bermasalah dibuang tidak disimpan (lihat langkah klaim di bawah). */
+const MIN_WORDS_AFTER_CLAIM_REMOVAL = 60;
 
 function clamp(n: unknown): number {
   const v = Math.round(Number(n) || 0);
@@ -227,9 +238,11 @@ Deno.serve(async (req: Request) => {
       admin.from("jobs").select("*").eq("id", jobId).maybeSingle(),
       admin.from("profiles").select("*").eq("id", userId).maybeSingle(),
       admin.from("user_skills").select("name, proficiency_level").eq("user_id", userId),
+      // Semua peran dibaca (bukan tiga terbaru): lama pengalaman dihitung dari seluruh riwayat, dan semua jabatan dan
+      // perusahaan di sini adalah fakta sah untuk surat. Prompt hanya mendaftar tiga peran terbaru.
       admin.from("work_experiences")
-        .select("role_title, company_name, description, start_date, end_date")
-        .eq("user_id", userId).order("start_date", { ascending: false }).limit(3),
+        .select("role_title, company_name, description, start_date, end_date, is_current")
+        .eq("user_id", userId).order("start_date", { ascending: false, nullsFirst: false }).limit(50),
       // Pendidikan ikut menjadi fakta surat, supaya tahun lulus dan nama kampus tidak kena peringatan palsu.
       admin.from("education")
         .select("degree, field_of_study, institution, start_year, end_year")
@@ -247,8 +260,16 @@ Deno.serve(async (req: Request) => {
 
     const skillList =(skills ?? []).map((s: any) => s.name).join(", ")
       || (Array.isArray(profile?.skills) ? profile!.skills.join(", ") : "");
-    const workList = (work ?? [])
+    const workList = (work ?? []).slice(0, 3)
       .map((w: any) => `- ${w.role_title} @ ${w.company_name}: ${w.description ?? ""}`).join("\n");
+    // Lama pengalaman dihitung di kode dari tanggal peran (peran teknis dipisah dari non-teknis, peran yang bertumpuk
+    // dihitung sekali). profiles.experience_years diisi sendiri oleh pengguna dan tidak dipercaya bila ada peran bertanggal
+    // (E2E production 27 November 2026: surat menulis "3 tahun" untuk 13 bulan pengalaman teknis).
+    const experience = computeExperienceFacts(work, {
+      jobTitle: job.title,
+      jobDescription: job.description,
+      declaredYears: profile?.experience_years,
+    });
     const achievementLines = buildAchievementLines(achievementRows);
     // Kosong bila tidak ada penghargaan: prompt sama persis dengan sebelumnya.
     const achievementSection = achievementLines.length ? `\n${achievementPromptSection(achievementLines)}` : "";
@@ -262,7 +283,8 @@ Deno.serve(async (req: Request) => {
       firstName: profile?.full_name ?? "",
       currentTitle: profile?.current_title ?? "",
       location: profile?.location ?? "",
-      yearsOfExperience: profile?.experience_years ?? 0,
+      // Bukan profiles.experience_years (diisi sendiri, tidak terverifikasi): angka yang sah adalah hasil hitungan kode.
+      yearsOfExperience: Math.floor(experience.claimMonths / 12),
       skills: skillList ? skillList.split(",").map((x: string) => x.trim()).filter(Boolean) : [],
       summary: profile?.summary ?? profile?.bio ?? "",
       workExperiences: (work ?? []).map((w: any) => ({
@@ -272,6 +294,21 @@ Deno.serve(async (req: Request) => {
         degree: e.degree, field_of_study: e.field_of_study, institution: e.institution, start_year: e.start_year, end_year: e.end_year,
       })),
       achievements: achievementLines,
+    };
+    // Pengetahuan untuk penguji klaim surat (_shared/letter-claims.ts): jabatan dan organisasi yang sah.
+    const claimKnowledge: ClaimKnowledge = {
+      claimMonths: experience.claimMonths,
+      titles: [
+        String(profile?.current_title ?? ""),
+        ...(work ?? []).map((w: any) => String(w.role_title ?? "")),
+        String(job.title ?? ""),
+      ].filter(Boolean),
+      knownText: [
+        profile?.full_name, profile?.location, profile?.summary ?? profile?.bio, job.company, job.title,
+        ...(work ?? []).flatMap((w: any) => [w.company_name, w.role_title, w.description]),
+        ...(education ?? []).flatMap((e: any) => [e.institution, e.degree, e.field_of_study]),
+        ...achievementLines,
+      ].filter(Boolean).join("\n"),
     };
     const allowedContext = `${profile?.full_name ?? ""} ${job.company ?? ""} ${job.title ?? ""} ${job.description ?? ""} ${workList}${achievementLines.length ? ` ${achievementLines.join(" ")}` : ""}`;
     const targetContext = `${job.company ?? ""} ${job.title ?? ""}`;
@@ -291,16 +328,17 @@ Requirements: ${escapeWrapperTag(JSON.stringify(job.requirements ?? []))}
 CANDIDATE
 Name: ${profile?.full_name ?? "Kandidat"}
 Current title: ${profile?.current_title ?? "-"}
-Total work experience across all roles (years): ${profile?.experience_years ?? 0}. This is the TOTAL, never the length of one role; for a single role use only its own dates under Recent experience.
 Skills: ${skillList || "-"}
-Recent experience:
+Recent experience (most recent three roles):
 ${workList || "-"}${achievementSection}
+
+${experiencePromptBlock(experience)}
 
 TONE: ${tone}
 LANGUAGE: ${languageInstruction(language)}
 
 GROUNDING RULES (strict):
-${GROUNDING_RULES.map((r) => `- ${r}`).join("\n")}${achievementRule}
+${[...GROUNDING_RULES, ...EXPERIENCE_CLAIM_RULES].map((r) => `- ${r}`).join("\n")}${achievementRule}
 
 LETTER STRUCTURE (strict):
 ${letterStructureRules(job.title, job.company).map((r) => `- ${r}`).join("\n")}
@@ -325,7 +363,9 @@ Return JSON exactly in this shape:
     let model = chain[0].entry;
     let modelUsed = model;
     let keySource: "byok" | "applify" = chain[0].source;
-    let soft: { parsed: any; modelUsed: string; keySource: "byok" | "applify" } | null = null;
+    let soft: { parsed: any; modelUsed: string; keySource: "byok" | "applify"; candidate: ChainTarget } | null = null;
+    // Kandidat yang menghasilkan surat yang dipakai: ia juga yang dipanggil sekali lagi bila suratnya memuat klaim palsu.
+    let acceptedCandidate: ChainTarget = chain[0];
     let lastDetail = "";
     const rejectedReasons: string[] = [];
     // Satu baris per kandidat di log Edge Function, supaya alasan model gagal atau ditolak terlihat.
@@ -444,6 +484,7 @@ Return JSON exactly in this shape:
         parsed = { ...attempt, coverLetter: verdict.text };
         modelUsed = completion.model ? `${candidate.provider}:${completion.model}` : model;
         keySource = candidate.source;
+        acceptedCandidate = candidate;
         note("accepted", started);
         break;
       }
@@ -453,17 +494,73 @@ Return JSON exactly in this shape:
       // finish_reason "length" berarti jawaban terpotong oleh max_tokens.
       note(`rejected ${why.join(",")} finish=${completion.finish ?? "?"}`, started);
       const fallback = (verdict as { fallbackText?: string }).fallbackText;
-      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: completion.model ? `${candidate.provider}:${completion.model}` : model, keySource: candidate.source };
+      if (fallback && !soft) soft = { parsed: { ...attempt, coverLetter: fallback }, modelUsed: completion.model ? `${candidate.provider}:${completion.model}` : model, keySource: candidate.source, candidate };
     }
     if (!parsed && soft) {
       parsed = soft.parsed;
       modelUsed = soft.modelUsed;
       keySource = soft.keySource;
+      acceptedCandidate = soft.candidate;
     }
     if (!parsed) {
       const safeReason = budgetExhausted ? "time_budget" : rejectedReasons[rejectedReasons.length - 1] ?? "ai_unavailable";
       return json({ error: "AI generation failed", reason: safeReason, rejected: [...new Set(rejectedReasons)], budgetExhausted, elapsedMs: Date.now() - requestStarted, attempts, models: chain.map((m) => m.entry), quota }, 502);
     }
+
+    // Klaim yang tidak didukung profil (lama pengalaman melebihi hitungan kode, jabatan, perusahaan): surat dibuat ulang
+    // sekali dengan peringatan, dan kalimat yang masih melanggar dihapus. Deterministik, tanpa model tambahan di jalur
+    // normal: model hanya dipanggil bila ada pelanggaran dan waktu masih ada.
+    let claimViolations = findClaimViolations(parsed.coverLetter ?? "", claimKnowledge);
+    let claimRetried = false;
+    if (claimViolations.length > 0) {
+      claimRetried = true;
+      const retryTimeoutMs = nextCallTimeoutMs({
+        perCallMs: AI_CALL_TIMEOUT_MS,
+        totalBudgetMs: AI_TOTAL_BUDGET_MS,
+        elapsedMs: Date.now() - requestStarted,
+      });
+      if (retryTimeoutMs > 0) {
+        const retryStarted = Date.now();
+        try {
+          const retryResp = await postChat(acceptedCandidate, {
+            timeoutMs: () => nextCallTimeoutMs({ perCallMs: AI_CALL_TIMEOUT_MS, totalBudgetMs: AI_TOTAL_BUDGET_MS, elapsedMs: Date.now() - requestStarted }),
+            numesTimeoutMs: NUMES_TIMEOUT_MS,
+            numesBudget,
+            redirect: acceptedCandidate.source === "byok" ? "manual" : "follow",
+            body: JSON.stringify(requestBody(acceptedCandidate, [
+              { role: "system", content: sys },
+              { role: "user", content: `${userPrompt}\n\n${correctionNote(claimViolations, claimKnowledge)}` },
+            ], { temperature: 0.3, maxTokens: 1600 })),
+          });
+          if (retryResp.ok) {
+            const retryText = stripReasoning(readCompletion(acceptedCandidate.format, await retryResp.json()).text).text;
+            const retryAttempt = retryText ? (extractJson(retryText) ?? { coverLetter: retryText }) : null;
+            const retryVerdict = retryAttempt ? acceptCoverLetter(String(retryAttempt.coverLetter ?? ""), { language, allowedContext }) : null;
+            if (retryVerdict?.ok === true) {
+              const remaining = findClaimViolations(retryVerdict.text, claimKnowledge);
+              // Hanya dipakai bila lebih bersih daripada surat pertama.
+              if (remaining.length < claimViolations.length) {
+                parsed = { ...parsed, coverLetter: retryVerdict.text };
+                claimViolations = remaining;
+              }
+            }
+          }
+          console.warn(`[generate-application] ${acceptedCandidate.entry} claim_retry ${claimViolations.length === 0 ? "clean" : "still_violating"} ${Date.now() - retryStarted}ms`);
+        } catch (e) {
+          console.warn(`[generate-application] ${acceptedCandidate.entry} claim_retry_error ${String((e as Error)?.name ?? e)}`);
+        }
+      }
+    }
+    const removedClaims = claimViolations;
+    if (removedClaims.length > 0) {
+      parsed = { ...parsed, coverLetter: removeViolatingSentences(parsed.coverLetter ?? "", removedClaims) };
+      // Surat yang nyaris habis setelah kalimat palsu dibuang bukan surat lagi: gagal secara terang-terangan, tanpa
+      // menyimpan apa pun dan tanpa memotong kuota, supaya pengguna mencoba lagi.
+      if (wordCount(parsed.coverLetter) < MIN_WORDS_AFTER_CLAIM_REMOVAL) {
+        return json({ error: "AI generation failed", reason: "unsupported_claims", rejected: ["unsupported_claims"], elapsedMs: Date.now() - requestStarted, attempts, models: chain.map((m) => m.entry), quota }, 502);
+      }
+    }
+    if (claimRetried) console.warn(`[generate-application] claim_check retried=true removed=${removedClaims.length}`);
 
     // Soft checks on the accepted letter: wrong language, unsupported numbers, and invented entity claims.
     // They are returned in analysis.warnings AND written into ai_notes, so the draft screen shows them.
@@ -474,6 +571,16 @@ Return JSON exactly in this shape:
         checkEntities: true,
         allowedContext: targetContext,
       }),
+      // Kalimat yang dihapus karena klaimnya tidak didukung profil: pengguna diberi tahu supaya memeriksa suratnya.
+      ...removalWarnings(removedClaims).map((w) => ({
+        kind: w.kind === "experience_duration" ? ("unsupported_number" as const) : ("unsupported_entity" as const),
+        values: w.values,
+        count: w.values.length,
+        message:
+          w.kind === "experience_duration"
+            ? `${w.message} Batas dari riwayat kerjamu: ${monthsLabelId(experience.claimMonths)}.`
+            : w.message,
+      })),
     ];
     const warningText = formatWarningsText(warnings);
     const salvageNote = parsed.salvaged

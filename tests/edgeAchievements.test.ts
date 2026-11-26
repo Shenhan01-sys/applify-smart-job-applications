@@ -26,8 +26,8 @@ test("Edge Function: membaca achievements milik pengguna, membatasinya lewat pem
   assert.match(src, /admin\.from\("achievements"\)\s*\.select\("title, category, issuer, achievement_date, is_featured, created_at"\)\s*\.eq\("user_id", userId\)/);
   assert.match(src, /const achievementLines = buildAchievementLines\(achievementRows\)/);
   // dalam prompt: sesudah pengalaman kerja, sebelum TONE; aturan menyusul daftar aturan grounding
-  assert.match(src, /Recent experience:\n\$\{workList \|\| "-"\}\$\{achievementSection\}\n\nTONE:/);
-  assert.match(src, /\$\{GROUNDING_RULES\.map\(\(r\) => `- \$\{r\}`\)\.join\("\\n"\)\}\$\{achievementRule\}/);
+  assert.match(src, /Recent experience \(most recent three roles\):\n\$\{workList \|\| "-"\}\$\{achievementSection\}\n\n\$\{experiencePromptBlock\(experience\)\}\n\nTONE:/);
+  assert.match(src, /\$\{\[\.\.\.GROUNDING_RULES, \.\.\.EXPERIENCE_CLAIM_RULES\]\.map\(\(r\) => `- \$\{r\}`\)\.join\("\\n"\)\}\$\{achievementRule\}/);
   // tanpa entri, kedua sisipan kosong sehingga prompt tidak berubah
   assert.match(src, /const achievementSection = achievementLines\.length \? `\\n\$\{achievementPromptSection\(achievementLines\)\}` : ""/);
   assert.match(src, /const achievementRule = achievementLines\.length \? `\\n- \$\{ACHIEVEMENT_GROUNDING_RULE\}` : ""/);

@@ -385,8 +385,10 @@ test("Edge Function generate-application membaca kolom yang kini bisa diisi dari
   const fn = read("../supabase/functions/generate-application/index.ts");
   assert.match(fn, /from\("user_skills"\)\.select\("name, proficiency_level"\)/);
   assert.match(fn, /from\("work_experiences"\)/);
-  assert.match(fn, /select\("role_title, company_name, description, start_date, end_date"\)/);
-  assert.match(fn, /order\("start_date", \{ ascending: false \}\)\.limit\(3\)/);
+  // Semua peran dibaca (batas 50), karena lama pengalaman dihitung dari seluruh riwayat; prompt mendaftar tiga terbaru.
+  assert.match(fn, /select\("role_title, company_name, description, start_date, end_date, is_current"\)/);
+  assert.match(fn, /order\("start_date", \{ ascending: false, nullsFirst: false \}\)\.limit\(50\)/);
+  assert.match(fn, /\(work \?\? \[\]\)\.slice\(0, 3\)/);
 });
 
 test("halaman profil: contoh data hanya di mode demo, simpan lewat kolom bersaring, editor terpasang", () => {
