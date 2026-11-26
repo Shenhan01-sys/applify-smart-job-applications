@@ -1,8 +1,10 @@
 /**
  * Terjemahan galat Supabase (auth, PostgREST, Edge Function) dan galat jaringan ke pesan Indonesia yang
  * memberi tahu pengguna apa yang bisa dilakukan. Pesan mentah tidak pernah ditampilkan apa adanya kecuali
- * sudah berbahasa Indonesia. Tanpa impor, supaya bisa dites dengan `node --test`.
+ * sudah berbahasa Indonesia. Hanya mengimpor modul murni lain di folder ini, supaya bisa dites dengan `node --test`.
  */
+
+import { PASSWORD_POLICY_MESSAGE } from "./passwordPolicy.ts";
 
 interface ErrLike {
   message?: unknown;
@@ -101,7 +103,7 @@ export function describeAuthError(err: unknown, fallback = "Proses akun belum be
     return 'Email ini sudah terdaftar. Pilih "Masuk", atau "Lupa kata sandi" bila kamu lupa kata sandinya.';
   }
   if (code === "weak_password" || /password should be at least|password is known to be weak|weak password/.test(msg)) {
-    return "Kata sandi terlalu pendek atau mudah ditebak. Pakai minimal 6 karakter dan campur huruf dengan angka.";
+    return PASSWORD_POLICY_MESSAGE;
   }
   if (code === "same_password" || /different from the old password/.test(msg)) {
     return "Kata sandi baru harus berbeda dari kata sandi yang lama.";

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { describeAuthError } from "@/lib/authErrors";
 import { hasRecoveryUrlParams } from "@/lib/resetPasswordGuard";
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/lib/passwordPolicy";
 import { Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
@@ -52,7 +53,8 @@ function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (password.length < 6) return setError("Kata sandi minimal 6 karakter.");
+    const policyError = passwordPolicyError(password);
+    if (policyError) return setError(policyError);
     if (password !== confirm) return setError("Kedua isian kata sandi belum sama. Ketik ulang dengan teliti.");
     setLoading(true);
     try {
@@ -101,8 +103,8 @@ function ResetPasswordPage() {
                 <label htmlFor="new-password" className="block text-sm font-medium mb-1.5">Kata sandi baru</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <input id="new-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required
-                    value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 6 karakter" className={`${inputClass} pr-12`} />
+                  <input id="new-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required aria-describedby="new-password-hint"
+                    value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 8 karakter" className={`${inputClass} pr-12`} />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
@@ -113,12 +115,13 @@ function ResetPasswordPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
+                <p id="new-password-hint" className="mt-1.5 text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
               </div>
               <div>
                 <label htmlFor="confirm-password" className="block text-sm font-medium mb-1.5">Ulangi kata sandi baru</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <input id="confirm-password" name="confirm" type={showConfirm ? "text" : "password"} autoComplete="new-password" minLength={6} required
+                  <input id="confirm-password" name="confirm" type={showConfirm ? "text" : "password"} autoComplete="new-password" required
                     value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Ketik sekali lagi" className={`${inputClass} pr-12`} />
                   <button
                     type="button"

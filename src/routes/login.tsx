@@ -8,6 +8,7 @@ import { rememberAuthMode } from "@/lib/authMode";
 import { detectInAppBrowser, inAppBrowserWarning } from "@/lib/inAppBrowser";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { clearPostLoginRedirect, navigateArgsForRedirect, rememberPostLoginRedirect, safeRedirectPath } from "@/lib/authRedirect";
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/lib/passwordPolicy";
 
 export const Route = createFileRoute("/login")({
   // `?mode=daftar` membuka formulir daftar (tombol "Daftar Gratis" di beranda); `?redirect=` mempertahankan rute tujuan UAT yang aman.
@@ -129,9 +130,17 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
     setSuccessMsg("");
+    // Aturan sandi baru hanya untuk daftar. Masuk dengan sandi lama (6 karakter) tidak boleh diblokir di klien.
+    if (isSignUp) {
+      const policyError = passwordPolicyError(password);
+      if (policyError) {
+        setError(policyError);
+        return;
+      }
+    }
+    setLoading(true);
 
     try {
       if (isSignUp) {
@@ -340,9 +349,9 @@ function LoginPage() {
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignUp ? "Minimal 6 karakter" : "Masukkan kata sandi"}
+                  placeholder={isSignUp ? "Minimal 8 karakter" : "Masukkan kata sandi"}
                   required
-                  minLength={6}
+                  aria-describedby={isSignUp ? "login-password-hint" : undefined}
                   className="w-full h-12 pl-10 pr-12 rounded-xl border-2 border-border bg-background text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
                 <button
@@ -355,6 +364,9 @@ function LoginPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
               </div>
+              {isSignUp && (
+                <p id="login-password-hint" className="mt-1.5 text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
+              )}
             </div>
 
             {error && (
