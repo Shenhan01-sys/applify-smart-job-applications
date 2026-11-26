@@ -10,7 +10,7 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
-import { acquireMonthlyInflightSlot, type MonthlySlotHandle } from "../_shared/quota-reservation.ts";
+import { acquireMonthlyInflightSlot, isValidUuid, type MonthlySlotHandle } from "../_shared/quota-reservation.ts";
 import { DEFAULT_NUMES_CALL_TIMEOUT_MS, NumesBudget } from "../_shared/numes-keys.ts";
 import {
   DEFAULT_AI_CALL_TIMEOUT_MS,
@@ -132,11 +132,12 @@ Deno.serve(async (req: Request) => {
     const userId = userData.user.id;
 
     const body = await req.json().catch(() => ({}));
-    const jobId: string | undefined = body?.jobId;
+    const jobId = typeof body?.jobId === "string" ? body.jobId.trim() : "";
     const tone: string = body?.tone ?? "professional";
     const mode: string = body?.mode ?? "generate"; // "generate" (consumes quota + persists) | "analyze" (preview only)
     const requestedLanguage: string | undefined = body?.language; // "id" | "en" | "auto" (default: Bahasa Indonesia)
     if (!jobId) return json({ error: "jobId is required" }, 400);
+    if (!isValidUuid(jobId)) return json({ error: "Invalid jobId format", code: "invalid_job_id" }, 400);
 
     // 2) Tier -> model
     const { data: sub } = await admin

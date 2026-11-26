@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { acquireMonthlyInflightSlot, effectiveMonthlyRemaining } from "../supabase/functions/_shared/quota-reservation.ts";
+import { acquireMonthlyInflightSlot, effectiveMonthlyRemaining, isValidUuid } from "../supabase/functions/_shared/quota-reservation.ts";
 import { calibrateScoreWithEvidence } from "../supabase/functions/_shared/green-assessment.ts";
 
 test("47.5 U6-P2-09: reservasi kuota bulanan mencegah balapan paralel saat sisa kuota 1 dan melepas di release()", async () => {
@@ -148,4 +148,19 @@ test("task-2d: slot.release() idempoten dan pelepasan dilakukan segera setelah c
     "utf8",
   );
   assert.match(sqlDraft, /NOT EXISTS\s*\(\s*SELECT 1\s+FROM public\.ai_applications/i);
+  assert.match(sqlDraft, /~[*]\s*'\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$'/i);
+  assert.match(sqlDraft, /THEN\s*\(l\.details ->> 'job_id'\)::uuid\s+ELSE NULL/i);
+});
+
+test("Gelombang 11 (2): isValidUuid & generate-application menolak jobId non-UUID sebelum reservasi kuota", () => {
+  assert.equal(isValidUuid("11111111-1111-4111-8111-111111111111"), true);
+  assert.equal(isValidUuid("  11111111-1111-4111-8111-111111111111  "), true);
+  assert.equal(isValidUuid(""), false);
+  assert.equal(isValidUuid("not-a-uuid"), false);
+  assert.equal(isValidUuid(null), false);
+
+  const edgeSrc = readFileSync(new URL("../supabase/functions/generate-application/index.ts", import.meta.url), "utf8");
+  const uuidIdx = edgeSrc.indexOf("isValidUuid(jobId)");
+  const reserveIdx = edgeSrc.indexOf("acquireMonthlyInflightSlot(");
+  assert.ok(uuidIdx > 0 && reserveIdx > uuidIdx, "validasi UUID harus sebelum reservasi kuota bulanan");
 });
