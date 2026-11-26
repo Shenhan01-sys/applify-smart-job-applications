@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isBillingEnabled } from "@/lib/appConfig";
 import { PLAN_PRICE } from "@/lib/subscriptionStore";
+import { describePlanSummary } from "@/lib/planSummary";
 import SavedAnswers from "@/components/SavedAnswers";
 import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
 import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
@@ -50,6 +51,7 @@ function SoonButton({ icon: Icon, children }: { icon?: typeof Lock; children: Re
 function SettingsPage() {
   const plan = useSubscription();
   const billing = isBillingEnabled();
+  const planSummary = describePlanSummary(plan.tier, plan.quota?.quota);
   const search = Route.useSearch();
   const navigate = useNavigate();
   const [gmail, setGmail] = useState<GmailBanner | null>(null);
@@ -133,6 +135,24 @@ function SettingsPage() {
           desc="Terima kabar status lamaran dan permintaan kode keamanan lewat WhatsApp terverifikasi atau email. Pengingat tindak lanjut ke akunmu belum aktif.">
           <NotificationSettingsCard />
         </Card>
+
+        {/* Pembayaran mati: kartu paket hanya membaca (paket dan draf per bulan), tanpa tombol bayar atau upgrade */}
+        {!billing && (
+          <Card icon={CreditCard} title="Paket Saya" desc="Paket akunmu dan jumlah draf AI yang boleh dibuat tiap bulan.">
+            <div className="mt-4 space-y-1.5 text-sm" data-testid="plan-readonly-card" aria-live="polite">
+              {plan.loading ? (
+                <p className="inline-flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Memuat paket...</p>
+              ) : plan.error ? (
+                <p className="text-muted-foreground">Status paket belum bisa dimuat saat ini. Muat ulang halaman untuk memeriksa paketmu.</p>
+              ) : (
+                <>
+                  <p className="font-semibold" data-testid="plan-readonly-sentence">{planSummary.sentence}</p>
+                  <p className="text-muted-foreground">{planSummary.note}</p>
+                </>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Tagihan hanya tampil bila VITE_ENABLE_BILLING=true */}
         {billing && (

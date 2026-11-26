@@ -39,6 +39,20 @@ test.describe("Pengaturan: sambungan Gmail", () => {
   });
 });
 
+test.describe("Pengaturan: kartu paket saat pembayaran mati", () => {
+  test("kartu Paket Saya menampilkan paket dan draf per bulan, tanpa tombol bayar, upgrade, atau tautan /subscription", async ({ app }) => {
+    await app.goto("/settings");
+    const card = app.getByTestId("plan-readonly-card");
+    await expect(card).toBeVisible();
+    await expect(app.getByTestId("plan-readonly-sentence")).toHaveText("Paket Gratis, 10 draf AI per bulan.");
+    await expect(card).toContainText("Pembayaran belum dibuka");
+    await expect(app.getByRole("heading", { name: "Paket Saya" })).toBeVisible();
+    await expect(app.getByRole("link", { name: /Lihat paket|Kelola paket/ })).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Bayar|Upgrade|Berlangganan/i })).toHaveCount(0);
+    await expect(app.locator('a[href="/subscription"]')).toHaveCount(0);
+  });
+});
+
 test.describe("Pengaturan: kartu yang fiturnya mati", () => {
   test("Kunci API Sendiri dan Notifikasi WhatsApp menampilkan Belum tersedia, bukan galat atau istilah teknis", async ({ app, backend }) => {
     backend.state.notificationStatus = { telegram: false, notificationsEnabled: false, whatsappKapso: false, email: false };
