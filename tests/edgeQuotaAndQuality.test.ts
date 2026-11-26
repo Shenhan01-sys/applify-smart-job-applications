@@ -144,13 +144,14 @@ test("task-2d: slot.release() idempoten dan pelepasan dilakukan segera setelah c
   assert.ok(consumeIdx > 0 && releaseAfterConsumeIdx > consumeIdx && releaseAfterConsumeIdx < returnIdx);
 });
 
-test("task-2d: draf SQL monthly_quota_reserve memuat NOT EXISTS & cast UUID aman", (t) => {
+test("task-2d: draf SQL monthly_quota_reserve memuat NOT EXISTS & cast UUID aman", () => {
   const sqlUrl = new URL("../../database/migrations/DRAFT_2026-11-26_monthly_quota_reserve.sql", import.meta.url);
   const sqlDraft = readFileSync(sqlUrl, "utf8");
-  if (sqlDraft.trim().length === 0) {
-    t.skip("DRAFT_2026-11-26_monthly_quota_reserve.sql kosong (0 byte) di disk; kontrak SQL dilewati");
-    return;
-  }
+  // Jangan skip bila kosong: draf kosong berarti regresi (kontrak kuota bulanan hilang), bukan alasan melewati tes.
+  assert.ok(
+    sqlDraft.trim().length > 0,
+    "DRAFT_2026-11-26_monthly_quota_reserve.sql kosong (0 byte): draf SQL harus berisi kontrak NOT EXISTS & cast UUID aman",
+  );
   assert.match(sqlDraft, /NOT EXISTS\s*\(\s*SELECT 1\s+FROM public\.ai_applications/i);
   assert.match(sqlDraft, /~[*]\s*'\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$'/i);
   assert.match(sqlDraft, /THEN\s*\(l\.details ->> 'job_id'\)::uuid\s+ELSE NULL/i);
