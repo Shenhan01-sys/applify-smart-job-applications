@@ -9,6 +9,7 @@ import AgentApplyStatus from "@/components/AgentApplyStatus";
 import AgentQuestions from "@/components/AgentQuestions";
 import AgentSecurityCode from "@/components/AgentSecurityCode";
 import AgentManualSubmit from "@/components/AgentManualSubmit";
+import OutcomeActions, { type OutcomeChange } from "@/components/OutcomeActions";
 import ExtensionConsent from "@/components/ExtensionConsent";
 import LockedClaimBanner from "@/components/LockedClaimBanner";
 import { isAgentApplyActive } from "@/lib/agentApplyStatus";
@@ -82,6 +83,7 @@ const STAGE_STYLE: Record<ApprovalStage, StageStyle> = {
   rejected:        { icon: XCircle,      text: RED },
   expired:         { icon: AlertCircle,  text: GRAY },
   replaced:        { icon: AlertCircle,  text: GRAY },
+  closed:          { icon: XCircle,      text: GRAY },
 };
 
 function ApprovalsPage() {
@@ -157,8 +159,9 @@ function ApprovalsPage() {
     loadEmailApplyData(history).then(setEmailData).catch(() => {});
   };
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (opts: { quiet?: boolean } = {}) => {
+    // quiet: muat ulang tanpa layar "Memuat", untuk tombol Muat ulang status dan sesudah tindakan di kartu.
+    if (!opts.quiet) setLoading(true);
     setLoadError("");
     try {
       if (isMockMode()) {
@@ -210,6 +213,15 @@ function ApprovalsPage() {
     loadData(); // the modal already confirmed the approval with a toast
   };
 
+  // Sesudah tindakan di kartu (lib/outcomeActions.ts): backend sudah menulis, jadi baca ulang daftarnya.
+  const handleOutcomeChanged = async (approvalId: string, change: OutcomeChange) => {
+    if (change === "rerun") handleAgentRerun(approvalId);
+    if (change === "continue_extension") handleConsentGranted(approvalId);
+    // "Belum terkirim, ulangi" membuat persetujuan baru di tab Menunggu: tunjukkan langsung.
+    if (change === "retry_fresh") handleTabChange("pending");
+    await loadData({ quiet: true });
+  };
+
   const handleRejected = () => {
     setModalOpen(false);
     setSelectedRequest(null);
@@ -233,7 +245,7 @@ function ApprovalsPage() {
         <header className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Persetujuan Lamaran</h1>
         </header>
-        <ErrorState title="Daftar persetujuan belum bisa dimuat" message={loadError} onRetry={loadData} />
+        <ErrorState title="Daftar persetujuan belum bisa dimuat" message={loadError} onRetry={() => loadData()} />
       </AppShell>
     );
   }
@@ -324,7 +336,7 @@ function ApprovalsPage() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Belum ada riwayat</h3>
               <p className="text-sm text-muted-foreground">
-                Lamaran yang sudah terkirim, kamu tolak, atau kedaluwarsa akan muncul di sini.
+                Lamaran yang sudah terkirim, kamu tolak, kamu tutup, atau kedaluwarsa akan muncul di sini.
               </p>
             </>
           )}
@@ -337,6 +349,11 @@ function ApprovalsPage() {
             const approved = request.status === 'approved';
             // Masa berlaku habis: tanpa pertanyaan, unggahan, kode, atau tombol lanjut. Hanya penjelasan dan ajukan lagi.
             const expired = approved && placement.stage === 'expired';
+            // Sudah tercatat terkirim: percobaan agen yang lebih lama tidak boleh lagi meminta jawaban, kode, atau langkah.
+            const isSent = placement.stage === 'sent';
+            const sentVia = isSent
+              ? (emailData.manual.has(request.id) ? 'manual' as const : emailData.sentAction[request.id] === 'email_apply' ? 'email' as const : 'agent' as const)
+              : null;
             const consent = approved && !expired
               ? extensionConsentState({
                   approvalStatus: request.status,
@@ -392,18 +409,18 @@ function ApprovalsPage() {
                       </p>
                     )}
                     {approved && (
-                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} expired={expired} />
+                      <AgentApplyStatus row={emailData.agent[request.id]} jobUrl={emailData.jobUrls[request.id]} consentShown={consent.show && !!consent.reason} notQueued={notQueuedFor(request.id)} expired={expired} sentVia={sentVia} />
                     )}
                     {consent.show && consent.reason && (
                       <ExtensionConsent approvalId={request.id} reason={consent.reason} onGranted={handleConsentGranted} />
                     )}
-                    {approved && !expired && (
+                    {approved && !expired && !isSent && (
                       <AgentSecurityCode approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} onCodeSent={handleCodeSent} />
                     )}
-                    {approved && !expired && (
+                    {approved && !expired && !isSent && (
                       <AgentQuestions approvalId={request.id} row={emailData.agent[request.id]} onRerun={handleAgentRerun} />
                     )}
-                    {approved && !expired && (
+                    {approved && !expired && !isSent && (
                       <AgentManualSubmit
                         approvalId={request.id}
                         row={emailData.agent[request.id]}
@@ -413,8 +430,19 @@ function ApprovalsPage() {
                       />
                     )}
                     {approved && (
-                      <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={loadData} />
+                      <LockedClaimBanner approvalId={request.id} row={emailData.agent[request.id]} onResolved={() => loadData({ quiet: true })} />
                     )}
+                    <OutcomeActions
+                      approvalId={request.id}
+                      stage={placement.stage}
+                      approvalStatus={request.status}
+                      row={emailData.agent[request.id]}
+                      jobUrl={emailData.jobUrls[request.id]}
+                      platform={request.platform}
+                      consentShown={consent.show}
+                      onChanged={(change) => handleOutcomeChanged(request.id, change)}
+                      onShowPending={() => handleTabChange("pending")}
+                    />
                     {approved && (() => {
                       const agentRow = emailData.agent[request.id];
                       const blockedByAgent =

@@ -8,9 +8,11 @@ import {
   awaitingLoginState,
   describeAgentApply,
   describeExpiredApproval,
+  describeSentApproval,
   resolveLoginTabUrl,
   type AgentApplyRow,
   type AgentApplyTone,
+  type SentVia,
 } from "@/lib/agentApplyStatus";
 import { describeDocumentsAttached, hasAgentEvidence } from "@/lib/agentEvidence";
 import { manualSubmitState } from "@/lib/manualSubmit";
@@ -50,6 +52,7 @@ export default function AgentApplyStatus({
   consentShown = false,
   notQueued = null,
   expired = false,
+  sentVia = null,
 }: {
   row: AgentApplyRow | null | undefined;
   jobUrl?: string | null;
@@ -58,11 +61,14 @@ export default function AgentApplyStatus({
   expired?: boolean;
   /** Persetujuan ini sengaja tidak diantre (LinkedIn, email langsung). Tanpa percobaan agen, kartu ini diganti penjelasan jalurnya. */
   notQueued?: NotQueuedRoute | null;
+  /** Persetujuan sudah tercatat terkirim lewat jalur ini. Bila percobaan agen terbaru bukan hasil terkirim, teks percobaan lama diganti. */
+  sentVia?: SentVia | null;
 }) {
   if (notQueued && !row) return <NotQueuedNotice route={notQueued} jobUrl={jobUrl} />;
-  const view = expired ? describeExpiredApproval() : describeAgentApply(row);
+  const sentOverride = !expired && sentVia ? describeSentApproval(row, sentVia) : null;
+  const view = sentOverride ?? (expired ? describeExpiredApproval() : describeAgentApply(row));
   // Berhenti sebelum kirim dengan langkah dari ekstensi: daftar bernomor menggantikan kalimat umumnya.
-  const nextSteps = expired ? null : nextStepGuideFor(row, view.tone);
+  const nextSteps = expired || sentOverride ? null : nextStepGuideFor(row, view.tone);
   // Situs belum diizinkan kirim otomatis: panel "Kirim sendiri di situs lowongan" di bawah kartu ini sudah menjelaskannya,
   // jadi kalimat umum "berhenti sebelum kirim" tidak diulang.
   const showHint = !!view.hint && !nextSteps && (expired || manualSubmitState(row)?.kind !== "not_allowed");
@@ -71,7 +77,7 @@ export default function AgentApplyStatus({
       ? "Situs ini mewajibkan akun pelamar. Klik Izinkan pada kartu Ekstensi Browser di bawah untuk membuka tab masuk."
       : view.hint;
   // Hanya log Ekstensi Browser yang mencatat berkas terpasang (details.documents_attached). Hanya jenisnya, tanpa nama atau jalur berkas.
-  const documents = row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
+  const documents = !sentOverride && row?.channel === "extension" ? describeDocumentsAttached(row.documents_attached) : null;
   const loginWaiting = !expired && awaitingLoginState(row).waiting;
   const openLoginUrl = loginWaiting ? resolveLoginTabUrl(row, jobUrl) : null;
   return (
@@ -130,7 +136,7 @@ export default function AgentApplyStatus({
           {documents}
         </p>
       )}
-      {row && hasAgentEvidence(row) && (
+      {row && !sentOverride && hasAgentEvidence(row) && (
         <AgentEvidence screenshots={row.screenshots} filledFields={row.filled_fields} loggedAt={row.logged_at} />
       )}
     </div>

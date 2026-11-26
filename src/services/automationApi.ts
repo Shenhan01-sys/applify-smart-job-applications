@@ -306,6 +306,42 @@ export const automationApi = {
   },
 
   /**
+   * "Sudah terkirim" (POST /api/approvals/:id/mark-sent): pengguna sudah memeriksa email atau portal dan lamaran
+   * ternyata terkirim. Backend menulis log success bertanda manual dan confirmed_by user (bukan konfirmasi sistem),
+   * dan memindahkan kartu lamaran ke Terkirim. Browser tidak menulis tabelnya sendiri (RLS). 200 { success,
+   * already_marked? }; 404, 409 (already_sent, agent_working, already_resolved, not_approved), 422 no_job.
+   */
+  async markApprovalSent(id: string) {
+    return apiFetch<{ success: boolean; already_marked?: boolean }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/mark-sent`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}) },
+      () => ({ success: true }),
+    )
+  },
+
+  /**
+   * "Belum terkirim, ulangi" (POST /api/approvals/:id/not-sent): backend membuat persetujuan baru (pending, 24 jam)
+   * untuk lowongan yang sama dan memindahkan yang lama ke Riwayat. Tidak ada yang dikirim. 200 { success,
+   * new_approval_id }; 404, 409 (already_sent, agent_working, already_resolved, pending_exists), 422 no_job.
+   */
+  async reportApprovalNotSent(id: string) {
+    return apiFetch<{ success: boolean; new_approval_id?: string }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/not-sent`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}) },
+      () => ({ success: true, new_approval_id: `mock-fresh-${id}` }),
+    )
+  },
+
+  /** "Tutup" (POST /api/approvals/:id/close): pindah ke Riwayat dengan status Ditutup. Kartu lamaran tidak diubah. */
+  async closeApproval(id: string) {
+    return apiFetch<{ success: boolean }>(
+      `${apiBase()}/api/approvals/${encodeURIComponent(id)}/close`,
+      { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}) },
+      () => ({ success: true }),
+    )
+  },
+
+  /**
    * Teruskan kode keamanan dari email ke agen yang menunggu (POST /api/agent/security-code).
    * 202 { accepted: true }; 400 invalid_code | invalid_job, 401, 404, 409 agent_not_waiting, 429 too_many_codes,
    * 503 feature_unavailable, 500 dilempar sebagai ApiError (lihat describeSecurityCodeError di securityCode.ts).
@@ -583,7 +619,7 @@ export const automationApi = {
 
   /** Status klaim atomik untuk persetujuan yang disetujui (mendeteksi klaim macet). */
   async getApprovalClaimStatuses(approvalIds: string[]): Promise<{
-    claims: Record<string, { approvalId: string; state: 'none' | 'in_progress' | 'submitted' | 'abandoned' | 'locked_stuck'; channel: 'worker' | 'extension' | null }>
+    claims: Record<string, { approvalId: string; state: 'none' | 'in_progress' | 'submitted' | 'abandoned' | 'closed' | 'locked_stuck'; channel: 'worker' | 'extension' | null }>
   }> {
     return apiFetch(
       `${apiBase()}/api/approvals/claim-statuses`,

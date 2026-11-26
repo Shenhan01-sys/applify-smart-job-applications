@@ -39,7 +39,8 @@ export type ApprovalStage =
   | "sent"
   | "rejected"
   | "expired"
-  | "replaced";
+  | "replaced"
+  | "closed";
 
 export interface ApprovalPlacement {
   tab: ApprovalTab;
@@ -64,7 +65,11 @@ export const STAGE_LABEL: Record<ApprovalStage, string> = {
   rejected: "Ditolak",
   expired: "Kedaluwarsa",
   replaced: "Diganti persetujuan baru",
+  closed: "Ditutup",
 };
+
+/** Terkirim menurut pernyataan pengguna (POST /mark-sent), bukan konfirmasi sistem. Data skripsi membedakannya. */
+export const SENT_BY_USER_LABEL = "Terkirim (dikonfirmasi kamu)";
 
 /** Persetujuan yang gagal dan masa berlakunya habis: tidak bisa dicoba lagi, jadi ditutup (tahap expired). */
 export const FAILED_CLOSED_LABEL = STATUS_TERM.expiredNotSent;
@@ -73,7 +78,7 @@ export const EXPIRED_NOT_SENT_LABEL = STATUS_TERM.expiredNotSent;
 export const EXPIRED_UNKNOWN_LABEL = "Masa berlaku habis, status belum terbaca";
 
 /** Tahap yang masuk tab Riwayat. Selain ini, persetujuan ada di tab Menunggu. */
-const HISTORY_STAGES: ReadonlySet<ApprovalStage> = new Set(["sent", "rejected", "expired", "replaced"]);
+const HISTORY_STAGES: ReadonlySet<ApprovalStage> = new Set(["sent", "rejected", "expired", "replaced", "closed"]);
 
 /** Bagian persetujuan (approval_requests) yang dibutuhkan. */
 export interface ApprovalPlacementInput {
@@ -128,7 +133,9 @@ const isEmailJobActive = (job: EmailQueueRow | null | undefined) => job?.status 
  *   expired                         -> Riwayat, "Kedaluwarsa"
  *   approved                        -> tergantung hasil kerja agen dan email, urutan pemeriksaan:
  *     1. ada log success                                       -> Riwayat, "Terkirim"
- *     2. klaim kirim dilepas (persetujuan baru sudah dibuat)    -> Riwayat, "Diganti persetujuan baru"
+ *     2. klaim kirim dilepas atau pengguna memilih "Belum terkirim, ulangi" (persetujuan baru sudah dibuat)
+ *                                                               -> Riwayat, "Diganti persetujuan baru"
+ *        pengguna memilih "Tutup"                               -> Riwayat, "Ditutup"
  *     3. status agen belum terbaca                              -> Menunggu, "Status belum terbaca";
  *        masa berlaku sudah habis                               -> Riwayat, "Masa berlaku habis, status belum terbaca"
  *     3b. masa berlaku habis, agen tidak bekerja, kirim sudah  -> Riwayat, "Kedaluwarsa, belum terkirim"
@@ -158,8 +165,11 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   const row = ctx.agent ?? null;
   const view = describeAgentApply(row, now);
 
-  if (ctx.sent === true || view.tone === "sent") return place("sent");
+  if (ctx.sent === true || view.tone === "sent") return place("sent", row?.confirmed_by === "user" ? SENT_BY_USER_LABEL : STAGE_LABEL.sent);
+  // Pernyataan pengguna ("Belum terkirim, ulangi" atau "Tutup") menutup persetujuan ini, juga bila agen sempat mencatat
+  // kirim yang belum terkonfirmasi. Hanya log success yang lebih kuat (cabang di atas).
   if (row?.claim_state === "abandoned") return place("replaced");
+  if (row?.claim_state === "closed") return place("closed");
   if (ctx.agentKnown === false && !row) {
     // Persetujuan yang masa berlakunya sudah habis tidak bisa dijawab, diunggah, atau dilanjutkan lagi, jadi status
     // agen yang tidak terbaca tidak boleh menahannya di Menunggu (uji E2E production 26 November 2026: tab Menunggu
@@ -175,8 +185,11 @@ export function placeApproval(approval: ApprovalPlacementInput | null | undefine
   // juga ditutup saat masa berlakunya habis, karena tidak ada percobaan agen yang akan datang dan tidak ada tombol
   // untuk menandainya terkirim.
   const idleNotQueued = !!ctx.notQueued && !ctx.emailJob && ctx.testMode !== true;
+  // Tanpa tugas agen sama sekali (status agen terbaca dan kosong) juga ditutup saat masa berlakunya habis: tidak ada
+  // giliran yang ditunggu. Hasil kirimnya tidak diketahui, jadi kartu di Riwayat memberi tiga tindakan.
+  const noTaskAtAll = !row && ctx.agentKnown === true && !ctx.emailJob && ctx.testMode !== true;
   if (
-    (row || idleNotQueued) &&
+    (row || idleNotQueued || noTaskAtAll) &&
     isExpiredByTime(approval?.expires_at, now) &&
     view.tone !== "unverified" &&
     !isAgentApplyActive(row) &&

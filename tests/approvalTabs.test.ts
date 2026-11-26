@@ -142,7 +142,10 @@ test("disetujui, agen gagal: bisa dicoba lagi tetap di Menunggu, masa berlaku ha
 });
 
 test("temuan 22: disetujui tidak pernah berlabel Kedaluwarsa hanya karena waktu lewat", () => {
-  expectPlace(place(approved({ expires_at: PAST }), {}), "pending", "not_started", "Menunggu giliran");
+  // Pembaruan 26 November 2026 (keputusan Hans): tanpa tugas agen sama sekali, persetujuan yang habis masa berlakunya
+  // tidak punya giliran yang ditunggu. Kartunya pindah ke Riwayat dan diberi tiga tindakan, bukan menggantung di
+  // Menunggu giliran tanpa jalan keluar. Labelnya tetap "Kedaluwarsa, belum terkirim", bukan "Kedaluwarsa" polos.
+  expectPlace(place(approved({ expires_at: PAST }), {}), "history", "expired", EXPIRED_NOT_SENT_LABEL);
   expectPlace(place(approved({ expires_at: PAST }), { sent: true }), "history", "sent", "Terkirim");
   for (const ctx of [{}, { agent: agentRow("processing") }, { agent: agentRow("completed", { status: "ready" }) }, { sent: true }]) {
     assert.notEqual(place(approved({ expires_at: PAST }), ctx).label, "Kedaluwarsa");
@@ -217,8 +220,11 @@ test("disetujui tanpa antrean dan tanpa tugas: ditutup saat masa berlaku habis (
   // email yang sedang berjalan, atau selesai dalam mode uji, tidak ikut ditutup
   expectPlace(place(approved({ expires_at: PAST }), { notQueued: "email_direct", emailJob: { status: "processing" } }), "pending", "processing");
   expectPlace(place(approved({ expires_at: PAST }), { notQueued: "email_direct", testMode: true, emailJob: { status: "completed" } }), "pending", "test_mode");
-  // jalur antrean biasa tanpa tugas tetap tidak ditutup hanya karena waktu (temuan 22)
-  expectPlace(place(approved({ expires_at: PAST }), {}), "pending", "not_started", "Menunggu giliran");
+  // jalur antrean biasa tanpa tugas juga ditutup (keputusan Hans 26 November 2026), tetapi hanya bila status agen terbaca
+  expectPlace(place(approved({ expires_at: PAST }), {}), "history", "expired", EXPIRED_NOT_SENT_LABEL);
+  expectPlace(place(approved({ expires_at: PAST }), { agentKnown: false }), "history", "expired", EXPIRED_UNKNOWN_LABEL);
+  // masa berlaku masih ada: tetap Menunggu giliran
+  expectPlace(place(approved({ expires_at: FUTURE }), {}), "pending", "not_started", "Menunggu giliran");
   // yang sudah terkirim tidak pernah ikut tertutup
   expectPlace(place(approved({ expires_at: PAST }), { notQueued: "manual", sent: true }), "history", "sent");
 });
@@ -241,8 +247,8 @@ test("klaim kirim dilepas karena pengguna membuat persetujuan baru: Riwayat, Dig
 
 // ---- invarian: Riwayat hanya terkirim atau ditutup ---------------------------------------------------
 
-test("Riwayat hanya memuat tahap terkirim, ditolak, kedaluwarsa, dan diganti; semua tahap lain di Menunggu", () => {
-  const history: ApprovalStage[] = ["sent", "rejected", "expired", "replaced"];
+test("Riwayat hanya memuat tahap terkirim, ditolak, kedaluwarsa, diganti, dan ditutup; semua tahap lain di Menunggu", () => {
+  const history: ApprovalStage[] = ["sent", "rejected", "expired", "replaced", "closed"];
   const examples: Array<[ApprovalStage, ReturnType<typeof placeApproval>]> = [
     ["review", place({ status: "pending", expires_at: FUTURE })],
     ["checking", place(approved(), { agentKnown: false })],
@@ -259,6 +265,7 @@ test("Riwayat hanya memuat tahap terkirim, ditolak, kedaluwarsa, dan diganti; se
     ["rejected", place({ status: "rejected" })],
     ["expired", place({ status: "expired" })],
     ["replaced", place(approved(), { agent: agentRow("completed", undefined, { claim_state: "abandoned" }) })],
+    ["closed", place(approved(), { agent: agentRow("completed", undefined, { claim_state: "closed" }) })],
   ];
   assert.equal(new Set(examples.map(([stage]) => stage)).size, Object.keys(STAGE_LABEL).length, "setiap tahap punya contoh");
   for (const [stage, got] of examples) {

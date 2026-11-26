@@ -183,6 +183,16 @@ export function describeApiError(err: unknown, fallback = "Terjadi kesalahan. Co
       return "Pengiriman untuk persetujuan ini masih berjalan atau statusnya belum bisa dipastikan. Tunggu beberapa menit, lalu muat ulang halaman.";
     case "already_resolved":
       return "Klaim ini sudah diselesaikan sebelumnya, jadi tidak ada yang diubah lagi.";
+    case "already_sent":
+      return "Lamaran ini sudah tercatat terkirim oleh agen atau email, jadi tidak perlu ditandai lagi. Muat ulang halaman untuk melihat statusnya.";
+    case "agent_working":
+      return "Agen atau ekstensi masih mengerjakan lamaran ini. Tunggu sampai selesai, lalu muat ulang halaman dan pilih tindakannya lagi.";
+    case "not_approved":
+      return "Persetujuan ini belum disetujui atau sudah diproses. Muat ulang halaman dan periksa statusnya.";
+    case "no_job":
+      return "Persetujuan ini tidak punya lowongan, jadi persetujuan baru tidak bisa dibuat. Ajukan lagi dari halaman Lowongan.";
+    case "pending_exists":
+      return "Sudah ada persetujuan yang menunggu untuk lowongan ini. Buka tab Menunggu untuk memeriksanya.";
     case "already_logged":
       return "Lamaran ini sudah tercatat terkirim, jadi tidak perlu dipulihkan lagi.";
     case "approval_required":

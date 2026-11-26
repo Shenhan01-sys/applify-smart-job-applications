@@ -300,7 +300,7 @@ test("kabel: kartu Persetujuan memasang panel kirim sendiri sesudah pertanyaan a
   const emailAt = page.indexOf("<EmailApplyPanel");
   assert.ok(questionsAt > 0 && manualAt > questionsAt && emailAt > manualAt);
   // kartu agen tampil di tab mana pun selama persetujuannya sudah disetujui (Menunggu atau Riwayat)
-  assert.match(page, /\{approved && !expired && \(\s*<AgentManualSubmit/);
+  assert.match(page, /\{approved && !expired && !isSent && \(\s*<AgentManualSubmit/);
   assert.match(page, /jobUrl=\{emailData\.jobUrls\[request\.id\]\}/);
   assert.match(page, /coverLetter=\{request\.cover_letter \?\? null\}/);
   assert.match(page, /onRerun=\{handleAgentRerun\}/);
@@ -315,7 +315,7 @@ test("kabel: Lamaran Saya memasang panel di jendela detail", () => {
   const at = src.indexOf("<AgentManualSubmit");
   assert.ok(at > 0);
   const block = src.slice(at, at + 700);
-  assert.match(block, /approvalId=\{selectedFacts\?\.approval_request_id\}/);
+  assert.match(block, /approvalId=\{approvalLive \? selectedFacts\?\.approval_request_id : undefined\}/);
   assert.match(block, /jobUrl=\{selectedJob\?\.external_url\}/);
   assert.match(block, /loadCoverLetter/);
 });
@@ -333,15 +333,14 @@ test("kabel: layanan membaca log manual lama dan alamat lowongan, dan memuat cov
 
 // ---- tombol "Saya sudah mengirimnya sendiri" sudah dihapus -------------------------------------------
 
-test("tombol tandai terkirim sendiri sudah tidak ada di layar, komponen, layanan, atau klien API", () => {
+test("tombol lama 'Saya sudah mengirimnya sendiri' tetap tidak ada; pernyataan pengguna hanya lewat backend dan hanya untuk hasil tidak pasti", () => {
+  // Keputusan 26 November 2026 menggantikan keputusan 25 November: tombolnya kembali, tetapi sebagai tiga tindakan pada
+  // hasil kirim yang tidak pasti (OutcomeActions), bukan tombol umum di panel kirim sendiri. Teks dan nama lama tidak kembali.
   const files = [
     "../src/components/AIApplyModal.tsx",
     "../src/components/AgentManualSubmit.tsx",
-    "../src/routes/approvals.tsx",
-    "../src/routes/applications.tsx",
     "../src/lib/manualSubmit.ts",
     "../src/services/manualSubmitService.ts",
-    "../src/services/automationApi.ts",
   ];
   for (const file of files) {
     const src = read(file);
@@ -355,10 +354,24 @@ test("tombol tandai terkirim sendiri sudah tidak ada di layar, komponen, layanan
   for (const gone of ["MARK_SENT_LABEL", "MARK_CONFIRM_TEXT", "MARKED_TEXT", "markSentErrorMessage"]) {
     assert.equal(names.includes(gone), false, gone);
   }
-  // Panel kirim sendiri tetap ada, tetapi tidak menawarkan penandaan.
+  // Panel kirim sendiri tetap tidak menawarkan penandaan.
   const panel = read("../src/components/AgentManualSubmit.tsx");
   assert.match(panel, /OPEN_FORM_LABEL/);
   assert.doesNotMatch(panel, /markApprovalSent|setConfirming|confirmMark/);
+
+  // Tiga tindakan baru: lewat klien API ke backend, tanpa menulis tabel dari browser (RLS mengunci tulisannya).
+  const api = read("../src/services/automationApi.ts");
+  assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/mark-sent/);
+  assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/not-sent/);
+  assert.match(api, /\/api\/approvals\/\$\{encodeURIComponent\(id\)\}\/close/);
+  for (const file of ["../src/components/OutcomeActions.tsx", "../src/lib/outcomeActions.ts"]) {
+    const src = read(file);
+    assert.doesNotMatch(src, /supabase|\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(/, `${file}: browser tidak boleh menulis tabel langsung`);
+  }
+  const widget = read("../src/components/OutcomeActions.tsx");
+  assert.match(widget, /automationApi\.markApprovalSent/);
+  assert.match(widget, /automationApi\.reportApprovalNotSent/);
+  assert.match(widget, /automationApi\.closeApproval/);
 });
 
 test("manualSubmitState: log incomplete page_mismatch menawarkan coba kirim otomatis lagi", () => {

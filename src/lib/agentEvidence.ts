@@ -95,6 +95,11 @@ export interface AgentLogFacts {
    * Agen tidak menekan kirim, jadi tidak ada tangkapan layar halaman konfirmasi. Kunci ini hanya ada bila true.
    */
   manual?: boolean;
+  /**
+   * details.confirmed_by === "user": log success yang ditulis backend atas pernyataan pengguna (POST /mark-sent), bukan
+   * konfirmasi sistem. Kunci ini hanya ada bila nilainya "user".
+   */
+  confirmed_by?: "user";
   /** details.approval_request_id: persetujuan yang dipakai percobaan ini. Kunci ini hanya ada bila log memuatnya. */
   approval_request_id?: string | null;
   /**
@@ -262,6 +267,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     screenshots: cleanScreenshots(details.screenshots),
     logged_at: typeof row.created_at === "string" && !Number.isNaN(Date.parse(row.created_at)) ? row.created_at : null,
     ...(details.manual === true ? { manual: true } : {}),
+    ...(details.confirmed_by === "user" ? { confirmed_by: "user" as const } : {}),
     ...(cleanText(details.approval_request_id, 64) ? { approval_request_id: cleanText(details.approval_request_id, 64) } : {}),
     ...(fromExtension ? { channel: "extension" as const } : {}),
     ...(documents ? { documents_attached: documents } : {}),

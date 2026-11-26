@@ -32,6 +32,8 @@ export interface EmailApplyData {
   agent: Record<string, AgentApplyRow>;
   /** approval ids the user marked as sent themselves (application_logs success with details.manual) */
   manual: Set<string>;
+  /** application_logs.action of the success row per approval id: "email_apply" (Gmail) or "apply" (agent, extension, or user). */
+  sentAction: Record<string, string>;
   /** job posting address (jobs.external_url, http or https only), per approval id: "Buka formulir lowongan" */
   jobUrls: Record<string, string>;
   /** approval ids whose email job finished without sending because real sending is off (test mode, application_logs skipped) */
@@ -46,7 +48,7 @@ export interface EmailApplyData {
   agentKnown: boolean;
 }
 
-export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, gmailEmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, notQueued: {}, agentKnown: false });
+export const emptyEmailApplyData = (): EmailApplyData => ({ gmail: null, gmailEmail: null, used: new Set(), jobs: {}, suggestions: {}, agent: {}, manual: new Set(), sentAction: {}, jobUrls: {}, testMode: new Set(), attachmentPlans: {}, sentAttachments: {}, notQueued: {}, agentKnown: false });
 
 /**
  * What the form-filling agent did for each approval: the latest `apply` job (payload.approval_request_id)
@@ -199,6 +201,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     const id = (row as any)?.details?.approval_request_id;
     if (typeof id !== "string") continue;
     data.used.add(id);
+    if (typeof (row as any)?.action === "string" && !data.sentAction[id]) data.sentAction[id] = (row as any).action;
     // Lampiran yang tercatat worker pada email yang terkirim (baris log email_apply; email lama tidak punya daftarnya).
     if ((row as any)?.action === "email_apply" && !data.sentAttachments[id]) {
       const sent = parseSentAttachments((row as any)?.details);
@@ -207,7 +210,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
     // Ditandai terkirim oleh pengguna sendiri: kartu menampilkannya sebagai hasil percobaan terbaru, bukan kiriman agen.
     if ((row as any)?.details?.manual === true) {
       data.manual.add(id);
-      data.agent[id] = manualSentRow(data.agent[id], (row as any).created_at);
+      data.agent[id] = manualSentRow(data.agent[id], (row as any).created_at, (row as any)?.details?.confirmed_by);
     }
   }
 

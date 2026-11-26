@@ -41,7 +41,7 @@ export interface AgentApplyRow extends AgentLogFacts {
   /** automation_queue.scheduled_at: jatuh tempo yang terlewat jauh pada tugas ekstensi berarti tidak ada ekstensi aktif. */
   scheduled_at?: string | null;
   /** Status penguncian atomik `approval_submit_claims` bila worker/ekstensi berhenti sesudah klaim. */
-  claim_state?: "none" | "in_progress" | "submitted" | "abandoned" | "locked_stuck";
+  claim_state?: "none" | "in_progress" | "submitted" | "abandoned" | "closed" | "locked_stuck";
   claim_channel?: "worker" | "extension" | null;
 }
 
@@ -71,6 +71,14 @@ export const AGENT_SENT_EMAIL_NOTE = "Cek juga kotak masuk emailmu: portal lowon
 export const AGENT_MANUAL_SENT_LABEL = "Terkirim (dikirim sendiri)";
 export const AGENT_MANUAL_SENT_HINT =
   "Kamu menandai lamaran ini sudah terkirim setelah mengirimnya sendiri di situs lowongan. Agen tidak menekan kirim dan tidak akan mengirimnya lagi. Applify tidak punya bukti dari situs lowongan untuk lamaran ini, jadi cek emailmu atau akunmu di situs itu bila perlu.";
+
+/**
+ * Log success yang ditulis backend atas pernyataan pengguna sesudah memeriksa email atau portal (details.manual dan
+ * details.confirmed_by "user"). Bukan konfirmasi sistem: tidak ada halaman konfirmasi atau tangkapan layar.
+ */
+export const AGENT_USER_CONFIRMED_LABEL = "Terkirim (dikonfirmasi kamu)";
+export const AGENT_USER_CONFIRMED_HINT =
+  "Kamu mengonfirmasi lamaran ini sudah terkirim setelah memeriksa email atau portal lowongan. Ini pernyataanmu, bukan konfirmasi dari situs lowongan, jadi Applify tidak punya bukti pengiriman. Agen tidak akan mengirimnya lagi.";
 
 export const AGENT_UNVERIFIED_LABEL = "Perlu dicek: kirim belum terkonfirmasi";
 export const AGENT_UNVERIFIED_HINT =
@@ -176,6 +184,9 @@ function partialHint(remaining: readonly string[] | undefined): string {
 export function describeLogOutcome(facts: AgentLogFacts | null | undefined): AgentApplyView | null {
   if (!facts) return null;
   const { log_status: status, reason, submit_blocked: blocked } = facts;
+  if (status === "success" && facts.manual === true && facts.confirmed_by === "user") {
+    return { label: AGENT_USER_CONFIRMED_LABEL, hint: AGENT_USER_CONFIRMED_HINT, tone: "sent", suggestEmail: false };
+  }
   if (status === "success" && facts.manual === true) {
     return { label: AGENT_MANUAL_SENT_LABEL, hint: AGENT_MANUAL_SENT_HINT, tone: "sent", suggestEmail: false };
   }
@@ -299,13 +310,41 @@ function filledNothing(row: AgentApplyRow): boolean {
   return isQueueNeedsManual(row.status, effectiveQueueJobType(row), row.fields_filled) || (row.log_status === "incomplete" && row.reason === "no_fields_filled");
 }
 
+/**
+ * Persetujuan yang sudah tercatat terkirim (log success, termasuk email) tetapi percobaan agen terbarunya berhenti
+ * sebelum kirim atau masih menunggu jawaban. Contoh nyata: GoToGroup 23 November 2026, email terkirim 24 November 08.12
+ * sesudah tiga percobaan ekstensi yang terisi sebagian. Status terkirimnya benar; teks percobaan lama yang masih ada di
+ * kartu (isian terisi, "Agen butuh jawabanmu") menyesatkan, jadi diganti penjelasan ini.
+ */
+export type SentVia = "email" | "agent" | "manual";
+export const SENT_VIA_EMAIL_LABEL = "Terkirim lewat email";
+export const SENT_VIA_EMAIL_HINT =
+  "Lamaran ini terkirim lewat email (Gmail). Percobaan agen atau ekstensi yang lebih lama berhenti sebelum kirim dan tidak berlaku lagi, jadi pertanyaan dan langkah lamanya tidak perlu dikerjakan. Cek juga folder Terkirim di Gmail.";
+export const SENT_STALE_ATTEMPT_HINT =
+  "Applify mencatat lamaran ini terkirim. Percobaan agen yang lebih lama dan berhenti sebelum kirim tidak berlaku lagi, jadi pertanyaan dan langkah lamanya tidak perlu dikerjakan.";
+
+/** Tampilan untuk persetujuan terkirim; null bila percobaan terbaru memang hasil terkirim (describeAgentApply sudah benar). */
+export function describeSentApproval(row: AgentApplyRow | null | undefined, via: SentVia): AgentApplyView | null {
+  if (describeAgentApply(row).tone === "sent") return null;
+  if (via === "email") return { label: SENT_VIA_EMAIL_LABEL, hint: SENT_VIA_EMAIL_HINT, tone: "sent", suggestEmail: false };
+  return { label: AGENT_SENT_LABEL, hint: SENT_STALE_ATTEMPT_HINT, tone: "sent", suggestEmail: false };
+}
+
 export const AGENT_ABANDONED_LABEL = "Klaim dilepas: persetujuan baru sudah dibuat";
 export const AGENT_ABANDONED_HINT =
   "Kamu memilih membuat persetujuan baru untuk lowongan ini, jadi pengiriman lama tidak dilanjutkan. Tinjau dan setujui permintaan baru di tab Menunggu.";
 
+export const AGENT_CLOSED_LABEL = "Ditutup";
+export const AGENT_CLOSED_HINT =
+  "Kamu menutup persetujuan ini tanpa mengirim lamaran, jadi agen tidak akan menjalankannya lagi. Bila lowongan ini masih kamu minati, ajukan lagi dari halaman Lowongan.";
+
 export function describeAgentApply(row: AgentApplyRow | null | undefined, now: number = Date.now()): AgentApplyView {
-  if (row?.claim_state === "abandoned" && row.log_status !== "success" && row.log_status !== "submit_unverified") {
+  // Pernyataan pengguna mengalahkan kirim yang belum terkonfirmasi; hanya log success yang lebih kuat.
+  if (row?.claim_state === "abandoned" && row.log_status !== "success") {
     return { label: AGENT_ABANDONED_LABEL, hint: AGENT_ABANDONED_HINT, tone: "manual", suggestEmail: false };
+  }
+  if (row?.claim_state === "closed" && row.log_status !== "success") {
+    return { label: AGENT_CLOSED_LABEL, hint: AGENT_CLOSED_HINT, tone: "manual", suggestEmail: false };
   }
   if (row?.claim_state === "locked_stuck" && row.log_status !== "success" && row.log_status !== "submit_unverified") {
     const channelLabel = row.claim_channel === "extension" ? "Ekstensi Browser" : "Agen";

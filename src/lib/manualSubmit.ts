@@ -9,9 +9,10 @@ import { isCodeTimeout } from "./securityCode.ts";
  * Penyebab paling sering: `details.submit_blocked` = "not_allowed", yaitu situs lowongan belum masuk daftar
  * kirim otomatis di server, atau ALLOW_REAL_SUBMIT mati. Sesi browser agen ada di server dan tidak bisa dijangkau
  * pengguna, jadi pengguna tidak bisa menekan kirim di sana. Layar memberi dua hal: buka formulir lowongan di tab
- * baru, dan salin isian serta cover letter yang disiapkan agen. Tidak ada tombol "sudah kukirim sendiri": status
- * Terkirim hanya datang dari log pengiriman agen atau email. Tombol "Coba kirim otomatis lagi" memakai endpoint
- * rerun yang sudah ada.
+ * baru, dan salin isian serta cover letter yang disiapkan agen. Tombol "Coba kirim otomatis lagi" memakai endpoint
+ * rerun yang sudah ada. Pernyataan pengguna ("Sudah terkirim", "Belum terkirim, ulangi", "Tutup") hanya ada untuk
+ * hasil kirim yang tidak pasti dan lewat backend (lib/outcomeActions.ts); status Terkirim dari pernyataan itu selalu
+ * ditandai konfirmasi pengguna, bukan konfirmasi sistem.
  *
  * Fungsi murni tanpa React dan tanpa Supabase, supaya bisa dites dengan `node --test`. Masukan dari database
  * tidak dipercaya: bentuk yang rusak diabaikan dan tidak pernah melempar galat.
@@ -84,7 +85,7 @@ export function manualSubmitState(row: AgentApplyRow | null | undefined): Manual
   return { kind: "other", text: MANUAL_OTHER_TEXT, canRerun: false };
 }
 
-/** Log lama: lamaran ini ditandai terkirim oleh pengguna (log success dengan details.manual). Tombol penandanya sudah dihapus. */
+/** Lamaran ini ditandai terkirim oleh pengguna (log success dengan details.manual), dari tombol "Sudah terkirim" atau log lama. */
 export function isManualSent(row: AgentLogFacts | null | undefined): boolean {
   return !!row && row.log_status === "success" && row.manual === true;
 }
@@ -94,9 +95,10 @@ export function isManualSent(row: AgentLogFacts | null | undefined): boolean {
  * jadi tidak terhubung ke tugas antrean; barisnya dibuat dari tugas terakhir (bila ada) dengan hasil log success
  * manual. Isian dan tangkapan layar dari percobaan agen sebelumnya ikut terbawa (keduanya memang dibuat agen).
  */
-export function manualSentRow(previous: AgentApplyRow | undefined, loggedAt: unknown): AgentApplyRow {
+export function manualSentRow(previous: AgentApplyRow | undefined, loggedAt: unknown, confirmedBy?: unknown): AgentApplyRow {
   return {
     ...previous,
+    ...(confirmedBy === "user" ? { confirmed_by: "user" as const } : {}),
     status: previous?.status ?? "completed",
     log_status: "success",
     manual: true,

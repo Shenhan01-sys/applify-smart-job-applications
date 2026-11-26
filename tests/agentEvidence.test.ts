@@ -168,7 +168,7 @@ test("percobaan lama tidak dibawa ke lamaran baru: bukti hanya untuk percobaan s
   assert.equal(attemptForApplication(attempt, { created_at: "2026-11-24T10:00:00Z" }), undefined);
   // jendela detail hanya membaca fakta bila attemptForApplication mengembalikan percobaan
   const src = read("../src/routes/applications.tsx");
-  assert.match(src, /const selectedFacts = selectedApp && selectedAttempt \? agentFacts\[selectedApp\.job_id\] : undefined;/);
+  assert.match(src, /const selectedFacts = selectedApp && selectedAttempt \? perApplication\[selectedApp\.id\]\?\.facts : undefined;/);
 });
 
 test("signedUrlOutcome: tautan bertanda tangan, cadangan dari log, dan pesan galat singkat", () => {
