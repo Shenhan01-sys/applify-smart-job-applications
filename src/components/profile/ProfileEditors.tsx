@@ -262,6 +262,15 @@ export function ExperienceEditor({ items, onSave, onDelete, now, onEditingChange
             <input type="checkbox" checked={form.is_current} onChange={(e) => set("is_current", e.target.checked)} className="h-4 w-4 accent-[#0A5BE0]" />
             Masih bekerja di sini
           </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.year_only === true}
+              onChange={(e) => set("year_only", e.target.checked)}
+              className="h-4 w-4 accent-[#0A5BE0]"
+            />
+            Hanya ingat tahunnya (bulan mulai atau selesai belum pasti)
+          </label>
           <Field label="Deskripsi" htmlFor={`${uid}-desc`} error={errors.description} hint={`${form.description.trim().length}/${LIMITS.longText}. Tulis tugas utama dengan fakta yang benar; draf AI hanya boleh memakai fakta dari profilmu.`}>
             <textarea id={`${uid}-desc`} rows={3} className={textareaCls} aria-invalid={!!errors.description} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Tugas dan tanggung jawab utama" />
           </Field>

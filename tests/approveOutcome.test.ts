@@ -41,6 +41,7 @@ test("modal Persetujuan memakai teks per jalur dan tanpa em dash", () => {
 test("HitlTrack di layar sempit memberi Langkah N dari 5; modal AI hanya punya satu aksi utama di footer", () => {
   const track = readFileSync(new URL("../src/components/HitlTrack.tsx", import.meta.url), "utf8");
   assert.match(track, /Langkah \{current \+ 1\} dari \{STEPS\.length\}/);
+  assert.match(track, /STATUS_TERM\.waitingTurn/);
   assert.doesNotMatch(track, /label: "Antrean"/);
   const modal = readFileSync(new URL("../src/components/AIApplyModal.tsx", import.meta.url), "utf8");
   const footer = modal.slice(modal.indexOf('<div className="flex flex-wrap items-center gap-3">'), modal.indexOf('<p id="apply-fill-hint"'));

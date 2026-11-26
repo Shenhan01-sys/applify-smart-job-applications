@@ -146,6 +146,15 @@ export const LOCATION_TYPES = [
   { value: "remote", label: "Remote" },
 ] as const;
 
+export const YEAR_ONLY_EXPERIENCE_NOTE = "Hanya tahun: bulan mulai atau selesai tidak tercantum.";
+const YEAR_ONLY_NOTE_RE = /hanya tahun|bulan (?:mulai|selesai) tidak tercantum/i;
+
+export function hasYearOnlyExperienceNote(notes: unknown): boolean {
+  if (typeof notes === "string") return YEAR_ONLY_NOTE_RE.test(notes);
+  if (Array.isArray(notes)) return notes.some((n) => YEAR_ONLY_NOTE_RE.test(String(n ?? "")));
+  return false;
+}
+
 export interface ExperienceForm {
   company_name: string;
   role_title: string;
@@ -156,6 +165,8 @@ export interface ExperienceForm {
   /** month input, YYYY-MM; ignored when is_current */
   end_date: string;
   is_current: boolean;
+  /** True bila bulan mulai/selesai perkiraan (menulis penanda ke `work_experiences.notes` untuk `conservativeYearOnly`). */
+  year_only?: boolean;
   description: string;
   /** one per line */
   achievements: string;
@@ -175,6 +186,7 @@ export interface ExperienceRow {
   description: string | null;
   achievements: string[];
   skills_used: string[];
+  notes?: string | null;
 }
 
 export const emptyExperienceForm = (): ExperienceForm => ({
@@ -199,6 +211,7 @@ export function experienceToForm(row: Record<string, any>): ExperienceForm {
     start_date: toMonthInput(row.start_date),
     end_date: row.is_current ? "" : toMonthInput(row.end_date),
     is_current: row.is_current === true,
+    ...(hasYearOnlyExperienceNote(row.notes) ? { year_only: true } : {}),
     description: trim(row.description),
     achievements: normalizeAchievements(row.achievements).join("\n"),
     skills_used: normalizeStringList(row.skills_used).join(", "),
@@ -258,6 +271,7 @@ export function validateExperience(form: ExperienceForm, now: Date = new Date())
       description: description || null,
       achievements,
       skills_used: skillsUsed,
+      ...(form.year_only === true ? { notes: YEAR_ONLY_EXPERIENCE_NOTE } : form.year_only === false ? { notes: null } : {}),
     },
   };
 }

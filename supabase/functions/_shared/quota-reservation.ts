@@ -15,6 +15,13 @@ export function effectiveMonthlyRemaining(quotaRemaining: number, activeInflight
   return Math.max(0, rem - inflight);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Validasi UUID agar jobId non-UUID ditolak sebelum masuk kueri/RPC reservasi kuota bulanan. */
+export function isValidUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value.trim());
+}
+
 export interface MonthlySlotHandle {
   allowed: boolean;
   effectiveRemaining: number;

@@ -236,6 +236,7 @@ test("pemetaan pratinjau ke baris: kolom, format tanggal, dan nilai bawaan sama 
     description: null,
     achievements: [],
     skills_used: [],
+    notes: "Bulan selesai tidak tercantum di PDF, diisi Desember.",
   });
   assert.deepEqual(sel.education[0], {
     institution: "Universitas Fiktif Nusantara",

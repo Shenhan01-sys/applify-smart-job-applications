@@ -567,7 +567,9 @@ export function buildImportPlan(preview: ImportPreview, existing: ExistingProfil
       continue;
     }
     seenExp.add(k);
-    plan.experiences.push({ ...base, status: "new", reason: "", row: v.row });
+    const notesText = e.notes.map((n) => n.trim()).filter(Boolean).join(" ");
+    const expRow: ExperienceRow = notesText ? { ...v.row, notes: notesText } : v.row;
+    plan.experiences.push({ ...base, status: "new", reason: "", row: expRow });
   }
 
   // --- pendidikan

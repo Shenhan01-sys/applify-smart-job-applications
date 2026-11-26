@@ -425,3 +425,24 @@ test("temuan 10: hapus skill memakai konfirmasi Hapus/Batal yang sama dengan pen
   assert.match(del, /variant\?: "row" \| "chip"/);
   assert.match(del, /busy \? <Loader2/);
 });
+
+test("Gelombang 11 (1b): form pengalaman menulis penanda year_only ke work_experiences.notes & profileService punya fallback pra-migrasi", () => {
+  const checked = validateExperience(okExperience({ year_only: true }), NOW);
+  assert.equal(checked.ok, true);
+  if (!checked.ok) return;
+  assert.match(String(checked.row.notes ?? ""), /hanya tahun/i);
+
+  const reopened = experienceToForm({ ...checked.row });
+  assert.equal(reopened.year_only, true);
+
+  const cleared = validateExperience({ ...reopened, year_only: false }, NOW);
+  assert.equal(cleared.ok, true);
+  if (cleared.ok) assert.equal(cleared.row.notes, null);
+
+  const svc = read("../src/services/profileService.ts");
+  assert.match(svc, /writeWorkExperienceWithNotesFallback/);
+  assert.match(svc, /workExpNotesUnsupported/);
+
+  const editors = read("../src/components/profile/ProfileEditors.tsx");
+  assert.match(editors, /Hanya ingat tahunnya/);
+});
