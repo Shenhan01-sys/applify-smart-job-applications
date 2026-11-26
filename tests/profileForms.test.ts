@@ -441,8 +441,74 @@ test("Gelombang 11 (1b): form pengalaman menulis penanda year_only ke work_exper
 
   const svc = read("../src/services/profileService.ts");
   assert.match(svc, /writeWorkExperienceWithNotesFallback/);
-  assert.match(svc, /workExpNotesUnsupported/);
+  assert.match(svc, /@\/lib\/workExperienceNotesWrite/);
 
   const editors = read("../src/components/profile/ProfileEditors.tsx");
   assert.match(editors, /Hanya ingat tahunnya/);
+});
+
+test("Gelombang 11 (1b): penulisan notes pra-migrasi membuang notes, mengingatnya sementara, dan mencoba lagi sesudah TTL", async () => {
+  const {
+    WORK_EXP_NOTES_UNSUPPORTED_TTL_MS,
+    isMissingWorkExpNotesError,
+    resetWorkExperienceNotesWriteCache,
+    writeWorkExperienceWithNotesFallback,
+  } = await import("../src/lib/workExperienceNotesWrite.ts");
+  resetWorkExperienceNotesWriteCache();
+
+  const notesMissing = { data: null, error: { code: "PGRST204", message: "Could not find the 'notes' column of 'work_experiences' in the schema cache" } };
+  const pgNotesMissing = { data: null, error: { code: "42703", message: 'column "notes" of relation "work_experiences" does not exist' } };
+  const otherColumnMissing = { data: null, error: { code: "42703", message: 'column "employment_type" of relation "work_experiences" does not exist' } };
+  assert.equal(isMissingWorkExpNotesError(notesMissing.error), true);
+  assert.equal(isMissingWorkExpNotesError(pgNotesMissing.error), true);
+  assert.equal(isMissingWorkExpNotesError(otherColumnMissing.error), false, "42703 untuk kolom lain bukan alasan membuang notes");
+  assert.equal(isMissingWorkExpNotesError({ code: "23505", message: "duplicate key notes" }), false);
+  assert.equal(isMissingWorkExpNotesError(null), false);
+
+  const calls: string[] = [];
+  let columnExists = false;
+  const run = (label: string) => async (payload?: Record<string, unknown>) => {
+    calls.push(`${label}:${payload && "notes" in payload ? "notes" : "tanpa-notes"}`);
+    return label === "full" && !columnExists ? notesMissing : { data: { id: "w1" }, error: null };
+  };
+  const write = (data: { company_name: string; notes?: string | null }, now: number) =>
+    writeWorkExperienceWithNotesFallback(data, () => run("full")(data), (stripped) => run("fallback")(stripped), now);
+
+  const t0 = 1_000_000;
+  // Pra-migrasi: percobaan penuh gagal, diulang tanpa notes, dan hasilnya sukses.
+  const first = await write({ company_name: "PT A", notes: "Hanya tahun" }, t0);
+  assert.equal(first.error, null);
+  assert.deepEqual(calls, ["full:notes", "fallback:tanpa-notes"]);
+
+  // Dalam TTL: langsung tanpa notes, tidak menembak query gagal lagi.
+  calls.length = 0;
+  await write({ company_name: "PT B", notes: null }, t0 + WORK_EXP_NOTES_UNSUPPORTED_TTL_MS - 1);
+  assert.deepEqual(calls, ["fallback:tanpa-notes"]);
+
+  // Tanpa field notes: jalur penuh biasa, tanpa fallback.
+  calls.length = 0;
+  await write({ company_name: "PT C" }, t0 + 1);
+  assert.deepEqual(calls, ["full:tanpa-notes"]);
+
+  // Sesudah TTL dan kolom sudah dimigrasi: notes ditulis lagi, ingatan "tidak ada" tidak menempel selamanya.
+  columnExists = true;
+  calls.length = 0;
+  await write({ company_name: "PT D", notes: "Hanya tahun" }, t0 + WORK_EXP_NOTES_UNSUPPORTED_TTL_MS + 1);
+  assert.deepEqual(calls, ["full:notes"]);
+  calls.length = 0;
+  await write({ company_name: "PT E", notes: "Hanya tahun" }, t0 + WORK_EXP_NOTES_UNSUPPORTED_TTL_MS + 2);
+  assert.deepEqual(calls, ["full:notes"]);
+
+  // Galat lain (bukan soal notes) dikembalikan apa adanya, tanpa mengulang dan tanpa menandai notes tidak didukung.
+  resetWorkExperienceNotesWriteCache();
+  calls.length = 0;
+  const failing = await writeWorkExperienceWithNotesFallback(
+    { company_name: "PT F", notes: "x" },
+    async () => { calls.push("full"); return otherColumnMissing; },
+    async () => { calls.push("fallback"); return { data: { id: "w2" }, error: null }; },
+    t0,
+  );
+  assert.equal(failing.error?.code, "42703");
+  assert.deepEqual(calls, ["full"]);
+  resetWorkExperienceNotesWriteCache();
 });

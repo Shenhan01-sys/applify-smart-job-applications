@@ -2,41 +2,9 @@ import { supabase } from "@/lib/supabase";
 import { mockFullProfile } from "@/mocks/mockData";
 import type { ExperienceRow, EducationRow, SkillRow } from "@/lib/profileForms";
 import { postLoginTarget, type PostLoginTarget, type ProfileSummary } from "@/lib/onboarding";
+import { writeWorkExperienceWithNotesFallback } from "@/lib/workExperienceNotesWrite";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
-
-const MISSING_NOTES_RE = /notes|schema cache|42703|PGRST204/i;
-let workExpNotesUnsupported = false;
-
-export function resetWorkExperienceNotesWriteCache() {
-  workExpNotesUnsupported = false;
-}
-
-function isMissingWorkExpNotesError(error: any): boolean {
-  if (!error) return false;
-  const code = String(error.code ?? "");
-  const msg = String(error.message ?? "");
-  return (code === "42703" || code === "PGRST204" || /does not exist|schema cache/i.test(msg)) && MISSING_NOTES_RE.test(`${code} ${msg}`);
-}
-
-async function writeWorkExperienceWithNotesFallback<
-  T extends { data: unknown; error: { message?: string; code?: string } | null },
->(
-  data: Partial<ExperienceRow>,
-  runFull: () => PromiseLike<T>,
-  runWithoutNotes: (stripped: Partial<ExperienceRow>) => PromiseLike<T>,
-): Promise<T> {
-  const hasNotesField = "notes" in data;
-  if (!hasNotesField) return runFull();
-  const { notes: _omit, ...withoutNotes } = data;
-  if (workExpNotesUnsupported) return runWithoutNotes(withoutNotes);
-  const res = await runFull();
-  if (res?.error && isMissingWorkExpNotesError(res.error)) {
-    workExpNotesUnsupported = true;
-    return runWithoutNotes(withoutNotes);
-  }
-  return res;
-}
 
 // ==================== TYPES ====================
 
