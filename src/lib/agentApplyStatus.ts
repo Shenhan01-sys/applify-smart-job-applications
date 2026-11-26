@@ -234,6 +234,30 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
         suggestEmail: false,
       };
     }
+    if (reason === "file_upload_required") {
+      return {
+        label: "Formulir meminta unggah berkas (lanjutkan di ekstensi)",
+        hint: "Google Form meminta unggah berkas yang memerlukan login akun Google. Agen tidak mengirim lamaran. Klik Lanjutkan di ekstensi untuk menyelesaikannya di browser kamu.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "google_forms_missing_required") {
+      return {
+        label: "Ada pertanyaan wajib yang perlu dilanjutkan di ekstensi",
+        hint: partialHint(facts.remaining_required),
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (facts.extension_handoff === true) {
+      return {
+        label: "Perlu dilanjutkan di Ekstensi Browser",
+        hint: "Agen berhenti sebelum mengirim dan mengalihkan formulir ke Ekstensi Browser. Klik Lanjutkan di ekstensi di bawah.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
   }
   if (status === "ready" && reason === "code_timeout") {
     return { label: AGENT_CODE_TIMEOUT_LABEL, hint: AGENT_CODE_TIMEOUT_HINT, tone: "manual", suggestEmail: false };

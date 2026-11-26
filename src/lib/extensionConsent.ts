@@ -17,6 +17,10 @@ import { isAgentApplyActive, type AgentApplyRow } from "./agentApplyStatus.ts";
 
 export const EXTENSION_CONSENT_TITLE = "Izinkan ekstensi browser mengisi formulir ini";
 export const EXTENSION_CONSENT_BUTTON = "Izinkan";
+export const EXTENSION_HANDOFF_TITLE = "Lanjutkan di ekstensi";
+export const EXTENSION_HANDOFF_BUTTON = "Lanjutkan di ekstensi";
+export const EXTENSION_HANDOFF_NOTE =
+  "Pengisian berhenti sebelum mengirim karena formulir membutuhkan login, unggah berkas, CAPTCHA, atau jawaban tambahan. Lanjutkan pengisian lewat Ekstensi Browser di tab Chrome/Edge milikmu.";
 export const EXTENSION_CONSENT_BUSY_LABEL = "Memproses...";
 export const EXTENSION_CONSENT_ALWAYS_LABEL = "Selalu izinkan tanpa bertanya";
 export const EXTENSION_CONSENT_EXPLAIN =
@@ -33,7 +37,7 @@ export const EXTENSION_CONSENT_REQUIRED_TOAST = "Disetujui. Izinkan ekstensi bro
 export const EXTENSION_CONSENT_EXPIRED_TEXT = "Persetujuan ini sudah kedaluwarsa. Ajukan lagi dari halaman Lowongan.";
 
 /** Alasan blok izin tampil. */
-export type ExtensionConsentReason = "not_started" | "flagged" | "login_needed";
+export type ExtensionConsentReason = "not_started" | "flagged" | "login_needed" | "handoff_needed";
 
 export interface ExtensionConsentInput {
   /** Status persetujuan (hanya "approved" yang bisa diizinkan). */
@@ -89,11 +93,21 @@ export function extensionConsentState(input: ExtensionConsentInput): ExtensionCo
   if (!eligible) return HIDDEN;
 
   const row = input.row;
+  const pendingQuestions = Math.max(row?.questions_pending ?? 0, row?.questions?.length ?? 0);
+  if (
+    row?.extension_handoff === true ||
+    row?.reason === "file_upload_required" ||
+    row?.reason === "google_forms_missing_required" ||
+    (row?.log_status === "incomplete" && row.reason === "partly_filled" && pendingQuestions > 0)
+  ) {
+    return { show: true, reason: "handoff_needed" };
+  }
   if (row?.log_status === "incomplete" && (row.reason === "auth_required" || row.reason === "external_redirect")) {
     return { show: true, reason: "login_needed" };
   }
   // "Belum ada tugas" hanya berarti bila status agen sudah terbaca; tugas yang tidak terbaca tidak boleh ditebak.
-  if (input.agentKnown && (!row || !row.status)) return { show: true, reason: "not_started" };
+  // Lowongan yang dijalankan agen server dulu (autoWorkerSupported, mis. Google Forms publik) tidak meminta izin ekstensi sebelum worker mencoba.
+  if (input.agentKnown && !channel.autoWorkerSupported && (!row || !row.status)) return { show: true, reason: "not_started" };
   return HIDDEN;
 }
 

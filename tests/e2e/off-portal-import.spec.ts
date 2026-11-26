@@ -1,4 +1,5 @@
 import { expect, test } from "./helpers/test";
+import { approval, isoAgo, jobRow } from "./helpers/fixtures";
 
 /**
  * Alur Impor Lowongan Off-Portal (Gelombang 3) pada halaman /jobs:
@@ -171,5 +172,135 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await expect(applyDialog).toBeVisible();
     await expect(applyDialog.getByText("Frontend Engineer")).toBeVisible();
     await expect(applyDialog.getByText("PT Nusantara Digital")).toBeVisible();
+  });
+
+  test("handoff Google Forms dari worker ke ekstensi menampilkan pertanyaan wajib dan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
+    const gfUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeDemo/viewform";
+    backend.state.jobs = [
+      jobRow("job-gf-1", {
+        title: "Product Engineer",
+        company: "PT Form Publik",
+        external_url: gfUrl,
+        platform_source: "off_portal_poster",
+      }),
+    ];
+    backend.state.history = [
+      approval("apr-gf-1", {
+        job_id: "job-gf-1",
+        job_title: "Product Engineer",
+        company: "PT Form Publik",
+        platform: "google_forms",
+        status: "approved",
+        reviewed_at: isoAgo(1),
+      }),
+    ];
+    backend.state.queue = [
+      {
+        id: "q-gf-1",
+        job_type: "apply",
+        status: "completed",
+        created_at: isoAgo(1),
+        payload: { approval_request_id: "apr-gf-1", job_id: "job-gf-1" },
+      },
+    ];
+    backend.state.logs = [
+      {
+        id: "log-gf-1",
+        action: "apply",
+        job_id: "job-gf-1",
+        status: "incomplete",
+        created_at: isoAgo(1),
+        details: {
+          queue_job_id: "q-gf-1",
+          approval_request_id: "apr-gf-1",
+          reason: "google_forms_missing_required",
+          extension_handoff: true,
+          handoff_reason: "missing_required",
+          fields_filled: 3,
+          remaining_required: ["Ceritakan proyek sistem terdistribusi tersulitmu"],
+          questions: [
+            {
+              key: "ceritakan proyek sistem terdistribusi tersulitmu",
+              label: "Ceritakan proyek sistem terdistribusi tersulitmu",
+              kind: "textarea",
+            },
+          ],
+        },
+      },
+    ];
+
+    await app.goto("/approvals");
+    await expect(app.getByText("Product Engineer")).toBeVisible();
+    await expect(app.getByText("Ceritakan proyek sistem terdistribusi tersulitmu", { exact: true })).toBeVisible();
+
+    const continueBtn = app.getByRole("button", { name: "Lanjutkan di ekstensi" });
+    await expect(continueBtn).toBeVisible();
+    await continueBtn.click();
+
+    await expect(app.getByText(/Izin diberikan/)).toBeVisible();
+    expect(backend.callsTo("POST", "/api/approvals/apr-gf-1/extension-consent")).toHaveLength(1);
+  });
+
+  test("log ekstensi incomplete + partly_filled + questions_pending > 0 menampilkan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
+    backend.state.jobs = [
+      jobRow("job-js-1", {
+        title: "Fullstack Developer",
+        company: "PT Portal Kerja",
+        external_url: "https://id.jobstreet.com/id/job/123456",
+        platform_source: "jobstreet",
+      }),
+    ];
+    backend.state.history = [
+      approval("apr-js-1", {
+        job_id: "job-js-1",
+        job_title: "Fullstack Developer",
+        company: "PT Portal Kerja",
+        platform: "jobstreet",
+        status: "approved",
+        reviewed_at: isoAgo(1),
+      }),
+    ];
+    backend.state.queue = [
+      {
+        id: "q-ext-js-1",
+        job_type: "extension_apply",
+        status: "completed",
+        created_at: isoAgo(1),
+        payload: { approval_request_id: "apr-js-1", job_id: "job-js-1" },
+      },
+    ];
+    backend.state.logs = [
+      {
+        id: "log-ext-js-1",
+        action: "apply",
+        job_id: "job-js-1",
+        status: "incomplete",
+        created_at: isoAgo(1),
+        details: {
+          channel: "extension",
+          approval_request_id: "apr-js-1",
+          reason: "partly_filled",
+          fields_filled: 4,
+          questions_pending: 1,
+          questions: [
+            {
+              key: "bersedia kerja shift",
+              label: "Bersedia kerja shift?",
+              kind: "radio",
+              options: ["Ya", "Tidak"],
+            },
+          ],
+        },
+      },
+    ];
+
+    await app.goto("/approvals");
+    await expect(app.getByText("Fullstack Developer")).toBeVisible();
+    await expect(app.getByText("Bersedia kerja shift?", { exact: true })).toBeVisible();
+    const continueBtn = app.getByRole("button", { name: "Lanjutkan di ekstensi" });
+    await expect(continueBtn).toBeVisible();
+    await continueBtn.click();
+    await expect(app.getByText(/Izin diberikan/)).toBeVisible();
+    expect(backend.callsTo("POST", "/api/approvals/apr-js-1/extension-consent")).toHaveLength(1);
   });
 });

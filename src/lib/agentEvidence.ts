@@ -65,6 +65,8 @@ export interface AgentLogFacts {
    * Hanya bermakna bila percobaan itu belum terkirim; lihat questionsToAnswer di formQuestions.ts.
    */
   questions?: PendingQuestion[];
+  /** details.questions_pending: jumlah pertanyaan wajib tertunda dari log worker/ekstensi. */
+  questions_pending?: number | null;
   /**
    * details.awaiting_until (ISO): batas waktu agen menunggu kode keamanan dari email. Hanya dibaca pada log
    * berstatus awaiting_code; log lain tidak membawa kunci ini.
@@ -95,6 +97,10 @@ export interface AgentLogFacts {
   channel?: "extension";
   /** details.documents_attached pada log ekstensi: berkas yang terpasang ke formulir. Hanya ada bila log memuatnya. */
   documents_attached?: AgentDocumentsAttached;
+  /** details.extension_handoff === true: worker berhenti dan mengalihkan pengisian (mis. Google Forms) ke Ekstensi Browser. */
+  extension_handoff?: boolean;
+  /** details.handoff_reason: google_login | file_upload | captcha | missing_required. */
+  handoff_reason?: string | null;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -219,6 +225,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
     questions: parseQuestions(details.questions),
+    ...(cleanCount(details.questions_pending) !== null ? { questions_pending: cleanCount(details.questions_pending) } : {}),
     fields_filled: cleanCount(details.fields_filled),
     filled_fields: cleanFilledFields(details.filled_fields),
     screenshots: cleanScreenshots(details.screenshots),
@@ -227,6 +234,8 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     ...(cleanText(details.approval_request_id, 64) ? { approval_request_id: cleanText(details.approval_request_id, 64) } : {}),
     ...(fromExtension ? { channel: "extension" as const } : {}),
     ...(documents ? { documents_attached: documents } : {}),
+    ...(details.extension_handoff === true ? { extension_handoff: true } : {}),
+    ...(cleanText(details.handoff_reason, 40) ? { handoff_reason: cleanText(details.handoff_reason, 40) } : {}),
   };
 }
 
