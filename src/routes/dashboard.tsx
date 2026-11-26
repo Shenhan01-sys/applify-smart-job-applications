@@ -13,6 +13,8 @@ import { buildChecklist, type Checklist } from "@/lib/onboardingChecklist";
 import { describeError } from "@/lib/authErrors";
 import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
 import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
+import { automationApi } from "@/services/automationApi";
+import { summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -66,6 +68,7 @@ export function DashboardPage() {
   const [approvedCount, setApprovedCount] = useState<number | null>(null);
   // null = unknown (the call failed or there is no data), so the ring shows a dash instead of a made-up number
   const [quota, setQuota] = useState<QuotaSummary | null>(null);
+  const [urgent, setUrgent] = useState<UrgentActionsSummary>({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -80,6 +83,7 @@ export function DashboardPage() {
         setHasResume(null);
         setApprovedCount(null);
         setQuota(null);
+        setUrgent({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
         setLoadError("");
         setLoading(false);
         return;
@@ -91,6 +95,7 @@ export function DashboardPage() {
         setProfileIncomplete(false);
         setHasResume(true);
         setApprovedCount(1);
+        setUrgent({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
         setQuota({ quota: mockSubscription.monthly_quota, used: mockSubscription.used_quota, remaining: mockSubscription.monthly_quota - mockSubscription.used_quota, allowed: true });
         setLoading(false);
         return;
@@ -98,7 +103,7 @@ export function DashboardPage() {
       try {
         // Same sources as the rest of the app: drafts and their status live in ai_applications (joined to
         // jobs), the monthly draft quota comes from the get_quota_status function the Edge Function uses.
-        const [p, apps, q, summary, approvedRes] = await Promise.all([
+        const [p, apps, q, summary, approvedRes, pendingApprovals, queueRes, logsRes] = await Promise.all([
           supabase.from("profiles").select("full_name, resume_url").eq("id", user.id).maybeSingle(),
           supabase
             .from("ai_applications")
@@ -111,6 +116,19 @@ export function DashboardPage() {
           profileService.getSummary(user.id).then((x) => needsOnboarding(x), () => null),
           // Langkah "Periksa dan setujui" di checklist: cukup jumlahnya. Galat = belum diketahui, bukan 0.
           supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "approved"),
+          automationApi.getPendingApprovals().catch(() => []),
+          supabase
+            .from("automation_queue")
+            .select("id, job_type, status, error_message, scheduled_at, created_at, payload")
+            .in("job_type", ["apply", "extension_apply"])
+            .order("created_at", { ascending: false })
+            .limit(50),
+          supabase
+            .from("application_logs")
+            .select("status, details, created_at")
+            .eq("action", "apply")
+            .order("created_at", { ascending: false })
+            .limit(100),
         ]);
         if (apps.error) throw new Error(apps.error.message);
         setProfile(p.data ?? null);
@@ -119,6 +137,13 @@ export function DashboardPage() {
         setHasResume(p.error ? null : !!(p.data as { resume_url?: string | null } | null)?.resume_url);
         setApprovedCount(approvedRes.error ? null : approvedRes.count ?? 0);
         setQuota(q.error ? null : parseQuotaStatus(q.data));
+        setUrgent(
+          summarizeUrgentActions({
+            pendingApprovals,
+            queueRows: queueRes.error ? [] : (queueRes.data ?? []),
+            applyLogs: logsRes.error ? [] : (logsRes.data ?? []),
+          }),
+        );
       } catch (err) {
         console.error("Dashboard load failed:", err);
         setLoadError(describeError(err, "Data belum bisa dimuat."));
@@ -191,6 +216,40 @@ export function DashboardPage() {
             <span className="inline-flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" /> Data lamaran belum bisa dimuat. {loadError} Angka di bawah belum tentu benar.</span>
             <button type="button" onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-sm font-semibold shrink-0">Coba lagi</button>
           </div>
+        )}
+
+        {/* E2E-06: Tampilkan tindakan mendesak yang perlu segera diperiksa pengguna */}
+        {!loadError && urgent.total > 0 && (
+          <section
+            data-testid="dashboard-urgent-actions"
+            aria-label="Tindakan mendesak"
+            className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div className="space-y-1">
+              <p className="font-display text-base font-bold text-amber-950 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" aria-hidden="true" />
+                Ada {urgent.total} tindakan yang perlu segera dicek
+              </p>
+              <ul className="text-sm text-amber-900 space-y-0.5">
+                {urgent.awaitingCodeCount > 0 && (
+                  <li>{urgent.awaitingCodeCount} lamaran menunggu kode keamanan dari emailmu.</li>
+                )}
+                {urgent.pendingQuestionsCount > 0 && (
+                  <li>{urgent.pendingQuestionsCount} lamaran menunggu jawaban pertanyaan formulir untuk agen.</li>
+                )}
+                {urgent.pendingApprovalsCount > 0 && (
+                  <li>{urgent.pendingApprovalsCount} draf lamaran menunggu persetujuanmu sebelum dikirim.</li>
+                )}
+              </ul>
+            </div>
+            <Link
+              to="/approvals"
+              className="min-h-11 shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-[#16150F] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition"
+            >
+              Tinjau di Persetujuan
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </section>
         )}
 
         {/* Pengguna baru: satu daftar langkah berurutan dengan satu ajakan utama (catatan 41, ON-01). Hilang bila semua selesai. */}

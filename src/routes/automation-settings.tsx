@@ -15,6 +15,7 @@ import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
 import { VISA_OPTIONS, visaSelectValue, visaValueToStore } from "@/lib/visaChoice";
 import { listToText, numberToText, parseCommaList, parseIndonesianSalary, parseOptionalNumber, sameList } from "@/lib/settingsForm";
+import { mergeIdentityFromProfile } from "@/lib/settingsProfileFallback";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -44,6 +45,7 @@ function AutomationSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [profileSyncedCount, setProfileSyncedCount] = useState(0);
   const [showSaved, setShowSaved] = useState(false);
   const [tabKey, setTabKey] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
@@ -70,7 +72,23 @@ function AutomationSettingsPage() {
         return;
       }
       const data = await automationApi.getSettings();
-      setSettings(data);
+      let profileRow: Record<string, unknown> | null = null;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          const { data: pRow } = await supabase
+            .from("profiles")
+            .select("full_name, phone, location, linkedin_url, portfolio_url")
+            .eq("id", user.id)
+            .maybeSingle();
+          profileRow = (pRow as Record<string, unknown> | null) ?? null;
+        }
+      } catch {
+        profileRow = null;
+      }
+      const { settings: mergedSettings, syncedFields } = mergeIdentityFromProfile(data, profileRow);
+      setSettings(mergedSettings);
+      setProfileSyncedCount(syncedFields.length);
       setSalaryText({ desired_salary: numberToText(data.desired_salary), current_ctc: numberToText(data.current_ctc) });
       setSalaryErrors({});
     } catch (error) {
@@ -189,6 +207,16 @@ function AutomationSettingsPage() {
                 <User className="h-5 w-5 text-[#0A5BE0]" aria-hidden="true" /> Data Pribadi
               </h2>
               <p className="text-sm text-muted-foreground">Data ini dipakai agen untuk mengisi formulir lamaran. Isi seperlunya.</p>
+              {profileSyncedCount > 0 && (
+                <div
+                  data-testid="profile-identity-sync-note"
+                  className="rounded-xl border border-[#0A5BE0]/25 bg-[#0A5BE0]/5 px-4 py-3 text-xs text-foreground"
+                >
+                  {profileSyncedCount} kolom identitas kosong dilengkapi otomatis dari{" "}
+                  <Link to="/profile" className="font-semibold text-[#0A5BE0] underline">Profil Saya</Link>. Tekan{" "}
+                  <strong className="font-semibold">Simpan Pengaturan</strong> bila ingin menyimpannya di sini.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField label="Nama depan" value={settings.first_name || ''} onChange={(v: string) => updateField('first_name', v)} />
                 <InputField label="Nama belakang" value={settings.last_name || ''} onChange={(v: string) => updateField('last_name', v)} />
