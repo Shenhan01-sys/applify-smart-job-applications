@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { shouldBlockHoneypot, WAITLIST_HONEYPOT_NAME } from "@/lib/waitinglistGuard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/waitinglist")({
@@ -75,7 +76,7 @@ function WaitinglistPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (honeypot.trim()) {
+    if (shouldBlockHoneypot(honeypot)) {
       setError("Permintaan tidak dapat diproses.");
       return;
     }
@@ -178,7 +179,7 @@ function WaitinglistPage() {
             <input
               id="wl-hp-confirm"
               type="text"
-              name="applify_hp_confirm"
+              name={WAITLIST_HONEYPOT_NAME}
               tabIndex={-1}
               autoComplete="new-password"
               data-lpignore="true"

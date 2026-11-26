@@ -18,11 +18,12 @@ test("47.6 FE-13: /reset-password mewajibkan event PASSWORD_RECOVERY atau parame
   assert.match(src, /if \(!recoveryConfirmed\)/);
 });
 
-test("47.6 FE-10: /waitinglist memiliki honeypot anti-bot aman autofill, jeda kirim lokal, dan batas panjang", () => {
+test("47.6 FE-10: /waitinglist memiliki honeypot anti-bot aman autofill memakai shouldBlockHoneypot, jeda kirim lokal, dan batas panjang", () => {
   const src = read("../src/routes/waitinglist.tsx");
   assert.doesNotMatch(src, /name="website"/);
   assert.doesNotMatch(src, />Situs web</);
-  assert.match(src, /name="applify_hp_confirm"/);
+  assert.match(src, /WAITLIST_HONEYPOT_NAME/);
+  assert.match(src, /shouldBlockHoneypot\(honeypot\)/);
   assert.match(src, /autoComplete="new-password"/);
   assert.match(src, /data-lpignore="true"/);
   assert.match(src, /applify:waitinglist-last-submit/);
