@@ -28,6 +28,7 @@ import {
 } from '@/lib/llmKeys'
 import { mockDeleteKey, mockLlmKeysResponse, mockSaveKey, mockTestKey } from '@/mocks/llmKeysMock'
 import { consentRequestBody } from '@/lib/extensionConsent'
+import { EXTENSION_TOKEN_TTL_SECONDS } from '@/lib/extensionConnect'
 import type {
   OffPortalParseResponse,
   OffPortalSourceType,
@@ -552,8 +553,8 @@ export const automationApi = {
     )
   },
 
-  /** Token singkat scoped `extension:apply` (berlaku 4 jam) untuk menghubungkan Ekstensi Chrome/Edge. */
-  async createExtensionToken(ttlSeconds: number = 14400): Promise<{
+  /** Token singkat scoped `extension:apply` (berlaku 8 jam) untuk menghubungkan Ekstensi Chrome/Edge. */
+  async createExtensionToken(ttlSeconds: number = EXTENSION_TOKEN_TTL_SECONDS): Promise<{
     token: string
     expiresAt: string
     scope: string

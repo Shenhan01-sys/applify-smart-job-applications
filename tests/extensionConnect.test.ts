@@ -11,11 +11,21 @@ import {
   EXTENSION_DOWNLOAD_VERSION,
   EXTENSION_GUIDE_HREF,
   EXTENSION_INSTALL_STEPS,
+  EXTENSION_TOKEN_TTL_LABEL,
+  EXTENSION_TOKEN_TTL_SECONDS,
   copyToClipboard,
   describeTokenExpiry,
 } from "../src/lib/extensionConnect.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
+
+test("FE meminta token ekstensi 8 jam lewat konstanta bersama, tanpa sisa angka 4 jam (14400)", () => {
+  const api = read("../src/services/automationApi.ts");
+  const card = read("../src/components/ExtensionConnectCard.tsx");
+  assert.match(api, /createExtensionToken\(ttlSeconds: number = EXTENSION_TOKEN_TTL_SECONDS\)/);
+  assert.match(card, /createExtensionToken\(EXTENSION_TOKEN_TTL_SECONDS\)/);
+  for (const src of [api, card]) assert.doesNotMatch(src, /14400/);
+});
 
 test("Pengaturan Ekstensi Chrome/Edge tersambung ke /api/extension/token dan menjaga aturan Firefox + tanpa teks terlarang", () => {
   const settings = read("../src/routes/settings.tsx");
@@ -77,8 +87,11 @@ test("salin ke papan klip: berhasil, ditolak, atau tidak ada Clipboard API", asy
 
 test("masa berlaku token dalam kata biasa: jam, sisa waktu, sudah lewat, dan tidak terbaca", () => {
   const now = Date.parse("2026-11-24T06:00:00Z");
-  const fourHours = describeTokenExpiry("2026-11-24T10:00:00Z", now, "UTC");
-  assert.match(fourHours, /^Berlaku sampai pukul 10[.:]00 \(sekitar 4 jam lagi\)\. Sesudah itu, buat token baru\.$/);
+  const fourHours = describeTokenExpiry("2026-11-24T14:00:00Z", now, "UTC");
+  assert.match(fourHours, /^Berlaku sampai pukul 14[.:]00 \(sekitar 8 jam lagi\)\. Sesudah itu, buat token baru\.$/);
+  // Token baru diminta 8 jam, sama dengan DEFAULT_EXTENSION_TTL_SEC dan batas MAX di backend (keputusan Hans 26 Nov).
+  assert.equal(EXTENSION_TOKEN_TTL_SECONDS, 28_800);
+  assert.equal(EXTENSION_TOKEN_TTL_LABEL, "8 jam");
   assert.match(describeTokenExpiry("2026-11-24T06:20:00Z", now, "UTC"), /\(20 menit lagi\)/);
   assert.match(describeTokenExpiry("2026-11-24T05:00:00Z", now, "UTC"), /sudah tidak berlaku/);
   assert.equal(describeTokenExpiry("bukan tanggal", now), "");

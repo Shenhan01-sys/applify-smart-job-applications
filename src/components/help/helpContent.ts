@@ -114,7 +114,7 @@ export const HELP_GLOSSARY: readonly HelpTerm[] = [
   },
   {
     term: "Token ekstensi",
-    meaning: "Kunci pendek dari Pengaturan yang menyambungkan ekstensi di laptop ke akun Applify-mu.",
+    meaning: "Kunci pendek dari Pengaturan yang menyambungkan ekstensi di laptop ke akun Applify-mu. Token berlaku 8 jam, sesudah itu buat token baru.",
   },
 ];
 
@@ -160,6 +160,10 @@ export const HELP_EXTRA_FAQ: readonly { question: string; answer: string }[] = [
   {
     question: "Ekstensi Browser belum tersambung",
     answer: "Buka halaman Pengaturan bagian Ekstensi Browser, salin token ekstensi, lalu tempel di panel ekstensi Chrome atau Edge di laptopmu.",
+  },
+  {
+    question: "Panel ekstensi bilang token tidak sah atau sudah kedaluwarsa",
+    answer: "Token ekstensi berlaku 8 jam. Buka Applify, masuk ke Pengaturan, klik Hubungkan Ekstensi Chrome/Edge, salin token baru, lalu tempel di panel ekstensi dan tekan Hubungkan Ekstensi.",
   },
   {
     question: "Kartu tidak bisa dipindah ke kolom Terkirim",

@@ -11,6 +11,7 @@ import {
   EXTENSION_GUIDE_LINK_LABEL,
   EXTENSION_INSTALL_STEPS,
   EXTENSION_TOKEN_PASTE_WARNING,
+  EXTENSION_TOKEN_TTL_SECONDS,
   copyToClipboard,
   describeTokenExpiry,
 } from "@/lib/extensionConnect";
@@ -46,7 +47,7 @@ export function ExtensionConnectCard() {
     setCopiedToken(false);
     setCopyFailed(false);
     try {
-      const res = await automationApi.createExtensionToken(14400);
+      const res = await automationApi.createExtensionToken(EXTENSION_TOKEN_TTL_SECONDS);
       setIssued({ token: res.token, expiresAt: res.expiresAt, scope: res.scope });
     } catch (err) {
       setError(

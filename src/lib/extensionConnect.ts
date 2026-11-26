@@ -19,6 +19,13 @@ export const EXTENSION_DOWNLOAD_LABEL = "Unduh ekstensi (zip)";
 /** ID tetap dari `key` di manifest paket UAT, sama di semua laptop. */
 export const EXTENSION_UAT_ID = "ikojbhmbbaignmlkcdailnbnekneplkj";
 
+/**
+ * Masa berlaku token ekstensi yang diminta dari server: 8 jam (keputusan Hans 26 Nov 2026), batas maksimum
+ * `MAX_EXTENSION_TTL_SEC` di backend. Angka ini harus sama dengan `DEFAULT_EXTENSION_TTL_SEC` di backend.
+ */
+export const EXTENSION_TOKEN_TTL_SECONDS = 8 * 60 * 60;
+export const EXTENSION_TOKEN_TTL_LABEL = "8 jam";
+
 export const EXTENSION_LAPTOP_ONLY_NOTE =
   "Ekstensi ini khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP.";
 
@@ -59,7 +66,7 @@ function humanDuration(ms: number): string {
 }
 
 /**
- * Kapan token berhenti berlaku, dalam kata biasa: "Berlaku sampai pukul 14.30 (sekitar 4 jam lagi). Sesudah itu,
+ * Kapan token berhenti berlaku, dalam kata biasa: "Berlaku sampai pukul 14.30 (sekitar 8 jam lagi). Sesudah itu,
  * buat token baru." Waktu tidak terbaca = teks kosong. `timeZone` hanya untuk tes.
  */
 export function describeTokenExpiry(expiresAt: string | null | undefined, now: number = Date.now(), timeZone?: string): string {

@@ -293,7 +293,7 @@ export class MockBackend {
       return route.fulfill(json(200, { updated, migrationPending: false }));
     }
     if (method === "POST" && path === "/api/extension/token") {
-      return route.fulfill(json(200, { token: "ext_tok_v1.e2e-test-token-value.e2e-signature", expiresAt: new Date(Date.now() + 4 * 3600_000).toISOString(), scope: "extension:apply", ttlSeconds: 14400 }));
+      return route.fulfill(json(200, { token: "ext_tok_v1.e2e-test-token-value.e2e-signature", expiresAt: new Date(Date.now() + 8 * 3600_000).toISOString(), scope: "extension:apply", ttlSeconds: 28800 }));
     }
     if (path === "/api/automation/settings") {
       if (method === "GET") return route.fulfill(json(200, s.settings));
