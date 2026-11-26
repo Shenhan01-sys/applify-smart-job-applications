@@ -60,6 +60,14 @@ export async function getPendingApprovalFor(applicationId: string): Promise<Pend
   return findPendingApproval(await automationApi.getPendingApprovals(), applicationId);
 }
 
+/**
+ * Send a saved draft to the approval queue (the same call as the "Ajukan ke Persetujuan" button of the AI Apply
+ * modal). If the draft already has a pending approval nothing is created: that one is returned with
+ * `created: false`, so a second click or a second screen does not queue the same draft twice. When the pending row
+ * (found in the list or returned by the idempotent POST) holds a different cover letter than the one being sent,
+ * it is aligned once through PATCH /api/approvals/:id/cover-letter before returning.
+ * Throws DraftNotSendableError when the draft cannot be sent, and the API error when a call fails.
+ */
 export async function requestApprovalForDraft(input: DraftApprovalInput): Promise<{ approval: PendingApproval; created: boolean }> {
   const built = buildApprovalPayload(input);
   if (!built.ok) throw new DraftNotSendableError(built.reason);
