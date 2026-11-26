@@ -14,6 +14,7 @@
  */
 
 import { describeApiError, parseApiError } from "./apiErrors.ts";
+import { APPROVAL_VALID_TEXT } from "./approvalExpiry.ts";
 
 export const EMAIL_APPLY_JOB_TYPE = "email_apply";
 
@@ -209,7 +210,7 @@ export function getEmailApplyState(approval: ApprovalLike | null | undefined, ct
   });
 
   if (!Number.isFinite(expires) || expires <= now) {
-    return off("expired", "Persetujuanmu tetap tercatat, tetapi masa berlakunya (24 jam) sudah kedaluwarsa, jadi email tidak bisa dikirim dari persetujuan ini. Ajukan draf lagi dari halaman Lowongan untuk mendapat persetujuan baru.");
+    return off("expired", `Persetujuanmu tetap tercatat, tetapi masa berlakunya (${APPROVAL_VALID_TEXT}) sudah kedaluwarsa, jadi email tidak bisa dikirim dari persetujuan ini. Ajukan draf lagi dari halaman Lowongan untuk mendapat persetujuan baru.`);
   }
   if (!approval.job_id) return off("no_job", "Persetujuan ini tidak terhubung ke lowongan, jadi email tidak bisa dikirim.");
   if (typeof approval.cover_letter !== "string" || approval.cover_letter.trim() === "") {

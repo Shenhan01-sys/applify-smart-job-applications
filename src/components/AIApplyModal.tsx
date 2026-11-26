@@ -33,6 +33,7 @@ import {
   type ApprovalAnswer,
 } from "@/lib/answerReview";
 import { toast } from "sonner";
+import { APPROVAL_VALID_TEXT } from "@/lib/approvalExpiry";
 import {
   Bot,
   ShieldCheck,
@@ -642,7 +643,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
                   !editable
                     ? `Lamaran ini sudah berstatus "${applicationStatusLabel(application.status)}", jadi tidak diajukan ke persetujuan lagi.`
                     : approvalId
-                      ? "Menunggu persetujuanmu di halaman Persetujuan (berlaku 24 jam). Tanpa persetujuan, agen tidak akan mengirim."
+                      ? `Menunggu persetujuanmu di halaman Persetujuan (berlaku ${APPROVAL_VALID_TEXT}). Tanpa persetujuan, agen tidak akan mengirim.`
                       : "Draf siap. Tinjau dan edit bila perlu, lalu ajukan ke persetujuan."
                 }
               />

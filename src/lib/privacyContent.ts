@@ -22,6 +22,8 @@
 // - tidak ada fitur hapus akun di aplikasi (pencarian deleteUser, hapus akun di src dan backend kosong); hapus data
 //   hanya lewat permintaan ke peneliti.
 
+import { APPROVAL_VALID_TEXT } from "./approvalExpiry.ts";
+
 export const PRIVACY_UPDATED = "25 November 2026";
 
 /** Kontak peneliti untuk pertanyaan dan permintaan hapus data. */
@@ -91,7 +93,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     id: "persetujuan",
     title: "Lamaran hanya dikirim setelah kamu menyetujui",
     paragraphs: [
-      "Agen tidak mengirim lamaran sebelum kamu menyetujuinya di halaman Persetujuan. Setiap persetujuan punya batas waktu 24 jam.",
+      `Agen tidak mengirim lamaran sebelum kamu menyetujuinya di halaman Persetujuan. Setiap persetujuan punya batas waktu ${APPROVAL_VALID_TEXT}.`,
       "Pengiriman sungguhan menyala lewat saklar di server (ALLOW_REAL_SUBMIT). Setelah kamu menekan Setujui, agen boleh menekan tombol kirim di situs lowongan yang diizinkan server, saat ini Greenhouse dan Portal Uji Applify, atau mengirim email lamaran lewat Gmail yang kamu hubungkan sendiri. Lamaran yang sudah terkirim tidak bisa ditarik. Tekan Tolak bila kamu tidak ingin lamaran terkirim.",
     ],
   },
