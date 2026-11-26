@@ -108,14 +108,11 @@ function GreenCareerPage() {
   const load = async () => {
     try {
       setLoading(true); setLoadError("");
-      // Skill dan hasil asesmen tersimpan dimuat bersama daftar (BS-07).
-      const [list, , persisted] = await Promise.all([
-        greenCareerService.listGreenJobs(),
-        loadProfileSkills(),
-        greenCareerService.listCompletedAssessments(),
-      ]);
+      // Skill dimuat bersama daftar supaya urutan kartu tidak berpindah setelah tampil; hasil asesmen tersimpan dimuat paralel (BS-07).
+      const persistedPromise = greenCareerService.listCompletedAssessments();
+      const [list] = await Promise.all([greenCareerService.listGreenJobs(), loadProfileSkills()]);
       setJobs(list);
-      setCompletedResults(persisted);
+      setCompletedResults(await persistedPromise);
     } catch (e) {
       setLoadError(describeError(e, "Daftar lowongan karier hijau belum bisa dimuat."));
     } finally { setLoading(false); }

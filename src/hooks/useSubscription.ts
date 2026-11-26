@@ -23,8 +23,7 @@ export interface AccountPlan {
  * `get_quota_status`. Tidak membaca penyimpanan browser. Gagal membaca berarti `error` terisi, bukan paket tebakan.
  */
 export function useSubscription(): AccountPlan {
-  const { user: authUser } = useAuth();
-  const authUserId = authUser?.id ?? null;
+  const { user } = useAuth();
   const [tier, setTier] = useState<PlanTier>("free");
   const [periodEnd, setPeriodEnd] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaSummary | null>(null);
@@ -45,7 +44,7 @@ export function useSubscription(): AccountPlan {
           return;
         }
         // BS-07: bersihkan state paket & kuota segera ketika sesi logout / berpindah akun.
-        if (!authUserId) {
+        if (!user?.id) {
           if (!alive) return;
           setTier("free");
           setPeriodEnd(null);
@@ -55,8 +54,8 @@ export function useSubscription(): AccountPlan {
         const [sub, q] = await Promise.all([
           // Kolom produksi bernama expires_at. current_period_end hanya ada di database/schema.sql (drift tercatat di
           // database/snapshots/schema-diff-2026-10-03.txt); memintanya membuat PostgREST menjawab 400 dan kartu kuota gagal.
-          supabase.from("subscriptions").select("plan_name, ai_model_tier, expires_at").eq("user_id", authUserId).maybeSingle(),
-          supabase.rpc("get_quota_status", { p_user_id: authUserId }),
+          supabase.from("subscriptions").select("plan_name, ai_model_tier, expires_at").eq("user_id", user.id).maybeSingle(),
+          supabase.rpc("get_quota_status", { p_user_id: user.id }),
         ]);
         if (sub.error) throw new Error(sub.error.message);
         if (!alive) return;
@@ -72,7 +71,7 @@ export function useSubscription(): AccountPlan {
     return () => {
       alive = false;
     };
-  }, [nonce, authUserId]);
+  }, [nonce, user?.id]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { tier, periodEnd, quota, loading, error, reload };

@@ -17,8 +17,8 @@ test("BS-07: AuthContext membungkus initSession dengan try/finally agar loading 
 test("BS-07: useSubscription mengamati user?.id dan mereset state saat sesi kosong", () => {
   const src = read("src/hooks/useSubscription.ts");
   assert.match(src, /useAuth\(\)/);
-  assert.match(src, /\[nonce,\s*authUserId\]/);
-  assert.match(src, /if \(!authUserId\)/);
+  assert.match(src, /\[nonce,\s*user\?\.id\]/);
+  assert.match(src, /if \(!user\?\.id\)/);
 });
 
 test("BS-07: dashboard dan skill-radar membersihkan state saat user null, dashboard menandai batas 500 baris", () => {
