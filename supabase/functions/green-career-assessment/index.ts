@@ -111,10 +111,27 @@ Deno.serve(async (req: Request) => {
       if (!job) return json({ error: "Job not found" }, 404);
       if (!job.is_green) return json({ error: "Job bukan Green Career role" }, 400);
 
-      const { data: profile } = await admin.from("profiles")
-        .select("full_name, current_title, experience_years, skills").eq("id", userId).maybeSingle();
+      // UX-P7-11: tabel `profiles` tidak memiliki kolom `skills`; skill kandidat disimpan di tabel `user_skills`.
+      const [profileRes, skillsRes] = await Promise.all([
+        admin.from("profiles").select("full_name, current_title, experience_years").eq("id", userId).maybeSingle(),
+        admin.from("user_skills").select("name").eq("user_id", userId).limit(50),
+      ]);
+      if (profileRes.error) {
+        console.error(`${TAG} profile_read_failed code=${profileRes.error.code ?? "none"}`);
+      }
+      if (skillsRes.error) {
+        console.error(`${TAG} user_skills_read_failed code=${skillsRes.error.code ?? "none"}`);
+      }
+      const skillNames = (skillsRes.data ?? [])
+        .map((r: { name?: unknown }) => (typeof r?.name === "string" ? r.name.trim() : ""))
+        .filter(Boolean);
+      const profileWithSkills = profileRes.data
+        ? { ...profileRes.data, skills: skillNames }
+        : skillNames.length > 0
+          ? { full_name: null, current_title: null, experience_years: 0, skills: skillNames }
+          : null;
 
-      const { sys, user } = buildGeneratePrompts(job, profile ?? null);
+      const { sys, user } = buildGeneratePrompts(job, profileWithSkills);
 
       const made = await runChain(MODELS, {
         tag: TAG,
