@@ -85,11 +85,7 @@ export function recallAuthProvider(storage?: StorageLike | null): AuthProvider |
   }
 }
 
-/** Galat dari supabase.auth: masuk, daftar, OAuth (Google atau LinkedIn), reset kata sandi. */
-export function describeAuthError(err: unknown, fallback = "Proses akun belum berhasil. Coba lagi.", provider?: AuthProvider | null): string {
-  const { msg, code, status } = norm(err);
-  const who = provider ?? detectAuthProvider(msg);
-
+function matchKnownAuthError(msg: string, code: string, status: number | undefined, who: AuthProvider | null): string | null {
   if (NETWORK.test(msg)) return MSG_NETWORK;
   if (code === "invalid_credentials" || /invalid login credentials/.test(msg)) {
     return 'Email atau kata sandi salah. Periksa lagi ketikanmu. Bila lupa kata sandi, pilih "Lupa kata sandi".';
@@ -136,8 +132,34 @@ export function describeAuthError(err: unknown, fallback = "Proses akun belum be
   }
   if (code === "user_not_found") return "Akun dengan email itu tidak ditemukan. Periksa penulisannya atau daftar akun baru.";
   if (status !== undefined && status >= 500) return "Server sedang bermasalah. Coba lagi beberapa menit lagi.";
+  return null;
+}
+
+/** Galat dari supabase.auth: masuk, daftar, OAuth (Google atau LinkedIn), reset kata sandi. */
+export function describeAuthError(err: unknown, fallback = "Proses akun belum berhasil. Coba lagi.", provider?: AuthProvider | null): string {
+  const { msg, code, status } = norm(err);
+  const who = provider ?? detectAuthProvider(msg);
+  const matched = matchKnownAuthError(msg, code, status, who);
+  if (matched) return matched;
   if (msg && looksIndonesian(msg)) return String((err as ErrLike).message);
   return fallback;
+}
+
+/**
+ * Terjemahan galat parameter query OAuth di `/auth/callback` (FE-20): parameter `error_description` datang dari
+ * URL browser dan tidak tepercaya, sehingga tidak boleh dipantulkan apa adanya walau memuat kata Indonesia.
+ */
+export function describeOAuthCallbackError(
+  params: { error?: string | null; errorCode?: string | null; errorDescription?: string | null },
+  fallback = "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi.",
+  provider?: AuthProvider | null,
+): string {
+  const { msg, code, status } = norm({
+    code: params.errorCode ?? params.error ?? "",
+    message: params.errorDescription ?? params.error ?? "",
+  });
+  const who = provider ?? detectAuthProvider(msg);
+  return matchKnownAuthError(msg, code, status, who) ?? fallback;
 }
 
 /** Galat umum dari Supabase (basis data, Edge Function) dan jaringan. */

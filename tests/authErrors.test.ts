@@ -104,4 +104,25 @@ test("halaman masuk mengingat penyedia sebelum pindah, dan halaman callback mema
   assert.match(login, /Coba lagi, atau pakai email dan kata sandi\.", "google"\)/);
   assert.match(login, /pakai Google atau email\.", "linkedin"\)/);
   assert.match(read("../src/routes/auth.callback.tsx"), /recallAuthProvider\(\)/);
+  assert.match(read("../src/routes/auth.callback.tsx"), /describeOAuthCallbackError\(/);
+});
+
+test("47.6 FE-20: describeOAuthCallbackError tidak memantulkan teks URL error_description sewenang-wenang", async () => {
+  const { describeOAuthCallbackError } = await import("../src/lib/authErrors.ts");
+  const fallback = "Proses masuk tidak berhasil. Kembali ke halaman masuk lalu coba lagi.";
+  const phish = describeOAuthCallbackError({
+    error: "server_error",
+    errorDescription: "Proses gagal masuk, silakan kunjungi https://evil.example untuk melanjutkan.",
+  });
+  assert.equal(phish, fallback);
+  assert.doesNotMatch(phish, /evil\.example/);
+
+  assert.match(
+    describeOAuthCallbackError({ error: "access_denied", errorDescription: "User denied" }, fallback, "google"),
+    /masuk dengan Google dibatalkan/,
+  );
+  assert.match(
+    describeOAuthCallbackError({ error: "invalid_request", errorDescription: "Unsupported provider: linkedin_oidc provider is not enabled" }),
+    /LinkedIn belum diaktifkan/,
+  );
 });
