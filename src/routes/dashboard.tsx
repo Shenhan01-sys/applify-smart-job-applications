@@ -15,14 +15,15 @@ import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
 import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
 import { automationApi } from "@/services/automationApi";
 import { summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/dashboard")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Beranda — Applify" }] }),
   component: DashboardPage,

@@ -11,15 +11,16 @@ import { ExtensionConnectCard } from "@/components/ExtensionConnectCard";
 import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
 import LlmKeysCard from "@/components/LlmKeysCard";
 import { gmailBanner, parseGmailCallback, validateGmailSearch, type GmailBanner } from "@/lib/gmailCallback";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 import { Chrome, Bell, CreditCard, Lock, Sparkles, Gauge, ChevronRight, Loader2, ClipboardList, KeyRound } from "lucide-react";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/settings")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Pengaturan — Applify" }] }),
   // Backend mengarahkan balik ke /settings?gmail=connected atau ?gmail=error&reason=... sesudah sambungan Gmail.
@@ -136,7 +137,7 @@ function SettingsPage() {
         {/* Tagihan hanya tampil bila VITE_ENABLE_BILLING=true */}
         {billing && (
           <Card icon={CreditCard} title="Paket & Tagihan"
-            desc={plan.tier === "free" ? "Kamu saat ini di paket Gratis." : `Paket ${TIER_LABEL[plan.tier]} · ${PLAN_PRICE[plan.tier].label}${PLAN_PRICE[plan.tier].period}`}>
+            desc={plan.error ? "Status paket belum bisa dimuat saat ini. Muat ulang untuk memeriksa paketmu." : plan.tier === "free" ? "Kamu saat ini di paket Gratis." : `Paket ${TIER_LABEL[plan.tier]} · ${PLAN_PRICE[plan.tier].label}${PLAN_PRICE[plan.tier].period}`}>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link to="/subscription" className="inline-flex min-h-11 items-center gap-1.5 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition">
                 <Sparkles className="h-4 w-4" aria-hidden="true" /> {plan.tier === "free" ? "Lihat paket" : "Kelola paket"}

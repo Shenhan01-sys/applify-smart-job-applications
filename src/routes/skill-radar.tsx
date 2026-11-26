@@ -18,12 +18,13 @@ import {
   type SkillAxis,
   type UserSkillRow,
 } from "@/lib/skillRadar";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 export const Route = createFileRoute("/skill-radar")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Peta Skill — Applify" }] }),
   component: SkillPage,

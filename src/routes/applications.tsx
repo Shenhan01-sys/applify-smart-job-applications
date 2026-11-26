@@ -63,14 +63,15 @@ import {
   Search,
   ShieldCheck,
 } from "lucide-react";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/applications")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Lamaran Saya — Applify" }] }),
   component: AppsPage,

@@ -59,6 +59,6 @@ test.describe("harness", () => {
     // Skrip awal dijalankan berurutan: yang ini mengosongkan sesi yang ditanam fixture.
     await app.addInitScript(() => window.localStorage.clear());
     await app.goto("/approvals");
-    await expect(app).toHaveURL(/\/login$/);
+    await expect(app).toHaveURL(/\/login\?redirect=%2Fapprovals$/);
   });
 });

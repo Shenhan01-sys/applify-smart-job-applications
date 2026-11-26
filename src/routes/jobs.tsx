@@ -44,14 +44,15 @@ import { profileService } from "@/services/profileService";
 import { useSubscription } from "@/hooks/useSubscription";
 // Lowongan contoh dan id tersimpan hanya untuk mode demo eksplisit (VITE_MOCK_MODE=true).
 import { mockJobs as mockJobsData, mockSavedJobIds } from "@/mocks/mockData";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 export const Route = createFileRoute("/jobs")({
   validateSearch: (search: Record<string, unknown>): { cari?: string } =>
     typeof search.cari === "string" && search.cari.trim() ? { cari: search.cari } : {},
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Lowongan — Applify" }] }),
   component: JobsPage,

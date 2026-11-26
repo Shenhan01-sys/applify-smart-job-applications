@@ -16,14 +16,15 @@ import { ErrorState } from "@/components/ErrorState";
 import { VISA_OPTIONS, visaSelectValue, visaValueToStore } from "@/lib/visaChoice";
 import { listToText, numberToText, parseCommaList, parseIndonesianSalary, parseOptionalNumber, sameList } from "@/lib/settingsForm";
 import { mergeIdentityFromProfile } from "@/lib/settingsProfileFallback";
+import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
 export const Route = createFileRoute("/automation-settings")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     if (isMockMode()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) throw redirect({ to: "/login", search: loginSearchWithRedirect(location) });
   },
   head: () => ({ meta: [{ title: "Pengaturan Agen — Applify" }] }),
   component: AutomationSettingsPage,
