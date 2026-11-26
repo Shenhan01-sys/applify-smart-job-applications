@@ -1,6 +1,11 @@
 import { automationApi } from "@/services/automationApi";
 import { describeApiError } from "@/lib/apiErrors";
-import { buildApprovalPayload, findPendingApproval, type PendingApproval } from "@/lib/draftApproval";
+import {
+  buildApprovalPayload,
+  findPendingApproval,
+  syncReturnedPendingCover,
+  type PendingApproval,
+} from "@/lib/draftApproval";
 
 export interface DraftApprovalInput {
   applicationId: string;
@@ -55,17 +60,17 @@ export async function getPendingApprovalFor(applicationId: string): Promise<Pend
   return findPendingApproval(await automationApi.getPendingApprovals(), applicationId);
 }
 
-/**
- * Send a saved draft to the approval queue (the same call as the "Ajukan ke Persetujuan" button of the AI Apply
- * modal). If the draft already has a pending approval nothing is created: that one is returned with
- * `created: false`, so a second click or a second screen does not queue the same draft twice.
- * Throws DraftNotSendableError when the draft cannot be sent, and the API error when a call fails.
- */
 export async function requestApprovalForDraft(input: DraftApprovalInput): Promise<{ approval: PendingApproval; created: boolean }> {
   const built = buildApprovalPayload(input);
   if (!built.ok) throw new DraftNotSendableError(built.reason);
   const existing = await getPendingApprovalFor(input.applicationId);
-  if (existing) return { approval: existing, created: false };
+  if (existing) {
+    const synced = await syncReturnedPendingCover(existing, built.payload.cover_letter, syncPendingApprovalCoverLetter, true);
+    existing.cover_letter = synced.approval.cover_letter;
+    return { approval: existing, created: false };
+  }
   const approval = (await automationApi.createApproval(built.payload)) as PendingApproval;
-  return { approval, created: true };
+  // Bila server POST /api/approvals mengembalikan baris pending lama milik (user_id, job_id) dengan
+  // surat berbeda dari hasil sunting terbaru di modal, selaraskan via PATCH sebelum selesai.
+  return await syncReturnedPendingCover(approval, built.payload.cover_letter, syncPendingApprovalCoverLetter, false);
 }

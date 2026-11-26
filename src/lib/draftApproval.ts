@@ -20,6 +20,32 @@ export interface PendingApproval {
   status?: string;
   expires_at?: string;
   answers?: unknown;
+  cover_letter?: string | null;
+}
+
+/**
+ * Periksa apakah persetujuan `pending` yang dikembalikan server (dari daftar pending maupun POST idempoten)
+ * membawa `cover_letter` berbeda dari surat yang baru disunting di modal.
+ */
+export function needsPendingCoverLetterSync(approval: PendingApproval | null | undefined, wantedLetter: string): boolean {
+  if (!approval?.id || approval.id === "pending") return false;
+  if (!("cover_letter" in approval)) return false;
+  return String(approval.cover_letter ?? "").trim() !== wantedLetter.trim();
+}
+
+/** Alur pengajuan draf murni (dapat diuji langsung tanpa bundler); dipakai `approvalService.ts`. */
+export async function syncReturnedPendingCover(
+  approval: PendingApproval,
+  wantedLetter: string,
+  patchCover: (id: string, coverLetter: string) => Promise<unknown>,
+  alreadyPending: boolean,
+): Promise<{ approval: PendingApproval; created: boolean }> {
+  const trimmed = wantedLetter.trim();
+  if (needsPendingCoverLetterSync(approval, trimmed)) {
+    await patchCover(approval.id, trimmed);
+    return { approval: { ...approval, cover_letter: trimmed }, created: false };
+  }
+  return { approval, created: !alreadyPending };
 }
 
 /**

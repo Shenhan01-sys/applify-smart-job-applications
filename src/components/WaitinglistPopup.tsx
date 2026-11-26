@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Sparkles, X, UserPlus, ShieldCheck } from "lucide-react";
 
@@ -16,6 +16,8 @@ interface WaitinglistPopupProps {
 export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }: WaitinglistPopupProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -29,6 +31,8 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
 
   useEffect(() => {
     if (!open) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss();
     };
@@ -37,6 +41,8 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      previousFocusRef.current?.focus?.();
+      previousFocusRef.current = null;
     };
   }, [open]);
 
@@ -63,10 +69,12 @@ export function WaitinglistPopup({ delayMs = SHOW_DELAY_MS, perSession = true }:
       />
 
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="waitinglist-popup-title"
-        className="relative w-full max-w-md glass rounded-3xl overflow-hidden shadow-2xl animate-popUp"
+        tabIndex={-1}
+        className="relative w-full max-w-md glass rounded-3xl overflow-hidden shadow-2xl animate-popUp outline-none"
       >
         {/* Accent gradient strip */}
         <div className="absolute inset-x-0 top-0 h-1 gradient-primary" aria-hidden="true" />

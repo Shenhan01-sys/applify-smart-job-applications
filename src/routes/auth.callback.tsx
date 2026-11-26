@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { profileService } from "@/services/profileService";
 import { describeAuthError, recallAuthProvider } from "@/lib/authErrors";
 import { backSearchFor, clearAuthMode, recallAuthMode } from "@/lib/authMode";
+import { consumePostLoginRedirect, navigateArgsForRedirect } from "@/lib/authRedirect";
 import { waitForSession } from "@/lib/authSession";
 import { Loader2, AlertCircle } from "lucide-react";
 
@@ -46,11 +47,16 @@ function AuthCallbackPage() {
         if (session?.user) {
           window.history.replaceState(null, "", window.location.pathname);
           clearAuthMode();
+          const savedRedirect = consumePostLoginRedirect();
           // Pengguna baru (profil masih kosong) langsung ke Profil dengan banner sambutan.
           const target = await profileService.resolvePostLoginTarget(session.user.id);
           if (controller.signal.aborted) return;
           if (target.to === "/profile") navigate({ to: "/profile", search: { welcome: 1 } });
-          else navigate({ to: "/dashboard" });
+          else {
+            const navArgs = navigateArgsForRedirect(savedRedirect);
+            if (navArgs) navigate(navArgs as any);
+            else navigate({ to: "/dashboard" });
+          }
         } else {
           setStatus('error');
           setErrorMsg('Proses masuk belum selesai: sesimu tidak ditemukan. Tautan mungkin sudah dipakai atau kedaluwarsa, atau koneksimu lambat. Kembali ke halaman masuk lalu coba lagi.');
