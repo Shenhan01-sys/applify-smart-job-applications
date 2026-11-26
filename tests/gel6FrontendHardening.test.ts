@@ -55,3 +55,10 @@ test("48.6 UX-P7-12, 13, 14: target sentuh min-h-11, info jumlah skill radar, se
     assert.ok(!item.includes("\u2014") && !item.includes("!"), item);
   }
 });
+
+test("47.6 FE-19: WaitinglistPopup memindahkan fokus ke dialog saat terbuka dan mengembalikannya saat tutup", () => {
+  const popup = read("../src/components/WaitinglistPopup.tsx");
+  assert.match(popup, /previousFocusRef\.current/);
+  assert.match(popup, /dialogRef\.current\?\.focus\(\)/);
+  assert.match(popup, /tabIndex=\{-1\}/);
+});

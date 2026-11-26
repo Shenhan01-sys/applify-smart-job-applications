@@ -7,7 +7,7 @@ import { describeAuthError, rememberAuthProvider } from "@/lib/authErrors";
 import { rememberAuthMode } from "@/lib/authMode";
 import { detectInAppBrowser, inAppBrowserWarning } from "@/lib/inAppBrowser";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
-import { safeRedirectPath } from "@/lib/authRedirect";
+import { clearPostLoginRedirect, navigateArgsForRedirect, rememberPostLoginRedirect, safeRedirectPath } from "@/lib/authRedirect";
 
 export const Route = createFileRoute("/login")({
   // `?mode=daftar` membuka formulir daftar (tombol "Daftar Gratis" di beranda); `?redirect=` mempertahankan rute tujuan UAT yang aman.
@@ -108,20 +108,15 @@ function LoginPage() {
   const goAfterLogin = async (userId: string) => {
     if (routing.current) return;
     routing.current = true;
+    clearPostLoginRedirect();
     const target = await profileService.resolvePostLoginTarget(userId);
     if (target.to === "/profile") {
       navigate({ to: "/profile", search: { welcome: 1 } });
       return;
     }
-    const safeNext = safeRedirectPath(redirectTo);
-    if (safeNext) {
-      const u = new URL(safeNext, "https://applify.local");
-      const searchObj = Object.fromEntries(u.searchParams.entries());
-      navigate({
-        to: u.pathname as any,
-        ...(u.search ? { search: searchObj as any } : {}),
-        ...(u.hash ? { hash: u.hash.slice(1) } : {}),
-      } as any);
+    const navArgs = navigateArgsForRedirect(redirectTo);
+    if (navArgs) {
+      navigate(navArgs as any);
       return;
     }
     navigate({ to: "/dashboard" });
@@ -176,6 +171,7 @@ function LoginPage() {
     setError("");
     rememberAuthProvider("google");
     rememberAuthMode(isSignUp ? "daftar" : "masuk");
+    rememberPostLoginRedirect(redirectTo);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -202,6 +198,7 @@ function LoginPage() {
     setError("");
     rememberAuthProvider("linkedin");
     rememberAuthMode(isSignUp ? "daftar" : "masuk");
+    rememberPostLoginRedirect(redirectTo);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "linkedin_oidc",

@@ -42,7 +42,11 @@ test("47.6 FE-18: rute utama UAT mempertahankan tujuan redirect saat diarahkan k
   }
   const loginSrc = readRoute("login.tsx");
   assert.match(loginSrc, /safeRedirectPath\(search\.redirect\)/);
-  assert.match(loginSrc, /safeRedirectPath\(redirectTo\)/);
+  assert.match(loginSrc, /navigateArgsForRedirect\(redirectTo\)/);
+  assert.match(loginSrc, /rememberPostLoginRedirect\(redirectTo\)/);
+  const callbackSrc = readRoute("auth.callback.tsx");
+  assert.match(callbackSrc, /consumePostLoginRedirect\(\)/);
+  assert.match(callbackSrc, /navigateArgsForRedirect\(savedRedirect\)/);
 });
 
 test("47.6 FE-32: /settings menampilkan status galat saat plan.error alih-alih menyamar sebagai paket Gratis", () => {
