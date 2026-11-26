@@ -581,7 +581,10 @@ export function AppsPage() {
   };
 
   // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
-  const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(filteredApps);
+  const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
+  const displayedGroupedApps: Record<ApplicationStatus, AIApplicationData[]> = hasActiveFilter
+    ? groupByStatus(filteredApps)
+    : groupedApps;
   // Lowongan yang sama dengan lebih dari satu lamaran: kartunya diberi urutan dan waktu dibuat agar bisa dibedakan.
   const duplicates = useMemo(
     () => duplicateApplications(applications.map((a) => ({ id: a.id, created_at: a.created_at, job_id: a.job_id, title: jobOf(a)?.title, company: jobOf(a)?.company }))),
@@ -752,8 +755,8 @@ export function AppsPage() {
                 >
                   <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-3">
                     {APPLICATION_STATUSES.map((status) => (
-                      <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
-                        {groupedApps[status].map((app) => (
+                      <DroppableColumn key={status} status={status} apps={displayedGroupedApps[status]}>
+                        {displayedGroupedApps[status].map((app) => (
                           <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
