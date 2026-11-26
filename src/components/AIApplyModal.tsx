@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
 import {
+  APPROVAL_COVER_SYNC_FAILED,
   describeApprovalError,
   getPendingApprovalFor,
   requestApprovalForDraft,
@@ -325,7 +326,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       const synced = await syncPendingApprovalCoverLetter(approvalId, insights.coverLetter);
       setApplication({ ...application, cover_letter: insights.coverLetter });
       setIsEditing(false);
-      if (synced) toast.success("Surat baru ikut diperbarui di antrean Persetujuan.");
+      if (synced === "synced") toast.success("Surat baru ikut diperbarui di antrean Persetujuan.");
+      else if (synced === "failed") toast.warning(APPROVAL_COVER_SYNC_FAILED);
     } catch (err: any) {
       setError(describeError(err, "Surat belum bisa ditulis ulang. Coba lagi."));
     } finally {
@@ -350,7 +352,8 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       const synced = await syncPendingApprovalCoverLetter(approvalId, editedCoverLetter);
       setApplication({ ...application, cover_letter: editedCoverLetter });
       setIsEditing(false);
-      if (synced) toast.success("Perubahan surat ikut diperbarui di antrean Persetujuan.");
+      if (synced === "synced") toast.success("Perubahan surat ikut diperbarui di antrean Persetujuan.");
+      else if (synced === "failed") toast.warning(APPROVAL_COVER_SYNC_FAILED);
     } catch (err: any) {
       setError(describeError(err, "Perubahan belum tersimpan. Coba lagi."));
     }

@@ -19,14 +19,31 @@ export class DraftNotSendableError extends Error {
   }
 }
 
-/** E2E-04: sinkronkan perubahan surat lamaran ke antrean persetujuan yang masih tertunda. */
-export async function syncPendingApprovalCoverLetter(approvalId: string | null | undefined, coverLetter: string): Promise<boolean> {
-  if (!approvalId || approvalId === "pending") return false;
+/** Hasil sinkron surat: "synced" terkirim, "skipped" tidak ada yang perlu disinkron, "failed" server menolak atau tidak terjangkau. */
+export type CoverLetterSyncResult = "synced" | "skipped" | "failed";
+
+/**
+ * E2E-04: sinkronkan perubahan surat lamaran ke antrean persetujuan yang masih tertunda.
+ * Surat di draf (ai_applications) sudah tersimpan lebih dulu, jadi kegagalan di sini (persetujuan sudah diproses,
+ * kedaluwarsa, atau jaringan putus) tidak boleh membuat penyimpanan draf tampak gagal: hasilnya "failed" dan
+ * pemanggil memberi tahu pengguna. Surat kosong tidak dikirim, karena server menolaknya dan persetujuan tetap
+ * memakai surat sebelumnya.
+ */
+export async function syncPendingApprovalCoverLetter(approvalId: string | null | undefined, coverLetter: string): Promise<CoverLetterSyncResult> {
+  if (!approvalId || approvalId === "pending") return "skipped";
   const trimmed = coverLetter.trim();
-  if (!trimmed) throw new DraftNotSendableError("Surat lamaran tidak boleh kosong.");
-  await automationApi.updateApprovalCoverLetter(approvalId, trimmed);
-  return true;
+  if (!trimmed) return "skipped";
+  try {
+    await automationApi.updateApprovalCoverLetter(approvalId, trimmed);
+    return "synced";
+  } catch (err) {
+    console.warn("[approval] surat belum tersinkron ke antrean Persetujuan:", err);
+    return "failed";
+  }
 }
+
+/** Pesan untuk pengguna bila sinkron surat ke antrean Persetujuan gagal sementara surat di draf sudah tersimpan. */
+export const APPROVAL_COVER_SYNC_FAILED = "Surat tersimpan di draf, tetapi antrean Persetujuan belum ikut diperbarui. Buka halaman Persetujuan dan cek suratnya sebelum menyetujui.";
 
 /** Message for a failed approval request: the draft's own reason, else what the server answered. */
 export function describeApprovalError(err: unknown, fallback = "Draf belum bisa diajukan."): string {
