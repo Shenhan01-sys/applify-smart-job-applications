@@ -105,7 +105,7 @@ test("Edge Function memakai penjaga: bersihkan <think>, validasi surat, bahasa, 
   assert.match(fn, /checkGrounding\(/);
   assert.match(fn, /aiNotes,\s*\n\s*matchScore/, "result.aiNotes memuat peringatan, dan itulah yang disimpan ke ai_notes");
   assert.match(fn, /ai_notes: result\.aiNotes/);
-  assert.match(fn, /"AI generation failed", detail: lastDetail, rejected:/);
+  assert.match(fn, /"AI generation failed", reason: safeReason, rejected:/);
   // kuota baru dipakai setelah ada surat yang lolos
   assert.ok(fn.indexOf("if (!parsed)") < fn.indexOf('rpc("consume_monthly_apply"'));
 });
