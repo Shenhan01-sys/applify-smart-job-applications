@@ -116,8 +116,9 @@ test("UX-P7-07: satuan kuota di kartu paket sama dengan yang dijalankan kode (dr
   // Draf AI dibatasi per BULAN (get_quota_status memakai period 'monthly'; bawaan 10 per akun).
   assert.match(read("backend/services/quota-status.ts"), /DEFAULT_MONTHLY_QUOTA = 10/);
   assert.ok(FREE_FEATURES.includes("10 draf AI per bulan (kuota bulanan)"));
-  // Tidak ada kode yang memberi Pro angka draf bulanan berbeda, jadi kartu Pro tidak menjanjikan angka itu.
-  assert.ok(PRO_FEATURES.includes("Kuota draf AI per bulan ditetapkan per akun (bawaan 10)"));
+  // Keputusan Hans 26 November 2026: kuota draf bulanan Pro 100, Free tetap 10.
+  assert.ok(PRO_FEATURES.includes("100 draf AI per bulan (kuota bulanan)"));
+  assert.equal(PRO_FEATURES.filter((f) => /ditetapkan per akun|bawaan 10/i.test(f)).length, 0);
   assert.equal(PRO_FEATURES.filter((f) => /draf.*per hari|per hari.*draf/i.test(f)).length, 0);
   // Pengiriman dibatasi per HARI UTC (reset 00:00 UTC = 07:00 WIB), untuk kedua paket.
   assert.match(read("worker/src/lib/quota.ts"), /resets 00:00 UTC = 07:00 WIB/);

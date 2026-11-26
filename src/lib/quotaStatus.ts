@@ -1,7 +1,14 @@
 import { parseQuotaStatus, type QuotaSummary } from "../../supabase/functions/_shared/quota.ts";
 
 // The shared parser also runs inside the generate-application Edge Function, so it lives next to it.
-export { parseQuotaStatus, DEFAULT_MONTHLY_QUOTA, type QuotaSummary } from "../../supabase/functions/_shared/quota.ts";
+export {
+  parseQuotaStatus,
+  DEFAULT_MONTHLY_QUOTA,
+  FREE_MONTHLY_QUOTA,
+  PRO_MONTHLY_QUOTA,
+  monthlyQuotaForTier,
+  type QuotaSummary,
+} from "../../supabase/functions/_shared/quota.ts";
 
 const whole = (v: unknown): number | undefined => {
   const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;

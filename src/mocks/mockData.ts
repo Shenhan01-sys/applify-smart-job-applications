@@ -41,7 +41,7 @@ export const mockSubscription = {
   user_id: MOCK_USER_ID,
   ai_model_tier: "pro",
   daily_apply_quota: 20,
-  monthly_quota: 50,
+  monthly_quota: 100,
   used_quota: 12,
   status: "active",
   created_at: "2025-01-01T00:00:00Z",

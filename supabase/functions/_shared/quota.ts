@@ -8,6 +8,20 @@
 
 export const DEFAULT_MONTHLY_QUOTA = 10;
 
+/**
+ * Kuota draf AI bulanan per paket (keputusan 26 November 2026): Free 10, Pro 100.
+ * Angka yang berlaku adalah kolom `subscriptions.monthly_quota`. Database mengisinya dari paket lewat trigger di
+ * database/migrations/DRAFT_2026-11-26_pro_monthly_quota_100.sql (saat baris dibuat dan saat `ai_model_tier` berubah).
+ * Konstanta ini hanya dipakai untuk teks harga dan nilai cadangan tampilan, bukan untuk menegakkan batas.
+ */
+export const FREE_MONTHLY_QUOTA = 10;
+export const PRO_MONTHLY_QUOTA = 100;
+
+/** Kuota draf bulanan bawaan sebuah paket. Paket selain "pro" (termasuk kosong) dianggap Free. */
+export function monthlyQuotaForTier(tier: unknown): number {
+  return typeof tier === "string" && tier.trim().toLowerCase() === "pro" ? PRO_MONTHLY_QUOTA : FREE_MONTHLY_QUOTA;
+}
+
 export interface QuotaSummary {
   /** Allowed drafts per month (subscriptions.daily_apply_quota is the column the database functions use). */
   quota: number;

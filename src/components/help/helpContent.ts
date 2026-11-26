@@ -105,7 +105,7 @@ export const HELP_EXTRA_GLOSSARY: readonly HelpTerm[] = [
 export const HELP_EXTRA_FAQ: readonly { question: string; answer: string }[] = [
   {
     question: "Kuota draf bulanan sudah habis",
-    answer: "Paket Free memiliki batas draf per bulan. Kamu tetap bisa melamar sendiri dari tautan lowongan, menunggu awal bulan, atau memakai API key sendiri jika tersedia.",
+    answer: "Paket Free mendapat 10 draf per bulan dan paket Pro 100 draf per bulan. Kamu tetap bisa melamar sendiri dari tautan lowongan, menunggu awal bulan, atau memakai API key sendiri jika tersedia.",
   },
   {
     question: "Ekstensi Browser belum tersambung",
