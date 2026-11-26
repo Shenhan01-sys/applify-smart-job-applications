@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getApiBaseUrl } from "@/lib/appConfig";
 import { isRealSubmitOffLog } from "@/lib/emailTestMode";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
@@ -26,26 +27,35 @@ const QUEUE_COLUMNS = "id, job_type, status, error_message, created_at, complete
 
 export const automationQueue = {
   /**
-   * Enqueue a background auto-apply job. The local worker (polling automation_queue)
-   * will pick it up and drive agent-browser to fill/submit the application.
-   * RLS ("Users can only access own queue items") scopes the row to the caller.
+   * Enqueue a background auto-apply job via the authenticated backend API (`POST /api/queue/apply`)
+   * so payload validation, approval checks, and platform rate limits always run server-side
+   * instead of direct browser INSERT into `automation_queue` (audit 47.6 FE-04, 48.1 BS-U4-02).
    */
   async enqueueAutoApply(jobId: string): Promise<{ id: string }> {
     if (isMockMode()) {
       await new Promise((r) => setTimeout(r, 600));
       return { id: `q-${Date.now()}` };
     }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error("Not authenticated");
 
-    const { data, error } = await supabase
-      .from("automation_queue")
-      .insert({ user_id: user.id, job_type: "apply", payload: { job_id: jobId } })
-      .select("id")
-      .single();
-
-    if (error) throw error;
-    return data;
+    const resp = await fetch(`${getApiBaseUrl()}/api/queue/apply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ job_id: jobId }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(text || `HTTP ${resp.status}`);
+    }
+    const body = (await resp.json()) as { jobId?: string; id?: string };
+    const id = body.jobId ?? body.id;
+    if (!id) throw new Error("Server tidak mengembalikan id tugas antrean");
+    return { id };
   },
 
   /**
