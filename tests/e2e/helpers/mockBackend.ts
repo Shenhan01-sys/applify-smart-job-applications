@@ -428,9 +428,9 @@ export class MockBackend {
       return route.fulfill(json(501, { message: "not_mocked", path }));
     }
 
-    if (method === "GET") {
+    if (method === "GET" || method === "HEAD") {
       this.restReads.push({ seq: ++callSeq, method, path, search: url.search, body: undefined, authorization: request.headers()["authorization"] ?? null });
-      return this.selectRows(route, table, url);
+      return this.selectRows(route, table, url, method === "HEAD");
     }
 
     if ((method === "POST" || method === "PATCH") && PROFILE_TABLES.has(table)) return this.writeProfileTable(route, table, url);
@@ -515,9 +515,15 @@ export class MockBackend {
     return map[table];
   }
 
-  private async selectRows(route: Route, table: string, url: URL): Promise<void> {
+  /**
+   * Bacaan PostgREST. `headOnly` = HEAD dengan `count=exact` (select(..., { count: "exact", head: true })): hanya
+   * jumlah baris yang cocok yang dijawab, lewat header Content-Range, tanpa isi.
+   */
+  private async selectRows(route: Route, table: string, url: URL, headOnly = false): Promise<void> {
     const s = this.state;
     const sources: Record<string, Row[] | undefined> = {
+      // Dibaca Beranda untuk menghitung persetujuan yang disetujui (checklist pengguna baru).
+      approval_requests: [...s.pending, ...s.history],
       automation_queue: s.queue,
       application_logs: s.logs,
       jobs: s.jobs,
@@ -558,6 +564,11 @@ export class MockBackend {
     } catch (err) {
       this.unmocked.push(`SUPABASE GET ${table}: ${(err as Error).message}`);
       return route.fulfill(json(501, { message: (err as Error).message }));
+    }
+
+    if (headOnly) {
+      const range = out.length === 0 ? "*/0" : `0-${out.length - 1}/${out.length}`;
+      return route.fulfill({ status: 200, headers: { "content-type": "application/json", "content-range": range }, body: "" });
     }
 
     const order = url.searchParams.get("order");

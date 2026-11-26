@@ -18,6 +18,8 @@ import { summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboa
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
+const EMPTY_URGENT: UrgentActionsSummary = { pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 };
+
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async () => {
     if (isMockMode()) return;
@@ -68,7 +70,7 @@ export function DashboardPage() {
   const [approvedCount, setApprovedCount] = useState<number | null>(null);
   // null = unknown (the call failed or there is no data), so the ring shows a dash instead of a made-up number
   const [quota, setQuota] = useState<QuotaSummary | null>(null);
-  const [urgent, setUrgent] = useState<UrgentActionsSummary>({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
+  const [urgent, setUrgent] = useState<UrgentActionsSummary>(EMPTY_URGENT);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -83,7 +85,7 @@ export function DashboardPage() {
         setHasResume(null);
         setApprovedCount(null);
         setQuota(null);
-        setUrgent({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
+        setUrgent(EMPTY_URGENT);
         setLoadError("");
         setLoading(false);
         return;
@@ -95,7 +97,7 @@ export function DashboardPage() {
         setProfileIncomplete(false);
         setHasResume(true);
         setApprovedCount(1);
-        setUrgent({ pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 });
+        setUrgent(EMPTY_URGENT);
         setQuota({ quota: mockSubscription.monthly_quota, used: mockSubscription.used_quota, remaining: mockSubscription.monthly_quota - mockSubscription.used_quota, allowed: true });
         setLoading(false);
         return;
@@ -103,7 +105,7 @@ export function DashboardPage() {
       try {
         // Same sources as the rest of the app: drafts and their status live in ai_applications (joined to
         // jobs), the monthly draft quota comes from the get_quota_status function the Edge Function uses.
-        const [p, apps, q, summary, approvedRes, pendingApprovals, queueRes, logsRes] = await Promise.all([
+        const [p, apps, q, summary, approvedRes] = await Promise.all([
           supabase.from("profiles").select("full_name, resume_url").eq("id", user.id).maybeSingle(),
           supabase
             .from("ai_applications")
@@ -116,19 +118,6 @@ export function DashboardPage() {
           profileService.getSummary(user.id).then((x) => needsOnboarding(x), () => null),
           // Langkah "Periksa dan setujui" di checklist: cukup jumlahnya. Galat = belum diketahui, bukan 0.
           supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "approved"),
-          automationApi.getPendingApprovals().catch(() => []),
-          supabase
-            .from("automation_queue")
-            .select("id, job_type, status, error_message, scheduled_at, created_at, payload")
-            .in("job_type", ["apply", "extension_apply"])
-            .order("created_at", { ascending: false })
-            .limit(50),
-          supabase
-            .from("application_logs")
-            .select("status, details, created_at")
-            .eq("action", "apply")
-            .order("created_at", { ascending: false })
-            .limit(100),
         ]);
         if (apps.error) throw new Error(apps.error.message);
         setProfile(p.data ?? null);
@@ -137,13 +126,6 @@ export function DashboardPage() {
         setHasResume(p.error ? null : !!(p.data as { resume_url?: string | null } | null)?.resume_url);
         setApprovedCount(approvedRes.error ? null : approvedRes.count ?? 0);
         setQuota(q.error ? null : parseQuotaStatus(q.data));
-        setUrgent(
-          summarizeUrgentActions({
-            pendingApprovals,
-            queueRows: queueRes.error ? [] : (queueRes.data ?? []),
-            applyLogs: logsRes.error ? [] : (logsRes.data ?? []),
-          }),
-        );
       } catch (err) {
         console.error("Dashboard load failed:", err);
         setLoadError(describeError(err, "Data belum bisa dimuat."));
@@ -153,6 +135,52 @@ export function DashboardPage() {
     }
     loadData();
   }, [user, reloadKey]);
+
+  // E2E-06: banner Tindakan mendesak dimuat terpisah dari data utama. Persetujuan pending datang dari backend
+  // (Railway) yang bisa lambat atau tertidur, jadi Beranda tidak boleh menunggunya. Dimuat sekali per login dan per
+  // "Coba lagi", tanpa polling. Hanya membaca: automation_queue dan application_logs dibatasi RLS ke baris milik sendiri,
+  // dan filter user_id dikirim juga supaya kueri memakai indeks (user_id, created_at).
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId || isMockMode()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [pendingApprovals, queueRes, logsRes] = await Promise.all([
+          automationApi.getPendingApprovals().catch(() => []),
+          supabase
+            .from("automation_queue")
+            .select("id, job_type, status, error_message, scheduled_at, created_at, payload")
+            .eq("user_id", userId)
+            .in("job_type", ["apply", "extension_apply"])
+            .order("created_at", { ascending: false })
+            .limit(50),
+          supabase
+            .from("application_logs")
+            .select("status, details, created_at")
+            .eq("user_id", userId)
+            .eq("action", "apply")
+            .order("created_at", { ascending: false })
+            .limit(100),
+        ]);
+        if (cancelled) return;
+        setUrgent(
+          summarizeUrgentActions({
+            pendingApprovals,
+            queueRows: queueRes.error ? [] : (queueRes.data ?? []),
+            applyLogs: logsRes.error ? [] : (logsRes.data ?? []),
+          }),
+        );
+      } catch (err) {
+        // Banner hanya pelengkap: gagal dimuat berarti tidak tampil, bukan galat di Beranda.
+        console.warn("Urgent actions load skipped:", err);
+        if (!cancelled) setUrgent(EMPTY_URGENT);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, reloadKey]);
 
   if (loading) {
     return (
