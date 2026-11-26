@@ -36,11 +36,14 @@ export type PendingQuestion = {
    * (worker hanya menanyakan isian wajib), dan tanpa kunci ini pertanyaan dianggap wajib dijawab.
    */
   required?: boolean;
+  /** Konteks bagian/grup/petunjuk tempat pertanyaan berasal (mis. "Riwayat Pekerjaan #1"), bila tersedia. */
+  context?: string;
 };
 
 export const MAX_QUESTIONS = 20;
 export const MAX_KEY_LENGTH = 200;
 export const MAX_LABEL_LENGTH = 400;
+export const MAX_CONTEXT_LENGTH = 260;
 export const MAX_OPTIONS = 30;
 export const MAX_OPTION_LENGTH = 120;
 export const MAX_ANSWER_LENGTH = 2000;
@@ -106,8 +109,17 @@ export function parseQuestions(details: unknown): PendingQuestion[] {
     if (!key || !label || key === "__proto__" || seen.has(key)) continue;
     const kind = typeof item.kind === "string" && KINDS.has(item.kind) ? (item.kind as QuestionKind) : "text";
     const options = kind === "select" || kind === "radio" ? cleanOptions(item.options) : undefined;
+    const context =
+      typeof item.context === "string" ? item.context.replace(/\s+/g, " ").trim().slice(0, MAX_CONTEXT_LENGTH).trim() : "";
     seen.add(key);
-    out.push({ key, label, kind, ...(options ? { options } : {}), ...(typeof item.required === "boolean" ? { required: item.required } : {}) });
+    out.push({
+      key,
+      label,
+      kind,
+      ...(options ? { options } : {}),
+      ...(typeof item.required === "boolean" ? { required: item.required } : {}),
+      ...(context ? { context } : {}),
+    });
     if (out.length >= MAX_QUESTIONS) break;
   }
   return out;

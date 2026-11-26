@@ -383,6 +383,11 @@ function QuestionForm({
 
           return (
             <div key={q.key}>
+              {q.context && (
+                <p className="mb-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {q.context}
+                </p>
+              )}
               {control}
               {err && (
                 <p id={errId} className="mt-1 flex items-center gap-1 text-xs text-red-600">
