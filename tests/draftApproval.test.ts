@@ -63,6 +63,16 @@ test("isi pengajuan sama dengan modal AI Apply: job_id, application_id, job_titl
   assert.equal(noPlatform.ok && noPlatform.payload.platform, null);
 });
 
+test("draf tanpa job_id ditolak sebelum dikirim, karena backend mewajibkan job_id (E2E-05)", () => {
+  for (const jobId of [undefined, null, "", "   "]) {
+    const r = buildApprovalPayload({ applicationId: "app-1", jobId, jobTitle: "A", company: "B", coverLetter: "x" });
+    assert.equal(r.ok, false);
+    assert.match((r as { reason: string }).reason, /Lowongan untuk draf ini sudah tidak ada/);
+  }
+  const trimmed = buildApprovalPayload({ applicationId: "app-1", jobId: " job-1 ", jobTitle: "A", company: "B", coverLetter: "x" });
+  assert.equal(trimmed.ok && trimmed.payload.job_id, "job-1");
+});
+
 test("draf tanpa lowongan, tanpa id, atau tanpa surat ditolak dengan alasan yang bisa dibaca", () => {
   const noJob = buildApprovalPayload({ applicationId: "app-1", jobId: "j", jobTitle: undefined, company: undefined, coverLetter: "x" });
   assert.equal(noJob.ok, false);

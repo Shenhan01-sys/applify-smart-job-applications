@@ -44,7 +44,7 @@ export function findPendingApproval(approvals: unknown, applicationId: string, n
 }
 
 export interface ApprovalPayload {
-  job_id: string | null;
+  job_id: string;
   application_id: string;
   job_title: string;
   company: string;
@@ -72,10 +72,13 @@ export function buildApprovalPayload(input: {
   if (!input.applicationId) return { ok: false, reason: "Draf ini belum punya id, jadi belum bisa diajukan." };
   if (!jobTitle || !company) return { ok: false, reason: "Lowongan untuk draf ini sudah tidak ada, jadi draf belum bisa diajukan." };
   if (!coverLetter.trim()) return { ok: false, reason: "Surat lamaran draf ini kosong. Isi suratnya dulu sebelum diajukan." };
+  // E2E-05: backend mewajibkan job_id (400 job_id_required) dan memakainya untuk mencegah persetujuan ganda.
+  const jobId = typeof input.jobId === "string" ? input.jobId.trim() : "";
+  if (!jobId) return { ok: false, reason: "Lowongan untuk draf ini sudah tidak ada, jadi draf belum bisa diajukan." };
   return {
     ok: true,
     payload: {
-      job_id: input.jobId ?? null,
+      job_id: jobId,
       application_id: input.applicationId,
       job_title: jobTitle,
       company,
