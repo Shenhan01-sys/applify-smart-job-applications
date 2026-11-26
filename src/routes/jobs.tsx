@@ -120,6 +120,12 @@ function JobsPage() {
   // Penyaring 80% tetap di klien: skornya per pengguna.
   useEffect(() => {
     if (isMockMode()) return;
+    // Pencarian atau penyaring berubah: daftar yang tampil sudah milik penyaring sebelumnya (mis. kosong karena Remote).
+    // Tandai "memperbarui" sekarang juga, jangan menunggu jeda ketik 350 ms, supaya klik "Semua" tidak tampak gagal
+    // melepas Remote selama jawaban baru belum datang (uji E2E production 26 November 2026).
+    setFetching(true);
+    // Jawaban kueri sebelumnya yang masih di jalan tidak boleh menimpa daftar sebelum kueri baru dikirim.
+    fetchSeq.current += 1;
     const t = setTimeout(() => fetchJobs(searchQuery), searchQuery ? 350 : 0);
     return () => clearTimeout(t);
   }, [searchQuery, activeFilter]);

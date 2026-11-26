@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { describeApiError } from '@/lib/apiErrors'
+import { appendScanStage, settleScanStages, type ScanStage } from '@/lib/scanStages'
 import {
   SEARCH_INPUT_HINT_PROFILE_LINK,
   SEARCH_INPUT_HINT_SETTINGS_LINK,
@@ -43,10 +44,6 @@ const PLATFORM_HINTS: Record<string, string> = {
 // LinkedIn butuh sesi browser dan dilamar manual.
 const DEFAULT_PLATFORMS = ['jobstreet', 'glints', 'kalibrr', 'dealls', 'greenhouse', 'lever', 'ashby', 'workable', 'smartrecruiters']
 
-interface ScanStage {
-  message: string
-  type: 'info' | 'success' | 'analysis' | 'error'
-}
 
 export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   const [isScanning, setIsScanning] = useState(false)
@@ -84,13 +81,12 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   }, [waitingSince])
 
   const addStage = useCallback((message: string, type: ScanStage['type'] = 'info') => {
-    setStages((prev) => {
-      const errs = prev.filter((s) => s.type === 'error')
-      const others = prev.filter((s) => s.type !== 'error')
-      const nextOthers = type === 'error' ? others : [...others, { message, type }].slice(-5)
-      const nextErrs = type === 'error' ? [...errs, { message, type }] : errs
-      return [...nextOthers, ...nextErrs]
-    })
+    setStages((prev) => appendScanStage(prev, message, type))
+  }, [])
+
+  // Pencarian berakhir: baris kemajuan ("Menghubungi 9 situs...") dibuang, tersisa kalimat hasil dan galat per situs.
+  const settleStage = useCallback((message: string, type: ScanStage['type']) => {
+    setStages((prev) => settleScanStages(prev, message, type))
   }, [])
 
   const togglePlatform = (platformId: string) => {
@@ -142,7 +138,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
         setWaitingSince(null)
       }
       if (searched.cancelled) {
-        addStage('Pencarian dibatalkan.', 'info')
+        settleStage('Pencarian dibatalkan.', 'info')
         setProgress(0)
         return
       }
@@ -159,13 +155,13 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       if (failed) {
         // Penyebab sudah ditampilkan sebagai toast oleh useJobSearch; jangan menulis "tidak ada lowongan" untuk permintaan yang gagal.
         if (searched.code === 'keywords_required') setInputMissing(true)
-        addStage(searched.message ?? 'Pencarian gagal. Periksa koneksi lalu coba lagi.', 'error')
+        settleStage(searched.message ?? 'Pencarian gagal. Periksa koneksi lalu coba lagi.', 'error')
         setIsScanning(false)
         return
       }
 
       if (total === 0) {
-        addStage('Pencarian selesai, tetapi tidak ada lowongan yang cocok. Coba pilih lebih banyak situs lowongan.', 'error')
+        settleStage('Pencarian selesai, tetapi tidak ada lowongan yang cocok. Coba pilih lebih banyak situs lowongan.', 'error')
         setIsScanning(false)
         return
       }
@@ -174,7 +170,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       addStage(`Menyaring lokasi dan menghapus duplikat dari ${searchResults.length} sumber...`, 'analysis')
       addStage('Mengurutkan berdasarkan kecocokan dengan kata kunci dan skill di profilmu...', 'analysis')
       setProgress(100)
-      addStage(`Selesai. ${total} lowongan ditemukan dan diurutkan. Daftar di bawah sudah diperbarui.`, 'success')
+      settleStage(`Selesai. ${total} lowongan ditemukan dan diurutkan. Daftar di bawah sudah diperbarui.`, 'success')
       // Panel tidak ditutup otomatis: dulu tertutup satu detik sesudah selesai, sehingga hasilnya hampir tak terbaca.
       onComplete()
     } catch (error) {

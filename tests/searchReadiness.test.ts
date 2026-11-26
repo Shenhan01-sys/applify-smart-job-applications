@@ -44,7 +44,7 @@ test("pemindai: petunjuk sebelum mencari, tautan ke Pengaturan Agen dan Profil, 
   assert.match(scanner, /to="\/automation-settings"/);
   assert.match(scanner, /to="\/profile"/);
   assert.match(scanner, /searched\.code === 'keywords_required'\) setInputMissing\(true\)/);
-  assert.match(scanner, /addStage\(searched\.message \?\? /);
+  assert.match(scanner, /settleStage\(searched\.message \?\? /);
   // petunjuk tampil di atas daftar situs, sebelum tombol mencari dipakai
   assert.ok(scanner.indexOf('data-testid="search-input-hint"') < scanner.indexOf("Pilih situs lowongan:"));
   // pencarian tidak diblokir: backend masih bisa memakai skill profil
