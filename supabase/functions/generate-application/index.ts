@@ -10,6 +10,7 @@
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.0";
 import { parseQuotaStatus } from "../_shared/quota.ts";
+import { acquireMonthlyInflightSlot, type MonthlySlotHandle } from "../_shared/quota-reservation.ts";
 import { DEFAULT_NUMES_CALL_TIMEOUT_MS, NumesBudget } from "../_shared/numes-keys.ts";
 import {
   DEFAULT_AI_CALL_TIMEOUT_MS,
@@ -203,6 +204,22 @@ Deno.serve(async (req: Request) => {
       }
       return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
     }
+
+    // 3c) Reservasi slot kuota sebelum memanggil model AI mahal (47.5 U6-P2-09) agar permintaan paralel
+    //     untuk lowongan berbeda tidak sama-sama lolos pada sisa kuota 1. Dilepas di `finally`.
+    let slot: MonthlySlotHandle | null = null;
+    if (mode !== "analyze" && byokTargets.length === 0) {
+      slot = await acquireMonthlyInflightSlot(admin, {
+        userId,
+        jobId,
+        quotaRemaining: Number(quota.remaining ?? 0),
+      });
+      if (!slot.allowed) {
+        return json({ error: "Kuota bulanan habis atau sedang dipakai oleh permintaan lain. Coba sesaat lagi.", quota }, 429);
+      }
+    }
+
+    try {
 
     // 4) Context
     const [{ data: job }, { data: profile }, { data: skills }, { data: work }, { data: education }, { data: achievementRows }] = await Promise.all([
@@ -455,7 +472,10 @@ Return JSON exactly in this shape:
       }),
     ];
     const warningText = formatWarningsText(warnings);
-    const aiNotes = [parsed.aiNotes ?? "", warningText].filter(Boolean).join("\n\n");
+    const salvageNote = parsed.salvaged
+      ? "Perlu ditinjau: draf dipulihkan dari jawaban model yang terpotong — periksa kelengkapan paragraf penutup sebelum mengirim."
+      : "";
+    const aiNotes = [parsed.aiNotes ?? "", salvageNote, warningText].filter(Boolean).join("\n\n");
 
     // "Skill yang Disorot" = irisan dengan skill profil (lib _shared/tailored-skills.ts), bukan keluaran model apa adanya:
     // model pernah mengisinya dengan kalimat persyaratan lowongan (uji klik 21 November 2026, temuan 24).
@@ -470,6 +490,7 @@ Return JSON exactly in this shape:
       optimizedCV: { summary: parsed.aiNotes ?? "", highlighted_skills: tailoredSkills },
       tailoredSkills,
       aiNotes,
+      salvaged: Boolean(parsed.salvaged),
       matchScore: clamp(parsed.matchScore ?? job.match_score),
       acceptancePotential: clamp(parsed.acceptancePotential ?? job.acceptance_potential),
       skillGaps: parsed.skillGaps ?? [],
@@ -529,6 +550,9 @@ Return JSON exactly in this shape:
     }
 
     return json({ application: app, analysis: result, quota });
+    } finally {
+      await slot?.release();
+    }
   } catch (e: any) {
     return json({ error: String(e?.message ?? e) }, 500);
   }
