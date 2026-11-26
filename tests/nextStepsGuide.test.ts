@@ -139,8 +139,8 @@ test("kartu Persetujuan memakai daftar langkah, gerbang kedaluwarsa, dan tidak m
   assert.doesNotMatch(steps, /onClick|<button/, "daftar hanya petunjuk dan tautan buka tab");
   const page = read("../src/routes/approvals.tsx");
   assert.match(page, /const expired = approved && placement\.stage === 'expired'/);
-  assert.match(page, /\{approved && !expired && \(\s*<AgentQuestions/);
-  assert.match(page, /\{approved && !expired && \(\s*<AgentSecurityCode/);
-  assert.match(page, /\{approved && !expired && \(\s*<AgentManualSubmit/);
+  assert.match(page, /\{approved && !expired && !isSent && \(\s*<AgentQuestions/);
+  assert.match(page, /\{approved && !expired && !isSent && \(\s*<AgentSecurityCode/);
+  assert.match(page, /\{approved && !expired && !isSent && \(\s*<AgentManualSubmit/);
   assert.match(page, /expired=\{expired\}/);
 });

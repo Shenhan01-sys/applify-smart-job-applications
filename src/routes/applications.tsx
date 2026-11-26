@@ -19,6 +19,10 @@ import { attemptForApplication, fieldsFilledByQueueJob, needsFillYourself, sentQ
 import { getApplyState } from "@/services/formGapService";
 import AgentEvidence from "@/components/AgentEvidence";
 import AgentManualSubmit from "@/components/AgentManualSubmit";
+import { APPROVAL_VALID_TEXT, STALE_APPROVAL_TEXT, liveApprovalIds } from "@/lib/approvalExpiry";
+import { attemptsForApplications } from "@/lib/applicationAttempts";
+import OutcomeActions from "@/components/OutcomeActions";
+import { automationApi } from "@/services/automationApi";
 import { describeLogOutcome } from "@/lib/agentApplyStatus";
 import { hasAgentEvidence, type AgentLogFacts } from "@/lib/agentEvidence";
 import { awaitingCodeState } from "@/lib/securityCode";
@@ -344,7 +348,12 @@ export function AppsPage() {
   // Fakta percobaan agen terbaru per job_id (hasil kirim, isian yang diisi, jalur tangkapan layar) untuk blok
   // "Bukti dari agen" di jendela detail. Dibaca dari log yang sama dengan `attempts`.
   const [agentFacts, setAgentFacts] = useState<Record<string, AgentLogFacts>>({});
+  // Baris log mentah per lowongan: dipakai memisahkan percobaan per lamaran (lib/applicationAttempts.ts), supaya kartu
+  // tidak menampilkan bukti milik lamaran lain untuk lowongan yang sama.
+  const [logRowsByJob, setLogRowsByJob] = useState<Record<string, unknown[]>>({});
   const [applyReloads, setApplyReloads] = useState(0);
+  // Persetujuan yang masih berlaku (disetujui, belum kedaluwarsa). null = belum dimuat atau gagal: tautan tidak disembunyikan.
+  const [liveApprovals, setLiveApprovals] = useState<Set<string> | null>(null);
   // Skill profil untuk menyaring "Skill yang Disorot" saat ditampilkan: draf lama (dibuat sebelum penyaringan di
   // Edge Function) masih memuat skill lowongan yang tidak ada di profil (temuan 30, uji klik 21 November 2026).
   // null = belum dimuat atau gagal dimuat (hanya penyaring frasa yang berlaku); mode demo tidak memakainya.
@@ -390,6 +399,25 @@ export function AppsPage() {
       alive = false;
     };
   }, [selectedId, selectedStatus]);
+
+  // Persetujuan yang masih berlaku, dibaca saat jendela detail dibuka. Pertanyaan, kode, dan jalankan ulang hanya
+  // ditawarkan untuk persetujuan yang masih berlaku; yang kedaluwarsa ada di Riwayat dan tidak bisa dijawab lagi
+  // (audit Gemini 26 November 2026: kartu IDEKU mengarah ke Persetujuan padahal persetujuannya sudah kedaluwarsa).
+  useEffect(() => {
+    if (!selectedId || isMockMode()) return;
+    let alive = true;
+    automationApi
+      .getApprovalHistory({ limit: 100 })
+      .then((list) => {
+        if (alive) setLiveApprovals(liveApprovalIds(list));
+      })
+      .catch(() => {
+        if (alive) setLiveApprovals(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedId]);
 
   const handleRequestApproval = async (app: AIApplicationData) => {
     const job = jobOf(app);
@@ -486,15 +514,17 @@ export function AppsPage() {
       setFormGaps({});
       setAttempts({});
       setAgentFacts({});
+      setLogRowsByJob({});
       return;
     }
     let alive = true;
     getApplyState(agentJobKey.split(","))
-      .then(({ gaps, attempts: latest, agentFacts: facts }) => {
+      .then(({ gaps, attempts: latest, agentFacts: facts, rowsByJob }) => {
         if (!alive) return;
         setFormGaps(gaps);
         setAttempts(latest);
         setAgentFacts(facts);
+        setLogRowsByJob(rowsByJob);
       })
       .catch((err) => {
         console.warn("Hasil percobaan agen belum bisa dimuat:", err);
@@ -502,6 +532,7 @@ export function AppsPage() {
           setFormGaps({});
           setAttempts({});
           setAgentFacts({});
+          setLogRowsByJob({});
         }
       });
     return () => {
@@ -521,11 +552,14 @@ export function AppsPage() {
   // Untuk draf yang belum pernah dicoba agen, layar sengaja tidak menampilkan apa-apa, bukan petunjuk semacam
   // "Agen belum mendukung situs ini": tidak ada data di kode yang menyatakan sumber mana yang tidak bisa diisi agen
   // (hasilnya bergantung pada halaman, misalnya perlu masuk dulu), jadi petunjuk itu akan menjadi klaim tanpa bukti.
-  const attemptOf = (app: AIApplicationData) => attemptForApplication(attempts[app.job_id], app);
+  // Percobaan dan fakta per lamaran: hanya log dalam jendela waktu lamaran itu (lib/applicationAttempts.ts). Percobaan
+  // terbaru per lowongan (attempts, agentFacts) tetap dipakai Antrean Agen, yang memang per lowongan.
+  const perApplication = useMemo(() => attemptsForApplications(applications, logRowsByJob), [applications, logRowsByJob]);
+  const attemptOf = (app: AIApplicationData) => perApplication[app.id]?.attempt;
   const fillYourselfFor = (app: AIApplicationData) => canRequestApproval(app.status) && needsFillYourself(attemptOf(app));
   // "Perlu dicek": percobaan agen terbaru berhenti di tunggu kode keamanan (lib/needsCheck.ts). Status di database tetap
   // ready; kartunya hanya ditampilkan di kolom Perlu tindak lanjut dan hitungan terkirim tidak berubah.
-  const needsCheckFor = (app: AIApplicationData) => isNeedsCheckApplication(app, agentFacts[app.job_id], !!attemptOf(app));
+  const needsCheckFor = (app: AIApplicationData) => isNeedsCheckApplication(app, perApplication[app.id]?.facts, !!attemptOf(app));
 
   // "Tandai: Sudah Kutindaklanjuti" hanya mencatat bahwa pengguna sendiri sudah follow-up. Applify tidak
   // mengirim email follow-up. Status `submitted` tetap di kolom Terkirim, dan kartu di `follow_up`
@@ -596,7 +630,7 @@ export function AppsPage() {
     moveApplication(move.appId, move.status);
     // needsCheckFor membaca attempts dan agentFacts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applications, moveApplication, attempts, agentFacts]);
+  }, [applications, moveApplication, perApplication]);
 
   // Hitungan yang sama dengan penghitung Beranda (lib/dashboardStats.ts): "Terkirim" mencakup semua lamaran yang sudah
   // dikirim (Terkirim, Perlu tindak lanjut, Sudah dibalas, dan Ditutup yang pernah dikirim), bukan hanya kolom Terkirim.
@@ -610,7 +644,7 @@ export function AppsPage() {
     return rows.filter((a) => boardColumnOf(a.status, needsCheckFor(a)) === statusFilter);
     // needsCheckFor membaca attempts dan agentFacts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applications, searchQuery, statusFilter, attempts, agentFacts]);
+  }, [applications, searchQuery, statusFilter, perApplication]);
   const hasActiveFilter = searchQuery.trim() !== "" || statusFilter !== "all";
 
   useEffect(() => {
@@ -667,7 +701,7 @@ export function AppsPage() {
   const selectedFillYourself = selectedApp ? fillYourselfFor(selectedApp) : false;
   const selectedNeedsCheck = selectedApp ? needsCheckFor(selectedApp) : false;
   // Hasil percobaan agen terbaru untuk lamaran ini (hanya percobaan sesudah lamaran dibuat, lihat attemptForApplication).
-  const selectedFacts = selectedApp && selectedAttempt ? agentFacts[selectedApp.job_id] : undefined;
+  const selectedFacts = selectedApp && selectedAttempt ? perApplication[selectedApp.id]?.facts : undefined;
   const selectedOutcome = describeLogOutcome(selectedFacts);
   // Terkirim menurut log: agen menekan kirim dan halaman konfirmasi terdeteksi. Hanya ini yang disebut "Bukti pengiriman".
   const selectedSent = selectedOutcome?.tone === "sent";
@@ -680,6 +714,9 @@ export function AppsPage() {
   // Agen berhenti sebelum kirim (situs belum diizinkan, dan sebagainya): pengguna bisa membuka formulir, menyalin isian,
   // atau menjalankan agen lagi. Pertanyaan, kode keamanan, dan hasil lain yang punya alur sendiri tidak masuk (lib/manualSubmit.ts).
   const selectedManualState = manualSubmitState(selectedFacts);
+  // Persetujuan percobaan ini masih berlaku? Tidak diketahui (belum dimuat, gagal, atau log lama tanpa id) dianggap berlaku.
+  const selectedApprovalId = selectedFacts?.approval_request_id ?? null;
+  const approvalLive = !selectedApprovalId || liveApprovals === null || liveApprovals.has(selectedApprovalId);
   // Log lama yang ditandai terkirim oleh pengguna sendiri: bukan kiriman agen, jadi tidak ada bukti dari situs untuk ditampilkan.
   const selectedManualSent = isManualSent(selectedFacts);
   const selectedSkills = selectedApp ? highlightedSkills(selectedApp.tailored_skills, profileSkills) : [];
@@ -929,7 +966,7 @@ export function AppsPage() {
                     {approvalUi.state === "pending" ? (
                       <>
                         <p className="text-sm text-muted-foreground">
-                          Draf ini sudah menunggu persetujuanmu (berlaku 1 jam). Tanpa persetujuan, agen tidak akan mengirim.
+                          Draf ini sudah menunggu persetujuanmu (berlaku {APPROVAL_VALID_TEXT}). Tanpa persetujuan, agen tidak akan mengirim.
                         </p>
                         <Link
                           to="/approvals"
@@ -950,6 +987,27 @@ export function AppsPage() {
                             <p>{selectedIssue.hint}</p>
                           </div>
                         )}
+                        {(selectedIssue?.tone === "unverified" || selectedNeedsCheck) && selectedApprovalId && approvalLive && (
+                          <OutcomeActions
+                            approvalId={selectedApprovalId}
+                            stage={selectedNeedsCheck ? "needs_action" : "unverified"}
+                            approvalStatus="approved"
+                            row={selectedFacts}
+                            jobUrl={selectedJob?.external_url}
+                            platform={selectedJob?.platform_source}
+                            className="mt-0"
+                            onChanged={async () => {
+                              setSelectedApp(null);
+                              await loadApplications();
+                              setApplyReloads((n) => n + 1);
+                            }}
+                          />
+                        )}
+                        {!approvalLive && (selectedIssue || selectedNeedsCheck || selectedQuestionCount > 0 || selectedAwaitingCode || !!selectedManualState) && (
+                          <p data-testid="agent-stale-approval" className="rounded-xl bg-[#F5F5F5] p-3 text-sm">
+                            {STALE_APPROVAL_TEXT}
+                          </p>
+                        )}
                         {selectedNeedsCheck && (
                           <div data-testid="needs-check-panel" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E] space-y-2">
                             <p id="detail-needs-check-heading" className="font-semibold">{NEEDS_CHECK_HEADING}</p>
@@ -968,22 +1026,24 @@ export function AppsPage() {
                                   {NEEDS_CHECK_OPEN_FORM_LABEL}
                                 </a>
                               )}
-                              <Link
-                                to="/approvals"
-                                className="inline-flex min-h-11 items-center rounded-lg border-2 border-[#92400E]/40 bg-white px-4 text-sm font-semibold text-[#92400E] hover:bg-black/[4%]"
-                              >
-                                {NEEDS_CHECK_APPROVALS_LABEL}
-                              </Link>
+                              {approvalLive && (
+                                <Link
+                                  to="/approvals"
+                                  className="inline-flex min-h-11 items-center rounded-lg border-2 border-[#92400E]/40 bg-white px-4 text-sm font-semibold text-[#92400E] hover:bg-black/[4%]"
+                                >
+                                  {NEEDS_CHECK_APPROVALS_LABEL}
+                                </Link>
+                              )}
                             </div>
                           </div>
                         )}
-                        {selectedQuestionCount > 0 && (
+                        {selectedQuestionCount > 0 && approvalLive && (
                           <p data-testid="agent-questions-link" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
                             Agen butuh jawabanmu untuk {selectedQuestionCount} pertanyaan. Jawab di halaman{" "}
                             <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
                           </p>
                         )}
-                        {selectedAwaitingCode && (
+                        {selectedAwaitingCode && approvalLive && (
                           <p data-testid="agent-code-link" className="rounded-xl bg-[#FEF3C7] p-3 text-sm text-[#92400E]">
                             Agen menunggu kode keamanan dari emailmu. Masukkan di halaman{" "}
                             <Link to="/approvals" className="font-semibold underline underline-offset-4">Persetujuan</Link>.
@@ -992,7 +1052,7 @@ export function AppsPage() {
                         {selectedManualState && (
                           <AgentManualSubmit
                             className="mt-0"
-                            approvalId={selectedFacts?.approval_request_id}
+                            approvalId={approvalLive ? selectedFacts?.approval_request_id : undefined}
                             row={selectedFacts}
                             jobUrl={selectedJob?.external_url}
                             loadCoverLetter
@@ -1005,7 +1065,7 @@ export function AppsPage() {
                             : selectedApp.status === "ready"
                               ? (selectedAttempt?.fieldsFilled ?? 0) > 0
                                 ? // Status ready ditulis worker sesudah mengisi sebagian atau seluruh formulir. Teks ini hanya untuk percobaan yang mengisi minimal satu isian (fields_filled > 0).
-                                  "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim. Pengiriman otomatis belum diizinkan (selama uji coba, pengiriman dimatikan), jadi lamaran tidak terkirim dan tetap di kolom Siap dikirim. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang."
+                                  "Agen sudah mengisi formulir lowongan ini lalu berhenti sebelum tombol kirim, jadi lamaran belum terkirim dan tetap di kolom Siap dikirim. Penyebabnya bisa situs ini belum ada di daftar kirim otomatis, atau ada isian wajib yang kosong. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang."
                                 : // Ready lewat Ubah status, atau percobaan agen tidak tercatat: tidak ada bukti agen mengisi formulir.
                                   "Draf ini ditandai siap dikirim, tetapi belum ada catatan bahwa agen berhasil mengisi formulirnya. Kirim sendiri di situs lowongan, atau ajukan lagi supaya agen mencoba mengisi formulir."
                               : "Draf ini belum diajukan. Tinjau suratnya, lalu ajukan ke persetujuan. Agen tidak mengirim apa pun sebelum kamu menyetujuinya."}

@@ -144,7 +144,7 @@ test("service getApplyState/getFormGaps: membaca application_logs milik pengguna
   assert.match(svc, /if \(error\) throw error/);
   assert.match(svc, /import \{ isMockMode \} from "@\/lib\/appConfig"/);
   // Diperluas (bukti agen): hasilnya kini juga memuat agentFacts, kosong di mode demo.
-  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{ gaps: \{\}, attempts: \{\}, agentFacts: \{\} \}/);
+  assert.match(svc, /if \(isMockMode\(\) \|\| ids\.length === 0\) return \{ gaps: \{\}, attempts: \{\}, agentFacts: \{\}, rowsByJob: \{\} \}/);
   // satu kueri untuk kekurangan dan percobaan terbaru
   assert.equal([...svc.matchAll(/\.from\("application_logs"\)/g)].length, 1);
   // pencocokan lewat job_id (application_id di baris log kosong), bukan application_id
@@ -185,7 +185,9 @@ test("Lamaran Saya: jendela detail ready memuat daftar bernomor <ol> isian koson
   const src = read("../src/routes/applications.tsx");
   const box = src.slice(src.indexOf("Draf ini sudah menunggu persetujuanmu"), src.indexOf('approvalUi.state === "unknown"'));
   // teks lama dan tombol lama tetap
-  assert.match(box, /Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim\. Pengiriman otomatis belum diizinkan \(selama uji coba, pengiriman dimatikan\), jadi lamaran tidak terkirim dan tetap di kolom Siap dikirim\. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang\./);
+  assert.match(box, /Agen sudah mengisi formulir lowongan ini lalu berhenti sebelum tombol kirim, jadi lamaran belum terkirim dan tetap di kolom Siap dikirim\. Penyebabnya bisa situs ini belum ada di daftar kirim otomatis, atau ada isian wajib yang kosong\. Bila ada data yang kurang, lengkapi dulu lalu ajukan lagi supaya agen mengisi ulang\./);
+  // Teks lama "selama uji coba, pengiriman dimatikan" salah sejak ALLOW_REAL_SUBMIT menyala (audit Gemini 26 November 2026).
+  assert.doesNotMatch(box, /selama uji coba, pengiriman dimatikan/);
   // Formulir yang diisi agen ada di peramban server: teks ini tidak boleh menyuruh pengguna mengirim sendiri.
   assert.doesNotMatch(box.slice(0, box.indexOf("Draf ini ditandai siap dikirim")), /Kirim sendiri di situs lowongan, atau lengkapi/);
   assert.match(src, /"Ajukan lagi ke Persetujuan"/);

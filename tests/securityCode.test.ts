@@ -339,7 +339,7 @@ test("Persetujuan: kolom kode tampil di bawah status agen dan di atas pertanyaan
   const questions = page.indexOf("<AgentQuestions");
   const email = page.indexOf("<EmailApplyPanel");
   assert.ok(status > 0 && code > status && questions > code && email > questions);
-  assert.match(page, /\{approved && !expired && \(\s*<AgentSecurityCode/);
+  assert.match(page, /\{approved && !expired && !isSent && \(\s*<AgentSecurityCode/);
   assert.match(page, /pollIntervalMs\(agentRows\) === CODE_POLL_MS/);
   assert.match(page, /awaitingCode \? CODE_POLL_MS : AGENT_POLL_MS/);
   assert.doesNotMatch(page, /15_000/);
@@ -361,6 +361,6 @@ test("Lamaran Saya: satu baris tautan ke Persetujuan saat agen menunggu kode, te
   assert.match(src, /import \{ awaitingCodeState \} from "@\/lib\/securityCode";/);
   assert.match(src, /const selectedAwaitingCode = awaitingCodeState\(selectedFacts\)\.waiting;/);
   assert.match(src, /Agen menunggu kode keamanan dari emailmu\. Masukkan di halaman\{" "\}\s*<Link to="\/approvals"[^>]*>Persetujuan<\/Link>\./);
-  assert.match(src, /\{selectedAwaitingCode && \(\s*<p data-testid="agent-code-link"/);
+  assert.match(src, /\{selectedAwaitingCode && approvalLive && \(\s*<p data-testid="agent-code-link"/);
   assert.match(src, /\{!selectedIssue && !selectedAwaitingCode && !selectedManualState && <p/);
 });

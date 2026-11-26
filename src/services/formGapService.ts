@@ -2,11 +2,14 @@ import { supabase } from "@/lib/supabase";
 import { isMockMode } from "@/lib/appConfig";
 import { attemptsByJob, gapsByJob, type ApplyAttempt, type FormGaps } from "@/lib/formGaps";
 import { agentFactsByJob, type AgentLogFacts } from "@/lib/agentEvidence";
+import { groupLogRowsByJob } from "@/lib/applicationAttempts";
 
 export type ApplyState = {
   gaps: Record<string, FormGaps>;
   attempts: Record<string, ApplyAttempt>;
   agentFacts: Record<string, AgentLogFacts>;
+  /** Baris log mentah per lowongan, untuk memisahkan percobaan per lamaran (lib/applicationAttempts.ts). */
+  rowsByJob: Record<string, unknown[]>;
 };
 
 /**
@@ -19,7 +22,7 @@ export type ApplyState = {
  */
 export async function getApplyState(jobIds: string[]): Promise<ApplyState> {
   const ids = [...new Set((jobIds ?? []).filter((id) => typeof id === "string" && id.length > 0))];
-  if (isMockMode() || ids.length === 0) return { gaps: {}, attempts: {}, agentFacts: {} };
+  if (isMockMode() || ids.length === 0) return { gaps: {}, attempts: {}, agentFacts: {}, rowsByJob: {} };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -34,7 +37,7 @@ export async function getApplyState(jobIds: string[]): Promise<ApplyState> {
     .limit(500);
   if (error) throw error;
 
-  return { gaps: gapsByJob(data, ids), attempts: attemptsByJob(data, ids), agentFacts: agentFactsByJob(data, ids) };
+  return { gaps: gapsByJob(data, ids), attempts: attemptsByJob(data, ids), agentFacts: agentFactsByJob(data, ids), rowsByJob: groupLogRowsByJob(data, ids) };
 }
 
 /** Hanya kekurangan isian per lowongan (kunci: jobs.id); lihat getApplyState. */

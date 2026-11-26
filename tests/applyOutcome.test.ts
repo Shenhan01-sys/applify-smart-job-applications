@@ -279,7 +279,7 @@ test("Lamaran Saya: lencana 'Isi sendiri di situs' di kartu Kanban, baris daftar
 
 test("Lamaran Saya: teks 'Agen sudah membuka formulir' hanya bila fields_filled > 0", () => {
   const src = read("../src/routes/applications.tsx");
-  const text = "Agen sudah membuka formulir lowongan ini dan berhenti sebelum tombol kirim.";
+  const text = "Agen sudah mengisi formulir lowongan ini lalu berhenti sebelum tombol kirim, jadi lamaran belum terkirim";
   assert.equal(src.split(text).length - 1, 1, "satu tempat");
   const at = src.indexOf(text);
   const before = src.slice(Math.max(0, at - 700), at);
@@ -335,10 +335,13 @@ test("attemptForApplication: masukan kosong atau rusak tidak menghasilkan percob
 
 test("Lamaran Saya: lencana dan detail memakai percobaan yang dikaitkan dengan lamaran, bukan hasil per lowongan mentah", () => {
   const src = read("../src/routes/applications.tsx");
-  assert.match(src, /const attemptOf = \(app: AIApplicationData\) => attemptForApplication\(attempts\[app\.job_id\], app\);/);
+  assert.match(src, /const attemptOf = \(app: AIApplicationData\) => perApplication\[app\.id\]\?\.attempt;/);
+  // percobaan dipisah per lamaran (lib/applicationAttempts.ts), bukan per lowongan mentah
+  assert.match(src, /const perApplication = useMemo\(\(\) => attemptsForApplications\(applications, logRowsByJob\)/);
   assert.match(src, /const selectedAttempt = selectedApp \? attemptOf\(selectedApp\) : undefined;/);
   // tidak ada pembacaan percobaan per lowongan yang melewati penjaga itu
-  assert.equal(src.split("attempts[").length - 1, 1, "hanya di dalam attemptOf");
+  assert.equal(src.split("attempts[").length - 1, 0, "tidak ada pembacaan per lowongan mentah");
+  assert.equal(src.split("agentFacts[").length - 1, 0, "fakta percobaan juga lewat perApplication, bukan per lowongan");
   // tidak ada petunjuk "belum mendukung situs" tanpa dasar data
   assert.doesNotMatch(src.replace(/^\s*\/\/.*$/gm, ""), /belum mendukung/i);
 });

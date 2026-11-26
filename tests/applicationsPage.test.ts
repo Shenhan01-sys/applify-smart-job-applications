@@ -51,7 +51,7 @@ test("Persetujuan: label Indonesia dan galat tidak diganti data contoh", () => {
   const src = read("../src/routes/approvals.tsx");
   // label lencana datang dari placement (lib/approvalTabs.ts), bukan kode status mentah
   assert.match(src, /\{placement\.label\}/);
-  assert.doesNotMatch(src, /\{request\.status\}/);
+  assert.doesNotMatch(src, />\s*\{request\.status\}\s*</);
   assert.match(src, /<ErrorState/);
   assert.doesNotMatch(src, /toast\.error\('Gagal memuat approvals'\)/);
   const settings = read("../src/routes/automation-settings.tsx");
