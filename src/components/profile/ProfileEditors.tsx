@@ -88,13 +88,13 @@ function FormShell({ title, saving, onCancel, onSubmit, error, children }: { tit
     >
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold">{title}</h4>
-        <button type="button" onClick={onCancel} aria-label="Tutup formulir" className="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-black/[6%]"><X className="h-4 w-4" /></button>
+        <button type="button" onClick={onCancel} aria-label="Tutup formulir" className="min-h-11 min-w-11 rounded-lg grid place-items-center text-muted-foreground hover:bg-black/[6%]"><X className="h-4 w-4" /></button>
       </div>
       {children}
       {error && <p className="text-xs text-red-600 bg-red-50 border-2 border-red-100 rounded-lg p-2" role="alert">{error}</p>}
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} disabled={saving} className="h-10 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-50">Batal</button>
-        <button type="submit" disabled={saving} className="h-10 px-5 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0A5BE0]/90 transition disabled:opacity-60 inline-flex items-center gap-2">
+        <button type="button" onClick={onCancel} disabled={saving} className="min-h-11 px-4 rounded-lg border-2 border-black/[8%] bg-black/[4%] text-sm hover:bg-black/[7%] transition disabled:opacity-50">Batal</button>
+        <button type="submit" disabled={saving} className="min-h-11 px-5 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0A5BE0]/90 transition disabled:opacity-60 inline-flex items-center gap-2">
           {saving && <Loader2 className="h-4 w-4 animate-spin" />} Simpan
         </button>
       </div>

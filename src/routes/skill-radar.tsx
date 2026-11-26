@@ -234,7 +234,8 @@ function RadarTable({ data }: { data: SkillAxis[] }) {
                 <span>{d.name}</span>
                 {d.matchedSkills && d.matchedSkills.length > 0 && (
                   <span className="block text-xs font-normal text-neutral-500">
-                    {d.matchedSkills.join(", ")}
+                    dari {d.matchedSkills.length} skill: {d.matchedSkills.join(", ")}
+                    {d.matchedSkills.length === 1 ? " (baru 1 skill, belum mencerminkan seluruh bidang)" : ""}
                   </span>
                 )}
               </th>
@@ -287,7 +288,8 @@ function ActionableInsights({ data }: { data: SkillAxis[] }) {
               </p>
               {gap.matchedSkills && gap.matchedSkills.length > 0 && (
                 <p className="mt-1 text-xs text-neutral-500">
-                  Terbaca dari profil: {gap.matchedSkills.join(", ")}
+                  Terbaca dari {gap.matchedSkills.length} skill di profil: {gap.matchedSkills.join(", ")}
+                  {gap.matchedSkills.length === 1 ? " (baru 1 skill)" : ""}
                 </p>
               )}
               <div className="mt-4 pt-4 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

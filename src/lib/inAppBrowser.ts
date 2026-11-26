@@ -19,6 +19,8 @@ const RULES: ReadonlyArray<[RegExp, InAppBrowser]> = [
   [/\bLinkedInApp\b/i, "LinkedIn"],
   // WebView Android generik: penanda "; wv)" dari Chrome WebView.
   [/; wv\)/i, "WebView"],
+  // WebView iOS (WKWebView) generik: iPhone/iPad + AppleWebKit tanpa penanda peramban penuh (Safari/CriOS/FxiOS/EdgiOS/OPiOS/DuckDuckGo).
+  [/(?:iPhone|iPad|iPod).*AppleWebKit(?!.*Safari\/)(?!.*(?:CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo))/i, "WebView"],
 ];
 
 /** Nama aplikasi bila `userAgent` milik peramban bawaan aplikasi, atau null untuk peramban biasa. */

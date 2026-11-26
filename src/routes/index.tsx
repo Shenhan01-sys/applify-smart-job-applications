@@ -157,22 +157,22 @@ function Navbar({ authLink }: { authLink: string }) {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <button onClick={signOut} className="hidden md:inline-flex h-9 items-center rounded-lg border-2 border-[color:var(--border)] bg-black/[3%] px-4 text-sm font-medium hover:bg-black/[6%] transition">
+              <button onClick={signOut} className="hidden md:inline-flex min-h-11 items-center rounded-lg border-2 border-[color:var(--border)] bg-black/[3%] px-4 text-sm font-medium hover:bg-black/[6%] transition">
                 Logout
               </button>
-              <Link to="/dashboard" className="inline-flex h-9 items-center rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white hover:opacity-90 transition">
+              <Link to="/dashboard" className="inline-flex min-h-11 items-center rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white hover:opacity-90 transition">
                 Dashboard
               </Link>
             </>
           ) : (
             <>
-              <Link to={authLink} className="hidden md:inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <Link to={authLink} className="hidden md:inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground hover:text-foreground">
                 <LogIn className="h-3.5 w-3.5" /> Masuk
               </Link>
               <Link
                 to={authLink}
                 search={authLink === "/login" ? { mode: "daftar" } : undefined}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#16150F] px-4 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#16150F] px-4 text-sm font-semibold text-[#F4F1E8] hover:bg-black transition"
               >
                 <UserPlus className="h-3.5 w-3.5" /> Daftar Gratis
               </Link>
@@ -208,6 +208,9 @@ function Hero({ authLink }: { authLink: string }) {
           <div className="mt-4 font-display text-lg font-semibold text-[#16150F]">
             Apply Smarter. <span className="text-[#0A5BE0]">Fairer.</span> Together.
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Melamar lebih cerdas, adil, dan tetap dalam kendalimu.
+          </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to={authLink}
@@ -558,13 +561,13 @@ function TruthBand() {
 
 function Manifesto() {
   const nodes = [
-    { pos: "top-[80px] left-[20px] -translate-x-[100%] -translate-y-1/2 pr-2", d: "mf-d1", e: "♻️", t: "Net-Zero", dark: true },
-    { pos: "top-[45px] left-[45px] -translate-x-[100%] -translate-y-[100%] pr-1 pb-1", d: "mf-d2", e: "🤝", t: "Fair Pay", dark: true },
-    { pos: "top-[25px] left-[75px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "🌿", t: "ESG+", dark: true },
-    { pos: "top-[15px] left-[125px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d4", e: "🔋", t: "Clean Tech", dark: false },
-    { pos: "top-[30px] left-[175px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "📉", t: "Low Carbon", dark: true },
-    { pos: "top-[50px] left-[200px] -translate-y-[100%] pl-1 pb-1", d: "mf-d2", e: "⚖️", t: "Equity", dark: true },
-    { pos: "top-[90px] left-[220px] -translate-y-[50%] pl-2", d: "mf-d1", e: "👁️", t: "Transparent", dark: true },
+    { pos: "top-[80px] left-[20px] -translate-x-[100%] -translate-y-1/2 pr-2", d: "mf-d1", e: "♻️", t: "Nol Emisi (Net-Zero)", dark: true },
+    { pos: "top-[45px] left-[45px] -translate-x-[100%] -translate-y-[100%] pr-1 pb-1", d: "mf-d2", e: "🤝", t: "Upah Adil (Fair Pay)", dark: true },
+    { pos: "top-[25px] left-[75px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "🌿", t: "Keberlanjutan (ESG+)", dark: true },
+    { pos: "top-[15px] left-[125px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d4", e: "🔋", t: "Teknologi Bersih", dark: false },
+    { pos: "top-[30px] left-[175px] -translate-x-[50%] -translate-y-[100%] pb-1.5", d: "mf-d3", e: "📉", t: "Rendah Karbon", dark: true },
+    { pos: "top-[50px] left-[200px] -translate-y-[100%] pl-1 pb-1", d: "mf-d2", e: "⚖️", t: "Kesetaraan", dark: true },
+    { pos: "top-[90px] left-[220px] -translate-y-[50%] pl-2", d: "mf-d1", e: "👁️", t: "Transparan", dark: true },
   ];
   const ecoPaths = [
     "M 120,170 C 105,150 115,120 90,105 C 65,90 40,110 20,80",

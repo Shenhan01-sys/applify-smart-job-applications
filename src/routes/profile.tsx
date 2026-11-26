@@ -178,6 +178,8 @@ function ProfilePage() {
   const [prefsState, setPrefsState] = useState<"loading" | "ready" | "failed">(isMockMode() ? "ready" : "loading");
   const [prefsError, setPrefsError] = useState("");
   const [prefErrors, setPrefErrors] = useState<PreferencesErrors>({});
+  const [savedFormJson, setSavedFormJson] = useState<string | null>(null);
+  const [savedPrefsJson, setSavedPrefsJson] = useState<string | null>(null);
   const [openEditors, setOpenEditors] = useState<Record<string, boolean>>({});
   const setEditorOpen = useCallback((key: string, open: boolean) => {
     setOpenEditors((prev) => (prev[key] === open ? prev : { ...prev, [key]: open }));
@@ -194,7 +196,9 @@ function ProfilePage() {
     setPrefsError("");
     try {
       const settings = await automationApi.getSettings();
-      setPreferences(preferencesFromSettings(settings as Record<string, unknown>));
+      const loaded = preferencesFromSettings(settings as Record<string, unknown>);
+      setPreferences(loaded);
+      setSavedPrefsJson(JSON.stringify(loaded));
       setPrefsState("ready");
     } catch (err) {
       setPrefsError(describeApiError(err, "Preferensi kerjamu belum bisa dimuat."));
@@ -206,7 +210,7 @@ function ProfilePage() {
     async function loadProfile() {
       if (isMockMode()) {
         const data = mockProfileData;
-        setFormData({
+        const loaded = {
           full_name: data.full_name || "",
           current_title: data.current_title || "",
           location: data.location || "",
@@ -215,7 +219,9 @@ function ProfilePage() {
           email: "demo@applify.id",
           linkedin_url: data.linkedin_url || "",
           portfolio_url: data.portfolio_url || "",
-        });
+        };
+        setFormData(loaded);
+        setSavedFormJson(JSON.stringify(loaded));
         setLoading(false);
         return;
       }
@@ -224,7 +230,7 @@ function ProfilePage() {
         setLoadError("");
         const full = await profileService.getFullProfile(user!.id);
         const d = full.profile || {};
-        setFormData({
+        const loaded = {
           full_name: d.full_name || "",
           current_title: d.current_title || "",
           location: d.location || "",
@@ -233,7 +239,9 @@ function ProfilePage() {
           email: user?.email || "",
           linkedin_url: d.linkedin_url || "",
           portfolio_url: d.portfolio_url || "",
-        });
+        };
+        setFormData(loaded);
+        setSavedFormJson(JSON.stringify(loaded));
         setWorkExps(full.workExperiences);
         setEducations(full.education);
         setCerts(full.certifications);
@@ -248,6 +256,20 @@ function ProfilePage() {
     }
     if (user) loadProfile();
   }, [user, reloadKey]);
+
+  const hasUnsavedChanges =
+    (savedFormJson !== null && JSON.stringify(formData) !== savedFormJson) ||
+    (savedPrefsJson !== null && JSON.stringify(preferences) !== savedPrefsJson);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges && !hasOpenEditor) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedChanges, hasOpenEditor]);
 
   useEffect(() => {
     if (user) loadPreferences();
@@ -329,6 +351,8 @@ function ProfilePage() {
       }
     }
     toast.success("Profil dan preferensi tersimpan.");
+    setSavedFormJson(JSON.stringify(formData));
+    setSavedPrefsJson(JSON.stringify(preferences));
     setSaving(false);
     return true;
   };
@@ -504,9 +528,27 @@ function ProfilePage() {
     <AppShell>
       <style>{slideInRight}</style>
 
-      <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Profil Saya</h1>
-        <p className="text-muted-foreground text-sm mt-1">Isi sekali, dipakai untuk semua lamaran.</p>
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Profil Saya</h1>
+          <p className="text-muted-foreground text-sm mt-1">Isi sekali, dipakai untuk semua lamaran.</p>
+        </div>
+        {(hasUnsavedChanges || hasOpenEditor) && (
+          <div role="status" className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>Ada perubahan belum disimpan</span>
+            {hasUnsavedChanges && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => { void handleSave(); }}
+                className="min-h-11 px-2 font-semibold text-[#0A5BE0] underline underline-offset-2 disabled:opacity-50"
+              >
+                Simpan sekarang
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Banner sambutan: penuh sekali (daftar atau masuk pertama), sesudah itu pengingat ringkas selama profil belum lengkap */}

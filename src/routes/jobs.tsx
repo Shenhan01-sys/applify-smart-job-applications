@@ -136,15 +136,16 @@ function JobsPage() {
       }
       setProfileSkills(profileSkillList(await profileService.getSkillSource(userId)));
       if (!isMockMode()) {
-        supabase
-          .from("profiles")
-          .select("current_title, location")
-          .eq("id", userId)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data) setProfileRankCtx({ currentTitle: data.current_title ?? null, location: data.location ?? null });
-          })
-          .catch(() => {});
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("current_title, location")
+            .eq("id", userId)
+            .maybeSingle();
+          if (data) setProfileRankCtx({ currentTitle: data.current_title ?? null, location: data.location ?? null });
+        } catch {
+          // Abaikan bila metadata profil opsional untuk ranking gagal dimuat
+        }
       }
     } catch (err) {
       console.error("Error loading profile skills:", err);

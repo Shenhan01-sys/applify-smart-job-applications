@@ -233,7 +233,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                     type="button"
                     onClick={handleConnectGmail}
                     disabled={connectingGmail}
-                    className="font-semibold text-[#0A5BE0] hover:underline disabled:opacity-60"
+                    className="inline-flex min-h-11 items-center font-semibold text-[#0A5BE0] hover:underline disabled:opacity-60"
                   >
                     {connectingGmail ? "Membuka..." : "Hubungkan Gmail"}
                   </button>
@@ -292,7 +292,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                     data-testid="email-confirm-retry-with-cv"
                     onClick={retryKeepingCv}
                     disabled={sending || !state.enabled}
-                    className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5"
+                    className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] disabled:opacity-60 inline-flex items-center gap-1.5"
                   >
                     {sending && retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {EMAIL_CV_RETRY_LABEL}
                   </button>
@@ -301,13 +301,13 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
                   type="button"
                   onClick={submit}
                   disabled={sending || !state.enabled || (missingCv && !confirmNoCv)}
-                  className={`h-9 px-4 rounded-lg text-xs font-semibold disabled:opacity-60 inline-flex items-center gap-1.5 ${
+                  className={`min-h-11 px-4 rounded-lg text-sm font-semibold disabled:opacity-60 inline-flex items-center gap-1.5 ${
                     retryWithCv ? "border-2 border-black/[8%] bg-white hover:bg-black/[4%]" : "bg-[#0A5BE0] text-white hover:bg-[#0256d3]"
                   }`}
                 >
                   {sending && !retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {retryWithCv ? "Kirim tanpa CV" : "Ya, masukkan ke antrean"}
                 </button>
-                <button type="button" onClick={() => changeConfirmation(false)} disabled={sending} className="h-9 px-4 rounded-lg border-2 border-black/[8%] bg-white text-xs hover:bg-black/[4%]">Batal</button>
+                <button type="button" onClick={() => changeConfirmation(false)} disabled={sending} className="min-h-11 px-4 rounded-lg border-2 border-black/[8%] bg-white text-sm hover:bg-black/[4%]">Batal</button>
               </div>
             </div>
           ) : (
@@ -315,7 +315,7 @@ export default function EmailApplyPanel({ approval, gmailConnected, gmailEmail, 
               type="button"
               onClick={() => changeConfirmation(true)}
               disabled={!state.enabled}
-              className="h-9 px-4 rounded-lg bg-[#0A5BE0] text-white text-xs font-semibold hover:bg-[#0256d3] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="min-h-11 px-4 rounded-lg bg-[#0A5BE0] text-white text-sm font-semibold hover:bg-[#0256d3] transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               <Mail className="h-3.5 w-3.5" /> Kirim lewat Email
             </button>

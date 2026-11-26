@@ -90,3 +90,33 @@ export const HELP_FAQ: readonly { question: string; answer: string }[] = [
     answer: "Jalur email menunggu Gmail terhubung dan persetujuanmu. Surat yang dikirim adalah draf yang sudah kamu setujui.",
   },
 ];
+
+export const HELP_EXTRA_GLOSSARY: readonly HelpTerm[] = [
+  {
+    term: "Agen",
+    meaning: "Program asisten otomatis di server Applify yang menyiapkan isian formulir dan mengirim hanya sesudah kamu menyetujuinya.",
+  },
+  {
+    term: "Draf lamaran",
+    meaning: "Rancangan surat lamaran buatan AI yang belum dikirim dan masih bisa kamu sunting sebelum diajukan ke Persetujuan.",
+  },
+];
+
+export const HELP_EXTRA_FAQ: readonly { question: string; answer: string }[] = [
+  {
+    question: "Kuota draf bulanan sudah habis",
+    answer: "Paket Free memiliki batas draf per bulan. Kamu tetap bisa melamar sendiri dari tautan lowongan, menunggu awal bulan, atau memakai API key sendiri jika tersedia.",
+  },
+  {
+    question: "Ekstensi Browser belum tersambung",
+    answer: "Buka halaman Pengaturan bagian Ekstensi Browser, salin token ekstensi, lalu tempel di panel ekstensi Chrome atau Edge di laptopmu.",
+  },
+  {
+    question: "Kartu tidak bisa dipindah ke kolom Terkirim",
+    answer: "Kolom Terkirim hanya diisi otomatis sesudah agen atau pengiriman email berhasil mengirim lamaran, agar catatan bukti pengiriman tetap akurat.",
+  },
+  {
+    question: "Lowongan tidak punya tautan pendaftaran",
+    answer: "Sebagian lowongan hanya mencantumkan email HRD atau formulir khusus. Buka rincian lowongan untuk melihat apakah tersedia jalur Kirim lewat Email.",
+  },
+];
