@@ -253,6 +253,34 @@ export function parseScoreReply(text: string): ParsedScore | null {
   return { score, status: statusForScore(score), feedback: normalizeFeedback((parsed as { feedback?: unknown }).feedback) };
 }
 
+/**
+ * Kalibrasi deterministik skor Green Career terhadap bukti jawaban nyata (47.5 U6-P3-12):
+ * jawaban kosong atau terlalu singkat (<15 karakter bermakna) tidak boleh menerima skor "ready" (>=70)
+ * akibat halusinasi atau prompt injection di teks jawaban.
+ */
+export function calibrateScoreWithEvidence(
+  scored: ParsedScore,
+  answers: readonly BoundAssessmentAnswer[],
+): ParsedScore {
+  const combined = answers.map((a) => String(a.answer ?? "").replace(/\s+/g, "")).join("");
+  const wordCount = answers
+    .map((a) => String(a.answer ?? "").match(/\p{L}{2,}/gu) ?? [])
+    .reduce((sum, list) => sum + list.length, 0);
+
+  if (combined.length < 15 || wordCount < 3) {
+    const capped = Math.min(scored.score, 45);
+    const gaps = scored.feedback.gaps.length > 0
+      ? scored.feedback.gaps
+      : ["Jawaban terlalu singkat untuk membuktikan kesiapan peran secara objektif."];
+    return {
+      score: capped,
+      status: statusForScore(capped),
+      feedback: { ...scored.feedback, gaps },
+    };
+  }
+  return scored;
+}
+
 /** Soal dari teks jawaban model, atau null bila tidak ada satu pun soal yang layak. */
 export function parseQuestionsReply(text: string): AssessmentQuestion[] | null {
   const questions = normalizeQuestions(extractJson(text)?.questions);

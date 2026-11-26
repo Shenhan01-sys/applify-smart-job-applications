@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
 import { mockUser, mockSession } from "@/mocks/mockData";
 import { keepUserIfUnchanged } from "@/lib/stableUser";
+import { clearUserBrowserState } from "@/lib/signOutCleanup";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
 
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    clearUserBrowserState();
     if (isMockMode()) {
       setUser(null);
       setSession(null);

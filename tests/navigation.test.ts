@@ -28,9 +28,10 @@ test("halaman aktif mengenali anak rute tetapi bukan awalan yang kebetulan sama"
   assert.equal(isActivePath("/profile-lama", "/profile"), false);
 });
 
-test("AppShell: tanpa teks tertulis tetap (Free Member, 7 platform), tanpa lonceng atau sakelar agen palsu", () => {
+test("AppShell: tanpa teks tertulis tetap (Free Member, 7 platform) atau sakelar agen palsu; lonceng memakai pusat notifikasi nyata", () => {
   const src = read("../src/components/app/AppShell.tsx");
-  assert.doesNotMatch(src, /Free Member|7 platform|v1\.0\.0|feedback|Bell/);
+  assert.doesNotMatch(src, /Free Member|7 platform|v1\.0\.0|feedback/);
+  assert.match(src, /InAppNotificationsBell/);
   assert.doesNotMatch(src, /AgentToggle|agentOn/);
   assert.match(src, /@\/components\/ui\/sheet/);
   assert.match(src, /aria-label="Buka menu"/);

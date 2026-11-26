@@ -22,6 +22,7 @@ import {
   MSG_SERVER_ERROR,
   buildGeneratePrompts,
   buildScorePrompts,
+  calibrateScoreWithEvidence,
   checkAssessmentRateLimit,
   parseQuestionsReply,
   parseScoreReply,
@@ -195,7 +196,7 @@ Deno.serve(async (req: Request) => {
         console.error(`${TAG} score_failed all_providers_failed tried=${scored.attempts.length}`);
         return json({ error: MSG_SCORE_FAILED }, 502);
       }
-      const { score, status, feedback } = scored.value;
+      const { score, status, feedback } = calibrateScoreWithEvidence(scored.value, answers);
 
       const { error: updErr } = await admin.from("green_career_assessments")
         .update({ status, readiness_score: score, transcript: answers, feedback, updated_at: new Date().toISOString() })

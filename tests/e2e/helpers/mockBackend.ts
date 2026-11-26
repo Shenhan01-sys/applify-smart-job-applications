@@ -53,6 +53,8 @@ export interface BackendState {
   /** GET /api/notifications/status dan /preferences. */
   notificationStatus: Row;
   notificationPrefs: Row;
+  /** GET /api/notifications/in-app */
+  inAppNotifications: Row[];
   /** subscriptions (baca) dan jawaban RPC get_quota_status. */
   subscriptions: Row[];
   /** Tabel profil yang dibaca dan ditulis halaman Profil. Penulisan (POST dan PATCH) mengubah isinya, seperti PostgREST. */
@@ -199,6 +201,7 @@ export class MockBackend {
         emailEnabled: false,
         notifyEvents: { ready: true, submitted: true, awaiting_code: true, follow_up: true, locked_claim: true },
       },
+      inAppNotifications: [],
       subscriptions: [],
       workExperiences: [],
       education: [],
@@ -271,6 +274,24 @@ export class MockBackend {
     if (method === "GET" && path === "/api/llm-keys") return route.fulfill(json(200, s.llmKeys));
     if (method === "GET" && path === "/api/notifications/status") return route.fulfill(json(200, s.notificationStatus));
     if (method === "GET" && path === "/api/notifications/preferences") return route.fulfill(json(200, s.notificationPrefs));
+    if (method === "GET" && path === "/api/notifications/in-app") {
+      const unreadCount = s.inAppNotifications.filter((n) => !n.read_at).length;
+      return route.fulfill(json(200, { items: s.inAppNotifications, unreadCount, migrationPending: false }));
+    }
+    if (method === "POST" && path === "/api/notifications/in-app/read") {
+      const payload = (body ?? {}) as { ids?: string[]; all?: boolean };
+      const idSet = new Set(Array.isArray(payload.ids) ? payload.ids : []);
+      let updated = 0;
+      const nowIso = new Date().toISOString();
+      s.inAppNotifications = s.inAppNotifications.map((n) => {
+        if (!n.read_at && (payload.all || idSet.has(String(n.id)))) {
+          updated += 1;
+          return { ...n, read_at: nowIso };
+        }
+        return n;
+      });
+      return route.fulfill(json(200, { updated, migrationPending: false }));
+    }
     if (method === "POST" && path === "/api/extension/token") {
       return route.fulfill(json(200, { token: "ext_tok_v1.e2e-test-token-value.e2e-signature", expiresAt: new Date(Date.now() + 4 * 3600_000).toISOString(), scope: "extension:apply", ttlSeconds: 14400 }));
     }

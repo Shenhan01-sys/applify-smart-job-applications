@@ -149,13 +149,14 @@ export const automationApi = {
   },
 
   // Job Search
-  async searchJobs(params: { keywords?: string; location?: string; platforms?: string[] }) {
+  async searchJobs(params: { keywords?: string; location?: string; platforms?: string[] }, options?: { signal?: AbortSignal }) {
     return apiFetch(
       `${apiBase()}/api/automation/search`,
       {
         method: 'POST',
         headers: await getAuthHeaders(),
         body: JSON.stringify(params),
+        signal: options?.signal,
       },
       () => ({ jobs: mockJobs, total: mockJobs.length }),
       1500,
@@ -592,6 +593,30 @@ export const automationApi = {
       `${apiBase()}/api/notifications/status`,
       { headers: await getAuthHeaders() },
       () => ({ telegram: false, notificationsEnabled: false, whatsappKapso: false, email: false }),
+    )
+  },
+
+  async getInAppNotifications(limit = 20): Promise<{
+    items: Array<{ id: string; event: string; title: string; body: string; href: string | null; read_at: string | null; created_at: string }>
+    unreadCount: number
+    migrationPending?: boolean
+  }> {
+    return apiFetch(
+      `${apiBase()}/api/notifications/in-app?limit=${encodeURIComponent(String(limit))}`,
+      { headers: await getAuthHeaders() },
+      () => ({ items: [], unreadCount: 0, migrationPending: false }),
+    )
+  },
+
+  async markInAppNotificationsRead(opts: { ids?: string[]; all?: boolean }): Promise<{ updated: number; migrationPending?: boolean }> {
+    return apiFetch(
+      `${apiBase()}/api/notifications/in-app/read`,
+      {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ ids: opts.ids, all: opts.all === true }),
+      },
+      () => ({ updated: 0, migrationPending: false }),
     )
   },
 
