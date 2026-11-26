@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { MAX_SCAN_PROGRESS_LINES, appendScanStage, settleScanStages, type ScanStage } from "../src/lib/scanStages.ts";
 import { classifyJobChannel, CORPORATE_COMPLEX_ATS_DOMAINS } from "../src/lib/applyChannel.ts";
-import { HELP_GLOSSARY } from "../src/components/help/helpContent.ts";
+import { HELP_EXTRA_FAQ } from "../src/components/help/helpContent.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -92,5 +92,5 @@ test("E2E-07 label Eksperimental: hanya ATS korporat (Workday, iCIMS, Taleo, Suc
     assert.match(res.badgeLabel, /\(Eksperimental\)$/, url);
   }
   // Penjelasan label ada di Bantuan.
-  assert.ok(HELP_GLOSSARY.some((g) => /Eksperimental/.test(g.term) && /Workday/.test(g.meaning)));
+  assert.ok(HELP_EXTRA_FAQ.some((f) => /Eksperimental/.test(f.question) && /Workday/.test(f.answer)));
 });

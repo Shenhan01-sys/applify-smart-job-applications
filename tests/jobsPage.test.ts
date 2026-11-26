@@ -117,5 +117,7 @@ test("UX Wave 2: beranda ke mode daftar, kampus tidak ke payment, dan JobCard me
   const scanner = read("../src/components/AIJobScanner.tsx");
   assert.match(scanner, /Portal Karir/);
   assert.match(scanner, /Situs Karir Perusahaan \(ATS\)/);
-  assert.match(scanner, /prev\.filter\(\(s\) => s\.type === 'error'\)/);
+  // Galat per situs tetap tampil di bawah baris kemajuan; logikanya sekarang ada di lib/scanStages.ts (dipakai pemindai).
+  assert.match(scanner, /appendScanStage\(prev, message, type\)/);
+  assert.match(read("../src/lib/scanStages.ts"), /prev\.filter\(\(s\) => s\.type === "error"\)/);
 });

@@ -113,12 +113,8 @@ export const HELP_GLOSSARY: readonly HelpTerm[] = [
     meaning: "Halaman tempat kamu memeriksa draf, lalu memilih Setujui atau Tolak.",
   },
   {
-    term: "Eksperimental",
-    meaning: "Label pada lowongan di sistem ATS perusahaan besar (Workday, iCIMS, Taleo, SuccessFactors). Formulirnya berlangkah banyak, jadi ekstensi mungkin tidak bisa mengisinya penuh. Bila ada kolom yang kosong, isi sendiri atau lamar langsung di situs perusahaan.",
-  },
-  {
     term: "Token ekstensi",
-    meaning: "Kunci pendek dari Pengaturan yang menyambungkan ekstensi di laptop ke akun Applify-mu. Token berlaku 8 jam, sesudah itu buat token baru.",
+    meaning: "Kunci pendek dari Pengaturan yang menyambungkan ekstensi di laptop ke akun Applify-mu, berlaku 8 jam.",
   },
 ];
 
@@ -164,6 +160,10 @@ export const HELP_EXTRA_FAQ: readonly { question: string; answer: string }[] = [
   {
     question: "Ekstensi Browser belum tersambung",
     answer: "Buka halaman Pengaturan bagian Ekstensi Browser, salin token ekstensi, lalu tempel di panel ekstensi Chrome atau Edge di laptopmu.",
+  },
+  {
+    question: "Lowongan berlabel Eksperimental",
+    answer: "Label itu muncul pada lowongan di sistem ATS perusahaan besar (Workday, iCIMS, Taleo, SuccessFactors). Formulirnya berlangkah banyak, jadi ekstensi mungkin tidak bisa mengisinya penuh. Bila ada kolom yang kosong, isi sendiri atau lamar langsung di situs perusahaan.",
   },
   {
     question: "Panel ekstensi bilang token tidak sah atau sudah kedaluwarsa",
