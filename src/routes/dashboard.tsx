@@ -72,7 +72,18 @@ export function DashboardPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!user?.id) return;
+      if (!user?.id) {
+        // BS-07: bersihkan state akun lama saat logout di tab lain agar tidak tertinggal di layar.
+        setProfile(null);
+        setApplications([]);
+        setProfileIncomplete(null);
+        setHasResume(null);
+        setApprovedCount(null);
+        setQuota(null);
+        setLoadError("");
+        setLoading(false);
+        return;
+      }
       setLoadError("");
       if (isMockMode()) {
         setProfile(mockProfileData);
@@ -188,6 +199,11 @@ export function DashboardPage() {
         {/* Mission Control diorama. Akun tanpa lamaran tidak diberi tiga bulatan 0 (ON-18): checklist di atas yang menunjuk langkahnya. */}
         {(stats.total > 0 || loadError) && (
           <MissionControlStage drafts={stats.drafts} ready={stats.ready} sent={stats.sent} responded={stats.responded} followUp={stats.followUp} empty={false} />
+        )}
+        {applications.length >= 500 && (
+          <p role="status" className="text-xs text-neutral-600 text-right">
+            Ringkasan menghitung hingga 500 lamaran terbaru. Buka menu Lamaran untuk melihat riwayat lengkap.
+          </p>
         )}
 
         {/* Bottom: activity log + quick actions */}

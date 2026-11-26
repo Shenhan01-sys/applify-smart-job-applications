@@ -29,6 +29,39 @@ export const Route = createFileRoute("/green-career")({
   component: GreenCareerPage,
 });
 
+const MIN_TEXT_ANSWER_CHARS = 20;
+const draftKey = (id: string) => `applify:green-draft:${id}`;
+
+function readSavedDraft(id: string): Record<string, string> {
+  if (!id || typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(draftKey(id));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSavedDraft(id: string, answers: Record<string, string>): void {
+  if (!id || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(draftKey(id), JSON.stringify(answers));
+  } catch {
+    // abaikan jika sessionStorage dibatasi
+  }
+}
+
+function clearSavedDraft(id: string): void {
+  if (!id || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(draftKey(id));
+  } catch {
+    // abaikan
+  }
+}
+
 type View = "list" | "questions" | "analyzing" | "result";
 
 function GreenCareerPage() {
@@ -75,13 +108,24 @@ function GreenCareerPage() {
   const load = async () => {
     try {
       setLoading(true); setLoadError("");
-      // Skill dimuat bersama daftar supaya urutan kartu tidak berpindah setelah tampil.
-      const [list] = await Promise.all([greenCareerService.listGreenJobs(), loadProfileSkills()]);
+      // Skill dan hasil asesmen tersimpan dimuat bersama daftar (BS-07).
+      const [list, , persisted] = await Promise.all([
+        greenCareerService.listGreenJobs(),
+        loadProfileSkills(),
+        greenCareerService.listCompletedAssessments(),
+      ]);
       setJobs(list);
+      setCompletedResults(persisted);
     } catch (e) {
       setLoadError(describeError(e, "Daftar lowongan karier hijau belum bisa dimuat."));
     } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (view === "questions" && assessmentId) {
+      writeSavedDraft(assessmentId, answers);
+    }
+  }, [view, assessmentId, answers]);
 
   const startAssessment = async (j: GreenJob) => {
     if (inFlightRef.current) return;
@@ -89,7 +133,7 @@ function GreenCareerPage() {
     try {
       setBusy(true); setBusyJobId(j.id); setError(""); setJob(j);
       const res = await greenCareerService.startAssessment(j.id);
-      setAssessmentId(res.assessmentId); setQuestions(res.questions); setAnswers({}); setView("questions");
+      setAssessmentId(res.assessmentId); setQuestions(res.questions); setAnswers(readSavedDraft(res.assessmentId)); setView("questions");
     } catch (e) {
       setError(describeError(e, "Asesmen belum bisa dimulai. Coba lagi sebentar lagi."));
     } finally {
@@ -106,6 +150,7 @@ function GreenCareerPage() {
     try {
       const payload = questions.map((q) => ({ id: q.id, question: q.question, answer: answers[q.id] ?? "" }));
       const r = await greenCareerService.submitAssessment(assessmentId, payload);
+      clearSavedDraft(assessmentId);
       if (job?.id) setCompletedResults((prev) => new Map(prev).set(job.id, r));
       setResult(r); setView("result");
     } catch (e) {
@@ -117,7 +162,10 @@ function GreenCareerPage() {
     }
   };
 
-  const reset = () => { setView("list"); setJob(null); setResult(null); setQuestions([]); setAnswers({}); setError(""); };
+  const reset = () => {
+    if (assessmentId) clearSavedDraft(assessmentId);
+    setView("list"); setJob(null); setResult(null); setQuestions([]); setAnswers({}); setError("");
+  };
   // Skor kecocokan per pengguna (lib/greenMatch.ts, logika yang sama dengan halaman Lowongan); kartu tanpa skor di akhir.
   const matchViews = useMemo(
     () => new Map(jobs.map((j) => [j.id, greenMatchView(j, profileSkills, skillsFailed)] as const)),
@@ -127,7 +175,11 @@ function GreenCareerPage() {
     const v = matchViews.get(j.id);
     return v?.kind === "score" ? v.score : null;
   });
-  const allAnswered = questions.length > 0 && questions.every((q) => (answers[q.id] ?? "").trim().length > 0);
+  // UX-P7-15: pertanyaan esai minimal 20 karakter agar jawaban 1 huruf tidak dikirim ke AI.
+  const allAnswered = questions.length > 0 && questions.every((q) => {
+    const trimmed = (answers[q.id] ?? "").trim();
+    return q.type === "mcq" ? trimmed.length > 0 : trimmed.length >= MIN_TEXT_ANSWER_CHARS;
+  });
 
   return (
     <AppShell>
@@ -421,7 +473,14 @@ function QuestionsView({ job, questions, answers, setAnswers, onBack, onSubmit, 
                 ))}
               </div>
             ) : (
-              <textarea rows={3} aria-labelledby={`pertanyaan-${q.id}`} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Jawabanmu..." className="w-full p-3 rounded-xl border-2 border-neutral-300 bg-white text-base md:text-sm resize-none focus:outline-none focus:border-brand-emerald" />
+              <div>
+                <textarea rows={3} aria-labelledby={`pertanyaan-${q.id}`} value={answers[q.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [q.id]: e.target.value }))} placeholder="Tulis jawaban minimal 20 karakter..." className="w-full p-3 rounded-xl border-2 border-neutral-300 bg-white text-base md:text-sm resize-none focus:outline-none focus:border-brand-emerald" />
+                <p className="mt-1.5 text-xs text-neutral-500">
+                  {(answers[q.id] ?? "").trim().length < MIN_TEXT_ANSWER_CHARS
+                    ? `Minimal ${MIN_TEXT_ANSWER_CHARS} karakter (${(answers[q.id] ?? "").trim().length}/${MIN_TEXT_ANSWER_CHARS}).`
+                    : "Panjang jawaban mencukupi."}
+                </p>
+              </div>
             )}
           </div>
         ))}
