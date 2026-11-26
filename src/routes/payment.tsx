@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   PLAN_PRICE,
   activateSimulatedCheckout,
+  parsePlanSearch,
   type PlanTier,
   type PaymentMethod,
 } from "@/lib/subscriptionStore";
@@ -21,7 +22,7 @@ type PaymentSearch = {
 
 export const Route = createFileRoute("/payment")({
   validateSearch: (input: Record<string, unknown>): PaymentSearch => ({
-    plan: (input.plan as PlanTier) || undefined,
+    plan: parsePlanSearch(input.plan),
   }),
   beforeLoad: async () => {
     // Langganan dan pembayaran disembunyikan dari uji coba kecuali VITE_ENABLE_BILLING=true.
