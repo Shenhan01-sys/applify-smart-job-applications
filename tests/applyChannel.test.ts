@@ -113,3 +113,20 @@ test("portal login menjelaskan butuh ekstensi khusus laptop dan mengarahkan ke s
   const li = classifyJobChannel({ platform_source: "linkedin", external_url: "https://www.linkedin.com/jobs/view/999" });
   assert.equal(needsBrowserExtension(li), false);
 });
+
+test("E2E-07: ATS korporasi kompleks (Workday/iCIMS/Taleo/SuccessFactors) ditandai eksperimental dengan saran manual", () => {
+  for (const url of [
+    "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/SWE_1",
+    "https://careers-acme.icims.com/jobs/1234/job",
+    "https://acme.taleo.net/careersection/ex/jobdetail.ftl?job=123",
+    "https://jobs.successfactors.com/career?company=acme",
+    "https://career5.successfactors.eu/career?company=acme",
+  ]) {
+    const res = classifyJobChannel({ external_url: url });
+    assert.equal(res.extensionSupported, true, url);
+    assert.equal(res.experimentalExtension, true, url);
+    assert.match(res.badgeLabel, /Eksperimental/);
+    assert.match(res.reason, /eksperimental/i);
+    assert.match(res.reason, /manual/i);
+  }
+});

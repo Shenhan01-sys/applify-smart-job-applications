@@ -19,6 +19,15 @@ export class DraftNotSendableError extends Error {
   }
 }
 
+/** E2E-04: sinkronkan perubahan surat lamaran ke antrean persetujuan yang masih tertunda. */
+export async function syncPendingApprovalCoverLetter(approvalId: string | null | undefined, coverLetter: string): Promise<boolean> {
+  if (!approvalId || approvalId === "pending") return false;
+  const trimmed = coverLetter.trim();
+  if (!trimmed) throw new DraftNotSendableError("Surat lamaran tidak boleh kosong.");
+  await automationApi.updateApprovalCoverLetter(approvalId, trimmed);
+  return true;
+}
+
 /** Message for a failed approval request: the draft's own reason, else what the server answered. */
 export function describeApprovalError(err: unknown, fallback = "Draf belum bisa diajukan."): string {
   return err instanceof DraftNotSendableError ? err.message : describeApiError(err, fallback);

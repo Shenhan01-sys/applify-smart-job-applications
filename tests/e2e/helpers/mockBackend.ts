@@ -305,6 +305,21 @@ export class MockBackend {
     // v2: halaman Persetujuan menanyakan status klaim kirim untuk banner klaim macet. Tidak ada klaim macet di fixture.
     if (method === "POST" && path === "/api/approvals/claim-statuses") return route.fulfill(json(200, { claims: {} }));
 
+    const patchCover = path.match(/^\/api\/approvals\/([^/]+)\/cover-letter$/);
+    if (method === "PATCH" && patchCover) {
+      const id = decodeURIComponent(patchCover[1]);
+      const nextLetter = String((body as Row)?.cover_letter ?? "");
+      const pendingRow = s.pending.find((a) => a.id === id);
+      if (pendingRow) {
+        pendingRow.cover_letter = nextLetter;
+        return route.fulfill(json(200, { success: true, approval: pendingRow }));
+      }
+      if (s.history.some((a) => a.id === id)) {
+        return route.fulfill(json(409, { error: "Approval request was already processed", code: "already_processed" }));
+      }
+      return route.fulfill(json(404, { error: "Approval request not found" }));
+    }
+
     const detail = path.match(/^\/api\/approvals\/([^/]+)$/);
     if (method === "GET" && detail) {
       const row = s.approvalDetail[decodeURIComponent(detail[1])];

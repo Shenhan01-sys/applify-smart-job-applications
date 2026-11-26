@@ -3,7 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { aiApplicationService, type AIApplicationData } from "@/services/aiApplicationService";
 import { automationQueue } from "@/services/automationQueue";
-import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
+import {
+  describeApprovalError,
+  getPendingApprovalFor,
+  requestApprovalForDraft,
+  syncPendingApprovalCoverLetter,
+} from "@/services/approvalService";
 import { profileService } from "@/services/profileService";
 import { parseQuotaStatus } from "@/lib/quotaStatus";
 import { aiPlanLabel, formatModelUsed, modelDisplay } from "@/lib/modelLabel";
@@ -317,8 +322,10 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
       });
       setRawSkills(insights.tailoredSkills);
       await aiApplicationService.updateCoverLetter(application.id, insights.coverLetter);
+      const synced = await syncPendingApprovalCoverLetter(approvalId, insights.coverLetter);
       setApplication({ ...application, cover_letter: insights.coverLetter });
       setIsEditing(false);
+      if (synced) toast.success("Surat baru ikut diperbarui di antrean Persetujuan.");
     } catch (err: any) {
       setError(describeError(err, "Surat belum bisa ditulis ulang. Coba lagi."));
     } finally {
@@ -338,9 +345,12 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   const handleSaveEdit = async () => {
     if (!application) return;
     try {
+      setError("");
       await aiApplicationService.updateCoverLetter(application.id, editedCoverLetter);
+      const synced = await syncPendingApprovalCoverLetter(approvalId, editedCoverLetter);
       setApplication({ ...application, cover_letter: editedCoverLetter });
       setIsEditing(false);
+      if (synced) toast.success("Perubahan surat ikut diperbarui di antrean Persetujuan.");
     } catch (err: any) {
       setError(describeError(err, "Perubahan belum tersimpan. Coba lagi."));
     }
@@ -354,6 +364,7 @@ export function AIApplyModal({ jobId, jobTitle, company, jobData, match = null, 
   const persistPendingEdit = async () => {
     if (application && editedCoverLetter && editedCoverLetter !== application.cover_letter) {
       await aiApplicationService.updateCoverLetter(application.id, editedCoverLetter);
+      await syncPendingApprovalCoverLetter(approvalId, editedCoverLetter);
       setApplication({ ...application, cover_letter: editedCoverLetter });
     }
   };
