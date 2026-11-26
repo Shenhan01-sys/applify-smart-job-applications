@@ -74,3 +74,47 @@ test("Gelombang 4 Google Forms handoff: sebelum worker jalan tidak meminta izin 
   assert.equal(after.reason, "handoff_needed");
   assert.equal(EXTENSION_HANDOFF_BUTTON, "Lanjutkan di ekstensi");
 });
+
+test("Gelombang 4 ekstensi partly_filled + questions_pending > 0 memunculkan tombol 'Lanjutkan di ekstensi'", () => {
+  const jobUrl = "https://id.jobstreet.com/id/job/999";
+  const extLog = agentLogFacts({
+    status: "incomplete",
+    created_at: "2026-11-26T00:35:00Z",
+    details: {
+      channel: "extension",
+      reason: "partly_filled",
+      questions_pending: 2,
+      questions: [
+        { key: "bersedia shift", label: "Bersedia kerja shift?", kind: "radio", options: ["Ya", "Tidak"] },
+      ],
+    },
+  });
+  assert.equal(extLog.questions_pending, 2);
+
+  const stateWithPending = extensionConsentState({
+    approvalStatus: "approved",
+    platform: "jobstreet",
+    jobUrl,
+    row: { ...extLog, status: "completed", job_type: "extension_apply" },
+    agentKnown: true,
+  });
+  assert.deepEqual(stateWithPending, { show: true, reason: "handoff_needed" });
+
+  // Bila questions_pending === 0 dan questions kosong: tidak memunculkan handoff
+  const stateNoPending = extensionConsentState({
+    approvalStatus: "approved",
+    platform: "jobstreet",
+    jobUrl,
+    row: {
+      status: "completed",
+      job_type: "extension_apply",
+      channel: "extension",
+      log_status: "incomplete",
+      reason: "partly_filled",
+      questions_pending: 0,
+      questions: [],
+    },
+    agentKnown: true,
+  });
+  assert.equal(stateNoPending.show, false);
+});

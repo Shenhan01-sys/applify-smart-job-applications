@@ -20,7 +20,7 @@ export const EXTENSION_CONSENT_BUTTON = "Izinkan";
 export const EXTENSION_HANDOFF_TITLE = "Lanjutkan di ekstensi";
 export const EXTENSION_HANDOFF_BUTTON = "Lanjutkan di ekstensi";
 export const EXTENSION_HANDOFF_NOTE =
-  "Agen server berhenti sebelum mengirim karena formulir membutuhkan login Google, unggah berkas, CAPTCHA, atau jawaban tambahan. Lanjutkan pengisian lewat Ekstensi Browser di tab Chrome/Edge milikmu.";
+  "Pengisian berhenti sebelum mengirim karena formulir membutuhkan login, unggah berkas, CAPTCHA, atau jawaban tambahan. Lanjutkan pengisian lewat Ekstensi Browser di tab Chrome/Edge milikmu.";
 export const EXTENSION_CONSENT_BUSY_LABEL = "Memproses...";
 export const EXTENSION_CONSENT_ALWAYS_LABEL = "Selalu izinkan tanpa bertanya";
 export const EXTENSION_CONSENT_EXPLAIN =
@@ -93,10 +93,12 @@ export function extensionConsentState(input: ExtensionConsentInput): ExtensionCo
   if (!eligible) return HIDDEN;
 
   const row = input.row;
+  const pendingQuestions = Math.max(row?.questions_pending ?? 0, row?.questions?.length ?? 0);
   if (
     row?.extension_handoff === true ||
     row?.reason === "file_upload_required" ||
-    row?.reason === "google_forms_missing_required"
+    row?.reason === "google_forms_missing_required" ||
+    (row?.log_status === "incomplete" && row.reason === "partly_filled" && pendingQuestions > 0)
   ) {
     return { show: true, reason: "handoff_needed" };
   }

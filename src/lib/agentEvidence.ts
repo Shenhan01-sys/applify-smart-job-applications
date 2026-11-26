@@ -65,6 +65,8 @@ export interface AgentLogFacts {
    * Hanya bermakna bila percobaan itu belum terkirim; lihat questionsToAnswer di formQuestions.ts.
    */
   questions?: PendingQuestion[];
+  /** details.questions_pending: jumlah pertanyaan wajib tertunda dari log worker/ekstensi. */
+  questions_pending?: number | null;
   /**
    * details.awaiting_until (ISO): batas waktu agen menunggu kode keamanan dari email. Hanya dibaca pada log
    * berstatus awaiting_code; log lain tidak membawa kunci ini.
@@ -223,6 +225,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
     questions: parseQuestions(details.questions),
+    ...(cleanCount(details.questions_pending) !== null ? { questions_pending: cleanCount(details.questions_pending) } : {}),
     fields_filled: cleanCount(details.fields_filled),
     filled_fields: cleanFilledFields(details.filled_fields),
     screenshots: cleanScreenshots(details.screenshots),
