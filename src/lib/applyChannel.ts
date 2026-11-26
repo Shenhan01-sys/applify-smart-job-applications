@@ -30,6 +30,8 @@ export interface ChannelClassification {
   emailApplySupported: boolean;
   extensionSupported: boolean;
   manualOnly: boolean;
+  /** E2E-07: True untuk ATS korporasi kompleks (Workday/iCIMS/Taleo/SuccessFactors) yang bersifat eksperimental di ekstensi. */
+  experimentalExtension?: boolean;
   badgeLabel: string;
   badgeTone: "ats" | "email" | "extension" | "manual";
   reason: string;
@@ -44,6 +46,24 @@ import {
 
 /** Host yang benar-benar diizinkan di manifest Ekstensi Browser (selaras backend/services/apply-channel.ts, J5-02). */
 export const EXTENSION_HOST_DOMAINS: readonly string[] = [...EXTENSION_LOGIN_PORTAL_DOMAINS, ...KNOWN_ATS_DOMAINS];
+
+/**
+ * E2E-07: ATS korporasi multi-langkah / Shadow DOM tertutup yang tumpang tindih antara daftar ATS dikenal
+ * dan portal autentikasi di shared/domains.json. Tetap didukung ekstensi, namun diberi label eksperimental
+ * dan saran melamar manual bila formulir gagal diisi penuh.
+ */
+export const CORPORATE_COMPLEX_ATS_DOMAINS = [
+  "myworkdayjobs.com",
+  "workday.com",
+  "icims.com",
+  "taleo.net",
+  "successfactors.com",
+  "successfactors.eu",
+] as const;
+
+export function isCorporateComplexAtsHost(hostname: string): boolean {
+  return Boolean(hostname) && hostMatchesDomain(hostname, CORPORATE_COMPLEX_ATS_DOMAINS);
+}
 
 const AUTH_PORTAL_DOMAINS = [
   "linkedin.com",
@@ -291,6 +311,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
 
   if (isPortal) {
     const viaExtension = isExtensionUrl(primaryUrl);
+    const experimentalExtension = viaExtension && isCorporateComplexAtsHost(primaryHost);
     return {
       channel: "auth_portal",
       platform: platform || primaryHost || "portal",
@@ -301,11 +322,18 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
       emailApplySupported: false,
       extensionSupported: viaExtension,
       manualOnly: false,
-      badgeLabel: viaExtension ? "Portal · Butuh Ekstensi" : "Portal · Manual",
+      ...(experimentalExtension ? { experimentalExtension: true } : {}),
+      badgeLabel: experimentalExtension
+        ? "Portal · Ekstensi (Eksperimental)"
+        : viaExtension
+          ? "Portal · Butuh Ekstensi"
+          : "Portal · Manual",
       badgeTone: viaExtension ? "extension" : "manual",
-      reason: viaExtension
-        ? "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan."
-        : "Portal ini butuh masuk akun pelamar dan belum didukung Ekstensi Browser Applify, jadi silakan lamar manual di situsnya.",
+      reason: experimentalExtension
+        ? "Portal ATS korporasi kompleks ini bersifat eksperimental untuk Ekstensi Browser (sering memiliki banyak langkah atau Shadow DOM tertutup). Bila isian kurang lengkap, disarankan melamar manual di situs perusahaannya."
+        : viaExtension
+          ? "Portal ini butuh masuk akun pelamar, jadi diisi Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP. Ekstensi berhenti sebelum kirim sehingga kamu yang menekan Kirim Sekarang di panel ekstensi. Bila tanpa ekstensi atau memakai HP, pilih lowongan dari situs karier perusahaan."
+          : "Portal ini butuh masuk akun pelamar dan belum didukung Ekstensi Browser Applify, jadi silakan lamar manual di situsnya.",
     };
   }
 
@@ -345,6 +373,7 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     };
   }
 
+  const externalExperimental = externalViaExtension && isCorporateComplexAtsHost(primaryHost);
   return {
     channel: "external_web",
     platform: platform || primaryHost || "web",
@@ -355,12 +384,19 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     emailApplySupported: false,
     extensionSupported: externalViaExtension,
     manualOnly: false,
-    badgeLabel: externalViaExtension ? "Situs Web · Ekstensi" : "Situs Web · Manual",
+    ...(externalExperimental ? { experimentalExtension: true } : {}),
+    badgeLabel: externalExperimental
+      ? "Situs Web · Ekstensi (Eksperimental)"
+      : externalViaExtension
+        ? "Situs Web · Ekstensi"
+        : "Situs Web · Manual",
     badgeTone: externalViaExtension ? "extension" : "manual",
     reason: !primaryUrl
       ? "Belum ada tautan lamaran eksternal pada lowongan ini."
-      : externalViaExtension
-        ? "Situs karier eksternal yang didukung Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP untuk pengisian terpandu."
-        : "Situs karier eksternal ini belum didukung Ekstensi Browser Applify, jadi silakan lamar manual langsung di situs perusahaannya.",
+      : externalExperimental
+        ? "ATS korporasi kompleks ini bersifat eksperimental untuk Ekstensi Browser. Disarankan melamar manual di situs perusahaan bila formulir multi-langkah gagal terisi penuh."
+        : externalViaExtension
+          ? "Situs karier eksternal yang didukung Ekstensi Browser khusus laptop (Chrome atau Edge) dan tidak bisa dipasang di HP untuk pengisian terpandu."
+          : "Situs karier eksternal ini belum didukung Ekstensi Browser Applify, jadi silakan lamar manual langsung di situs perusahaannya.",
   };
 }
