@@ -1,11 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { buildAgentApplyRows } from "../src/lib/agentApplyRows.ts";
+import { emptyPlacementData } from "../src/lib/approvalTabs.ts";
 import { summarizeUrgentActions } from "../src/lib/dashboardUrgent.ts";
 import { mergeIdentityFromProfile } from "../src/lib/settingsProfileFallback.ts";
 
 test("E2E-06: summarizeUrgentActions menghitung persetujuan pending aktif, OTP menunggu kode, dan pertanyaan agen", () => {
   const now = Date.parse("2026-11-26T10:00:00Z");
+  const queueRows = [
+    { id: "q-otp", job_type: "apply", status: "processing", created_at: "2026-11-26T09:58:00Z", payload: { approval_request_id: "apr-otp" } },
+    { id: "q-ask", job_type: "apply", status: "completed", created_at: "2026-11-26T09:50:00Z", payload: { approval_request_id: "apr-ask" } },
+  ];
+  const applyLogs = [
+    {
+      status: "awaiting_code",
+      created_at: "2026-11-26T09:59:00Z",
+      details: { queue_job_id: "q-otp", awaiting_until: "2026-11-26T10:05:00Z", code_length: 6 },
+    },
+    {
+      status: "ready",
+      created_at: "2026-11-26T09:51:00Z",
+      details: {
+        queue_job_id: "q-ask",
+        questions: [{ key: "q1", label: "Ekspektasi gaji?", kind: "text", required: true }],
+      },
+    },
+  ];
   const summary = summarizeUrgentActions({
     now,
     pendingApprovals: [
@@ -13,30 +34,17 @@ test("E2E-06: summarizeUrgentActions menghitung persetujuan pending aktif, OTP m
       { id: "p-expired", status: "pending", expires_at: "2026-11-26T09:00:00Z" },
       { id: "p-approved", status: "approved", expires_at: "2026-11-26T12:00:00Z" },
     ],
-    queueRows: [
-      { id: "q-otp", job_type: "apply", status: "processing", created_at: "2026-11-26T09:58:00Z", payload: { approval_request_id: "apr-otp" } },
-      { id: "q-ask", job_type: "apply", status: "completed", created_at: "2026-11-26T09:50:00Z", payload: { approval_request_id: "apr-ask" } },
+    history: [
+      { id: "apr-otp", status: "approved", expires_at: "2026-11-26T12:00:00Z" },
+      { id: "apr-ask", status: "approved", expires_at: "2026-11-26T12:00:00Z" },
     ],
-    applyLogs: [
-      {
-        status: "awaiting_code",
-        created_at: "2026-11-26T09:59:00Z",
-        details: { queue_job_id: "q-otp", awaiting_until: "2026-11-26T10:05:00Z", code_length: 6 },
-      },
-      {
-        status: "ready",
-        created_at: "2026-11-26T09:51:00Z",
-        details: {
-          queue_job_id: "q-ask",
-          questions: [{ key: "q1", label: "Ekspektasi gaji?", type: "text", required: true }],
-        },
-      },
-    ],
+    data: { ...emptyPlacementData(), agentKnown: true, agent: buildAgentApplyRows(queueRows, applyLogs, []) },
   });
 
   assert.equal(summary.pendingApprovalsCount, 1);
   assert.equal(summary.awaitingCodeCount, 1);
   assert.equal(summary.pendingQuestionsCount, 1);
+  assert.equal(summary.unverifiedCount, 0);
   assert.equal(summary.total, 3);
 });
 

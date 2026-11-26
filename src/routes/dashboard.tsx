@@ -14,12 +14,13 @@ import { describeError } from "@/lib/authErrors";
 import { parseQuotaStatus, type QuotaSummary } from "@/lib/quotaStatus";
 import { recentActivity, relativeTime, summarizeApplications, type DashApplication, type DashStatus } from "@/lib/dashboardStats";
 import { automationApi } from "@/services/automationApi";
-import { summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
+import { EMPTY_URGENT_SUMMARY as EMPTY_URGENT, summarizeUrgentActions, type UrgentActionsSummary } from "@/lib/dashboardUrgent";
+import { APPROVAL_HISTORY_LIMIT } from "@/lib/approvalTabs";
+import type { ApprovalLike } from "@/lib/emailApply";
+import { loadEmailApplyData } from "@/services/emailApplyService";
 import { loginSearchWithRedirect } from "@/lib/authRedirect";
 
 const isMockMode = () => import.meta.env.VITE_MOCK_MODE === "true";
-
-const EMPTY_URGENT: UrgentActionsSummary = { pendingApprovalsCount: 0, awaitingCodeCount: 0, pendingQuestionsCount: 0, total: 0 };
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async ({ location }) => {
@@ -139,42 +140,28 @@ export function DashboardPage() {
 
   // E2E-06: banner Tindakan mendesak dimuat terpisah dari data utama. Persetujuan pending datang dari backend
   // (Railway) yang bisa lambat atau tertidur, jadi Beranda tidak boleh menunggunya. Dimuat sekali per login dan per
-  // "Coba lagi", tanpa polling. Hanya membaca: automation_queue dan application_logs dibatasi RLS ke baris milik sendiri,
-  // dan filter user_id dikirim juga supaya kueri memakai indeks (user_id, created_at).
+  // "Coba lagi", tanpa polling. Hanya membaca.
+  // Angkanya harus sama dengan kartu di tab Menunggu halaman Persetujuan (audit 26 November 2026: kartu Binance
+  // "Perlu dicek" ada di Menunggu, tetapi banner tidak menyebutnya). Karena itu datanya dibaca oleh pemuat yang sama
+  // (loadEmailApplyData: log agen, klaim, tugas email, lowongan, dengan RLS ke baris milik sendiri), dengan batas Riwayat
+  // yang sama, dan kartunya ditempatkan oleh fungsi yang sama (splitApprovalTabs lewat summarizeUrgentActions).
   const userId = user?.id;
   useEffect(() => {
     if (!userId || isMockMode()) return;
     let cancelled = false;
     (async () => {
       try {
-        const [pendingApprovals, decidedApprovals, queueRes, logsRes] = await Promise.all([
+        const [pendingApprovals, history] = await Promise.all([
           automationApi.getPendingApprovals().catch(() => []),
-          // Riwayat: dipakai untuk membuang kode dan pertanyaan milik persetujuan yang sudah kedaluwarsa. Gagal = tanpa penyaring.
-          automationApi.getApprovalHistory({ limit: 100 }).catch(() => undefined),
-          supabase
-            .from("automation_queue")
-            .select("id, job_type, status, error_message, scheduled_at, created_at, payload")
-            .eq("user_id", userId)
-            .in("job_type", ["apply", "extension_apply"])
-            .order("created_at", { ascending: false })
-            .limit(50),
-          supabase
-            .from("application_logs")
-            .select("status, details, created_at")
-            .eq("user_id", userId)
-            .eq("action", "apply")
-            .order("created_at", { ascending: false })
-            .limit(100),
+          // Gagal = tanpa persetujuan yang sudah disetujui: banner hanya menghitung draf pending.
+          automationApi.getApprovalHistory({ limit: APPROVAL_HISTORY_LIMIT }).catch(() => undefined),
         ]);
+        // Gagal = status agen belum terbaca, sama seperti halaman Persetujuan: tidak ada kartu disetujui yang dihitung.
+        const data = Array.isArray(history)
+          ? await loadEmailApplyData(history as unknown as ApprovalLike[], { placementOnly: true }).catch(() => undefined)
+          : undefined;
         if (cancelled) return;
-        setUrgent(
-          summarizeUrgentActions({
-            pendingApprovals,
-            approvals: decidedApprovals,
-            queueRows: queueRes.error ? [] : (queueRes.data ?? []),
-            applyLogs: logsRes.error ? [] : (logsRes.data ?? []),
-          }),
-        );
+        setUrgent(summarizeUrgentActions({ pendingApprovals, history, data }));
       } catch (err) {
         // Banner hanya pelengkap: gagal dimuat berarti tidak tampil, bukan galat di Beranda.
         console.warn("Urgent actions load skipped:", err);
@@ -269,8 +256,11 @@ export function DashboardPage() {
                 {urgent.pendingQuestionsCount > 0 && (
                   <li>{urgent.pendingQuestionsCount} lamaran menunggu jawaban pertanyaan formulir untuk agen.</li>
                 )}
+                {urgent.unverifiedCount > 0 && (
+                  <li>{urgent.unverifiedCount} lamaran perlu dicek: kirim belum terkonfirmasi.</li>
+                )}
                 {urgent.pendingApprovalsCount > 0 && (
-                  <li>{urgent.pendingApprovalsCount} draf lamaran menunggu persetujuanmu sebelum dikirim.</li>
+                  <li>{urgent.pendingApprovalsCount} draf menunggu persetujuanmu.</li>
                 )}
               </ul>
             </div>

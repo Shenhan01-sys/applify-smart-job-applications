@@ -144,8 +144,11 @@ async function loadAttachmentProfile(): Promise<AttachmentProfile | null> {
  * Gmail status, which approvals are already used, the latest email_apply job of each, and addresses
  * written in the posting. The worker stays the authority: a stale answer here only changes what the button
  * says, never what the worker accepts.
+ *
+ * placementOnly: pembaca yang hanya menempatkan kartu ke tab (banner Beranda) tidak butuh status Gmail dan profil untuk
+ * pratinjau lampiran, jadi dua bacaan itu dilewati. Data yang dipakai `placementContextFromData` tetap sama persis.
  */
-export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<EmailApplyData> {
+export async function loadEmailApplyData(approvals: ApprovalLike[], options: { placementOnly?: boolean } = {}): Promise<EmailApplyData> {
   const approved = approvals.filter((a) => a.status === "approved");
   const data = emptyEmailApplyData();
   if (approved.length === 0) return data;
@@ -156,7 +159,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
 
   let agentKnown = true;
   const [gmail, logs, queue, jobs, agent, claimRes, skippedLogs, profile] = await Promise.all([
-    automationApi.getGmailStatus(),
+    options.placementOnly ? Promise.resolve(null) : automationApi.getGmailStatus(),
     supabase.from("application_logs").select("action, details, created_at").eq("status", "success").in("details->>approval_request_id", ids),
     supabase
       .from("automation_queue")
@@ -183,7 +186,7 @@ export async function loadEmailApplyData(approvals: ApprovalLike[]): Promise<Ema
       .eq("action", "email_apply")
       .eq("status", "skipped")
       .in("details->>approval_request_id", ids),
-    loadAttachmentProfile(),
+    options.placementOnly ? Promise.resolve(null) : loadAttachmentProfile(),
   ]);
 
   data.gmail = gmail ? gmail.gmail === true : null;

@@ -13,12 +13,24 @@ import {
   terminalExplanation,
   type StatusActionId,
 } from "../src/lib/outcomeActions.ts";
-import { STAGE_LABEL, placeApproval, splitApprovalTabs, SENT_BY_USER_LABEL, type ApprovalPlacementContext, type ApprovalStage } from "../src/lib/approvalTabs.ts";
+import {
+  STAGE_LABEL,
+  emptyPlacementData,
+  pendingBreakdown,
+  placeApproval,
+  placementContextFromData,
+  splitApprovalTabs,
+  SENT_BY_USER_LABEL,
+  type ApprovalPlacementContext,
+  type ApprovalStage,
+  type PlacementSourceData,
+} from "../src/lib/approvalTabs.ts";
 import { agentLogFacts } from "../src/lib/agentEvidence.ts";
 import { ApiError } from "../src/lib/apiErrors.ts";
 import { AGENT_CLOSED_LABEL, AGENT_USER_CONFIRMED_LABEL, describeAgentApply, describeLogOutcome, describeSentApproval, SENT_VIA_EMAIL_LABEL, type AgentApplyRow } from "../src/lib/agentApplyStatus.ts";
 import { manualSentRow } from "../src/lib/manualSubmit.ts";
 import { attemptsForApplications } from "../src/lib/applicationAttempts.ts";
+import { buildAgentApplyRows } from "../src/lib/agentApplyRows.ts";
 import { summarizeUrgentActions } from "../src/lib/dashboardUrgent.ts";
 import { liveApprovalIds } from "../src/lib/approvalExpiry.ts";
 
@@ -250,32 +262,137 @@ test("kartu persetujuan memasang tindakan di semua tahap, memakai sentVia, dan t
   assert.match(page, /loadData\(\{ quiet: true \}\)/);
 });
 
+/** Data pembaca halaman Persetujuan untuk satu kumpulan baris agen, bentuknya sama dengan hasil loadEmailApplyData. */
+const sourceData = (agent: Record<string, AgentApplyRow>, over: Partial<PlacementSourceData> = {}): PlacementSourceData => ({
+  ...emptyPlacementData(),
+  agentKnown: true,
+  agent,
+  ...over,
+});
+
 test("dashboard: kode dan pertanyaan milik persetujuan kedaluwarsa tidak dihitung (banner menunjuk halaman yang tidak menampilkannya)", () => {
   const queueRows = [
     { id: "q-exp", job_type: "extension_apply", status: "completed", created_at: iso(NOW - 100_000), payload: { approval_request_id: "apr-expired" } },
     { id: "q-live", job_type: "extension_apply", status: "completed", created_at: iso(NOW - 90_000), payload: { approval_request_id: "apr-live" } },
   ];
-  const question = { question: "Berapa gaji?", kind: "text", required: true, field_key: "gaji" };
+  const question = { key: "gaji", label: "Berapa ekspektasi gajimu?", kind: "text", required: true };
   const applyLogs = ["apr-expired", "apr-live"].map((id, i) => ({
     status: "incomplete",
     created_at: iso(NOW - 80_000 + i),
     details: { channel: "extension", approval_request_id: id, reason: "partly_filled", questions: [question], questions_pending: 1 },
   }));
-  const base = { pendingApprovals: [], queueRows, applyLogs, now: NOW };
-  const before = summarizeUrgentActions(base);
-  assert.equal(before.pendingQuestionsCount, 2, "tanpa daftar persetujuan: perilaku lama");
-  const after = summarizeUrgentActions({
-    ...base,
-    approvals: [
-      { id: "apr-expired", status: "approved", expires_at: PAST },
-      { id: "apr-live", status: "approved", expires_at: FUTURE },
-    ],
-  });
+  const history = [
+    { id: "apr-expired", status: "approved", expires_at: PAST },
+    { id: "apr-live", status: "approved", expires_at: FUTURE },
+  ];
+  const data = sourceData(buildAgentApplyRows(queueRows, [], applyLogs));
+  const after = summarizeUrgentActions({ history, data, now: NOW });
   assert.equal(after.pendingQuestionsCount, 1);
   assert.equal(after.total, 1);
-  const none = summarizeUrgentActions({ ...base, approvals: [{ id: "apr-expired", status: "approved", expires_at: PAST }] });
+  const none = summarizeUrgentActions({ history: [history[0]], data, now: NOW });
   assert.equal(none.total, 0);
+  // Status agen belum terbaca (pemuat gagal): kartu disetujui tidak dihitung, sama dengan halaman Persetujuan.
+  assert.equal(summarizeUrgentActions({ history, now: NOW }).total, 0);
   assert.deepEqual([...liveApprovalIds([{ id: "a", status: "approved", expires_at: FUTURE }, { id: "b", status: "rejected", expires_at: FUTURE }, { id: "c", status: "approved" }, null, "x"], NOW)], ["a"]);
+});
+
+// ---- banner Beranda sama dengan tab Menunggu (audit production 26 November 2026, 23.20 WIB) -----------
+
+const UNVERIFIED = agentRow("completed", { status: "submit_unverified" });
+
+test("banner Beranda: kartu Binance 'kirim belum terkonfirmasi' (kedaluwarsa, tetap di Menunggu) dihitung terpisah dari draf pending", () => {
+  // Persis isi tab Menunggu di production: satu draf pending yang masih berlaku, satu kartu Binance perlu dicek.
+  const pendingApprovals = [{ id: "apr-uji", status: "pending", expires_at: FUTURE }];
+  const history = [{ id: "apr-bin", status: "approved", expires_at: PAST }];
+  const data = sourceData({ "apr-bin": UNVERIFIED });
+  const summary = summarizeUrgentActions({ pendingApprovals, history, data, now: NOW });
+  assert.deepEqual(summary, { pendingApprovalsCount: 1, awaitingCodeCount: 0, pendingQuestionsCount: 0, unverifiedCount: 1, total: 2 });
+  // Sebelum perbaikan banner hanya melihat draf pending: tanpa data agen, kartu Binance tidak ikut (agen belum terbaca).
+  assert.equal(summarizeUrgentActions({ pendingApprovals, history, now: NOW }).unverifiedCount, 0);
+});
+
+test("banner Beranda: kartu yang tidak ada di Menunggu tidak dihitung (kedaluwarsa, sudah terkirim, ditutup, diganti, lazy-kedaluwarsa)", () => {
+  const history = [
+    { id: "apr-bin", status: "approved", expires_at: PAST },
+    { id: "apr-sent", status: "approved", expires_at: PAST },
+    { id: "apr-closed", status: "approved", expires_at: PAST },
+    { id: "apr-abandoned", status: "approved", expires_at: PAST },
+    { id: "apr-rejected", status: "rejected", expires_at: FUTURE },
+  ];
+  const pendingApprovals = [{ id: "apr-lazy", status: "pending", expires_at: PAST }];
+  const agent = {
+    "apr-bin": UNVERIFIED,
+    "apr-sent": UNVERIFIED,
+    "apr-closed": { ...UNVERIFIED, claim_state: "closed" as const },
+    "apr-abandoned": { ...UNVERIFIED, claim_state: "abandoned" as const },
+  };
+  // Hanya apr-bin yang masih di Menunggu. apr-sent punya log success, jadi pindah ke Riwayat.
+  const data = sourceData(agent, { used: new Set(["apr-sent"]) });
+  const summary = summarizeUrgentActions({ pendingApprovals, history, data, now: NOW });
+  assert.equal(summary.unverifiedCount, 1);
+  assert.equal(summary.pendingApprovalsCount, 0, "draf pending yang kedaluwarsa ada di Riwayat");
+  assert.equal(summary.total, 1);
+});
+
+test("banner Beranda: persetujuan pending yang kedaluwarsa dan tidak tampil di Menunggu tetap tidak dihitung", () => {
+  const summary = summarizeUrgentActions({ pendingApprovals: [{ id: "a", status: "pending", expires_at: PAST }, { id: "b", status: "pending", expires_at: FUTURE }], now: NOW });
+  assert.equal(summary.pendingApprovalsCount, 1);
+  assert.equal(summary.total, 1);
+});
+
+test("banner Beranda: setiap hitungan sama dengan jumlah kartu tahap itu di tab Menunggu (satu aturan penempatan)", () => {
+  const code = agentRow("processing", { status: "awaiting_code", details: { awaiting_until: iso(NOW + 600_000), code_length: 6 } });
+  const ask = agentRow("completed", { status: "incomplete", details: { reason: "partly_filled", questions: [{ key: "gaji", label: "Berapa ekspektasi gajimu?", kind: "text" }], questions_pending: 1 } });
+  const pendingApprovals = [
+    { id: "p1", status: "pending", expires_at: FUTURE },
+    { id: "p2", status: "pending", expires_at: FUTURE },
+  ];
+  const history = [
+    { id: "code", status: "approved", expires_at: FUTURE },
+    { id: "ask", status: "approved", expires_at: FUTURE },
+    { id: "unv-live", status: "approved", expires_at: FUTURE },
+    { id: "unv-old", status: "approved", expires_at: PAST },
+    { id: "run", status: "approved", expires_at: FUTURE },
+    { id: "wait", status: "approved", expires_at: FUTURE },
+    { id: "old-ask", status: "approved", expires_at: PAST },
+  ];
+  const data = sourceData({
+    code,
+    ask,
+    "unv-live": UNVERIFIED,
+    "unv-old": UNVERIFIED,
+    run: agentRow("processing"),
+    "old-ask": ask,
+  });
+  const summary = summarizeUrgentActions({ pendingApprovals, history, data, now: NOW });
+  assert.deepEqual(
+    { review: summary.pendingApprovalsCount, code: summary.awaitingCodeCount, ask: summary.pendingQuestionsCount, unverified: summary.unverifiedCount },
+    { review: 2, code: 1, ask: 1, unverified: 2 },
+  );
+  assert.equal(summary.total, 6);
+
+  // Aturan yang sama dengan halaman Persetujuan: cocokkan dengan hasil splitApprovalTabs pada data yang sama.
+  const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) => placementContextFromData(data, a.id), NOW);
+  const inMenunggu = (stage: ApprovalStage) => tabs.pending.filter((p) => p.placement.stage === stage).length;
+  assert.equal(summary.pendingApprovalsCount, pendingBreakdown(tabs).review);
+  assert.equal(summary.unverifiedCount, inMenunggu("unverified"));
+  assert.equal(summary.awaitingCodeCount + summary.pendingQuestionsCount, inMenunggu("needs_action"));
+  // Kartu yang berjalan (processing) dan yang belum punya tugas (not_started) bukan tindakan pengguna.
+  assert.equal(inMenunggu("processing"), 1);
+  assert.equal(inMenunggu("not_started"), 1);
+});
+
+test("banner Beranda: tidak ada aturan penempatan sendiri, dan angkanya memakai batas Riwayat yang sama dengan halaman Persetujuan", () => {
+  const lib = read("../src/lib/dashboardUrgent.ts");
+  assert.match(lib, /splitApprovalTabs\(/);
+  assert.match(lib, /placementContextFromData\(/);
+  assert.doesNotMatch(lib, /liveApprovalIds|effectiveApprovalStatus|Date\.parse/, "kedaluwarsa ditentukan placeApproval, bukan banner");
+  const dash = read("../src/routes/dashboard.tsx");
+  const page = read("../src/routes/approvals.tsx");
+  assert.match(dash, /getApprovalHistory\(\{ limit: APPROVAL_HISTORY_LIMIT \}\)/);
+  assert.match(page, /getApprovalHistory\(\{ limit: APPROVAL_HISTORY_LIMIT \}\)/);
+  assert.match(dash, /loadEmailApplyData\(/);
+  assert.match(page, /placementContextFromData\(emailData, a\.id/);
 });
 
 test("Datadog yang Ditutup tidak memakai bukti lamaran lain untuk lowongan yang sama (percobaan dibatasi per lamaran)", () => {

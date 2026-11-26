@@ -19,7 +19,7 @@ import { pendingEmptyState } from "@/lib/approvalsEmpty";
 import { AGENT_POLL_MS, CODE_POLL_MS, pollIntervalMs } from "@/lib/securityCode";
 import { emptyEmailApplyData, loadEmailApplyData, type EmailApplyData } from "@/services/emailApplyService";
 import { platformLabel } from "@/lib/platforms";
-import { pendingBreakdown, splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
+import { APPROVAL_HISTORY_LIMIT, pendingBreakdown, placementContextFromData, splitApprovalTabs, type ApprovalStage } from "@/lib/approvalTabs";
 import type { NotQueuedRoute } from "@/lib/approveOutcome";
 import { describeApiError } from "@/lib/apiErrors";
 import { ErrorState } from "@/components/ErrorState";
@@ -173,7 +173,7 @@ function ApprovalsPage() {
       }
       const [pending, hist] = await Promise.all([
         automationApi.getPendingApprovals(),
-        automationApi.getApprovalHistory({ limit: 50 }),
+        automationApi.getApprovalHistory({ limit: APPROVAL_HISTORY_LIMIT }),
       ]);
       setPendingApprovals(pending as unknown as ApprovalRequest[]);
       setHistory(hist as unknown as ApprovalRequest[]);
@@ -252,15 +252,9 @@ function ApprovalsPage() {
 
   // Menunggu memuat yang belum selesai (termasuk yang sudah disetujui tetapi belum terkirim). Riwayat hanya yang terkirim atau ditutup.
   const notQueuedFor = (id: string): NotQueuedRoute | null => notQueuedIds.get(id) ?? emailData.notQueued[id] ?? null;
-  const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) => ({
-    agent: emailData.agent[a.id],
-    sent: emailData.used.has(a.id),
-    emailJob: emailData.jobs[a.id],
-    testMode: emailData.testMode.has(a.id),
-    agentKnown: emailData.agentKnown,
-    consentRequired: consentIds.has(a.id),
-    notQueued: notQueuedFor(a.id),
-  }));
+  const tabs = splitApprovalTabs([...pendingApprovals, ...history], (a) =>
+    placementContextFromData(emailData, a.id, { consentRequired: consentIds.has(a.id), notQueued: notQueuedIds.get(a.id) }),
+  );
   const displayApprovals = activeTab === 'pending' ? tabs.pending : tabs.history;
   const pendingParts = pendingBreakdown(tabs);
 

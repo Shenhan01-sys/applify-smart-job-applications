@@ -69,11 +69,16 @@ Konstanta masa berlaku persetujuan ada di `src/lib/approvalExpiry.ts` dan dijaga
 
 ## Banner Tindakan mendesak di Beranda
 
-| Sumber hitungan | Sebelum | Sesudah |
-| --- | --- | --- |
-| Draf menunggu persetujuan | dihitung, tautan ke Persetujuan | sama |
-| Kode keamanan menunggu | dihitung dari log, termasuk persetujuan kedaluwarsa | hanya persetujuan yang disetujui dan belum lewat `expires_at` |
-| Pertanyaan agen | dihitung dari log, termasuk persetujuan kedaluwarsa (kartunya tidak ada di Menunggu) | hanya persetujuan yang masih berlaku |
+Banner tidak punya aturan penempatan sendiri. `summarizeUrgentActions` (`src/lib/dashboardUrgent.ts`) menempatkan setiap persetujuan dengan `splitApprovalTabs` dan `placementContextFromData` (`src/lib/approvalTabs.ts`), fungsi yang sama dengan halaman Persetujuan. Datanya dibaca `loadEmailApplyData` (dengan `placementOnly`, tanpa status Gmail dan profil) dari Riwayat sebanyak `APPROVAL_HISTORY_LIMIT` baris, sama dengan halaman Persetujuan. Banner hanya menghitung kartu tab Menunggu menurut tahapnya, jadi angkanya sama dengan kartu yang ditemukan pengguna setelah menekan "Tinjau di Persetujuan". Kartu yang masuk Riwayat (kedaluwarsa, terkirim, ditutup, diganti) tidak dihitung.
+
+| Baris banner | Tahap kartu di Menunggu | Sebelum | Sesudah |
+| --- | --- | --- | --- |
+| "N draf menunggu persetujuanmu." | Menunggu persetujuan | "N draf lamaran menunggu persetujuanmu sebelum dikirim.", dihitung dari draf pending yang belum kedaluwarsa | sama hitungannya, teks diringkas |
+| "N lamaran menunggu kode keamanan dari emailmu." | Perlu tindakanmu, agen menunggu kode | dihitung dari log, termasuk persetujuan kedaluwarsa | hanya kartu yang tampil di Menunggu. Tugas yang masih berjalan tetap dihitung walau masa berlakunya lewat, karena kartunya tetap di Menunggu |
+| "N lamaran menunggu jawaban pertanyaan formulir untuk agen." | Perlu tindakanmu, ada pertanyaan | dihitung dari log, termasuk persetujuan kedaluwarsa | hanya kartu yang tampil di Menunggu |
+| "N lamaran perlu dicek: kirim belum terkonfirmasi." | Perlu dicek, kirim belum terkonfirmasi | tidak dihitung (kasus Binance, 26 November 2026: Menunggu berisi 2 kartu, banner hanya menyebut 1 draf) | dihitung, termasuk yang masa berlakunya sudah lewat |
+
+Belum dihitung banner: kartu Menunggu bertahap Perlu diisi sendiri, Kirim lewat panel Email, kode tidak masuk atau ditolak (`code_timeout`, `code_rejected`), Terisi belum terkirim, dan Gagal bisa dicoba lagi. Kartu itu tampil di tab Menunggu dengan tindakannya sendiri. Menambahkannya ke banner adalah keputusan terpisah.
 
 ## Panel samping ekstensi (hanya dokumentasi, tidak diubah)
 

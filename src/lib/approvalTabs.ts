@@ -109,6 +109,50 @@ export interface ApprovalPlacementContext {
   now?: number;
 }
 
+/**
+ * Jumlah persetujuan Riwayat yang dimuat. Halaman Persetujuan dan banner Beranda memakai angka yang sama: kalau tidak,
+ * persetujuan di luar batas ikut atau tidak ikut terhitung, dan angka banner berbeda dari jumlah kartu Menunggu.
+ */
+export const APPROVAL_HISTORY_LIMIT = 50;
+
+/**
+ * Bagian hasil `loadEmailApplyData` (services/emailApplyService.ts) yang dibaca `placeApproval`. Bentuk struktural supaya
+ * berkas ini tetap murni, tanpa Supabase.
+ */
+export interface PlacementSourceData {
+  agent: Record<string, AgentApplyRow>;
+  used: ReadonlySet<string>;
+  jobs: Record<string, EmailQueueRow>;
+  testMode: ReadonlySet<string>;
+  agentKnown: boolean;
+  notQueued: Record<string, NotQueuedRoute>;
+}
+
+/** Data kosong: status agen belum terbaca (agentKnown false), jadi tidak ada yang dianggap "tanpa tugas". */
+export const emptyPlacementData = (): PlacementSourceData => ({ agent: {}, used: new Set(), jobs: {}, testMode: new Set(), agentKnown: false, notQueued: {} });
+
+/**
+ * Konteks penempatan satu persetujuan, dari data yang sama dengan yang dipakai halaman Persetujuan. Satu-satunya tempat
+ * yang menerjemahkan data itu ke `ApprovalPlacementContext`, jadi halaman Persetujuan dan banner Beranda tidak bisa
+ * berbeda pendapat tentang tab sebuah kartu. `local` adalah ingatan halaman Persetujuan saja (izin ekstensi dan jalur
+ * tanpa antrean dari jawaban approve barusan); Beranda tidak punya dan memakai data lowongan.
+ */
+export function placementContextFromData(
+  data: PlacementSourceData,
+  id: string,
+  local: { consentRequired?: boolean; notQueued?: NotQueuedRoute | null } = {},
+): ApprovalPlacementContext {
+  return {
+    agent: data.agent[id],
+    sent: data.used.has(id),
+    emailJob: data.jobs[id],
+    testMode: data.testMode.has(id),
+    agentKnown: data.agentKnown,
+    consentRequired: local.consentRequired === true,
+    notQueued: local.notQueued ?? data.notQueued[id] ?? null,
+  };
+}
+
 const place = (stage: ApprovalStage, label: string = STAGE_LABEL[stage]): ApprovalPlacement => ({
   tab: HISTORY_STAGES.has(stage) ? "history" : "pending",
   stage,

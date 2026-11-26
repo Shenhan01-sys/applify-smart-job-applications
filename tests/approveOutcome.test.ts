@@ -110,7 +110,7 @@ test("kabel: modal memakai approvedToast dan meneruskan jalur tanpa antrean; toa
   assert.match(modal, /onApproved\(\{ consentRequired, notQueued: notQueuedRouteFrom\(result\) \}\)/);
   assert.doesNotMatch(modal, /Disetujui — lamaran masuk antrean agen/);
   const page = readFileSync(new URL("../src/routes/approvals.tsx", import.meta.url), "utf8");
-  assert.match(page, /notQueued: notQueuedFor\(a\.id\)/);
+  assert.match(page, /placementContextFromData\(emailData, a\.id, \{[^}]*notQueued: notQueuedIds\.get\(a\.id\)/);
   assert.match(page, /notQueued=\{notQueuedFor\(request\.id\)\}/);
   const svc = readFileSync(new URL("../src/services/emailApplyService.ts", import.meta.url), "utf8");
   assert.match(svc, /notQueuedRouteForJob\(/);

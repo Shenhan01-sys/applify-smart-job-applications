@@ -8,19 +8,21 @@ import { readFileSync } from "node:fs";
  */
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
-test("E2E-06: banner Tindakan mendesak dimuat di efek sendiri, tanpa polling, dengan filter user_id", () => {
+test("E2E-06: banner Tindakan mendesak dimuat di efek sendiri, tanpa polling, hanya membaca", () => {
   const dash = read("../src/routes/dashboard.tsx");
 
   // Tidak lagi ikut Promise.all utama: Beranda tidak menunggu backend persetujuan.
   const mainStart = dash.indexOf("const [p, apps, q, summary, approvedRes] = await Promise.all([");
   assert.ok(mainStart > 0, "Promise.all utama harus berisi lima kueri data Beranda");
   const mainEnd = dash.indexOf("]);", mainStart);
-  assert.doesNotMatch(dash.slice(mainStart, mainEnd), /getPendingApprovals|automation_queue|application_logs/);
+  assert.doesNotMatch(dash.slice(mainStart, mainEnd), /getPendingApprovals|loadEmailApplyData|automation_queue|application_logs/);
 
   assert.equal((dash.match(/getPendingApprovals\(\)/g) ?? []).length, 1);
   const urgentEffect = dash.slice(dash.indexOf("const userId = user?.id;"));
-  assert.match(urgentEffect, /from\("automation_queue"\)[\s\S]{0,200}\.eq\("user_id", userId\)/);
-  assert.match(urgentEffect, /from\("application_logs"\)[\s\S]{0,200}\.eq\("user_id", userId\)/);
+  // Data kartu dibaca oleh pemuat yang sama dengan halaman Persetujuan (RLS ke baris milik sendiri), bukan kueri sendiri.
+  assert.match(urgentEffect, /loadEmailApplyData\(history as unknown as ApprovalLike\[\], \{ placementOnly: true \}\)/);
+  assert.doesNotMatch(urgentEffect, /from\("automation_queue"\)|from\("application_logs"\)/);
+  assert.match(urgentEffect, /summarizeUrgentActions\(\{ pendingApprovals, history, data \}\)/);
   assert.match(urgentEffect, /let cancelled = false/);
   assert.match(urgentEffect, /\[userId, reloadKey\]/);
   // Hanya membaca dan tidak berulang.

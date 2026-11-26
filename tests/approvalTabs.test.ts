@@ -190,7 +190,7 @@ test("E2E 26 Nov: hitungan Menunggu dipecah menjadi menunggu keputusan dan belum
     Array.from({ length: 8 }, () => "Kedaluwarsa"),
   );
   // Beranda menghitung persetujuan pending yang belum kedaluwarsa dengan aturan yang sama.
-  const urgent = summarizeUrgentActions({ pendingApprovals: rows.filter((r) => r.status === "pending"), now: NOW });
+  const urgent = summarizeUrgentActions({ pendingApprovals: rows.filter((r) => r.status === "pending"), history: rows.filter((r) => r.status !== "pending"), now: NOW });
   assert.equal(urgent.pendingApprovalsCount, parts.review);
 });
 
@@ -318,7 +318,7 @@ test("splitApprovalTabs: yang belum terkirim tetap di Menunggu, review di atas, 
 
 test("kabel: halaman Persetujuan membagi tab lewat splitApprovalTabs dan memasang kartu agen di tab mana pun", () => {
   const page = read("../src/routes/approvals.tsx");
-  assert.match(page, /import \{ pendingBreakdown, splitApprovalTabs, type ApprovalStage \} from "@\/lib\/approvalTabs"/);
+  assert.match(page, /import \{[^}]*\bpendingBreakdown\b[^}]*\bsplitApprovalTabs\b[^}]*\} from "@\/lib\/approvalTabs"/);
   assert.match(page, /data-testid="pending-breakdown"/);
   assert.match(page, /splitApprovalTabs\(\[\.\.\.pendingApprovals, \.\.\.history\]/);
   assert.match(page, /activeTab === 'pending' \? tabs\.pending : tabs\.history/);

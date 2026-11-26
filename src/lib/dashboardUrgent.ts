@@ -1,60 +1,77 @@
-import { buildAgentApplyRows } from "./agentApplyRows.ts";
 import { isAgentApplyActive } from "./agentApplyStatus.ts";
+import {
+  emptyPlacementData,
+  pendingBreakdown,
+  placementContextFromData,
+  splitApprovalTabs,
+  type PlacementSourceData,
+} from "./approvalTabs.ts";
 import { questionsToAnswer } from "./formQuestions.ts";
 import { awaitingCodeState } from "./securityCode.ts";
-import { liveApprovalIds } from "./approvalExpiry.ts";
 
 export interface UrgentActionsSummary {
+  /** Draf yang menunggu keputusanmu (tahap "Menunggu persetujuan"). */
   pendingApprovalsCount: number;
   awaitingCodeCount: number;
   pendingQuestionsCount: number;
+  /** Kartu Menunggu berlabel "Perlu dicek, kirim belum terkonfirmasi": hasil kirimnya tidak pasti, pengguna harus memutuskan. */
+  unverifiedCount: number;
   total: number;
 }
 
+export const EMPTY_URGENT_SUMMARY: UrgentActionsSummary = {
+  pendingApprovalsCount: 0,
+  awaitingCodeCount: 0,
+  pendingQuestionsCount: 0,
+  unverifiedCount: 0,
+  total: 0,
+};
+
+const asList = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.filter((x): x is Record<string, unknown> => !!x && typeof x === "object" && typeof (x as { id?: unknown }).id === "string")
+    : [];
+
 /**
- * Merangkum tindakan mendesak yang perlu segera ditindaklanjuti pengguna dari Beranda (E2E-06):
- *   1. Persetujuan yang masih berstatus `pending` dan belum kedaluwarsa.
- *   2. Tugas agen yang sedang menunggu kode keamanan email (`awaiting_code` aktif).
- *   3. Percobaan agen/ekstensi yang berhenti dan menunggu jawaban pertanyaan formulir.
+ * Merangkum tindakan mendesak di Beranda (E2E-06) dari kartu yang sama dengan tab Menunggu di halaman Persetujuan.
+ *
+ * Tidak ada aturan sendiri di sini: setiap persetujuan ditempatkan oleh `splitApprovalTabs` dengan konteks dari
+ * `placementContextFromData`, persis seperti halaman Persetujuan. Banner hanya menghitung kartu Menunggu menurut tahapnya,
+ * jadi angkanya tidak bisa berbeda dari kartu yang ditemukan pengguna setelah menekan "Tinjau di Persetujuan":
+ *   1. tahap review: draf yang menunggu keputusan dan belum kedaluwarsa.
+ *   2. tahap needs_action dengan agen menunggu kode keamanan email.
+ *   3. tahap needs_action dengan agen yang berhenti dan menunggu jawaban pertanyaan formulir.
+ *   4. tahap unverified: kirim belum terkonfirmasi, hasilnya tidak pasti (kasus Binance, 26 November 2026).
+ * Persetujuan kedaluwarsa dan yang sudah ditutup ada di Riwayat dan tidak dihitung.
  */
 export function summarizeUrgentActions(input: {
+  /** Persetujuan pending dari backend (GET /api/approvals/pending). */
   pendingApprovals?: unknown;
-  queueRows?: unknown;
-  applyLogs?: unknown;
-  /**
-   * Persetujuan yang sudah diputuskan (Riwayat dari backend, memuat status dan expires_at). Bila ada, kode dan
-   * pertanyaan hanya dihitung untuk persetujuan yang masih berlaku: persetujuan kedaluwarsa ada di tab Riwayat dan
-   * tidak bisa dijawab lagi, jadi tautan banner ke halaman Persetujuan tidak akan menemukannya (audit Gemini 26 November
-   * 2026: banner menghitung 2 pertanyaan yang tidak tampil di tujuan). Tanpa daftar ini, semua dihitung seperti dulu.
-   */
-  approvals?: unknown;
+  /** Riwayat dari backend (GET /api/approvals/history, `APPROVAL_HISTORY_LIMIT` baris). */
+  history?: unknown;
+  /** Hasil `loadEmailApplyData(history, { placementOnly: true })`. Tanpanya, status agen dianggap belum terbaca. */
+  data?: PlacementSourceData;
   now?: number;
 }): UrgentActionsSummary {
   const now = input.now ?? Date.now();
-  const pendingList = Array.isArray(input.pendingApprovals) ? input.pendingApprovals : [];
-  const pendingApprovalsCount = pendingList.filter((item) => {
-    if (!item || typeof item !== "object") return false;
-    const row = item as { status?: unknown; expires_at?: unknown };
-    if (row.status !== undefined && row.status !== "pending") return false;
-    if (typeof row.expires_at === "string") {
-      const exp = Date.parse(row.expires_at);
-      if (Number.isFinite(exp) && exp <= now) return false;
-    }
-    return true;
-  }).length;
-
-  const logs = Array.isArray(input.applyLogs) ? input.applyLogs : [];
-  const extensionLogs = logs.filter(
-    (r) => r && typeof r === "object" && (r as { details?: { channel?: unknown } }).details?.channel === "extension",
+  const data = input.data ?? emptyPlacementData();
+  const tabs = splitApprovalTabs(
+    [...asList(input.pendingApprovals), ...asList(input.history)] as { id: string; status?: string | null; expires_at?: string | null }[],
+    (a) => placementContextFromData(data, a.id),
+    now,
   );
-  const agentRows = buildAgentApplyRows(input.queueRows, logs, extensionLogs);
-
-  const liveIds = Array.isArray(input.approvals) ? liveApprovalIds(input.approvals, now) : null;
 
   let awaitingCodeCount = 0;
   let pendingQuestionsCount = 0;
-  for (const [approvalId, row] of Object.entries(agentRows)) {
-    if (liveIds && !liveIds.has(approvalId)) continue;
+  let unverifiedCount = 0;
+  for (const { item, placement } of tabs.pending) {
+    if (placement.stage === "unverified") {
+      unverifiedCount += 1;
+      continue;
+    }
+    if (placement.stage !== "needs_action") continue;
+    const row = data.agent[item.id];
+    if (!row) continue;
     if (awaitingCodeState(row, now).waiting) {
       awaitingCodeCount += 1;
       continue;
@@ -69,10 +86,12 @@ export function summarizeUrgentActions(input: {
     }
   }
 
+  const pendingApprovalsCount = pendingBreakdown(tabs).review;
   return {
     pendingApprovalsCount,
     awaitingCodeCount,
     pendingQuestionsCount,
-    total: pendingApprovalsCount + awaitingCodeCount + pendingQuestionsCount,
+    unverifiedCount,
+    total: pendingApprovalsCount + awaitingCodeCount + pendingQuestionsCount + unverifiedCount,
   };
 }
