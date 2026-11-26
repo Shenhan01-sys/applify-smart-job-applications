@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { AlertCircle, Brain, Search, Check, Loader2, Sparkles, Radar, Globe } from 'lucide-react'
+import { AlertCircle, Brain, Check, Loader2, Sparkles, Radar, X } from 'lucide-react'
 import { useJobSearch } from '@/hooks/useAutomation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -52,7 +52,10 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
   const [isScanning, setIsScanning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(DEFAULT_PLATFORMS)
+  const [keywordsInput, setKeywordsInput] = useState('')
+  const [locationInput, setLocationInput] = useState('')
   const [stages, setStages] = useState<ScanStage[]>([])
+  const abortRef = useRef<AbortController | null>(null)
   const { results, loading, totalJobs, searchJobs } = useJobSearch()
   // Uji E2E klik 20 November 2026: selama sekitar 60 detik layar hanya menampilkan "Mencari lowongan...".
   // Backend mengembalikan hasil semua situs sekaligus, jadi kemajuan per situs tidak bisa diketahui di tengah jalan.
@@ -96,11 +99,20 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
     )
   }
 
+  const cancelScan = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }
+
   const startScan = async () => {
     if (selectedPlatforms.length === 0) {
       toast.error('Pilih minimal satu situs lowongan dulu.')
       return
     }
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
     setIsScanning(true)
     setProgress(0)
@@ -108,22 +120,31 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
     try {
       // Stage 1: Initialize
-      addStage('Memulai pencarian...', 'info')
-      setProgress(10)
-      await sleep(500)
-
       addStage(`Menghubungi ${selectedPlatforms.length} situs lowongan...`, 'info')
       setProgress(20)
-      await sleep(500)
 
       // Stage 2: Search
       addStage('Mencari lowongan...', 'info')
+      const kw = keywordsInput.trim()
+      const loc = locationInput.trim()
       setWaitingSince(Date.now())
       let searched: Awaited<ReturnType<typeof searchJobs>>
       try {
-        searched = await searchJobs({ platforms: selectedPlatforms })
+        searched = await searchJobs(
+          {
+            platforms: selectedPlatforms,
+            ...(kw ? { keywords: kw } : {}),
+            ...(loc ? { location: loc } : {}),
+          },
+          { signal: controller.signal },
+        )
       } finally {
         setWaitingSince(null)
+      }
+      if (searched.cancelled) {
+        addStage('Pencarian dibatalkan.', 'info')
+        setProgress(0)
+        return
       }
       const { groups: searchResults, total, stats, failed } = searched
 
@@ -151,13 +172,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
 
       // Stage 3: tahap yang benar-benar dikerjakan backend (job-aggregation.service.ts)
       addStage(`Menyaring lokasi dan menghapus duplikat dari ${searchResults.length} sumber...`, 'analysis')
-      setProgress(80)
-      await sleep(600)
-
       addStage('Mengurutkan berdasarkan kecocokan dengan kata kunci dan skill di profilmu...', 'analysis')
-      setProgress(95)
-      await sleep(600)
-
       setProgress(100)
       addStage(`Selesai. ${total} lowongan ditemukan dan diurutkan. Daftar di bawah sudah diperbarui.`, 'success')
       // Panel tidak ditutup otomatis: dulu tertutup satu detik sesudah selesai, sehingga hasilnya hampir tak terbaca.
@@ -166,6 +181,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       addStage('Terjadi kesalahan saat mencari lowongan.', 'error')
       toast.error(describeApiError(error, 'Pencarian lowongan gagal. Coba lagi.'))
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       setIsScanning(false)
     }
   }
@@ -182,18 +198,64 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             Cari lowongan dari JobStreet, Glints, Kalibrr, Dealls, dan papan karier perusahaan sekaligus. Hasil diurutkan menurut kecocokan dengan skill di Profil Saya, jadi isi skill dulu supaya urutannya tepat.
           </p>
         </div>
-        <Button
-          onClick={startScan}
-          disabled={isScanning || selectedPlatforms.length === 0}
-          className="inline-flex items-center justify-center gap-2 min-h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isScanning || loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Radar className="h-4 w-4" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={startScan}
+            disabled={isScanning || selectedPlatforms.length === 0}
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-6 rounded-xl bg-[#0A5BE0] text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isScanning || loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Radar className="h-4 w-4" aria-hidden="true" />
+            )}
+            {isScanning || loading ? 'Mencari lowongan...' : 'Cari Sekarang'}
+          </Button>
+          {isScanning && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cancelScan}
+              data-testid="cancel-scan-btn"
+              className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl text-sm"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Batalkan
+            </Button>
           )}
-          {isScanning || loading ? 'Mencari lowongan...' : 'Cari Sekarang'}
-        </Button>
+        </div>
+      </div>
+
+      {/* Input kata kunci & kota cepat (opsional, melengkapi Pengaturan Agen; 47.3 P3-01) */}
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="scanner-keywords" className="block text-xs font-medium text-muted-foreground mb-1">
+            Kata kunci cepat (opsional)
+          </label>
+          <input
+            id="scanner-keywords"
+            type="text"
+            value={keywordsInput}
+            onChange={(e) => setKeywordsInput(e.target.value)}
+            disabled={isScanning}
+            placeholder="Mis. Frontend Developer, Data Analyst"
+            className="w-full min-h-11 rounded-xl border border-black/15 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]"
+          />
+        </div>
+        <div>
+          <label htmlFor="scanner-location" className="block text-xs font-medium text-muted-foreground mb-1">
+            Kota atau lokasi (opsional)
+          </label>
+          <input
+            id="scanner-location"
+            type="text"
+            value={locationInput}
+            onChange={(e) => setLocationInput(e.target.value)}
+            disabled={isScanning}
+            placeholder="Mis. Jakarta, Bandung, Remote"
+            className="w-full min-h-11 rounded-xl border border-black/15 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]"
+          />
+        </div>
       </div>
 
       {inputMissing && (
@@ -342,8 +404,4 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
       )}
     </div>
   )
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }

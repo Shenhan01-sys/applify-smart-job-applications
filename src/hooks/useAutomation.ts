@@ -67,14 +67,17 @@ export function useJobSearch() {
    * POST /api/automation/search. Respons backend: { jobs, total, results: [{platform, jobs, errors}], stats, ingest }.
    * Hasil dikelompokkan per sumber supaya kartu platform di AIJobScanner bisa menampilkan jumlahnya.
    */
-  const searchJobs = async (params: {
-    keywords?: string
-    location?: string
-    platforms?: string[]
-  }): Promise<{ groups: Array<{ platform: string; jobs: any[] }>; total: number; stats: JobSearchSourceStat[]; failed?: boolean; message?: string; code?: string }> => {
+  const searchJobs = async (
+    params: {
+      keywords?: string
+      location?: string
+      platforms?: string[]
+    },
+    options?: { signal?: AbortSignal },
+  ): Promise<{ groups: Array<{ platform: string; jobs: any[] }>; total: number; stats: JobSearchSourceStat[]; failed?: boolean; cancelled?: boolean; message?: string; code?: string }> => {
     try {
       setLoading(true)
-      const data: any = await automationApi.searchJobs(params)
+      const data: any = await automationApi.searchJobs(params, options)
       const jobs: any[] = Array.isArray(data?.jobs) ? data.jobs : []
       let groups: Array<{ platform: string; jobs: any[] }>
       if (Array.isArray(data?.results) && data.results.every((r: any) => Array.isArray(r?.jobs))) {
@@ -93,7 +96,10 @@ export function useJobSearch() {
       setStats(sourceStats)
       setTotalJobs(total)
       return { groups, total, stats: sourceStats }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError' || options?.signal?.aborted) {
+        return { groups: [], total: 0, stats: [], cancelled: true, message: 'Pencarian dibatalkan oleh pengguna.' }
+      }
       const message = describeApiError(error, 'Gagal mencari lowongan.')
       toast.error(message)
       // failed membedakan "permintaan gagal" dari "pencarian jalan tetapi hasilnya nol". message dan code membiarkan
