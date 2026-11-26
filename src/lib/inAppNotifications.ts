@@ -18,6 +18,23 @@ export interface InAppNotificationsResponse {
   migrationPending?: boolean;
 }
 
+/**
+ * Satu permintaan yang sedang berjalan dipakai bersama pemanggil lain. AppShell memasang lonceng di sidebar desktop
+ * dan di header mobile sekaligus (salah satunya disembunyikan CSS), jadi tanpa ini setiap siklus polling dua kali
+ * ke `/api/notifications/in-app`.
+ */
+export function shareInflight<T>(fn: () => Promise<T>): () => Promise<T> {
+  let inflight: Promise<T> | null = null;
+  return () => {
+    if (!inflight) {
+      inflight = fn().finally(() => {
+        inflight = null;
+      });
+    }
+    return inflight;
+  };
+}
+
 /** Label jumlah belum dibaca untuk lencana lonceng: null bila 0, `99+` bila lebih dari 99. */
 export function formatUnreadBadge(unreadCount: number): string | null {
   if (!Number.isFinite(unreadCount) || unreadCount <= 0) return null;

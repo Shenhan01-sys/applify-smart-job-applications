@@ -8,6 +8,7 @@ import {
   applyReadLocally,
   formatUnreadBadge,
   safeNotificationHref,
+  shareInflight,
   type InAppNotification,
   type InAppNotificationsResponse,
 } from "@/lib/inAppNotifications";
@@ -15,6 +16,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Button } from "@/components/ui/button";
 
 const POLL_INTERVAL_MS = 45_000;
+
+// Lonceng terpasang dua kali di AppShell (sidebar desktop dan header mobile): satu permintaan dipakai bersama.
+const fetchNotificationsShared = shareInflight(() => automationApi.getInAppNotifications(20));
 
 export function InAppNotificationsBell() {
   const { user } = useAuth();
@@ -26,7 +30,7 @@ export function InAppNotificationsBell() {
   const refresh = useCallback(async () => {
     if (!user?.id && !isMockMode()) return;
     try {
-      const res = await automationApi.getInAppNotifications(20);
+      const res = await fetchNotificationsShared();
       setState(res);
     } catch {
       // Best-effort: lonceng tidak boleh mengganggu navigasi bila server sedang tidak terjangkau.
@@ -40,6 +44,8 @@ export function InAppNotificationsBell() {
     }
     void refresh();
     const timer = setInterval(() => {
+      // Tab di latar belakang tidak perlu polling; refresh berjalan lagi saat tab terlihat dan lonceng dibuka.
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       void refresh();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);

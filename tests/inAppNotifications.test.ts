@@ -1,7 +1,39 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { applyReadLocally, formatUnreadBadge, safeNotificationHref } from "../src/lib/inAppNotifications.ts";
+import { applyReadLocally, formatUnreadBadge, safeNotificationHref, shareInflight } from "../src/lib/inAppNotifications.ts";
+
+test("shareInflight: pemanggil serentak berbagi satu permintaan, setelah selesai permintaan baru dibuat", async () => {
+  let calls = 0;
+  let release: (v: number) => void = () => {};
+  const fetcher = shareInflight(
+    () =>
+      new Promise<number>((resolve) => {
+        calls += 1;
+        release = resolve;
+      }),
+  );
+  const a = fetcher();
+  const b = fetcher();
+  assert.equal(calls, 1);
+  release(7);
+  assert.deepEqual(await Promise.all([a, b]), [7, 7]);
+  const c = fetcher();
+  assert.equal(calls, 2);
+  release(8);
+  assert.equal(await c, 8);
+});
+
+test("shareInflight: galat tidak menyangkut, permintaan berikutnya jalan lagi", async () => {
+  let calls = 0;
+  const fetcher = shareInflight(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error("gagal");
+    return "ok";
+  });
+  await assert.rejects(fetcher(), /gagal/);
+  assert.equal(await fetcher(), "ok");
+});
 
 test("formatUnreadBadge: nol null, 1..99 string angka, >99 menjadi 99+", () => {
   assert.equal(formatUnreadBadge(0), null);

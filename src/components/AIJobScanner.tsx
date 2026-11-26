@@ -237,6 +237,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             type="text"
             value={keywordsInput}
             onChange={(e) => setKeywordsInput(e.target.value)}
+            maxLength={120}
             disabled={isScanning}
             placeholder="Mis. Frontend Developer, Data Analyst"
             className="w-full min-h-11 rounded-xl border border-black/15 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]"
@@ -251,6 +252,7 @@ export function AIJobScanner({ onComplete }: { onComplete: () => void }) {
             type="text"
             value={locationInput}
             onChange={(e) => setLocationInput(e.target.value)}
+            maxLength={80}
             disabled={isScanning}
             placeholder="Mis. Jakarta, Bandung, Remote"
             className="w-full min-h-11 rounded-xl border border-black/15 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A5BE0]"
