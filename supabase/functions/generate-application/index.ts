@@ -529,15 +529,22 @@ Return JSON exactly in this shape:
         .eq("user_id", userId).eq("job_id", jobId).neq("status", CLOSED_STATUS)
         .order("created_at", { ascending: false }).limit(10);
       const winner = pickActiveApplication(winners);
-      if (winner) return json({ application: winner, reused: true, analysis: reusedAnalysis(winner), quota });
+      if (winner) {
+        await slot?.release();
+        return json({ application: winner, reused: true, analysis: reusedAnalysis(winner), quota });
+      }
     }
-    if (insErr) return json({ error: "Failed to save draft", detail: insErr.message, analysis: result, quota }, 500);
+    if (insErr) {
+      await slot?.release();
+      return json({ error: "Failed to save draft", detail: insErr.message, analysis: result, quota }, 500);
+    }
 
     // 7b) Consume one monthly application only now that the draft row succeeded, and only when Applify's key wrote it.
     //     A draft written with the user's own key (BYOK) does not use the monthly quota. If quota update fails or was
     //     exhausted concurrently by another job, remove the newly inserted draft so no orphan draft remains.
     if (mode !== "analyze" && keySource === "applify") {
       const { data: q, error: qErr } = await admin.rpc("consume_monthly_apply", { p_user_id: userId });
+      await slot?.release();
       if (qErr) {
         if (app?.id) await admin.from("ai_applications").delete().eq("id", app.id).eq("user_id", userId);
         return json({ error: "Quota update failed", detail: qErr.message }, 500);
@@ -547,6 +554,8 @@ Return JSON exactly in this shape:
         if (app?.id) await admin.from("ai_applications").delete().eq("id", app.id).eq("user_id", userId);
         return json({ error: "Kuota bulanan habis. Upgrade ke Pro untuk lebih banyak lamaran.", quota }, 429);
       }
+    } else {
+      await slot?.release();
     }
 
     return json({ application: app, analysis: result, quota });

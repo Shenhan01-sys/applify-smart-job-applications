@@ -27,6 +27,7 @@ export async function acquireMonthlyInflightSlot(
 ): Promise<MonthlySlotHandle> {
   const now = args.now ?? new Date();
   const reservationId = crypto.randomUUID();
+  let released = false;
 
   // Jalur 1: RPC atomik ber-advisory lock (jika migrasi DRAFT sudah dijalankan)
   if (typeof admin?.rpc === "function") {
@@ -44,7 +45,8 @@ export async function acquireMonthlyInflightSlot(
           allowed,
           effectiveRemaining: Number.isFinite(eff) ? Math.max(0, eff) : 0,
           release: async () => {
-            if (!allowed) return;
+            if (!allowed || released) return;
+            released = true;
             try {
               await admin
                 .from("application_logs")
@@ -95,7 +97,8 @@ export async function acquireMonthlyInflightSlot(
     allowed: true,
     effectiveRemaining: Math.max(0, eff - 1),
     release: async () => {
-      if (!rowId) return;
+      if (!rowId || released) return;
+      released = true;
       try {
         await admin
           .from("application_logs")
