@@ -41,6 +41,11 @@ export interface BackendState {
   applications: Row[];
   /** GET /api/approvals/:id */
   approvalDetail: Record<string, Row>;
+  /**
+   * POST /api/approvals/claim-statuses: status klaim per id persetujuan ({ approvalId, state, channel }). Kosong: tidak ada
+   * klaim. Rute not-sent dan close mengisinya (abandoned, closed), seperti backend sungguhan yang mencatatnya di log.
+   */
+  claims: Record<string, Row>;
   gmail: boolean;
   /** Connected Gmail sender returned by GET /api/oauth/status; never inferred from TEST_USER_EMAIL. */
   gmailEmail?: string | null;
@@ -185,6 +190,7 @@ export class MockBackend {
       answers: [],
       applications: [],
       approvalDetail: {},
+      claims: {},
       gmail: false,
       gmailEmail: null,
       approveExtra: {},
@@ -302,8 +308,13 @@ export class MockBackend {
         return route.fulfill(json(200, s.settings));
       }
     }
-    // v2: halaman Persetujuan menanyakan status klaim kirim untuk banner klaim macet. Tidak ada klaim macet di fixture.
-    if (method === "POST" && path === "/api/approvals/claim-statuses") return route.fulfill(json(200, { claims: {} }));
+    // v2: halaman Persetujuan menanyakan status klaim kirim untuk banner klaim macet. Bawaannya tidak ada klaim.
+    if (method === "POST" && path === "/api/approvals/claim-statuses") {
+      const asked = (body as { approval_ids?: unknown } | undefined)?.approval_ids;
+      const ids = Array.isArray(asked) ? new Set(asked.map(String)) : null;
+      const claims = Object.fromEntries(Object.entries(s.claims).filter(([id]) => !ids || ids.has(id)));
+      return route.fulfill(json(200, { claims }));
+    }
 
     const patchCover = path.match(/^\/api\/approvals\/([^/]+)\/cover-letter$/);
     if (method === "PATCH" && patchCover) {
@@ -342,13 +353,38 @@ export class MockBackend {
       return route.fulfill(json(200, { queued: true, queue_job_id: queueJobId }));
     }
 
-    const action = path.match(/^\/api\/approvals\/([^/]+)\/(approve|reject|rerun|mark-sent)$/);
+    const action = path.match(/^\/api\/approvals\/([^/]+)\/(approve|reject|rerun|mark-sent|not-sent|close)$/);
     if (method === "POST" && action) {
       const id = decodeURIComponent(action[1]);
       const kind = action[2];
       if (kind === "approve" || kind === "reject") this.settle(id, kind, body);
       if (kind === "rerun") return route.fulfill(json(200, { success: true, queue_job_id: `queue-rerun-${id}` }));
-      if (kind === "mark-sent") return route.fulfill(json(200, { success: true }));
+      if (kind === "mark-sent") {
+        // Seperti markApprovalSent di backend: satu log success milik pengguna, bukan konfirmasi sistem.
+        const row = [...s.history, ...s.pending].find((a) => a.id === id);
+        s.logs.push({
+          action: "apply",
+          status: "success",
+          job_id: row?.job_id ?? null,
+          created_at: new Date().toISOString(),
+          details: { approval_request_id: id, manual: true, confirmed_by: "user", reason: "manual_submit" },
+        });
+        return route.fulfill(json(200, { success: true }));
+      }
+      if (kind === "not-sent") {
+        // Seperti reportNotSent: persetujuan lama dilepas (abandoned) dan satu persetujuan baru menunggu keputusan.
+        const old = [...s.history, ...s.pending].find((a) => a.id === id);
+        const newId = `fresh-${id}`;
+        s.claims[id] = { approvalId: id, state: "abandoned", channel: null };
+        if (old && !s.pending.some((a) => a.id === newId)) {
+          s.pending.unshift({ ...old, id: newId, status: "pending", reviewed_at: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 24 * 3600_000).toISOString() });
+        }
+        return route.fulfill(json(200, { success: true, new_approval_id: newId }));
+      }
+      if (kind === "close") {
+        s.claims[id] = { approvalId: id, state: "closed", channel: null };
+        return route.fulfill(json(200, { success: true }));
+      }
       return route.fulfill(json(200, { success: true, id, status: kind === "approve" ? "approved" : "rejected", ...(kind === "approve" ? this.state.approveExtra : {}) }));
     }
 

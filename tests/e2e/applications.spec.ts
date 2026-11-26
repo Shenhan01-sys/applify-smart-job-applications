@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./helpers/test";
 import type { MockBackend } from "./helpers/mockBackend";
-import { applicationRow, approval, awaitingCodeLog, extensionQuestionsLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
+import { applicationRow, approval, approvedApproval, awaitingCodeLog, extensionQuestionsLog, isoAgo, jobRow, questionsLog, stoppedLog } from "./helpers/fixtures";
 
 /**
  * Halaman Lamaran Saya (src/routes/applications.tsx), jendela detail: yang ditawarkan ke pengguna saat agen
@@ -19,6 +19,9 @@ function seed(backend: MockBackend, log: Record<string, any>) {
   backend.state.applications = [applicationRow(APP_ID, JOB_ID, { jobs: jobRow(JOB_ID, { title: "Backend Engineer", company: "PT Contoh", external_url: FORM_URL }) })];
   backend.state.logs = [{ ...log, job_id: JOB_ID }];
   backend.state.approvalDetail[APPROVAL_ID] = approval(APPROVAL_ID, { cover_letter: "Surat yang disetujui untuk PT Contoh." });
+  // Persetujuan yang masih berlaku (disetujui, belum lewat expires_at). Jendela detail hanya menautkan pertanyaan, kode,
+  // dan tombol jalankan ulang ke persetujuan seperti ini; yang sudah kedaluwarsa dibahas di tes "persetujuan kedaluwarsa".
+  backend.state.history = [approvedApproval(APPROVAL_ID, { job_id: JOB_ID, application_id: APP_ID })];
 }
 
 async function openDetail(app: Page) {
@@ -201,6 +204,9 @@ test.describe("Lamaran: berhenti karena alasan lain tidak menawarkan jalan kelua
 
     await expect(dialog.getByRole("link", { name: "Buka Persetujuan" })).toHaveAttribute("href", "/approvals");
     await expect(dialog.getByRole("region", { name: "Kirim sendiri di situs lowongan" })).toHaveCount(0);
+    // Masa berlaku persetujuan di server 24 jam (APPROVAL_TTL_MS); teks tidak boleh lagi menulis "1 jam" (temuan Gemini 26 November 2026).
+    await expect(dialog.getByText(/berlaku 24 jam/)).toBeVisible();
+    await expect(dialog.getByText(/berlaku 1 jam/)).toHaveCount(0);
   });
 
   test("percobaan agen lebih tua daripada lamarannya diabaikan: tidak ada panel kirim sendiri", async ({ app, backend }) => {

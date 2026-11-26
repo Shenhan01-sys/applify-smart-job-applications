@@ -1,6 +1,6 @@
 import { expect, test } from "./helpers/test";
 import { TEST_USER_ID } from "./helpers/constants";
-import { applyLog, approval, awaitingCodeLog, queueRow } from "./helpers/fixtures";
+import { applyLog, approval, approvedApproval, awaitingCodeLog, isoAgo, queueRow } from "./helpers/fixtures";
 
 /**
  * Banner "Tindakan mendesak" di Beranda (src/routes/dashboard.tsx, E2E-06). Kode aplikasi asli; backend dan Supabase
@@ -11,6 +11,8 @@ import { applyLog, approval, awaitingCodeLog, queueRow } from "./helpers/fixture
 test.describe("Beranda: banner Tindakan mendesak", () => {
   test("persetujuan pending, kode keamanan, dan pertanyaan agen dihitung dan mengarah ke Persetujuan", async ({ app, backend }) => {
     backend.state.pending = [approval("apr-1"), approval("apr-2")];
+    // Kode dan pertanyaan agen hanya dihitung untuk persetujuan yang masih berlaku (disetujui dan belum kedaluwarsa).
+    backend.state.history = [approvedApproval("apr-otp"), approvedApproval("apr-ask")];
     backend.state.queue = [
       queueRow("queue-otp", "apr-otp", "processing"),
       queueRow("queue-ask", "apr-ask", "completed"),
@@ -35,6 +37,23 @@ test.describe("Beranda: banner Tindakan mendesak", () => {
     // Mode dev memakai StrictMode (efek dijalankan dua kali), jadi yang dicek tabelnya, bukan jumlah bacaannya.
     expect([...new Set(reads.map((r) => r.path.split("/").pop()))].sort()).toEqual(["application_logs", "automation_queue"]);
     for (const read of reads) expect(read.search).toContain(`user_id=eq.${TEST_USER_ID}`);
+  });
+
+  test("pertanyaan dan kode dari persetujuan kedaluwarsa tidak dihitung: banner tidak menautkan ke kartu yang tidak ada di Menunggu", async ({ app, backend }) => {
+    // Temuan Gemini 26 November 2026: banner menghitung pertanyaan agen, tetapi /approvals tidak menampilkannya karena
+    // persetujuannya sudah kedaluwarsa dan kartunya ada di Riwayat. Hanya persetujuan yang masih berlaku yang dihitung.
+    backend.state.history = [approvedApproval("apr-old-otp", { expires_at: isoAgo(2 * 3600_000) }), approvedApproval("apr-old-ask", { expires_at: isoAgo(2 * 3600_000) })];
+    backend.state.queue = [queueRow("queue-otp", "apr-old-otp", "processing"), queueRow("queue-ask", "apr-old-ask", "completed")];
+    backend.state.logs = [
+      awaitingCodeLog("queue-otp", "apr-old-otp"),
+      applyLog("queue-ask", "apr-old-ask", "ready", {
+        questions: [{ key: "gaji", label: "Ekspektasi gaji?", type: "text", required: true }],
+      }),
+    ];
+
+    await app.goto("/dashboard");
+    await expect(app.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect(app.getByTestId("dashboard-urgent-actions")).toHaveCount(0);
   });
 
   test("tanpa tindakan mendesak banner tidak muncul", async ({ app, backend }) => {
