@@ -91,7 +91,7 @@ export function InAppNotificationsBell() {
         {badge && (
           <span
             data-testid="in-app-notifications-badge"
-            className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white"
+            className="absolute -right-1 -top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold leading-none text-white"
           >
             {badge}
           </span>

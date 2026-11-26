@@ -490,7 +490,6 @@ Return JSON exactly in this shape:
       optimizedCV: { summary: parsed.aiNotes ?? "", highlighted_skills: tailoredSkills },
       tailoredSkills,
       aiNotes,
-      salvaged: Boolean(parsed.salvaged),
       matchScore: clamp(parsed.matchScore ?? job.match_score),
       acceptancePotential: clamp(parsed.acceptancePotential ?? job.acceptance_potential),
       skillGaps: parsed.skillGaps ?? [],
@@ -499,6 +498,7 @@ Return JSON exactly in this shape:
       modelUsed,
       tier,
       keySource,
+      salvaged: Boolean(parsed.salvaged),
     };
 
     if (mode === "analyze") return json({ analysis: result, quota });
