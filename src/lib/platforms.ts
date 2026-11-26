@@ -13,6 +13,9 @@ const PLATFORM_LABELS: Record<string, string> = {
   dealls: "Dealls",
   kitalulus: "KitaLulus",
   indeed: "Indeed",
+  off_portal_link: "Tautan Pribadi",
+  off_portal_poster: "Poster Pribadi",
+  off_portal_caption: "Caption Pribadi",
 };
 
 export function platformLabel(source?: string | null): string {

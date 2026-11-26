@@ -66,6 +66,11 @@ export interface BackendState {
   storage: string[];
   /** Jawaban POST /api/profile/import/linkedin-pdf. null = tidak ditiru (tercatat sebagai panggilan yang tidak ditiru). */
   importPreview: Row | null;
+  /** Jawaban POST /api/jobs/off-portal/parse dan /save untuk tes E2E impor off-portal. */
+  offPortalParse: Row | null;
+  offPortalSave: Row | null;
+  /** saved_jobs */
+  savedJobs: Row[];
 }
 
 export interface Override {
@@ -87,13 +92,57 @@ function columnValue(row: Row, key: string): unknown {
   return value && typeof value === "object" ? value[path] : undefined;
 }
 
-const isSupportedOperator = (expr: string): boolean => expr.startsWith("eq.") || (expr.startsWith("in.(") && expr.endsWith(")"));
+const isSupportedOperator = (key: string, expr: string): boolean => {
+  if (key === "or") return expr.startsWith("(") && expr.endsWith(")");
+  return expr.startsWith("eq.") || (expr.startsWith("in.(") && expr.endsWith(")"));
+};
+
+function splitTopLevelCommas(inner: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    else if (ch === "," && depth === 0) {
+      parts.push(inner.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(inner.slice(start));
+  return parts;
+}
+
+function matchesOrClause(row: Row, clause: string): boolean {
+  const firstDot = clause.indexOf(".");
+  if (firstDot <= 0) return false;
+  const col = clause.slice(0, firstDot);
+  const rest = clause.slice(firstDot + 1);
+  const actual = columnValue(row, col);
+  if (rest === "is.null") return actual === null || actual === undefined;
+  if (rest === "not.is.null") return actual !== null && actual !== undefined;
+  if (rest.startsWith("gte.")) return actual !== null && actual !== undefined && String(actual) >= rest.slice(4);
+  if (rest.startsWith("eq.")) return String(actual) === rest.slice(3);
+  if (rest.startsWith("in.(") && rest.endsWith(")")) {
+    const list = rest
+      .slice(4, -1)
+      .split(",")
+      .map((s) => s.replace(/^"|"$/g, ""));
+    return list.includes(String(actual));
+  }
+  throw new Error(`Operator PostgREST belum ditiru: or=${clause}`);
+}
 
 /**
- * Hanya operator yang dipakai aplikasi: eq dan in. Operator lain dianggap kontrak berubah dan dilempar,
+ * Hanya operator yang dipakai aplikasi: eq, in, dan or. Operator lain dianggap kontrak berubah dan dilempar,
  * juga saat tabelnya kosong (diperiksa lebih dulu di selectRows, tanpa menunggu ada baris yang dicocokkan).
  */
 function matchesFilter(row: Row, key: string, expr: string): boolean {
+  if (key === "or" && expr.startsWith("(") && expr.endsWith(")")) {
+    const clauses = splitTopLevelCommas(expr.slice(1, -1));
+    return clauses.some((c) => matchesOrClause(row, c));
+  }
   const actual = columnValue(row, key);
   if (expr.startsWith("eq.")) return String(actual) === expr.slice(3);
   if (expr.startsWith("in.(") && expr.endsWith(")")) {
@@ -159,6 +208,9 @@ export class MockBackend {
       projects: [],
       storage: [],
       importPreview: null,
+      offPortalParse: null,
+      offPortalSave: null,
+      savedJobs: [],
       ...initial,
     };
   }
@@ -269,6 +321,14 @@ export class MockBackend {
     // Impor profil dari PDF: hanya mengembalikan pratinjau, seperti backend sungguhan (tidak menulis apa pun).
     if (method === "POST" && path === "/api/profile/import/linkedin-pdf" && s.importPreview) {
       return route.fulfill(json(200, { success: true, preview: s.importPreview }));
+    }
+
+    // Impor lowongan off-portal (Gelombang 3): pratinjau & simpan privat aman-migrasi.
+    if (method === "POST" && path === "/api/jobs/off-portal/parse" && s.offPortalParse) {
+      return route.fulfill(json(200, s.offPortalParse));
+    }
+    if (method === "POST" && path === "/api/jobs/off-portal/save" && s.offPortalSave) {
+      return route.fulfill(json(200, s.offPortalSave));
     }
 
     this.unmocked.push(`API ${method} ${path}`);
@@ -425,6 +485,7 @@ export class MockBackend {
       automation_queue: s.queue,
       application_logs: s.logs,
       jobs: s.jobs,
+      saved_jobs: s.savedJobs,
       profiles: s.profiles,
       user_form_answers: s.answers,
       ai_applications: s.applications,
@@ -447,7 +508,7 @@ export class MockBackend {
     let out: Row[];
     try {
       for (const [key, expr] of url.searchParams.entries()) {
-        if (!NON_FILTER_PARAMS.has(key) && !isSupportedOperator(expr)) throw new Error(`Operator PostgREST belum ditiru: ${key}=${expr}`);
+        if (!NON_FILTER_PARAMS.has(key) && !isSupportedOperator(key, expr)) throw new Error(`Operator PostgREST belum ditiru: ${key}=${expr}`);
       }
       out = rows.filter((row) => {
         for (const [key, expr] of url.searchParams.entries()) {

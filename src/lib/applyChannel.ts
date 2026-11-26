@@ -152,6 +152,22 @@ export function isExtensionUrl(rawUrl: unknown): boolean {
   return hostMatchesDomain(new URL(safe).hostname, EXTENSION_HOST_DOMAINS);
 }
 
+const WHATSAPP_HOSTS = ["wa.me", "api.whatsapp.com", "chat.whatsapp.com"] as const;
+
+export function isWhatsAppUrl(rawUrl: unknown): boolean {
+  const safe = sanitizeHttpUrl(rawUrl);
+  if (!safe) return false;
+  return hostMatchesDomain(new URL(safe).hostname, WHATSAPP_HOSTS);
+}
+
+export function isGoogleFormUrl(rawUrl: unknown): boolean {
+  const safe = sanitizeHttpUrl(rawUrl);
+  if (!safe) return false;
+  const u = new URL(safe);
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  return host === "forms.gle" || (host === "docs.google.com" && u.pathname.includes("/forms/"));
+}
+
 export function extractPublicAtsUrl(description: string): string | null {
   if (!description) return null;
   const matches = description.match(/https?:\/\/[^\s<>"'\])}`]+/gi) ?? [];
@@ -293,7 +309,43 @@ export function classifyJobChannel(job: JobChannelInput): ChannelClassification 
     };
   }
 
+  if (isWhatsAppUrl(primaryUrl)) {
+    return {
+      channel: "external_web",
+      platform: "whatsapp",
+      applyUrl: primaryUrl,
+      resolvedApplyUrl: null,
+      applyEmail: null,
+      autoWorkerSupported: false,
+      emailApplySupported: false,
+      extensionSupported: false,
+      manualOnly: true,
+      badgeLabel: "WhatsApp Manual",
+      badgeTone: "manual",
+      reason: "Lamaran lewat WhatsApp dikirim manual langsung oleh kamu setelah menyiapkan draf di Applify.",
+    };
+  }
+
   const externalViaExtension = isExtensionUrl(primaryUrl);
+  if (isGoogleFormUrl(primaryUrl)) {
+    return {
+      channel: "external_web",
+      platform: platform || "google-forms",
+      applyUrl: primaryUrl,
+      resolvedApplyUrl: null,
+      applyEmail: null,
+      autoWorkerSupported: false,
+      emailApplySupported: false,
+      extensionSupported: externalViaExtension,
+      manualOnly: false,
+      badgeLabel: externalViaExtension ? "Google Form · Ekstensi" : "Google Form · Manual",
+      badgeTone: externalViaExtension ? "extension" : "manual",
+      reason: externalViaExtension
+        ? "Formulir Google Form didukung Ekstensi Browser khusus laptop (Chrome atau Edge) dan berhenti sebelum kirim."
+        : "Formulir Google Form. Siapkan draf surat dan jawaban di Applify lalu buka formulir untuk mengirimnya.",
+    };
+  }
+
   return {
     channel: "external_web",
     platform: platform || primaryHost || "web",

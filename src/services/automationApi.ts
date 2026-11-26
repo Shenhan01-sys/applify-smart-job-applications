@@ -28,6 +28,12 @@ import {
 } from '@/lib/llmKeys'
 import { mockDeleteKey, mockLlmKeysResponse, mockSaveKey, mockTestKey } from '@/mocks/llmKeysMock'
 import { consentRequestBody } from '@/lib/extensionConsent'
+import type {
+  OffPortalParseResponse,
+  OffPortalSourceType,
+  ParsedOffPortalJob,
+  SaveOffPortalResponse,
+} from '@/lib/offPortal'
 
 // Kunci API sendiri (BYOK) di mode demo: hanya 4 karakter terakhir yang diingat, selama halaman terbuka.
 let mockLlmKeyRows: LlmKeyRow[] = []
@@ -731,5 +737,102 @@ export const automationApi = {
       },
     )
     return parseDeleteResponse(body)
+  },
+
+  /** Pratinjau parsing lowongan off-portal (caption, link, dan/atau gambar poster + QR) tanpa menulis ke DB. */
+  async parseOffPortal(payload: {
+    rawText?: string
+    sourceUrl?: string
+    sourceType?: OffPortalSourceType
+    qrUrls?: string[]
+    imageBase64?: string
+    companyHint?: string
+    locationHint?: string
+  }): Promise<OffPortalParseResponse> {
+    return apiFetch<OffPortalParseResponse>(
+      `${apiBase()}/api/jobs/off-portal/parse`,
+      {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify(payload),
+      },
+      () => ({
+        sourceGroupId: '00000000-0000-4000-8000-000000000001',
+        sourceType: payload.imageBase64 ? 'off_portal_poster' : payload.rawText ? 'off_portal_caption' : 'off_portal_link',
+        acceptedUrls: payload.sourceUrl ? [payload.sourceUrl] : [],
+        rejectedUrls: [],
+        jobs: [
+          {
+            title: 'Frontend Engineer (Pratinjau Demo)',
+            company: payload.companyHint || 'Perusahaan Contoh',
+            location: payload.locationHint || 'Indonesia',
+            description: payload.rawText || 'Lowongan contoh mode demo.',
+            sourceType: payload.imageBase64 ? 'off_portal_poster' : 'off_portal_caption',
+            sourceGroupId: '00000000-0000-4000-8000-000000000001',
+            publicationFingerprint: '0'.repeat(64),
+            applyUrl: payload.sourceUrl || null,
+            applyEmail: null,
+            whatsappUrl: null,
+            formProvider: null,
+            channel: {
+              channel: 'external_web',
+              platform: 'off_portal_caption',
+              applyUrl: payload.sourceUrl || null,
+              applyEmail: null,
+              autoWorkerSupported: false,
+              emailApplySupported: false,
+              extensionSupported: false,
+              manualOnly: false,
+              reason: 'Pratinjau mode demo.',
+            },
+            safety: { riskLevel: 'low', flags: [], freshness: { status: 'fresh', ageDays: 0, label: null } },
+          },
+        ],
+        warnings: [],
+      }),
+      400,
+    )
+  },
+
+  /** Simpan 1..N kandidat lowongan off-portal sebagai lowongan pribadi milik pengguna (aman terhadap status migrasi DB). */
+  async saveOffPortalJobs(jobs: Array<Pick<
+    ParsedOffPortalJob,
+    'title' | 'company' | 'location' | 'description' | 'sourceType' | 'sourceGroupId' | 'publicationFingerprint' | 'applyUrl' | 'applyEmail' | 'whatsappUrl'
+  >>): Promise<SaveOffPortalResponse> {
+    return apiFetch<SaveOffPortalResponse>(
+      `${apiBase()}/api/jobs/off-portal/save`,
+      {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ jobs }),
+      },
+      () => ({
+        saved: true,
+        migrationRequired: false,
+        message: `${jobs.length} lowongan pribadi contoh disimpan (mode demo).`,
+        insertedCount: jobs.length,
+        duplicateCount: 0,
+        jobs: jobs.map((j, idx) => ({
+          id: `mock-offportal-${idx + 1}`,
+          title: j.title,
+          company: j.company,
+          location: j.location,
+          type: 'full-time',
+          workplace_type: null,
+          description: j.description,
+          platform_source: j.sourceType,
+          external_url: j.applyUrl ?? j.whatsappUrl ?? null,
+          status: 'active',
+          posted_at: new Date().toISOString(),
+          created_by: 'mock-user',
+          visibility: 'private',
+          source_type: j.sourceType,
+          source_group_id: j.sourceGroupId,
+          publication_fingerprint: j.publicationFingerprint,
+          alreadySaved: false,
+        })),
+      }),
+      400,
+    )
   },
 }

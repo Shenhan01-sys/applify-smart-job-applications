@@ -44,15 +44,30 @@ export function isTestSource(source: unknown): boolean {
   return /^(e2e|httpbin)/.test(source.trim().toLowerCase());
 }
 
+/** True untuk sumber lowongan pribadi off-portal (tautan, poster, atau caption). */
+export function isOffPortalSource(source: unknown): boolean {
+  if (typeof source !== "string") return false;
+  const s = source.trim().toLowerCase();
+  return s === "off_portal_link" || s === "off_portal_poster" || s === "off_portal_caption";
+}
+
 export interface JobFilterFields {
   status?: unknown;
   external_url?: unknown;
   platform_source?: unknown;
+  description?: unknown;
 }
 
-/** An active job with a real posting address that no test wrote. */
+const OFF_PORTAL_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
+
+/** An active job with a real posting address (or private off-portal job with HR email) that no test wrote. */
 export function isVisibleJob(job: JobFilterFields): boolean {
-  return job.status === "active" && isRealJobUrl(job.external_url) && !isTestSource(job.platform_source);
+  if (job.status !== "active" || isTestSource(job.platform_source)) return false;
+  if (isRealJobUrl(job.external_url)) return true;
+  if (isOffPortalSource(job.platform_source) && typeof job.description === "string" && OFF_PORTAL_EMAIL_RE.test(job.description)) {
+    return true;
+  }
+  return false;
 }
 
 export function visibleJobs<T extends JobFilterFields>(jobs: readonly T[]): T[] {
