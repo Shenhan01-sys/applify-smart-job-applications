@@ -174,13 +174,15 @@ function WaitinglistPage() {
           className="glass rounded-3xl p-6 md:p-8 space-y-5"
         >
           <div className="sr-only" aria-hidden="true">
-            <label htmlFor="wl-website">Situs web</label>
+            <label htmlFor="wl-hp-confirm">Jangan isi kolom ini</label>
             <input
-              id="wl-website"
+              id="wl-hp-confirm"
               type="text"
-              name="website"
+              name="applify_hp_confirm"
               tabIndex={-1}
-              autoComplete="off"
+              autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
               value={honeypot}
               onChange={(e) => setHoneypot(e.target.value)}
             />
