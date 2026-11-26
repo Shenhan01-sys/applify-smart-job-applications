@@ -18,6 +18,30 @@ test("47.6 FE-18: safeRedirectPath hanya menerima rute internal yang aman", () =
   assert.equal(safeRedirectPath(null), undefined);
 });
 
+test("47.6 FE-18: safeRedirectPath menolak path yang menjadi //host setelah dot-segment dibuang peramban", () => {
+  for (const evil of [
+    "/./\\evil.com",
+    "/a/..//evil.com",
+    "/.//evil.com",
+    "/%2e/\\evil.com",
+    "/%2F/evil.com",
+    "/./login",
+    "/a/../auth/callback",
+    "/%6Cogin",
+    "/bagus\\evil.com",
+  ]) {
+    assert.equal(safeRedirectPath(evil), undefined, `harus ditolak: ${evil}`);
+  }
+  // Setiap hasil yang diterima tetap satu origin dan tidak diawali //.
+  for (const ok of ["/jobs/abc?x=1#y", "/applications?status=submitted", "/profile?welcome=1", "/jobs?q=a//b", "/a/../jobs"]) {
+    const accepted = safeRedirectPath(ok);
+    assert.equal(accepted, ok, `harus diterima: ${ok}`);
+    const u = new URL(accepted as string, "https://applify.local");
+    assert.equal(u.origin, "https://applify.local");
+    assert.ok(!u.pathname.startsWith("//"));
+  }
+});
+
 test("47.6 FE-18: loginSearchWithRedirect mempertahankan path dan query rute terlindungi", () => {
   assert.deepEqual(loginSearchWithRedirect({ href: "/jobs?cari=react" }), { redirect: "/jobs?cari=react" });
   assert.deepEqual(loginSearchWithRedirect({ pathname: "/approvals", searchStr: "" }), { redirect: "/approvals" });
