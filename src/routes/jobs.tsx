@@ -33,10 +33,12 @@ import {
 import {
   HIGH_MATCH_THRESHOLD,
   computeMatch,
+  computeJobOrderScore,
   hasUsableSkills,
   profileSkillList,
   sortByMatch,
   type JobMatch,
+  type ProfileRankContext,
 } from "@/lib/matchScore";
 import { profileService } from "@/services/profileService";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -92,6 +94,7 @@ function JobsPage() {
   const [loadError, setLoadError] = useState("");
   // Skill profil untuk skor kecocokan per pengguna. null = belum dimuat atau gagal (lihat skillsError).
   const [profileSkills, setProfileSkills] = useState<string[] | null>(null);
+  const [profileRankCtx, setProfileRankCtx] = useState<ProfileRankContext>({});
   const [skillsError, setSkillsError] = useState("");
   // Id lowongan yang detail lengkapnya sudah diminta ke server (satu kali per lowongan), dan skor lama yang menahan urutan.
   const detailAttempts = useRef(new Set<string>());
@@ -132,6 +135,18 @@ function JobsPage() {
         userId = user.id;
       }
       setProfileSkills(profileSkillList(await profileService.getSkillSource(userId)));
+      if (!isMockMode()) {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("current_title, location")
+            .eq("id", userId)
+            .maybeSingle();
+          if (data) setProfileRankCtx({ currentTitle: data.current_title ?? null, location: data.location ?? null });
+        } catch {
+          // Abaikan bila metadata profil opsional untuk ranking gagal dimuat
+        }
+      }
     } catch (err) {
       console.error("Error loading profile skills:", err);
       setProfileSkills(null);
@@ -280,9 +295,12 @@ function JobsPage() {
 
     return matchesSearch && matchesFilter;
   });
-  // Skor tertinggi lebih dulu; yang tanpa skor di akhir, urutan sisanya tetap (terbaru lebih dulu).
-  const orderScoreOf = (job: JobData): number | null =>
-    heldScores.has(job.id) ? (heldScores.get(job.id) as number | null) : scoreOf(job);
+  // Urutan kartu menggabungkan skor skill jujur dengan sinyal judul, lokasi, dan kebaruan (47.3 P1-04);
+  // lencana persen di kartu tetap menampilkan rasio irisan skill murni dari computeMatch.
+  const orderScoreOf = (job: JobData): number | null => {
+    const base = heldScores.has(job.id) ? (heldScores.get(job.id) as number | null) : scoreOf(job);
+    return computeJobOrderScore(job, base, profileRankCtx);
+  };
   const shownJobs = sortByMatch(filteredJobs, orderScoreOf);
   const hasPortalJobs = useMemo(
     () => shownJobs.some((job) => needsBrowserExtension(classifyJobChannel(job))),

@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { describeAuthError } from "@/lib/authErrors";
+import { hasRecoveryUrlParams } from "@/lib/resetPasswordGuard";
 import { Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
@@ -22,10 +23,23 @@ function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    const urlHasRecovery =
+      typeof window !== "undefined" &&
+      hasRecoveryUrlParams({ search: window.location.search, hash: window.location.hash });
+    let recoveryConfirmed = urlHasRecovery;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) setState("ready");
+      if (event === "PASSWORD_RECOVERY") {
+        recoveryConfirmed = true;
+        setState("ready");
+      } else if (urlHasRecovery && session) {
+        setState("ready");
+      }
     });
     const timer = setTimeout(async () => {
+      if (!recoveryConfirmed) {
+        setState("invalid");
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       setState(session ? "ready" : "invalid");
     }, 1200);

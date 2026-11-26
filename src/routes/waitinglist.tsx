@@ -50,6 +50,8 @@ function WaitinglistPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<0 | 1>(0);
+  // Honeypot anti-bot & jeda kirim lokal (47.6 FE-10)
+  const [honeypot, setHoneypot] = useState("");
 
   const update = (k: keyof FormState, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -73,6 +75,17 @@ function WaitinglistPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (honeypot.trim()) {
+      setError("Permintaan tidak dapat diproses.");
+      return;
+    }
+    try {
+      const lastSent = Number(localStorage.getItem("applify:waitinglist-last-submit") || "0");
+      if (Number.isFinite(lastSent) && lastSent > 0 && Date.now() - lastSent < 60_000) {
+        setError("Tunggu sekitar satu menit sebelum mengirim ulang formulir akses awal.");
+        return;
+      }
+    } catch {}
     if (!form.work_status) { setError("Pilih status kerja saat ini."); return; }
     if (!form.job_goal.trim()) { setError("Pekerjaan yang kamu incar wajib diisi."); return; }
     if (!form.location_goal.trim()) { setError("Lokasi kerja yang kamu inginkan wajib diisi."); return; }
@@ -80,13 +93,13 @@ function WaitinglistPage() {
     setSubmitting(true);
 
     const payload = {
-      full_name: form.full_name.trim(),
-      university: form.university.trim(),
+      full_name: form.full_name.trim().slice(0, 120),
+      university: form.university.trim().slice(0, 160),
       age: parseInt(form.age, 10),
-      major: form.major.trim(),
+      major: form.major.trim().slice(0, 120),
       work_status: form.work_status,
-      job_goal: form.job_goal.trim(),
-      location_goal: form.location_goal.trim(),
+      job_goal: form.job_goal.trim().slice(0, 200),
+      location_goal: form.location_goal.trim().slice(0, 120),
       email: user?.email ?? null,
       user_id: user?.id ?? null,
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
@@ -102,7 +115,10 @@ function WaitinglistPage() {
       return;
     }
 
-    try { localStorage.setItem("applify:waitinglist-joined", "1"); } catch {}
+    try {
+      localStorage.setItem("applify:waitinglist-joined", "1");
+      localStorage.setItem("applify:waitinglist-last-submit", String(Date.now()));
+    } catch {}
     toast.success("Terima kasih, kamu sudah terdaftar.");
     navigate({ to: "/login" });
   };
@@ -157,6 +173,18 @@ function WaitinglistPage() {
           onSubmit={step === 0 ? onNext : onSubmit}
           className="glass rounded-3xl p-6 md:p-8 space-y-5"
         >
+          <div className="sr-only" aria-hidden="true">
+            <label htmlFor="wl-website">Situs web</label>
+            <input
+              id="wl-website"
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
           {error && (
             <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#C0341A]/30 bg-[#C0341A]/[6%] p-3 text-sm text-[#C0341A]">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />

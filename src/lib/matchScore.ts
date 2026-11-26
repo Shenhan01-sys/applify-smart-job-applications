@@ -459,6 +459,76 @@ export function sortByMatch<T>(jobs: readonly T[], scoreOf: (job: T) => number |
     .map((x) => x.job);
 }
 
+export interface ProfileRankContext {
+  currentTitle?: string | null;
+  location?: string | null;
+  nowMs?: number;
+}
+
+const RANK_DAY_MS = 24 * 60 * 60 * 1000;
+
+function titleOverlapScore(jobTitle: string | null | undefined, profileTitle: string | null | undefined): number | null {
+  const jt = normalize(String(jobTitle ?? ""));
+  const pt = normalize(String(profileTitle ?? ""));
+  if (!jt || !pt) return null;
+  const tokens = pt.split(" ").filter((t) => t.length >= 2);
+  if (tokens.length === 0) return null;
+  const hits = tokens.filter((t) => containsTerm(jt, t)).length;
+  return Math.round((hits / tokens.length) * 100);
+}
+
+function locationFitScore(
+  jobLocation: string | null | undefined,
+  workplaceType: string | null | undefined,
+  profileLocation: string | null | undefined,
+): number | null {
+  const pl = normalize(String(profileLocation ?? ""));
+  const jl = normalize(String(jobLocation ?? ""));
+  const wt = normalize(String(workplaceType ?? ""));
+  if (!pl || (!jl && !wt)) return null;
+  if (wt === "remote" || /\bremote\b/.test(jl)) return 90;
+  const cityTokens = pl.split(" ").filter((t) => t.length >= 3 && t !== "indonesia");
+  if (cityTokens.length === 0) return null;
+  if (cityTokens.some((t) => containsTerm(jl, t))) return 100;
+  return 25;
+}
+
+function freshnessFitScore(postedAt: string | null | undefined, nowMs: number): number | null {
+  const parsed = Date.parse(String(postedAt ?? ""));
+  if (Number.isNaN(parsed)) return null;
+  const ageDays = Math.max(0, (nowMs - parsed) / RANK_DAY_MS);
+  if (ageDays <= 3) return 100;
+  if (ageDays <= 7) return 80;
+  if (ageDays <= 14) return 60;
+  if (ageDays <= 30) return 35;
+  return 15;
+}
+
+/**
+ * Skor urutan komposit ala `rankJobC1` untuk daftar `/jobs` (47.3 P1-04):
+ * menggabungkan skor skill jujur (`matchScore`, bobot 0.65) dengan kecocokan judul peran (0.15), lokasi/remote (0.10),
+ * dan kebaruan `posted_at` (0.10) dengan redistribusi proporsional. Mengembalikan `null` bila `matchScore` null
+ * agar lowongan tanpa dasar skill tetap tampil di belakang (lencana persen di kartu tetap murni dari `computeMatch`).
+ */
+export function computeJobOrderScore(
+  job: { title?: string | null; location?: string | null; workplace_type?: string | null; posted_at?: string | null },
+  matchScore: number | null,
+  ctx?: ProfileRankContext | null,
+): number | null {
+  if (matchScore === null) return null;
+  const nowMs = ctx?.nowMs ?? Date.now();
+  const parts: Array<{ w: number; s: number }> = [{ w: 0.65, s: matchScore }];
+  const titleS = titleOverlapScore(job.title, ctx?.currentTitle);
+  if (titleS !== null) parts.push({ w: 0.15, s: titleS });
+  const locS = locationFitScore(job.location, job.workplace_type, ctx?.location);
+  if (locS !== null) parts.push({ w: 0.1, s: locS });
+  const freshS = freshnessFitScore(job.posted_at, nowMs);
+  if (freshS !== null) parts.push({ w: 0.1, s: freshS });
+  const totalW = parts.reduce((acc, p) => acc + p.w, 0);
+  const weighted = parts.reduce((acc, p) => acc + p.s * p.w, 0) / totalW;
+  return Math.round(weighted * 10) / 10;
+}
+
 /**
  * Skill profil (ejaan profil) yang ditunjuk `term`: sama dengan, atau memuat sebagai kata utuh, sebuah skill profil
  * (dan sebaliknya). Aturan yang sama dengan Edge Function generate-application (selectTailoredSkills): "java"

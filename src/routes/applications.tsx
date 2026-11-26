@@ -30,6 +30,7 @@ import {
   showFollowUpDoneBadge,
 } from "@/lib/followUp";
 import { isManualSent, manualSubmitState } from "@/lib/manualSubmit";
+import { applyOutcomePreset, extractOutcomeTag, filterApplications, OUTCOME_PRESETS, type OutcomePreset } from "@/lib/applicationFilters";
 import { describeApprovalError, getPendingApprovalFor, requestApprovalForDraft } from "@/services/approvalService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -128,48 +129,65 @@ function DraggableKanbanCard({ app, gaps, fillYourself, duplicate, onOpen }: { a
   const job = jobOf(app);
   const followUp = followUpBadge(app);
 
+  const outcome = extractOutcomeTag(app.company_response);
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group cursor-grab active:cursor-grabbing">
+    <div ref={setNodeRef} style={style} className="group">
       <div className="rounded-xl bg-[#F5F5F5] border-2 border-[#E0E0E0] p-3 hover:border-[#0A5BE0] hover:shadow-md transition relative">
-        <div aria-hidden="true" className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
-          <GripVertical className="h-3 w-3" />
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none">
+          <div aria-hidden="true" className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0A5BE0]/10 text-[#0A5BE0] grid place-items-center opacity-0 group-hover:opacity-100 transition">
+            <GripVertical className="h-3 w-3" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
+            <p className="text-sm font-semibold truncate">{jobDisplay(job).title}</p>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 truncate">{jobDisplay(job).company}</p>
+          <DuplicateNote info={duplicate} className="mt-1 leading-snug" />
+          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            {applicationSentNote(app)}
+          </div>
+          {outcome && (
+            <div className="mt-2">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                outcome === "Tawaran"
+                  ? "bg-green-100 text-green-800"
+                  : outcome === "Wawancara"
+                    ? "bg-[#EEF2FF] text-[#3730A3]"
+                    : "bg-red-100 text-red-800"
+              }`}>
+                {outcome}
+              </span>
+            </div>
+          )}
+          {app.status === "ready" && gaps && (
+            <div className="mt-2">
+              <FormGapBadge gaps={gaps} />
+            </div>
+          )}
+          {fillYourself && (
+            <div className="mt-2">
+              <FillYourselfBadge />
+            </div>
+          )}
+          {followUp && (
+            <div
+              className={`mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 ${
+                followUp.kind === "due" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#EEF2FF] text-[#3730A3]"
+              }`}
+            >
+              {followUp.kind === "due" ? <AlertCircle className="h-3 w-3" aria-hidden="true" /> : <Clock className="h-3 w-3" aria-hidden="true" />}
+              {followUp.label}
+            </div>
+          )}
+          {showFollowUpDoneBadge(app) && (
+            <div className="mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 bg-green-100 text-green-800">
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              {FOLLOW_UP_DONE_LABEL}
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-[#0A5BE0]" aria-hidden="true" />
-          <p className="text-sm font-semibold truncate">{jobDisplay(job).title}</p>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1 truncate">{jobDisplay(job).company}</p>
-        <DuplicateNote info={duplicate} className="mt-1 leading-snug" />
-        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {applicationSentNote(app)}
-        </div>
-        {app.status === "ready" && gaps && (
-          <div className="mt-2">
-            <FormGapBadge gaps={gaps} />
-          </div>
-        )}
-        {fillYourself && (
-          <div className="mt-2">
-            <FillYourselfBadge />
-          </div>
-        )}
-        {followUp && (
-          <div
-            className={`mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 ${
-              followUp.kind === "due" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#EEF2FF] text-[#3730A3]"
-            }`}
-          >
-            {followUp.kind === "due" ? <AlertCircle className="h-3 w-3" aria-hidden="true" /> : <Clock className="h-3 w-3" aria-hidden="true" />}
-            {followUp.label}
-          </div>
-        )}
-        {showFollowUpDoneBadge(app) && (
-          <div className="mt-2 text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 bg-green-100 text-green-800">
-            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-            {FOLLOW_UP_DONE_LABEL}
-          </div>
-        )}
         <button
           type="button"
           // Tombol ini bukan bagian dari seretan: tekan mouse, sentuhan, dan keyboard di sini tidak boleh memulai drag.
@@ -232,6 +250,9 @@ function AppListRow({ app, gaps, fillYourself, duplicate, profileSkills, onOpen 
         <span className={`mt-1.5 inline-block px-2.5 py-0.5 rounded-full text-xs font-medium md:hidden ${config.color}`}>
           {applicationStatusLabel(app.status)}
         </span>
+        {app.company_response && (
+          <p className="mt-1 text-xs text-[#3730A3] truncate">{app.company_response}</p>
+        )}
         {app.status === "ready" && gaps && (
           <span className="mt-1.5 ml-1.5 inline-block align-top md:ml-0">
             <FormGapBadge gaps={gaps} />
@@ -265,6 +286,10 @@ export function AppsPage() {
   const [viewKey, setViewKey] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [selectedApp, setSelectedApp] = useState<AIApplicationData | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [activeDragApp, setActiveDragApp] = useState<AIApplicationData | null>(null);
   // Id kartu yang dicoba dipindah ke "Terkirim": dialog menjelaskan bahwa status itu diisi Applify (lib/boardDnd.ts).
   const [pendingSubmitted, setPendingSubmitted] = useState<string | null>(null);
@@ -525,8 +550,41 @@ export function AppsPage() {
   // dikirim (Terkirim, Perlu tindak lanjut, Sudah dibalas, dan Ditutup yang pernah dikirim), bukan hanya kolom Terkirim.
   const stats = summarizeApplications(applications);
 
+  const filteredApps = useMemo(
+    () => filterApplications(applications, { query: searchQuery, status: statusFilter }),
+    [applications, searchQuery, statusFilter],
+  );
+  const hasActiveFilter = searchQuery.trim() !== "" || statusFilter !== "all";
+
+  useEffect(() => {
+    setNoteDraft(selectedApp?.company_response ?? "");
+  }, [selectedApp?.id, selectedApp?.company_response]);
+
+  const handleSaveCompanyResponse = async (rawValue: string) => {
+    if (!selectedApp) return;
+    setSavingNote(true);
+    try {
+      const updated = await aiApplicationService.updateCompanyResponse(selectedApp.id, rawValue);
+      const nextResponse = updated?.company_response ?? (rawValue.trim() ? rawValue.trim() : undefined);
+      const nextAt = updated?.response_received_at ?? (nextResponse ? new Date().toISOString() : undefined);
+      setApplications((prev) =>
+        prev.map((a) => (a.id === selectedApp.id ? { ...a, company_response: nextResponse, response_received_at: nextAt } : a)),
+      );
+      setSelectedApp((prev) => (prev && prev.id === selectedApp.id ? { ...prev, company_response: nextResponse, response_received_at: nextAt } : prev));
+      toast.success(nextResponse ? "Hasil dan catatan lamaran tersimpan." : "Catatan lamaran dibersihkan.");
+    } catch (err) {
+      console.error("Gagal menyimpan catatan lamaran:", err);
+      toast.error("Catatan lamaran belum tersimpan. Coba lagi.");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
   // Same grouping function as the Dashboard counters (lib/dashboardStats.ts), so both screens show the same numbers.
   const groupedApps: Record<ApplicationStatus, AIApplicationData[]> = groupByStatus(applications);
+  const displayedGroupedApps: Record<ApplicationStatus, AIApplicationData[]> = hasActiveFilter
+    ? groupByStatus(filteredApps)
+    : groupedApps;
   // Lowongan yang sama dengan lebih dari satu lamaran: kartunya diberi urutan dan waktu dibuat agar bisa dibedakan.
   const duplicates = useMemo(
     () => duplicateApplications(applications.map((a) => ({ id: a.id, created_at: a.created_at, job_id: a.job_id, title: jobOf(a)?.title, company: jobOf(a)?.company }))),
@@ -626,6 +684,35 @@ export function AppsPage() {
             ))}
           </div>
 
+          {/* Cari & Saring Lamaran (UX-P7-06) */}
+          {applications.length > 0 && (
+            <div className="mb-4 flex flex-col sm:flex-row gap-2.5">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <input
+                  type="search"
+                  aria-label="Cari lamaran"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari posisi, perusahaan, atau catatan..."
+                  className="min-h-11 w-full rounded-xl border-2 border-[#999999] bg-white pl-9 pr-3 text-sm focus:border-[#0A5BE0] focus:outline-none"
+                />
+              </div>
+              <select
+                aria-label="Saring status lamaran"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="min-h-11 rounded-xl border-2 border-[#999999] bg-white px-3 text-sm focus:border-[#0A5BE0] focus:outline-none"
+              >
+                <option value="all">Semua status ({applications.length})</option>
+                <option value="active">Aktif (selain Ditutup)</option>
+                {APPLICATION_STATUSES.map((s) => (
+                  <option key={s} value={s}>{applicationStatusLabel(s)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div key={viewKey} className={direction === 'next' ? 'animate-slide-right' : 'animate-slide-left'}>
             {applications.length === 0 ? (
               <div className="text-center py-16 rounded-2xl border-2 border-dashed border-black/[10%]">
@@ -638,6 +725,17 @@ export function AppsPage() {
                 <Link to="/jobs" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0A5BE0] px-6 text-sm font-semibold text-white hover:bg-[#0256d3] transition">
                   <Search className="h-4 w-4" aria-hidden="true" /> Cari lowongan
                 </Link>
+              </div>
+            ) : filteredApps.length === 0 && hasActiveFilter ? (
+              <div className="text-center py-12 rounded-2xl border-2 border-dashed border-black/[10%] bg-white/60">
+                <p className="text-sm font-semibold">Tidak ada lamaran yang cocok dengan pencarian atau filter ini.</p>
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}
+                  className="mt-3 inline-flex min-h-11 items-center rounded-xl border-2 border-[#0A5BE0]/40 px-4 text-sm font-semibold text-[#0A5BE0] hover:bg-[#0A5BE0]/5"
+                >
+                  Tampilkan semua lamaran
+                </button>
               </div>
             ) : view === "kanban" ? (
               <>
@@ -657,8 +755,8 @@ export function AppsPage() {
                 >
                   <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-3">
                     {APPLICATION_STATUSES.map((status) => (
-                      <DroppableColumn key={status} status={status} apps={groupedApps[status]}>
-                        {groupedApps[status].map((app) => (
+                      <DroppableColumn key={status} status={status} apps={displayedGroupedApps[status]}>
+                        {displayedGroupedApps[status].map((app) => (
                           <DraggableKanbanCard key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} onOpen={() => setSelectedApp(app)} />
                         ))}
                       </DroppableColumn>
@@ -679,12 +777,12 @@ export function AppsPage() {
                 </DndContext>
                 {/* Layar sempit: papan disembunyikan, jadi daftar ditampilkan sebagai gantinya */}
                 <div className="md:hidden space-y-3">
-                  {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
+                  {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
+                {filteredApps.map((app) => <AppListRow key={app.id} app={app} gaps={formGaps[app.job_id]} fillYourself={fillYourselfFor(app)} duplicate={duplicates.get(app.id)} profileSkills={profileSkills} onOpen={() => setSelectedApp(app)} />)}
               </div>
             )}
           </div>
@@ -925,6 +1023,69 @@ export function AppsPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="rounded-xl border-2 border-[#16150F]/10 p-4 space-y-3">
+                  <h3 className="text-sm font-semibold">Hasil & Catatan Lamaran</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {OUTCOME_PRESETS.map((preset: OutcomePreset) => {
+                      const active = extractOutcomeTag(noteDraft) === preset;
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={savingNote}
+                          onClick={() => {
+                            const next = applyOutcomePreset(noteDraft, preset);
+                            setNoteDraft(next);
+                            handleSaveCompanyResponse(next);
+                          }}
+                          aria-pressed={active}
+                          className={`min-h-11 rounded-lg border-2 px-3 text-xs font-semibold transition ${
+                            active
+                              ? "border-[#0A5BE0] bg-[#0A5BE0] text-white"
+                              : "border-[#999999] bg-white text-foreground hover:border-[#0A5BE0]"
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      );
+                    })}
+                    {selectedApp.company_response && (
+                      <button
+                        type="button"
+                        disabled={savingNote}
+                        onClick={() => { setNoteDraft(""); handleSaveCompanyResponse(""); }}
+                        className="min-h-11 rounded-lg border-2 border-black/15 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        Bersihkan hasil
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    rows={2}
+                    maxLength={1000}
+                    aria-label="Catatan pribadi atau balasan perusahaan"
+                    value={noteDraft}
+                    onChange={(e) => setNoteDraft(e.target.value)}
+                    placeholder="Catat jadwal wawancara, alasan penolakan, atau balasan HRD di sini..."
+                    className="w-full rounded-xl border-2 border-[#999999] bg-white p-3 text-sm focus:border-[#0A5BE0] focus:outline-none"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedApp.response_received_at
+                        ? `Diperbarui ${new Date(selectedApp.response_received_at).toLocaleDateString("id-ID")}`
+                        : "Disimpan di lamaranmu sendiri."}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={savingNote || noteDraft.trim() === (selectedApp.company_response ?? "").trim()}
+                      onClick={() => handleSaveCompanyResponse(noteDraft)}
+                      className="min-h-11 rounded-xl bg-[#0A5BE0] px-4 text-sm font-semibold text-white hover:bg-[#0256d3] transition disabled:opacity-50"
+                    >
+                      {savingNote ? "Menyimpan..." : "Simpan catatan"}
+                    </button>
+                  </div>
+                </div>
 
                 {(selectedApp.status === "submitted" || selectedApp.status === "follow_up") &&
                   selectedApp.follow_up_scheduled &&
