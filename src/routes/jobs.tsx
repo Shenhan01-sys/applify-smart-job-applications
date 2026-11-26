@@ -5,9 +5,10 @@ import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/app/AppShell";
 import { AIJobScanner } from "@/components/AIJobScanner";
 import { AIApplyModal } from "@/components/AIApplyModal";
+import { OffPortalImportModal } from "@/components/OffPortalImportModal";
 import { JobCard, type JobData } from "@/components/JobCard";
 import { ErrorState } from "@/components/ErrorState";
-import { Search, Zap, Loader2, Brain, Target } from "lucide-react";
+import { Search, Zap, Loader2, Brain, Target, BookmarkPlus } from "lucide-react";
 import { describeError } from "@/lib/authErrors";
 import { isMockMode } from "@/lib/appConfig";
 import { buildSavedJobRow } from "@/lib/savedJob";
@@ -84,6 +85,7 @@ function JobsPage() {
     if (cari !== undefined) setSearchQuery(cari);
   }, [cari]);
   const [showScanner, setShowScanner] = useState(false);
+  const [showOffPortalModal, setShowOffPortalModal] = useState(false);
   const [extensionBannerDismissed, setExtensionBannerDismissed] = useState<boolean>(() => isExtensionBannerDismissed());
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
@@ -146,8 +148,8 @@ function JobsPage() {
         .from("jobs")
         .select("*")
         .eq("status", "active")
-        // Lowongan tanpa alamat tidak bisa dilamar; saringan di bawah membuang sisanya (host uji, sumber uji).
-        .not("external_url", "is", null)
+        // Lowongan portal butuh alamat; lowongan pribadi off-portal boleh khusus email HR (external_url null).
+        .or("external_url.not.is.null,platform_source.in.(off_portal_link,off_portal_poster,off_portal_caption)")
         // Lowongan yang tayang lebih dari JOB_MAX_AGE_DAYS hari lalu kemungkinan besar sudah ditutup di situs asal.
         .or(freshJobsFilter());
       for (const filter of jobSearchFilters(search)) query = query.or(filter);
@@ -336,17 +338,26 @@ function JobsPage() {
           </div>
         </div>
 
-        {/* Pemindai lowongan */}
-        <div className="mt-5">
+        {/* Pemindai lowongan & impor off-portal */}
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => setShowScanner(!showScanner)}
             aria-expanded={showScanner}
             aria-controls="panel-pemindai"
-            className="w-full min-h-12 rounded-xl border-2 border-[#0A5BE0] bg-[#0A5BE0]/5 text-[#0A5BE0] font-semibold text-sm hover:bg-[#0A5BE0]/10 transition flex items-center justify-center gap-2"
+            className="w-full min-h-12 rounded-xl border-2 border-[#0A5BE0] bg-[#0A5BE0]/5 text-[#0A5BE0] font-semibold text-sm hover:bg-[#0A5BE0]/10 transition flex items-center justify-center gap-2 px-4"
           >
-            <Brain className="h-4 w-4" aria-hidden="true" />
+            <Brain className="h-4 w-4 shrink-0" aria-hidden="true" />
             {showScanner ? "Tutup pencarian lowongan" : SCANNER_BUTTON_LABEL}
+          </button>
+          <button
+            type="button"
+            data-testid="open-offportal-modal"
+            onClick={() => setShowOffPortalModal(true)}
+            className="w-full min-h-12 rounded-xl border-2 border-[#16150F] bg-white text-[#16150F] font-semibold text-sm hover:bg-[#16150F]/5 transition flex items-center justify-center gap-2 px-4"
+          >
+            <BookmarkPlus className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Impor Poster / Link Off-Portal
           </button>
         </div>
 
@@ -512,6 +523,16 @@ function JobsPage() {
           )}
         </div>
       )}
+
+      {/* Modal Impor Lowongan Off-Portal (Poster, Caption, Link, QR) */}
+      <OffPortalImportModal
+        open={showOffPortalModal}
+        onOpenChange={setShowOffPortalModal}
+        onSaved={() => {
+          if (!isMockMode()) void fetchJobs(searchQuery);
+        }}
+        onApplySavedJob={handleApply}
+      />
 
       {/* Modal AI Apply */}
       {showApplyModal && selectedJob && (
