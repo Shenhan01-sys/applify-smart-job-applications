@@ -278,6 +278,14 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
       };
     }
     if (reason === "captcha_blocked") {
+      if (facts.extension_handoff === true) {
+        return {
+          label: "Tertahan CAPTCHA, dialihkan ke Ekstensi",
+          hint: "Formulir tertahan tantangan anti-bot dan langsung dialihkan ke Ekstensi Browser. Buka tab lowongan yang dibuka ekstensi, selesaikan CAPTCHA-nya, lalu klik Kirim Sekarang.",
+          tone: "manual",
+          suggestEmail: false,
+        };
+      }
       return {
         label: "Tertahan CAPTCHA / verifikasi manusia",
         hint: "Agen berhenti karena halaman menampilkan tantangan anti-bot. Selesaikan langsung di tab Chrome/Edge lalu pakai Ekstensi Browser atau kirim manual.",
