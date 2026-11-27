@@ -326,9 +326,8 @@ test.describe("Persetujuan: kartu kode keamanan", () => {
 
 test.describe("Persetujuan: log Ekstensi Browser", () => {
   const APR = "apr-x";
-  const SAVED_TEXT = "Jawaban tersimpan. Kembali ke tab lowongan lalu klik Simpan jawaban dan isi ulang di panel Applify.";
   const WHY = EXTENSION_QUESTIONS[0];
-  const SAVE_BUTTON = "Simpan jawaban";
+  const SAVE_BUTTON = "Simpan jawaban dan jalankan ekstensi lagi";
 
   /** Persetujuan yang hanya dikerjakan ekstensi: tidak ada tugas apply di antrean worker, hanya log ekstensi tanpa queue_job_id. */
   function seedExtension(backend: import("./helpers/mockBackend").MockBackend, log: Record<string, any> = extensionQuestionsLog(APR)) {
@@ -383,15 +382,14 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
     expect(backend.apiCalls.filter((c) => c.method === "POST" && !c.path.endsWith("/claim-statuses"))).toEqual([]);
   });
 
-  test("jawaban disimpan ke bank jawaban tanpa memanggil rerun worker, lalu kartu minta kembali ke tab lowongan", async ({ app, backend }) => {
+  test("jawaban disimpan ke bank jawaban lalu mengantrekan ulang ekstensi; bila rerun gagal memberi petunjuk panel", async ({ app, backend }) => {
     seedExtension(backend);
     await openApproved(app);
 
     await app.getByLabel(WHY.label).fill("Karena produknya membantu pencari kerja.");
     await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
 
-    await expect(app.getByText(SAVED_TEXT)).toBeVisible();
-    await expect(app.getByText("Agen berjalan lagi dengan jawabanmu.")).toHaveCount(0);
+    await expect(app.getByText("Agen berjalan lagi dengan jawabanmu.")).toBeVisible();
 
     expect(backend.restWrites).toHaveLength(1);
     const save = backend.restWrites[0];
@@ -403,10 +401,23 @@ test.describe("Persetujuan: log Ekstensi Browser", () => {
     // Pertanyaan opsional yang kosong dan kolom rahasia tidak ikut disimpan.
     expect(rows).toEqual([{ user_id: TEST_USER_ID, question_key: WHY.key, question_label: WHY.label, answer: "Karena produknya membantu pencari kerja." }]);
 
-    // Tidak ada tugas worker yang diantrekan ulang dan tidak ada panggilan ke ekstensi (tidak ditiru).
-    expect(backend.callsTo("POST", `/api/approvals/${APR}/rerun`)).toHaveLength(0);
+    const reruns = backend.callsTo("POST", `/api/approvals/${APR}/rerun`);
+    expect(reruns).toHaveLength(1);
+    expect(save.seq).toBeLessThan(reruns[0].seq);
     expect(backend.callsTo("POST", `/api/approvals/${APR}/mark-sent`)).toHaveLength(0);
-    expect(backend.apiCalls.filter((c) => c.method === "POST" && !c.path.endsWith("/claim-statuses"))).toEqual([]);
+  });
+
+  test("bila antre ulang ekstensi ditolak backend, jawaban tetap tersimpan dengan petunjuk isi ulang dari panel", async ({ app, backend }) => {
+    seedExtension(backend);
+    backend.override(`POST /api/approvals/${APR}/rerun`, { status: 409, body: { error: "already_queued", message: "Tugas sudah ada di antrean." } });
+    await openApproved(app);
+
+    await app.getByLabel(WHY.label).fill("Karena produknya membantu pencari kerja.");
+    await app.getByRole("button", { name: SAVE_BUTTON, exact: true }).click();
+
+    await expect(app.getByText(/Atau kembali ke tab lowongan lalu klik Isi ulang formulir di panel Applify\./)).toBeVisible();
+    expect(backend.restWrites).toHaveLength(1);
+    expect(backend.callsTo("POST", `/api/approvals/${APR}/rerun`)).toHaveLength(1);
   });
 
   test("pertanyaan wajib yang kosong ditolak di layar, tidak menyimpan; opsional boleh kosong", async ({ app, backend }) => {
