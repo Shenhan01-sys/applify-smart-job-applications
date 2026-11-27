@@ -226,10 +226,20 @@ test("parseQuestions: secret_skip dan required dibaca; required hanya bila boole
   ]);
 });
 
-test("questionsToAnswer tidak memuat kolom rahasia; questionsToSelfFill hanya kolom rahasia, dengan gerbang yang sama", () => {
+test("questionsToAnswer tidak memuat kolom rahasia; questionsToSelfFill membaca details.questions maupun details.secret_skipped", () => {
   const facts = agentLogFacts(extLog("a1", "ready", 9, { questions: [Q_TEXT, Q_SECRET] }));
   assert.deepEqual(questionsToAnswer(facts).map((q) => q.key), ["why us"]);
   assert.deepEqual(questionsToSelfFill(facts).map((q) => q.key), ["account password"]);
+  const splitFacts = agentLogFacts(
+    extLog("a1", "incomplete", 9, {
+      reason: "partly_filled",
+      remaining_required: ["Account password"],
+      questions: [Q_TEXT],
+      secret_skipped: [{ key: "account password", label: "Account password", required: true }],
+    }),
+  );
+  assert.deepEqual(questionsToAnswer(splitFacts).map((q) => q.key), ["why us"]);
+  assert.deepEqual(questionsToSelfFill(splitFacts).map((q) => q.key), ["account password"]);
   // sudah terkirim atau kirim belum terkonfirmasi: tidak ada yang perlu dijawab atau diisi lagi
   for (const status of ["success", "submit_unverified"]) {
     const sent = { ...facts, log_status: status };
@@ -313,21 +323,16 @@ test("teks: jawaban tersimpan untuk ekstensi dan label isi sendiri persis sepert
   assert.equal(SELF_FILL_LABEL, "Isi sendiri di halaman lowongan");
 });
 
-test("AgentQuestions: log ekstensi menyimpan jawaban lalu berhenti, tanpa memanggil rerun worker", () => {
+test("AgentQuestions: baik log worker maupun ekstensi menyimpan jawaban lalu memanggil rerunApproval dan onStarted", () => {
   const src = read("../src/components/AgentQuestions.tsx");
   assert.match(src, /const extension = row\?\.channel === "extension";/);
+  assert.match(src, /EXTENSION_RERUN_FALLBACK_TEXT/);
   const submit = src.slice(src.indexOf("async function submit"));
   const validate = submit.indexOf("validateAnswers(");
   const save = submit.indexOf("saveAnswers(");
-  const branch = submit.indexOf("if (extension) {");
   const rerun = submit.indexOf("rerunApproval(");
-  assert.ok(validate > 0 && validate < save && save < branch && branch < rerun, "validasi, simpan, cabang ekstensi, baru rerun");
-  // cabang ekstensi keluar sebelum rerun dan tidak memanggil onStarted atau rerunApproval
-  const branchBody = submit.slice(branch, submit.indexOf("}\n", branch));
-  assert.match(branchBody, /setSavedForExtension\(true\)/);
-  assert.match(branchBody, /return;/);
-  assert.doesNotMatch(branchBody, /rerunApproval|onStarted/);
-  assert.match(src, /EXTENSION_ANSWERS_SAVED_TEXT/);
+  const started = submit.indexOf("onStarted()");
+  assert.ok(validate > 0 && validate < save && save < rerun && rerun < started, "validasi, simpan, rerunApproval, lalu onStarted");
   // kolom rahasia: tanpa isian, hanya keterangan
   assert.match(src, /questionsToSelfFill\(row\)/);
   assert.match(src, /data-testid="agent-self-fill"/);
@@ -340,6 +345,23 @@ test("AgentQuestions: log ekstensi menyimpan jawaban lalu berhenti, tanpa memang
   assert.equal(src.match(/<UploadList questions=\{(?:uploads)\} \/>/g)?.length, 2);
   const uploadList = src.slice(src.indexOf("function UploadList"), src.indexOf("function StartedNote"));
   assert.doesNotMatch(uploadList, /<input|<textarea|<select/);
+});
+
+test("describeAgentApply: log ekstensi incomplete + partly_filled dengan remaining_required tampil sebagai Terisi sebagian, bukan berhenti sebelum kirim", () => {
+  const view = describeAgentApply({
+    status: "completed",
+    job_type: "extension_apply",
+    ...agentLogFacts(
+      extLog("a1", "incomplete", 10, {
+        reason: "partly_filled",
+        remaining_required: ["Passport Country", "Are you over the age of 18?"],
+      }),
+    ),
+  });
+  assert.equal(view.tone, "manual");
+  assert.equal(view.label, "Terisi sebagian, belum terkirim");
+  assert.match(view.hint, /Passport Country/);
+  assert.match(view.hint, /Are you over the age of 18/);
 });
 
 test("kartu status agen menampilkan ringkasan berkas hanya untuk log ekstensi", () => {

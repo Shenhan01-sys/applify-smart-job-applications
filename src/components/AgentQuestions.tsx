@@ -6,7 +6,6 @@ import {
   ANSWER_NO,
   ANSWER_YES,
   ERROR_NO_ANSWERS,
-  EXTENSION_ANSWERS_SAVED_TEXT,
   MAX_ANSWER_LENGTH,
   RERUN_STARTED_TEXT,
   SELF_FILL_LABEL,
@@ -36,7 +35,8 @@ const EXTENSION_INTRO =
 const SELF_FILL_INTRO =
   "Kolom ini berisi data rahasia, jadi tidak diisi otomatis dan tidak disimpan di Applify. Isi sendiri langsung di halaman lowongan.";
 const SUBMIT_LABEL = "Simpan jawaban dan jalankan agen lagi";
-const EXTENSION_SUBMIT_LABEL = "Simpan jawaban";
+const EXTENSION_SUBMIT_LABEL = "Simpan jawaban dan jalankan ekstensi lagi";
+const EXTENSION_RERUN_FALLBACK_TEXT = "Atau kembali ke tab lowongan lalu klik Isi ulang formulir di panel Applify.";
 const SELECT_NO_OPTIONS_HINT = "Tulis persis seperti pilihan di formulir";
 
 const INPUT_CLASS =
@@ -183,8 +183,6 @@ function QuestionForm({
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
   const [tableMissing, setTableMissing] = useState(false);
-  // Hanya log ekstensi: jawaban sudah tersimpan dan pengguna diminta kembali ke tab lowongan.
-  const [savedForExtension, setSavedForExtension] = useState(false);
 
   // Isi lebih dulu dari jawaban tersimpan (kunci pertanyaan sama), tanpa menimpa yang sudah diketik pengguna.
   useEffect(() => {
@@ -219,7 +217,6 @@ function QuestionForm({
       return next;
     });
     if (formError) setFormError("");
-    if (savedForExtension) setSavedForExtension(false);
   };
 
   const fieldId = (i: number) => `${uid}-q${i}`;
@@ -250,16 +247,11 @@ function QuestionForm({
       setBusy(false);
       return;
     }
-    // Log ekstensi tidak punya tugas worker: jangan memanggil rerun. Pengguna mengisi ulang dari panel ekstensi.
-    if (extension) {
-      setSavedForExtension(true);
-      setBusy(false);
-      return;
-    }
     try {
       await rerunApproval(approvalId);
     } catch (err) {
-      setFormError(`Jawabanmu sudah tersimpan. ${describeRerunError(err)}`);
+      const extra = extension ? ` ${EXTENSION_RERUN_FALLBACK_TEXT}` : "";
+      setFormError(`Jawabanmu sudah tersimpan. ${describeRerunError(err)}${extra}`.trim());
       setBusy(false);
       return;
     }
@@ -408,11 +400,6 @@ function QuestionForm({
             {formError}
           </p>
         )}
-        {savedForExtension && (
-          <p role="status" className="flex items-start gap-1.5 rounded-lg border-2 border-green-300 bg-green-50 p-2 text-xs font-semibold text-green-900">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {EXTENSION_ANSWERS_SAVED_TEXT}
-          </p>
-        )}
 
         <div>
           <button
@@ -422,7 +409,7 @@ function QuestionForm({
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#0A5BE0] px-4 text-sm font-semibold text-white transition hover:bg-[#0256d3] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {busy ? (extension ? "Menyimpan jawaban..." : "Menyimpan dan menjalankan agen...") : extension ? EXTENSION_SUBMIT_LABEL : SUBMIT_LABEL}
+            {busy ? (extension ? "Menyimpan dan mengantrekan ekstensi..." : "Menyimpan dan menjalankan agen...") : extension ? EXTENSION_SUBMIT_LABEL : SUBMIT_LABEL}
           </button>
           <p className="mt-1.5 text-xs text-muted-foreground">Jangan menulis kata sandi di sini.</p>
         </div>

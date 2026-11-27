@@ -237,6 +237,17 @@ function cleanRemaining(value: unknown): string[] {
 }
 
 /**
+ * Gabungkan `details.secret_skipped` (kolom rahasia yang dilaporkan backend ekstensi terpisah dari `details.questions`)
+ * supaya komponen "Isi sendiri di halaman lowongan" di `/approvals` benar-benar menampilkannya, tanpa duplikat.
+ */
+function mergeSecretSkips(questions: PendingQuestion[], rawSecret: unknown): PendingQuestion[] {
+  if (!Array.isArray(rawSecret) || rawSecret.length === 0) return questions;
+  const seen = new Set(questions.map((q) => q.key));
+  const extra = parseQuestions(rawSecret.map((item) => (isRecord(item) ? { ...item, kind: "secret_skip" } : item))).filter((q) => !seen.has(q.key));
+  return extra.length > 0 ? [...questions, ...extra] : questions;
+}
+
+/**
  * Satu baris application_logs ({ status, details, created_at }) -> fakta percobaan agen. Tidak melempar:
  * baris yang bukan objek atau tanpa details menghasilkan fakta kosong (log lama).
  */
@@ -247,6 +258,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
   const fromExtension = details.channel === "extension";
   const documents = fromExtension ? cleanDocumentsAttached(details.documents_attached) : null;
   const nextSteps = fromExtension ? cleanNextSteps(details.next_steps) : [];
+  const parsedQuestions = mergeSecretSkips(parseQuestions(details.questions), fromExtension ? details.secret_skipped : null);
   return {
     log_status: cleanText(row.status, 40),
     submit_check_verdict: check ? cleanText(check.verdict, 40) : null,
@@ -260,7 +272,7 @@ export function agentLogFacts(row: unknown): AgentLogFacts {
       : {}),
     submit_blocked: cleanText(details.submit_blocked, 40),
     remaining_required: cleanRemaining(details.remaining_required),
-    questions: parseQuestions(details.questions),
+    questions: parsedQuestions,
     ...(cleanCount(details.questions_pending) !== null ? { questions_pending: cleanCount(details.questions_pending) } : {}),
     fields_filled: cleanCount(details.fields_filled),
     filled_fields: cleanFilledFields(details.filled_fields),

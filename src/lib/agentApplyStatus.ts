@@ -224,6 +224,12 @@ function googleFormsMissingHint(labels: readonly string[]): string {
   return `Agen berhenti sebelum kirim karena formulir punya pertanyaan wajib yang belum terjawab${list}. Lamaran belum terkirim. Jawab pertanyaannya di halaman Persetujuan, atau lanjutkan di Ekstensi Browser lalu kirim sendiri.`;
 }
 
+function extensionPartialHint(remaining: readonly string[] | undefined): string {
+  const list = (remaining ?? []).filter((l) => typeof l === "string" && l.trim());
+  const shown = list.slice(0, MAX_HINT_LABELS).map((l) => clip(l, MAX_HINT_LABEL_LENGTH)).join("; ");
+  const more = list.length - MAX_HINT_LABELS;
+  return `Isian wajib yang belum terisi: ${shown}${more > 0 ? `; dan ${more} isian lain` : ""}. Jawab di kartu ini bila tersedia, atau lengkapi langsung di tab lowongan sebelum menekan kirim.`;
+}
 function partialHint(remaining: readonly string[] | undefined): string {
   const list = (remaining ?? []).filter((l) => typeof l === "string" && l.trim());
   if (list.length === 0) {
@@ -340,6 +346,14 @@ export function describeLogOutcome(facts: AgentLogFacts | null | undefined): Age
       return {
         label: "Perlu dilanjutkan di Ekstensi Browser",
         hint: "Agen berhenti sebelum mengirim dan mengalihkan formulir ke Ekstensi Browser. Klik Lanjutkan di ekstensi di bawah.",
+        tone: "manual",
+        suggestEmail: false,
+      };
+    }
+    if (reason === "partly_filled" && Array.isArray(facts.remaining_required) && facts.remaining_required.length > 0) {
+      return {
+        label: AGENT_PARTIAL_LABEL,
+        hint: extensionPartialHint(facts.remaining_required),
         tone: "manual",
         suggestEmail: false,
       };
