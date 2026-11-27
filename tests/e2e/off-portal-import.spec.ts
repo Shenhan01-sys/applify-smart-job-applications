@@ -304,7 +304,7 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await expect(preview.getByTestId("offportal-unread-note")).toHaveCount(1);
   });
 
-  test("handoff Google Forms dari worker ke ekstensi menampilkan pertanyaan wajib dan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
+  test("handoff Google Forms dari worker ke ekstensi menampilkan pertanyaan wajib tanpa blok izin ekstensi", async ({ app, backend }) => {
     const gfUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeDemo/viewform";
     backend.state.jobs = [
       jobRow("job-gf-1", {
@@ -362,16 +362,11 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await app.goto("/approvals");
     await expect(app.getByText("Product Engineer")).toBeVisible();
     await expect(app.getByText("Ceritakan proyek sistem terdistribusi tersulitmu", { exact: true })).toBeVisible();
-
-    const continueBtn = app.getByRole("button", { name: "Lanjutkan di ekstensi" });
-    await expect(continueBtn).toBeVisible();
-    await continueBtn.click();
-
-    await expect(app.getByText(/Izin diberikan/)).toBeVisible();
-    expect(backend.callsTo("POST", "/api/approvals/apr-gf-1/extension-consent")).toHaveLength(1);
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Simpan jawaban dan jalankan agen lagi/ })).toBeVisible();
   });
 
-  test("log ekstensi incomplete + partly_filled + questions_pending > 0 menampilkan tombol Lanjutkan di ekstensi", async ({ app, backend }) => {
+  test("log ekstensi incomplete + partly_filled + questions_pending > 0 menampilkan pertanyaan dan Simpan jawaban tanpa blok izin ekstensi", async ({ app, backend }) => {
     backend.state.jobs = [
       jobRow("job-js-1", {
         title: "Fullstack Developer",
@@ -427,10 +422,7 @@ test.describe("Lowongan Off-Portal (Gelombang 3)", () => {
     await app.goto("/approvals");
     await expect(app.getByText("Fullstack Developer")).toBeVisible();
     await expect(app.getByText("Bersedia kerja shift?", { exact: true })).toBeVisible();
-    const continueBtn = app.getByRole("button", { name: "Lanjutkan di ekstensi" });
-    await expect(continueBtn).toBeVisible();
-    await continueBtn.click();
-    await expect(app.getByText(/Izin diberikan/)).toBeVisible();
-    expect(backend.callsTo("POST", "/api/approvals/apr-js-1/extension-consent")).toHaveLength(1);
+    await expect(app.getByTestId("extension-consent")).toHaveCount(0);
+    await expect(app.getByRole("button", { name: /Simpan jawaban dan jalankan ekstensi lagi/ })).toBeVisible();
   });
 });

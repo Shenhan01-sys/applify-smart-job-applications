@@ -11,9 +11,8 @@
  * Fungsi murni tanpa React atau Supabase, supaya bisa dites dengan `node --test`.
  */
 
-import { classifyJobChannel } from "./applyChannel.ts";
 import { describeApiError, parseApiError } from "./apiErrors.ts";
-import { isAgentApplyActive, type AgentApplyRow } from "./agentApplyStatus.ts";
+import { type AgentApplyRow } from "./agentApplyStatus.ts";
 
 export const EXTENSION_CONSENT_TITLE = "Izinkan ekstensi browser mengisi formulir ini";
 export const EXTENSION_CONSENT_BUTTON = "Izinkan";
@@ -65,7 +64,7 @@ const HIDDEN: ExtensionConsentState = { show: false };
 
 /**
  * Percobaan agen terbaru berhenti karena pengisian harus dialihkan ke Ekstensi Browser (Google Form dengan pertanyaan
- * wajib atau unggah berkas, login, CAPTCHA). Dipakai blok "Lanjutkan di ekstensi" dan tindakan di kartu Persetujuan.
+ * wajib atau unggah berkas, login, CAPTCHA). Dipakai tindakan di kartu Persetujuan.
  */
 export function isExtensionHandoffRow(row: Pick<AgentApplyRow, "extension_handoff" | "reason"> | null | undefined): boolean {
   return (
@@ -73,46 +72,12 @@ export function isExtensionHandoffRow(row: Pick<AgentApplyRow, "extension_handof
   );
 }
 
-/** Log menunjukkan lamaran sudah dikirim atau pengiriman sedang diurus: izin tidak relevan lagi. */
-function alreadySentOrClaimed(row: AgentApplyRow | null | undefined, submitted: boolean): boolean {
-  if (submitted) return true;
-  if (!row) return false;
-  if (row.log_status === "success" || row.log_status === "submit_unverified") return true;
-  return row.claim_state === "submitted" || row.claim_state === "in_progress" || row.claim_state === "locked_stuck";
-}
-
 /**
- * Apakah blok "Izinkan ekstensi" tampil untuk satu persetujuan. Syarat umum: disetujui, belum terkirim, dan tidak
- * ada tugas apply atau extension_apply yang sedang aktif. Lalu salah satu alasan:
- *   - flagged: jawaban approve meminta izin;
- *   - login_needed: percobaan terakhir berhenti karena situs meminta login atau mengalihkan ke domain lain
- *     (auth_required, external_redirect) dan situsnya didukung ekstensi;
- *   - not_started: belum ada tugas sama sekali dan situsnya didukung ekstensi (lowongan portal login, situs karier).
+ * Blok izin ekstensi ("Izinkan" / "Lanjutkan di ekstensi" + "Selalu izinkan tanpa bertanya") tidak lagi ditampilkan
+ * karena pengalihan dan antrean Ekstensi Browser berjalan otomatis.
  */
-export function extensionConsentState(input: ExtensionConsentInput): ExtensionConsentState {
-  if (input.approvalStatus !== "approved") return HIDDEN;
-  const submitted = input.submitted === true;
-  if (alreadySentOrClaimed(input.row, submitted)) return HIDDEN;
-  if (isAgentApplyActive(input.row)) return HIDDEN;
-
-  // Jawaban approve meminta izin dan belum ada tugas apa pun: izin dulu. Begitu ada tugas (atau hasilnya), yang tampil status tugas itu.
-  if (input.consentRequired === true && !input.row?.status) return { show: true, reason: "flagged" };
-
-  const channel = classifyJobChannel({ platform: input.platform, external_url: input.jobUrl });
-  const eligible = channel.extensionSupported && !channel.manualOnly;
-  if (!eligible) return HIDDEN;
-
-  const row = input.row;
-  const pendingQuestions = Math.max(row?.questions_pending ?? 0, row?.questions?.length ?? 0);
-  if (isExtensionHandoffRow(row) || (row?.log_status === "incomplete" && row.reason === "partly_filled" && pendingQuestions > 0)) {
-    return { show: true, reason: "handoff_needed" };
-  }
-  if (row?.log_status === "incomplete" && (row.reason === "auth_required" || row.reason === "external_redirect")) {
-    return { show: true, reason: "login_needed" };
-  }
-  // "Belum ada tugas" hanya berarti bila status agen sudah terbaca; tugas yang tidak terbaca tidak boleh ditebak.
-  // Lowongan yang dijalankan agen server dulu (autoWorkerSupported, mis. Google Forms publik) tidak meminta izin ekstensi sebelum worker mencoba.
-  if (input.agentKnown && !channel.autoWorkerSupported && (!row || !row.status)) return { show: true, reason: "not_started" };
+export function extensionConsentState(_input: ExtensionConsentInput): ExtensionConsentState {
+  // Ekstensi Browser dipakai otomatis tanpa meminta persetujuan/izin berulang di kartu Persetujuan.
   return HIDDEN;
 }
 

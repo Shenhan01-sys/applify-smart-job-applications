@@ -71,12 +71,11 @@ test("Gelombang 4 Google Forms handoff: sebelum worker jalan tidak meminta izin 
     row: { ...logRow, status: "completed", job_type: "apply" },
     agentKnown: true,
   });
-  assert.equal(after.show, true);
-  assert.equal(after.reason, "handoff_needed");
+  assert.equal(after.show, false);
   assert.equal(EXTENSION_HANDOFF_BUTTON, "Lanjutkan di ekstensi");
 });
 
-test("Gelombang 4 ekstensi partly_filled + questions_pending > 0 memunculkan tombol 'Lanjutkan di ekstensi'", () => {
+test("Gelombang 4 ekstensi partly_filled + questions_pending > 0 tidak lagi memunculkan blok izin ekstensi", () => {
   const jobUrl = "https://id.jobstreet.com/id/job/999";
   const extLog = agentLogFacts({
     status: "incomplete",
@@ -99,9 +98,9 @@ test("Gelombang 4 ekstensi partly_filled + questions_pending > 0 memunculkan tom
     row: { ...extLog, status: "completed", job_type: "extension_apply" },
     agentKnown: true,
   });
-  assert.deepEqual(stateWithPending, { show: true, reason: "handoff_needed" });
+  assert.deepEqual(stateWithPending, { show: false });
 
-  // Bila questions_pending === 0 dan questions kosong: tidak memunculkan handoff
+  // Bila questions_pending === 0 dan questions kosong: tetap tidak memunculkan blok izin
   const stateNoPending = extensionConsentState({
     approvalStatus: "approved",
     platform: "jobstreet",

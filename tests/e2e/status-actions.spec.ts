@@ -441,7 +441,7 @@ test.describe("Persetujuan: Google Form yang dialihkan ke Ekstensi Browser", () 
     await expect(card.getByTestId("action-refresh")).toBeVisible();
   });
 
-  test("pengalihan belum diantre: alasan dan pertanyaan tampil, dengan Lanjutkan di ekstensi, Buka formulir, Sudah terkirim, dan Tutup", async ({ app, backend }) => {
+  test("pengalihan belum diantre: alasan dan pertanyaan tampil, dengan Buka formulir, Sudah terkirim, dan Tutup tanpa blok izin", async ({ app, backend }) => {
     seedGoogleFormHandoff(backend, null);
     await app.goto("/approvals");
 
@@ -450,7 +450,7 @@ test.describe("Persetujuan: Google Form yang dialihkan ke Ekstensi Browser", () 
     await expect(card.getByText(/pertanyaan wajib yang belum terjawab: Posisi yang dilamar\./)).toBeVisible();
     await expect(card.getByText("Posisi yang dilamar").first()).toBeVisible();
     await expect(card.getByText(/belum ada di daftar situs/)).toHaveCount(0);
-    await expect(card.getByRole("button", { name: /Lanjutkan di ekstensi/ }).first()).toBeVisible();
+    await expect(card.getByTestId("extension-consent")).toHaveCount(0);
     await expect(card.getByTestId("action-open_form")).toHaveAttribute("href", FORM_URL);
     await expect(card.getByTestId("action-confirm_sent")).toHaveText(/Sudah terkirim/);
     await expect(card.getByTestId("action-close")).toHaveText(/Tutup/);

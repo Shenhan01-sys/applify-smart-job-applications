@@ -125,12 +125,12 @@ test("konteks pengalihan hanya dibawa untuk tugas ekstensi yang masih aktif, dan
   assert.deepEqual(only.questions?.map((q) => q.label), ["Posisi yang dilamar"]);
 });
 
-test("pengalihan belum diantre: tindakan Sudah terkirim, Buka formulir, dan Tutup tersedia, dan 'Lanjutkan di ekstensi' muncul", () => {
+test("pengalihan belum diantre: tindakan Sudah terkirim, Buka formulir, Lanjutkan di ekstensi (tanpa blok izin), dan Tutup tersedia", () => {
   const row = buildAgentApplyRows([applyJob], [handoffLog("q-apply")], [])["apr-gf"];
   assert.equal(isExtensionHandoffRow(row), true);
   const actions = panelActions({ stage: "needs_action", approvalStatus: "approved", row, jobUrl: FORM_URL, platform: "google_forms" });
   for (const id of ["confirm_sent", "open_form", "close"] as const) assert.ok(actions.includes(id), `${id} ada: ${actions.join(",")}`);
-  assert.equal(extensionConsentState({ approvalStatus: "approved", platform: "google_forms", jobUrl: FORM_URL, row, agentKnown: true }).reason, "handoff_needed");
+  assert.equal(extensionConsentState({ approvalStatus: "approved", platform: "google_forms", jobUrl: FORM_URL, row, agentKnown: true }).show, false);
   // Selama tugas ekstensi aktif, tidak ada tombol yang menimpa ekstensi: hanya Muat ulang dan Buka formulir.
   const active = buildAgentApplyRows([applyJob, extensionJob("pending")], [handoffLog("q-apply")], [])["apr-gf"];
   assert.deepEqual(panelActions({ stage: "processing", approvalStatus: "approved", row: active, jobUrl: FORM_URL, platform: "google_forms" }), ["refresh", "open_form"]);

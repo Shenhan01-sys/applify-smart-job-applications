@@ -37,67 +37,27 @@ test("teks blok izin: judul, tombol, centang, dan penjelasan sesuai permintaan p
   assert.match(EXTENSION_CONSENT_EXPLAIN, /menekan Kirim/);
 });
 
-test("izin tampil: disetujui, situs portal login, belum ada tugas, belum terkirim", () => {
-  assert.deepEqual(extensionConsentState(base()), { show: true, reason: "not_started" });
-  // situs ATS terdaftar di EXTENSION_HOST_DOMAINS didukung ekstensi; host luar manifest tidak (J5-02)
-  assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://acme.teamtailor.com/jobs/1" })).show, true);
+test("izin ekstensi selalu tersembunyi karena ekstensi dijalankan otomatis tanpa jeda persetujuan", () => {
+  assert.deepEqual(extensionConsentState(base()), { show: false });
+  assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://acme.teamtailor.com/jobs/1" })).show, false);
   assert.equal(extensionConsentState(base({ platform: "other", jobUrl: "https://karier.perusahaan.test/lowongan/1" })).show, false);
-  const notExt = describeConsentError(new ApiError(409, JSON.stringify({ code: "not_extension_channel" })));
-  assert.equal(notExt.alreadyActive, false);
-  assert.match(notExt.message, /belum didukung Ekstensi Browser/i);
-});
-
-test("izin tersembunyi: belum disetujui, LinkedIn (manual saja), tanpa tautan, atau sudah terkirim", () => {
   assert.equal(extensionConsentState(base({ approvalStatus: "pending" })).show, false);
   assert.equal(extensionConsentState(base({ approvalStatus: "rejected" })).show, false);
   assert.equal(extensionConsentState(base({ platform: "linkedin", jobUrl: "https://www.linkedin.com/jobs/view/999" })).show, false);
   assert.equal(extensionConsentState(base({ platform: "other", jobUrl: null })).show, false);
   assert.equal(extensionConsentState(base({ submitted: true })).show, false);
-  assert.equal(extensionConsentState(base({ row: { status: "completed", log_status: "success" } })).show, false);
-  assert.equal(extensionConsentState(base({ row: { status: "completed", log_status: "submit_unverified" } })).show, false);
-  assert.equal(extensionConsentState(base({ row: { status: "completed", claim_state: "submitted" } })).show, false);
-});
-
-test("izin tersembunyi selama tugas apply atau extension_apply masih aktif", () => {
-  for (const jobType of ["apply", "extension_apply"]) {
-    for (const status of ["pending", "processing"]) {
-      assert.equal(extensionConsentState(base({ row: { status, job_type: jobType } })).show, false, `${jobType} ${status}`);
-      assert.equal(extensionConsentState(base({ row: { status, job_type: jobType }, consentRequired: true })).show, false, `${jobType} ${status} + flag`);
-    }
+  assert.equal(extensionConsentState(base({ consentRequired: true })).show, false);
+  assert.equal(extensionConsentState(base({ agentKnown: false, consentRequired: true })).show, false);
+  for (const reason of ["auth_required", "external_redirect", "captcha_blocked", "partly_filled"]) {
+    assert.equal(
+      extensionConsentState(base({ row: { status: "completed", log_status: "incomplete", reason, fields_filled: 0, questions_pending: 2 } })).show,
+      false,
+      reason,
+    );
   }
-  // menunggu login di tab ekstensi juga aktif
-  assert.equal(
-    extensionConsentState(base({ row: { status: "processing", job_type: "extension_apply", log_status: "awaiting_login", awaiting_until: new Date(Date.now() + 60_000).toISOString() } })).show,
-    false,
-  );
-});
-
-test("jawaban approve meminta izin: blok tampil walau situsnya belum dikenali, selama belum ada tugas", () => {
-  assert.deepEqual(extensionConsentState(base({ platform: "other", jobUrl: null, consentRequired: true })), { show: true, reason: "flagged" });
-  // status agen belum terbaca: bendera dari jawaban approve tetap dipercaya
-  assert.equal(extensionConsentState(base({ agentKnown: false, consentRequired: true })).reason, "flagged");
-  // sudah ada hasil tugas: yang tampil status tugasnya, bukan izin lagi
-  assert.equal(extensionConsentState(base({ consentRequired: true, row: { status: "completed", fields_filled: 7 } })).show, false);
-  // tetap tidak tampil untuk persetujuan yang belum disetujui
-  assert.equal(extensionConsentState(base({ approvalStatus: "pending", consentRequired: true })).show, false);
-});
-
-test("percobaan berhenti karena login atau pengalihan domain: izin ditawarkan lagi untuk situs yang didukung ekstensi", () => {
-  for (const reason of ["auth_required", "external_redirect"]) {
-    const state = extensionConsentState(base({ row: { status: "completed", log_status: "incomplete", reason, fields_filled: 0 } }));
-    assert.deepEqual(state, { show: true, reason: "login_needed" }, reason);
-  }
-  // alasan lain (CAPTCHA, validasi) bukan urusan izin
-  assert.equal(extensionConsentState(base({ row: { status: "completed", log_status: "incomplete", reason: "captcha_blocked" } })).show, false);
-  // LinkedIn tidak pernah didukung ekstensi
-  assert.equal(
-    extensionConsentState(base({ platform: "linkedin", jobUrl: "https://www.linkedin.com/jobs/view/1", row: { status: "completed", log_status: "incomplete", reason: "auth_required" } })).show,
-    false,
-  );
-});
-
-test("status agen belum terbaca: 'belum ada tugas' tidak ditebak, blok izin tidak tampil", () => {
-  assert.equal(extensionConsentState(base({ agentKnown: false })).show, false);
+  const notExt = describeConsentError(new ApiError(409, JSON.stringify({ code: "not_extension_channel" })));
+  assert.equal(notExt.alreadyActive, false);
+  assert.match(notExt.message, /belum didukung Ekstensi Browser/i);
 });
 
 test("jawaban approve: hanya extension_consent_required true yang dihitung; badan POST memuat always hanya bila dicentang", () => {
