@@ -14,7 +14,7 @@ export const EXTENSION_GUIDE_LINK_LABEL = "Baca panduan pasang ekstensi";
 export const EXTENSION_DOWNLOAD_HREF = "/downloads/applify-extension-uat.zip";
 export const EXTENSION_DOWNLOAD_FILENAME = "applify-extension-uat.zip";
 export const EXTENSION_DOWNLOAD_VERSION = "0.1.3";
-export const EXTENSION_DOWNLOAD_SHA256 = "60c045cd25dbf4507d10725119e543b60a854057fbcc6eaff64979e07d40c22f";
+export const EXTENSION_DOWNLOAD_SHA256 = "d8fe90fc0edfd5d0775220905cc101a47db759782ff11846a64f2bf21a8fb48b";
 export const EXTENSION_DOWNLOAD_LABEL = "Unduh ekstensi (zip)";
 /** ID tetap dari `key` di manifest paket UAT, sama di semua laptop. */
 export const EXTENSION_UAT_ID = "ikojbhmbbaignmlkcdailnbnekneplkj";
