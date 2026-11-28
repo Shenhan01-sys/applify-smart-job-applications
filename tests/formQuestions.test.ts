@@ -131,11 +131,11 @@ test("parseQuestions: jenis tak dikenal jadi teks, pilihan hanya untuk select da
   assert.equal("options" in out[5], false);
 });
 
-test("parseQuestions: label paling 400 karakter, pilihan paling 30 dan masing-masing paling 120", () => {
-  const options = [...Array.from({ length: 40 }, (_, i) => `Pilihan ${i}`), "x".repeat(121)];
+test("parseQuestions: label paling 400 karakter, pilihan paling 100 dan masing-masing paling 120", () => {
+  const options = [...Array.from({ length: 110 }, (_, i) => `Pilihan ${i}`), "x".repeat(121)];
   const [q] = parseQuestions({ questions: [{ key: "k", label: "L".repeat(900), kind: "select", options: ["z".repeat(121), ...options] }] });
   assert.equal(q.label.length, 400);
-  assert.equal(q.options?.length, 30);
+  assert.equal(q.options?.length, 100);
   assert.equal(q.options?.[0], "Pilihan 0");
   assert.ok(q.options?.every((o) => o.length <= 120));
   const long = "p".repeat(120);
@@ -144,12 +144,12 @@ test("parseQuestions: label paling 400 karakter, pilihan paling 30 dan masing-ma
   assert.equal(parseQuestions({ questions: [{ key: "k", label: "L", kind: "radio", options: ["q".repeat(121)] }] })[0].options, undefined);
 });
 
-test("parseQuestions: paling banyak 20 pertanyaan dan daftar langsung juga diterima", () => {
-  const list = Array.from({ length: 35 }, (_, i) => ({ key: `k${i}`, label: `Label ${i}`, kind: "text" }));
+test("parseQuestions: hingga 200 pertanyaan dan daftar langsung juga diterima", () => {
+  const list = Array.from({ length: 215 }, (_, i) => ({ key: `k${i}`, label: `Label ${i}`, kind: "text" }));
   const out = parseQuestions({ questions: list });
-  assert.equal(out.length, 20);
-  assert.equal(out[19].key, "k19");
-  assert.equal(parseQuestions(list).length, 20);
+  assert.equal(out.length, 200);
+  assert.equal(out[199].key, "k199");
+  assert.equal(parseQuestions(list).length, 200);
 });
 
 test("parseQuestions: kunci dipangkas ke 200 karakter", () => {

@@ -40,11 +40,11 @@ export type PendingQuestion = {
   context?: string;
 };
 
-export const MAX_QUESTIONS = 20;
+export const MAX_QUESTIONS = 200;
 export const MAX_KEY_LENGTH = 200;
 export const MAX_LABEL_LENGTH = 400;
 export const MAX_CONTEXT_LENGTH = 260;
-export const MAX_OPTIONS = 30;
+export const MAX_OPTIONS = 100;
 export const MAX_OPTION_LENGTH = 120;
 export const MAX_ANSWER_LENGTH = 2000;
 
